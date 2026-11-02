@@ -294,8 +294,13 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
 
         // Asked outside the registry's lock, and of each job: a play session id is the client's to
         // send, so two users' jobs can carry the same one.
-        foreach (var job in jobs.Where(isCallers))
+        foreach (var job in jobs)
         {
+            if (!isCallers(job))
+            {
+                continue;
+            }
+
             if (isUserPaused.HasValue)
             {
                 _logger.LogDebug("Setting job.IsUserPaused to {0}. jobId: {1}", isUserPaused, job.Id);
