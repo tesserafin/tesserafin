@@ -1820,6 +1820,59 @@
       "note": "What DELETE Videos/ActiveEncodings did: the caller's own job first and everybody's was stopped, somebody else's first and the caller could not stop its own."
     },
     {
+      "id": "ping1-route-pings-every-job",
+      "stage": "PING1",
+      "status": "NEW",
+      "expect": "RED",
+      "property": "the ping route keeps alive only the jobs the caller owns",
+      "timeoutSeconds": 1800,
+      "gate": {
+        "kind": "dotnet-test",
+        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
+        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.Controllers.PlaybackPingOwnershipTests",
+        "expectedTests": [
+          "Tesserafin.Api.Tests.Controllers.PlaybackPingOwnershipTests.ThePingRoute_KeepsAliveOnlyTheCallersJob",
+          "Tesserafin.Api.Tests.Controllers.PlaybackPingOwnershipTests.ThePingRoute_AsksTheAuthorizerAboutEachJobsOwner"
+        ]
+      },
+      "mutations": [
+        {
+          "file": "Tesserafin.Api/Controllers/PlaystateController.cs",
+          "find": "        _transcodeManager.PingTranscodingJobs(playSessionId, null, job => _jobOwnership.OwnsJob(HttpContext, job.UserId, job.OwnerDeviceId));",
+          "replace": "        _transcodeManager.PingTranscodingJob(playSessionId, null);",
+          "count": 1
+        }
+      ],
+      "note": "What POST /Sessions/Playing/Ping did: every job under the named play session id was kept alive, whoever owned it."
+    },
+    {
+      "id": "ping1-progress-pings-every-job",
+      "stage": "PING1",
+      "status": "NEW",
+      "expect": "RED",
+      "property": "a progress report keeps alive and pauses only the reporter's jobs",
+      "timeoutSeconds": 1800,
+      "gate": {
+        "kind": "dotnet-test",
+        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
+        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.Controllers.PlaybackPingOwnershipTests",
+        "expectedTests": [
+          "Tesserafin.Api.Tests.Controllers.PlaybackPingOwnershipTests.ThePingRoute_KeepsAliveOnlyTheCallersJob",
+          "Tesserafin.Api.Tests.Controllers.PlaybackPingOwnershipTests.AProgressReport_KeepsAliveAndPausesOnlyTheReportersJob",
+          "Tesserafin.Api.Tests.Controllers.PlaybackPingOwnershipTests.AProgressReport_WithoutAUser_PingsNoJob"
+        ]
+      },
+      "mutations": [
+        {
+          "file": "Tesserafin.MediaEncoding/Transcoding/TranscodeManager.cs",
+          "find": "            if (!isCallers(job))",
+          "replace": "            if (!isCallers(job) && job is null)",
+          "count": 1
+        }
+      ],
+      "note": "The job filter itself removed: every job of the play session is pinged and paused by any caller."
+    },
+    {
       "id": "p2r4-stop-selects-again-by-play-session",
       "stage": "P2R4",
       "status": "NEW",
