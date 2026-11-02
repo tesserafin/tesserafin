@@ -240,7 +240,9 @@ public class PlaystateController : BaseTesserafinApiController
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public ActionResult PingPlaybackSession([FromQuery, Required] string playSessionId)
     {
-        _transcodeManager.PingTranscodingJob(playSessionId, null);
+        // Only the caller's jobs: a play session id is the client's to send, and another user's
+        // transcode under the same one must still reach its idle timeout.
+        _transcodeManager.PingTranscodingJobs(playSessionId, null, job => _jobOwnership.OwnsJob(HttpContext, job.UserId, job.OwnerDeviceId));
         return NoContent();
     }
 

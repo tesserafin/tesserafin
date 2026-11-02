@@ -4,7 +4,8 @@ using System.Threading.Tasks;
 namespace Tesserafin.Controller.MediaEncoding;
 
 /// <summary>
-/// Reaches <see cref="ITranscodeOutputStop"/> and <see cref="ITranscodeOwnedStop"/> from the
+/// Reaches <see cref="ITranscodeOutputStop"/>, <see cref="ITranscodeOwnedStop"/> and
+/// <see cref="ITranscodeOwnedPing"/> from the
 /// <see cref="ITranscodeManager"/> a caller already holds.
 /// </summary>
 public static class TranscodeOutputStopExtensions
@@ -43,4 +44,25 @@ public static class TranscodeOutputStopExtensions
         => transcodeManager is ITranscodeOwnedStop stop
             ? stop.StopTranscodingJobs(playSessionId, isCallers)
             : throw new NotSupportedException("This transcode manager cannot stop a play session's jobs by their owner.");
+
+    /// <summary>
+    /// Pings every job of <paramref name="playSessionId"/> that <paramref name="isCallers"/> accepts.
+    /// </summary>
+    /// <param name="transcodeManager">The transcode manager.</param>
+    /// <param name="playSessionId">The play session id the caller named.</param>
+    /// <param name="isUserPaused">Whether the caller reports the playback as paused, or null to leave it.</param>
+    /// <param name="isCallers">Whether a job is the caller's to ping.</param>
+    /// <exception cref="NotSupportedException">
+    /// The manager cannot ping jobs by their owner. Not a silent fallback to pinging every job of
+    /// the play session: that is the behaviour this method exists to replace.
+    /// </exception>
+    public static void PingTranscodingJobs(this ITranscodeManager transcodeManager, string playSessionId, bool? isUserPaused, Func<TranscodingJob, bool> isCallers)
+    {
+        if (transcodeManager is not ITranscodeOwnedPing ping)
+        {
+            throw new NotSupportedException("This transcode manager cannot ping a play session's jobs by their owner.");
+        }
+
+        ping.PingTranscodingJobs(playSessionId, isUserPaused, isCallers);
+    }
 }

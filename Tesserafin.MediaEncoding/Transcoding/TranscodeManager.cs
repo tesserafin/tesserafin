@@ -33,7 +33,7 @@ using Tesserafin.Model.Session;
 namespace Tesserafin.MediaEncoding.Transcoding;
 
 /// <inheritdoc cref="ITranscodeManager"/>
-public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegistry, IProgressiveJobBindingRegistry, IHardwareTranscodeFallback, ITranscodeOutputStop, ITranscodeOwnedStop, IDisposable
+public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegistry, IProgressiveJobBindingRegistry, IHardwareTranscodeFallback, ITranscodeOutputStop, ITranscodeOwnedStop, ITranscodeOwnedPing, IDisposable
 {
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<TranscodeManager> _logger;
@@ -266,8 +266,13 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
 
     /// <inheritdoc />
     public void PingTranscodingJob(string playSessionId, bool? isUserPaused)
+        => PingTranscodingJobs(playSessionId, isUserPaused, static _ => true);
+
+    /// <inheritdoc />
+    public void PingTranscodingJobs(string playSessionId, bool? isUserPaused, Func<TranscodingJob, bool> isCallers)
     {
         ArgumentException.ThrowIfNullOrEmpty(playSessionId);
+        ArgumentNullException.ThrowIfNull(isCallers);
 
         // Issue #42: named placeholders, so RequestId/PlaySessionId land as structured properties
         // rather than being baked into the message text. RequestId is the id of the HTTP ping that
@@ -287,7 +292,9 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
             jobs = _activeTranscodingJobs.Where(j => string.Equals(playSessionId, j.PlaySessionId, StringComparison.OrdinalIgnoreCase)).ToList();
         }
 
-        foreach (var job in jobs)
+        // Asked outside the registry's lock, and of each job: a play session id is the client's to
+        // send, so two users' jobs can carry the same one.
+        foreach (var job in jobs.Where(isCallers))
         {
             if (isUserPaused.HasValue)
             {
@@ -1396,7 +1403,10 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
     {
         if (!string.IsNullOrWhiteSpace(e.PlaySessionId))
         {
-            PingTranscodingJob(e.PlaySessionId, e.IsPaused);
+            // The report's session is the reporter's own (the playstate routes overwrite whatever
+            // session id the body named), so only that user's jobs are kept alive or paused by it.
+            var reporter = e.Session?.UserId ?? Guid.Empty;
+            PingTranscodingJobs(e.PlaySessionId, e.IsPaused, job => !reporter.IsEmpty() && reporter.Equals(job.UserId));
         }
     }
 
