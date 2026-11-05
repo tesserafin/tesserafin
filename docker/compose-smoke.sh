@@ -66,6 +66,9 @@ mkdir -p "${WORK}/media"
 echo "hello-tesserafin" > "${WORK}/media/probe.txt"
 # Map the requested host port without editing the tracked compose file.
 printf 'TESSERAFIN_MEDIA=%s/media\n' "${WORK}" > "${WORK}/.env"
+# docker-compose.yml has no default image until the 1.0.0 launch; pass one through.
+[[ -n "${TESSERAFIN_IMAGE:-}" ]] || { echo "compose-smoke: set TESSERAFIN_IMAGE (no public default image)" >&2; exit 2; }
+printf 'TESSERAFIN_IMAGE=%s\n' "${TESSERAFIN_IMAGE}" >> "${WORK}/.env"
 [[ "${PORT}" != "8096" ]] && cat > "${WORK}/docker-compose.override.yml" <<YAML
 services:
   tesserafin:

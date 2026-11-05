@@ -1,5 +1,9 @@
 # A6 — Image versioning, channels and the upgrade contract
 
+> **Withdrawn (2026-11-05).** `ghcr.io/tesserafin/server:1.0.0`, used as the example
+> throughout, is the pre-launch `0.1.0` and is no longer published
+> ([versioning policy §1](../versioning-policy.md)). The procedure is unchanged.
+
 Issue [#92](https://github.com/tesserafin/tesserafin/issues/92). This is
 both the operator-facing upgrade contract and the A6 implementation note: the
 audit that preceded the change is recorded in the last section.

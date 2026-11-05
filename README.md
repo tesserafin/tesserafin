@@ -67,8 +67,10 @@ verification steps and the limitations of each path; building from source is
 | Find a guide or an engineering reference | [Documentation index](docs/README.md) |
 | Report a problem | [Support](docs/support.md) |
 
-The public container package is `ghcr.io/tesserafin/server`. Private
-build packages and inherited development images are not installation fallbacks.
+No public container is published until the `1.0.0` launch; the former public
+image `ghcr.io/tesserafin/server:1.0.0` (pre-launch `0.1.0`) was withdrawn on
+2026-11-05. Private build packages and inherited development images are not
+installation fallbacks.
 No mutable public image channel is published.
 
 **Tried an installation on your own machine?**

@@ -17,11 +17,12 @@ The withdrawn pre-launch build `0.2.0` was labelled `v1.1.0` while its packages 
 
 Follow [the five-step Docker/NAS guide](container/A3-guided-install.md). Save the
 repository's [Compose file](../docker-compose.yml) and copy
-[`.env.example`](../.env.example) to configure media paths. The default image is:
+[`.env.example`](../.env.example) to configure media paths.
 
-```text
-ghcr.io/tesserafin/server@sha256:bc7587bc7d99b40d77770046d49a2931ff8162b6d1df3da8d3f108b7677d7dc3
-```
+**No public image is currently published.** The former default,
+`ghcr.io/tesserafin/server@sha256:bc7587bc7d99…` (`1.0.0`, now the pre-launch `0.1.0`), was
+withdrawn on 2026-11-05. `docker-compose.yml` has no default image until the
+`1.0.0` launch; set `TESSERAFIN_IMAGE` in `.env`.
 
 The release package is public; no GHCR login or GitHub token is required. The
 similarly named private `tesserafin-server` build package, web-assets package

@@ -12,7 +12,13 @@
 # host folders should use the documented bind-mount example instead (see the guide).
 services:
   tesserafin:
-    # IMMUTABLE by default, and deliberately a DIGEST (#92 / [A6]). Never
+    # NO DEFAULT IMAGE until the 1.0.0 launch. The public image this file used to
+    # default to, `ghcr.io/tesserafin/server@sha256:bc7587bc7d99…`, was
+    # withdrawn on 2026-11-05 with the pre-launch releases (it is the pre-launch `0.1.0`, see docs/versioning-policy.md §1).
+    # Set TESSERAFIN_IMAGE to an immutable reference (digest or `-dev.` tag) you
+    # have access to; `docker compose` refuses to start without it.
+    #
+    # Historical note, kept for the record. IMMUTABLE by default, and deliberately a DIGEST (#92 / [A6]). Never
     # `latest`, `preview`, or a moving major/minor tag: with one of those a
     # `docker compose pull` could change your version — possibly across a schema
     # migration — at a moment you did not choose. A digest cannot be re-pointed.
@@ -47,7 +53,7 @@ services:
     # Override with `TESSERAFIN_IMAGE=... docker compose up -d` or a .env file.
     # Moving channels are an explicit opt-in; the risks and the upgrade procedure
     # are in docs/container/A6-versioning-and-upgrades.md.
-    image: ${TESSERAFIN_IMAGE:-ghcr.io/tesserafin/server@sha256:bc7587bc7d99b40d77770046d49a2931ff8162b6d1df3da8d3f108b7677d7dc3}
+    image: ${TESSERAFIN_IMAGE:?set TESSERAFIN_IMAGE - no public Tesserafin image is published until the 1.0.0 launch}
     container_name: tesserafin
     # The image already runs as the fixed non-root identity 10000:10000; stated
     # here so the security posture is visible in the compose file itself.

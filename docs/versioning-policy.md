@@ -89,7 +89,7 @@ claim over upstream plugin binaries, and it does not silently accept them either
 
 | Package | Role | Visibility |
 |---|---|---|
-| `ghcr.io/tesserafin/server` | **public release package** — the only thing a user installs from; contains released manifests and nothing else | public |
+| `ghcr.io/tesserafin/server` | **public release package** — the only thing a user installs from; contains released manifests and nothing else. Its only tag, `1.0.0` (pre-launch `0.1.0`), was withdrawn 2026-11-05; the package returns with the launch | withdrawn (2026-11-05) |
 | `ghcr.io/tesserafin/tesserafin` | **pre-v1 server archive** — every inherited `12.0.0-dev.*` image | private |
 | `ghcr.io/tesserafin/tesserafin-server` | **canonical v1+ build package** — every immutable CI build, including the ones that are never released | private |
 | `ghcr.io/tesserafin/tesserafin-web-assets` | web-assets package, spanning both epochs | private |

@@ -16,6 +16,11 @@ Related docs:
 
 ## The image
 
+> **Withdrawn (2026-11-05).** The image this guide names, `ghcr.io/tesserafin/server:1.0.0`,
+> is the pre-launch `0.1.0` and is no longer published. The guide is kept as
+> the procedure for the `1.0.0` launch image; until then `docker-compose.yml`
+> needs `TESSERAFIN_IMAGE`.
+
 > **Epoch note.** Tesserafin public SemVer begins at `1.0.0`, published to the
 > public release package `ghcr.io/tesserafin/server` — see
 > [`../versioning-policy.md`](../versioning-policy.md).

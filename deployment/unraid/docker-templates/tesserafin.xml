@@ -23,7 +23,11 @@
   <Support>https://github.com/tesserafin/tesserafin/issues</Support>
   <Project>https://github.com/tesserafin/tesserafin</Project>
   <GitHub>https://github.com/tesserafin/tesserafin</GitHub>
-  <!-- The Tesserafin Server 1.0 development baseline, built from commit
+  <!-- SUSPENDED until the 1.0.0 launch: the image below was withdrawn on 2026-11-05 with the pre-launch releases (it is the pre-launch 0.1.0, see docs/versioning-policy.md §1),
+       so this template cannot pull it. Do not publish this template to a
+       Community Applications feed before the launch.
+
+       Historical note: the Tesserafin Server 1.0 development baseline, built from commit
        6227dbef66c631081e3179a521561b32b94dac59 and bundling Tesserafin Web
        a9a362eec764a9fe3fa6ba9b4a7dd7473677e35a. Pinned by manifest digest so the
        reference cannot be re-pointed; the equivalent immutable tag is
