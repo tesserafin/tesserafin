@@ -5,7 +5,9 @@ own changelog in [`tesserafin/tesserafin-web`](https://github.com/tesserafin/tes
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning
 follows [`docs/versioning-policy.md`](./docs/versioning-policy.md), which is authoritative:
-**public Tesserafin SemVer begins at `1.0.0`.**
+**`1.0.0` is reserved for the first public launch; everything before it is a pre-launch `0.x`.**
+
+**Pre-launch renumbering (2026-11-05).** The two builds published as `1.0.0` (2026-08-05) and `1.1.0` (2026-09-13) are pre-launch builds, renumbered **0.1.0** and **0.2.0**. Their GitHub Releases and Git tags were withdrawn; the commits remain (`6227dbef66`, `bb2234aebb`). Neither is supported. **`1.0.0` is reserved for the first public launch.**
 
 ## [Unreleased]
 
@@ -40,10 +42,10 @@ follows [`docs/versioning-policy.md`](./docs/versioning-policy.md), which is aut
     `sha256sum -c --ignore-missing`;
   - the MSI is still not attached, and nothing is signed.
 
-## [1.1.0] - 2026-09-13
+## [0.2.0] - 2026-09-13
 
-1.1.0 adds native distribution surfaces to the contents of [1.0.0](#100---2026-08-05), below.
-Git tag `v1.1.0`; [GitHub Release](https://github.com/tesserafin/tesserafin/releases/tag/v1.1.0).
+Published as `1.1.0` (Git tag `v1.1.0`, commit `bb2234aebb`); release and tag withdrawn 2026-11-05.
+0.2.0 adds native distribution surfaces to the contents of [0.1.0](#010---2026-08-05), below.
 The acceptance contract is
 [`docs/distribution/W5-A0-acceptance-contract.md`](./docs/distribution/W5-A0-acceptance-contract.md);
 tracker [#276](https://github.com/tesserafin/tesserafin/issues/276).
@@ -102,10 +104,10 @@ Stated rather than omitted:
 - **No D3D11VA, DXVA2, QSV, NVENC or AMF runtime claim on Windows.** The runners that measured the
   Windows forms have no GPU.
 
-## [1.0.0] - 2026-08-05
+## [0.1.0] - 2026-08-05
 
-The first public release, **1.0.0 — Foundation**. Git tag `1.0.0`;
-[GitHub Release](https://github.com/tesserafin/tesserafin/releases/tag/1.0.0).
+Published as **1.0.0 — Foundation** (Git tag `1.0.0`, commit `6227dbef66`); release and tag
+withdrawn 2026-11-05.
 
 Tesserafin is a fork of [Jellyfin](https://github.com/jellyfin/jellyfin). It inherited a
 `12.x` server line and a `13.x` web line from upstream history; those numbers describe a
@@ -220,7 +222,7 @@ Stated rather than omitted:
   [#188](https://github.com/tesserafin/tesserafin/issues/188); one finding is handled
   under coordinated disclosure and is deliberately not described publicly.
 - **The Linux container is the first release's deployment surface.**
-  [1.1.0](#110---2026-09-13), above, adds native Linux `.deb`, `.rpm` and `.tar.gz` forms,
+  [0.2.0](#020---2026-09-13) (published as 1.1.0), above, adds native Linux `.deb`, `.rpm` and `.tar.gz` forms,
   *accepted* on architecture-native runners. Until 2026-09-16 they were **not attached** to the
   1.1.0 GitHub Release and the container was the only published Linux path; they were attached
   on 2026-09-17 (see [Unreleased](#unreleased) for what is and is not there). The MSI is still
@@ -228,6 +230,6 @@ Stated rather than omitted:
   The full server test suite is not green on native Windows; see
   [`docs/distribution/W0-windows-server.md`](./docs/distribution/W0-windows-server.md) §2.7.
 
-[Unreleased]: https://github.com/tesserafin/tesserafin/compare/v1.1.0...master
-[1.1.0]: https://github.com/tesserafin/tesserafin/releases/tag/v1.1.0
-[1.0.0]: https://github.com/tesserafin/tesserafin/releases/tag/1.0.0
+[Unreleased]: https://github.com/tesserafin/tesserafin/compare/bb2234aebbf0ff2c1cbe291df48f2ffa62beea46...master
+[0.2.0]: https://github.com/tesserafin/tesserafin/tree/bb2234aebbf0ff2c1cbe291df48f2ffa62beea46
+[0.1.0]: https://github.com/tesserafin/tesserafin/tree/6227dbef66c631081e3179a521561b32b94dac59

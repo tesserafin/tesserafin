@@ -7,13 +7,11 @@ foundations are tracked separately and are not a released app.
 | Your environment | Published path | Instructions and limits |
 | --- | --- | --- |
 | Linux host or NAS with Docker | Public `1.0.0` container, `linux/amd64` and `linux/arm64`, pinned by digest in Compose | [Docker/NAS guide](container/A3-guided-install.md). Unraid/DSM guidance does not certify every NAS model; [independent reports](https://github.com/tesserafin/tesserafin/issues/117) remain incomplete. |
-| Native Linux | `.deb`, `.rpm`, `.tar.gz` for x64 and arm64 on `v1.1.0` | [Native Linux below](#native-linux), then the [L0 platform contract](distribution/L0-linux-packages.md). Unsigned downloads, no APT/DNF repository. |
-| Windows x64 | Portable ZIP attached to `v1.1.0` | [Windows install guide](distribution/install-windows.md). Unsigned, no published MSI or Windows arm64 artifact; Windows hardware acceleration is not validated. |
+| Native Linux | `.deb`, `.rpm`, `.tar.gz` for x64 and arm64 — **no published download** (pre-launch builds withdrawn 2026-11-05) | [Native Linux below](#native-linux), then the [L0 platform contract](distribution/L0-linux-packages.md). Unsigned downloads, no APT/DNF repository. |
+| Windows x64 | Portable ZIP — **no published download** (pre-launch builds withdrawn 2026-11-05) | [Windows install guide](distribution/install-windows.md). Unsigned, no published MSI or Windows arm64 artifact; Windows hardware acceleration is not validated. |
 
-The release label `v1.1.0` and the application/package version `1.0.0` are
-intentionally distinct. Download the filenames that actually exist; do not
-construct `1.1.0` package filenames. See [versioning policy](versioning-policy.md)
-and [release contents](../CHANGELOG.md).
+The withdrawn pre-launch build `0.2.0` was labelled `v1.1.0` while its packages carried
+`1.0.0`. See [versioning policy](versioning-policy.md) and [release contents](../CHANGELOG.md).
 
 ## Docker and NAS
 
@@ -38,8 +36,9 @@ setting does not configure HTTPS, a firewall or a router for public access.
 
 ## Native Linux
 
-Download the matching file from the
-[`v1.1.0` release](https://github.com/tesserafin/tesserafin/releases/tag/v1.1.0).
+**No package is currently published.** The pre-launch `0.2.0` build (published as
+`v1.1.0`) was withdrawn on 2026-11-05; packages return with the `1.0.0` launch. The
+steps below describe that build's packages.
 The lifecycle environments recorded in L0 are Ubuntu 24.04 (DEB), Rocky Linux 9
 (RPM), and Debian 12 (portable), on architecture-native x64/arm64 runners. Other
 distributions are not implied by the architecture name alone.

@@ -15,21 +15,14 @@ fork attribution.
 
 ## Project status
 
-Two public releases exist. Read this section before deciding what to install.
+**No public release yet.** `1.0.0` is reserved for the first public launch.
 
-- **[`1.0.0` — Foundation](https://github.com/tesserafin/tesserafin/releases/tag/1.0.0)**,
-  released 2026-08-05 (tag `1.0.0`). The Linux container
-  `ghcr.io/tesserafin/server`, installed by digest. It is still the 1.0
-  install path.
-- **[`1.1.0`](https://github.com/tesserafin/tesserafin/releases/tag/v1.1.0)**,
-  released 2026-09-13 (tag `v1.1.0`). It keeps the container unchanged and adds
-  native Linux packages and a native `win-x64` portable ZIP. Nothing in it is
-  Authenticode-signed. The MSI is documented but **not attached** to the
-  GitHub Release. The attached ZIP is `tesserafin-server_1.0.0_win-x64.zip`,
-  because `SharedVersion` is still `1.0.0`; its SHA-256
-  `c1f6261cb770bd3dcbf255f4dd15b287a7289adad5a619d31725c158cd20e2d8` identifies
-  the ZIP assembled at `41d3411c9838feec6650dd10ec89a1f198aafdeb` (run
-  `34766464798`). A rebuild from the `v1.1.0` tag is a different ZIP.
+Two pre-launch builds were published earlier as `1.0.0` (2026-08-05) and `1.1.0`
+(2026-09-13). They are renumbered **0.1.0** and **0.2.0**, their GitHub Releases
+and tags were withdrawn on 2026-11-05, and neither is supported. What they
+contained is recorded in the [changelog](CHANGELOG.md). Nothing is
+Authenticode-signed yet; signing starts with the launch
+([plan](docs/distribution/W6-signing-and-msi-publication-plan.md)).
 - `1.0.0` is the first public version epoch. The server and the web client share
   that number.
 - The build package `ghcr.io/tesserafin/tesserafin-server` and the

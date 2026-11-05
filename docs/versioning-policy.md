@@ -14,7 +14,18 @@ proven, and this document states the policy both of them serve.
 
 ## 1. The public version epoch
 
-**Tesserafin public SemVer begins at `1.0.0`.**
+**`1.0.0` is reserved for the first public launch.** Everything published before it
+is a pre-launch `0.x` build (owner ruling, 2026-11-05; tracker #386):
+
+| Pre-launch version | Published as | Commit | Status |
+| --- | --- | --- | --- |
+| `0.1.0` | `1.0.0` — Foundation, tag `1.0.0`, 2026-08-05 | `6227dbef66` | release + tag withdrawn 2026-11-05 |
+| `0.2.0` | `1.1.0`, tag `v1.1.0`, 2026-09-13 | `bb2234aebb` | release + tag withdrawn 2026-11-05 |
+
+Neither is supported; there is no upgrade commitment from them. The canonical
+version in the tree moves to `0.3.0` until the launch. The reasoning below about
+the inherited `12.x` / `13.x` lines is unchanged: it is why the public line starts
+at `1`, not `12`.
 
 Tesserafin is a fork. It inherited a `12.x` server version line and a `13.x` web
 version line from its upstream history. Those numbers describe an upstream
@@ -224,10 +235,10 @@ Contract: [W5-A0](./distribution/W5-A0-acceptance-contract.md).
 container. For 1.1, additionally:
 
 * **The Git tag and the GitHub Release are W5-A4, and owner-only.** No agent
-  slice, workflow or pull request creates either. W5-A4 has created both: Git
-  tag `v1.1.0` at `bb2234aebbf0ff2c1cbe291df48f2ffa62beea46`, and the
-  [GitHub Release](https://github.com/tesserafin/tesserafin/releases/tag/v1.1.0)
-  published 13 September 2026.
+  slice, workflow or pull request creates either. W5-A4 created both: Git
+  tag `v1.1.0` at `bb2234aebbf0ff2c1cbe291df48f2ffa62beea46`, and the GitHub
+  Release published 13 September 2026. Both were withdrawn on the owner's
+  instruction on 2026-11-05; that build is now the pre-launch `0.2.0` (§1).
 * **The unsigned `win-x64` ZIP digest is the W5-A1 pin**,
   [`ci/windows/w5/accepted-unsigned-zip.json`](../ci/windows/w5/accepted-unsigned-zip.json):
   `zipSha256` `c1f6261cb770bd3dcbf255f4dd15b287a7289adad5a619d31725c158cd20e2d8`,
