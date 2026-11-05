@@ -23,7 +23,7 @@ is a pre-launch `0.x` build (owner ruling, 2026-11-05; tracker #386):
 | `0.2.0` | `1.1.0`, tag `v1.1.0`, 2026-09-13 | `bb2234aebb` | release + tag withdrawn 2026-11-05 |
 
 Neither is supported; there is no upgrade commitment from them. The canonical
-version in the tree moves to `0.3.0` until the launch. The reasoning below about
+version in the tree is `0.3.0` until the launch (#389). The reasoning below about
 the inherited `12.x` / `13.x` lines is unchanged: it is why the public line starts
 at `1`, not `12`.
 
