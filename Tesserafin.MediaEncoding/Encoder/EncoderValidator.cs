@@ -299,6 +299,19 @@ namespace Tesserafin.MediaEncoding.Encoder
 
         public IEnumerable<string> GetEncoders() => GetCodecs(Codec.Encoder);
 
+        /// <summary>
+        /// Tests the configured x265 build, rather than inferring its depth
+        /// from an encoder name or FFmpeg version. The leading plus forbids
+        /// FFmpeg from silently selecting an 8-bit encoder pixel format.
+        /// </summary>
+        /// <returns>Whether a strict Main10 encode completed within the probe timeout.</returns>
+        public bool CheckSoftwareHevcMain10()
+            => GetProcessExitCode(
+                _encoderPath,
+                "-nostdin -hide_banner -loglevel error -f lavfi -i color=size=64x64:rate=1,format=yuv420p10le "
+                + "-frames:v 1 -c:v libx265 -preset ultrafast -profile:v main10 -pix_fmt +yuv420p10le "
+                + "-x265-params pools=1:frame-threads=1:log-level=error -f null -");
+
         public IEnumerable<string> GetHwaccels() => GetHwaccelTypes();
 
         public IEnumerable<string> GetFilters() => GetFFmpegFilters();

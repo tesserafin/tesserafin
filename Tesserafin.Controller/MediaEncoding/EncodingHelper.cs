@@ -210,6 +210,30 @@ namespace Tesserafin.Controller.MediaEncoding
         public string GetAv1Encoder(EncodingJobInfo state, EncodingOptions encodingOptions)
             => GetH26xOrAv1Encoder("libsvtav1", "av1", state, encodingOptions);
 
+        /// <summary>
+        /// Resolves the HEVC profile used by both the command and HLS manifest.
+        /// Main10 is opt-in and currently supported only by probed software x265.
+        /// </summary>
+        /// <param name="state">The encoding request.</param>
+        /// <param name="videoEncoder">The encoder selected for this attempt.</param>
+        /// <returns>The actual HEVC encoder profile.</returns>
+        public string GetHevcOutputProfile(EncodingJobInfo state, string videoEncoder)
+        {
+            var profile = state.GetRequestedProfiles("hevc").FirstOrDefault() ?? string.Empty;
+            profile = WhiteSpaceRegex().Replace(profile, string.Empty);
+            var maxDepth = state.GetRequestedVideoBitDepth("hevc");
+            // The existing DoVi reshaping path produces an 8-bit intermediate;
+            // leave it at Main until its entire filter chain is qualified.
+            var reshapesDovi = state.VideoStream?.VideoRangeType == VideoRangeType.DOVI;
+            return string.Equals(videoEncoder, "libx265", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(profile, "main10", StringComparison.OrdinalIgnoreCase)
+                && maxDepth is not < 10
+                && !reshapesDovi
+                && _mediaEncoder is ISoftwareVideoEncoderCapabilities { SupportsHevcMain10: true }
+                    ? "main10"
+                    : "main";
+        }
+
         private string GetH26xOrAv1Encoder(string defaultEncoder, string hwEncoder, EncodingJobInfo state, EncodingOptions encodingOptions)
         {
             // Only use alternative encoders for video files.
@@ -2275,8 +2299,11 @@ namespace Tesserafin.Controller.MediaEncoding
                 profile = string.Empty;
             }
 
-            // We only transcode to HEVC 8-bit for now, force Main Profile.
-            if (profile.Contains("main10", StringComparison.OrdinalIgnoreCase)
+            if (string.Equals(targetVideoCodec, "hevc", StringComparison.OrdinalIgnoreCase))
+            {
+                profile = GetHevcOutputProfile(state, videoEncoder);
+            }
+            else if (profile.Contains("main10", StringComparison.OrdinalIgnoreCase)
                 || profile.Contains("mainstill", StringComparison.OrdinalIgnoreCase))
             {
                 profile = "main";
@@ -3966,6 +3993,13 @@ namespace Tesserafin.Controller.MediaEncoding
             }
 
             var outFormat = isSwDecoder ? "yuv420p" : "nv12";
+            var softwareMain10 = string.Equals(vidEncoder, "libx265", StringComparison.OrdinalIgnoreCase)
+                && GetHevcOutputProfile(state, vidEncoder) == "main10";
+            if (softwareMain10)
+            {
+                outFormat = "yuv420p10le";
+            }
+
             var swScaleFilter = GetSwScaleFilter(state, options, vidEncoder, swpInW, swpInH, threeDFormat, reqW, reqH, reqMaxW, reqMaxH);
             if (isVaapiEncoder)
             {
@@ -4030,7 +4064,9 @@ namespace Tesserafin.Controller.MediaEncoding
                 var subH = state.SubtitleStream?.Height;
                 var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, reqMaxH);
                 subFilters.Add(subPreProcFilters);
-                overlayFilters.Add("overlay=eof_action=pass:repeatlast=0");
+                overlayFilters.Add(softwareMain10
+                    ? "overlay=format=yuv420p10:eof_action=pass:repeatlast=0"
+                    : "overlay=eof_action=pass:repeatlast=0");
             }
 
             return (mainFilters, subFilters, overlayFilters);

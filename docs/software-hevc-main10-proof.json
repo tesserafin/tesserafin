@@ -1,0 +1,215 @@
+{
+  "runtime_sha256": "5828a103b3d26bbaf61dca8b16767973b8a87a204af5c6827a8679eae74632f1",
+  "server_sha256": "37cbf88363476972ccb6213359861cf0b3907ecc10099e9dc16cd9c0612dde1f",
+  "results": [
+    {
+      "source": "SDR Ten",
+      "requested_profile": "main10",
+      "ceiling": 10,
+      "first_segment": 0,
+      "manifest_main10": true,
+      "served_codec": "hevc",
+      "served_profile": "Main 10",
+      "served_pixel_format": "yuv420p10le",
+      "color_transfer": "bt709",
+      "bytes": 85352,
+      "decoded": true,
+      "subtitle_white_fraction": null,
+      "stop_http": 204,
+      "live_jobs_before_stop": 1,
+      "live_jobs_after_stop": 0,
+      "seek_arguments": [],
+      "served_file_sha256": "12559d386855a9909cf14c7cf81e39fc6e8d09713003d2a8c1b9d636d36b7d74"
+    },
+    {
+      "source": "SDR Ten",
+      "requested_profile": "main",
+      "ceiling": 10,
+      "first_segment": 0,
+      "manifest_main10": false,
+      "served_codec": "hevc",
+      "served_profile": "Main",
+      "served_pixel_format": "yuv420p",
+      "color_transfer": "bt709",
+      "bytes": 86298,
+      "decoded": true,
+      "subtitle_white_fraction": null,
+      "stop_http": 204,
+      "live_jobs_before_stop": 1,
+      "live_jobs_after_stop": 0,
+      "seek_arguments": [],
+      "served_file_sha256": "e0aafb3120e8cb6d59a0a12b7844520d0c672d98259d5b1ed11dc265e7219a6d"
+    },
+    {
+      "source": "SDR Ten",
+      "requested_profile": "main10",
+      "ceiling": 8,
+      "first_segment": 0,
+      "manifest_main10": false,
+      "served_codec": "hevc",
+      "served_profile": "Main",
+      "served_pixel_format": "yuv420p",
+      "color_transfer": "bt709",
+      "bytes": 86298,
+      "decoded": true,
+      "subtitle_white_fraction": null,
+      "stop_http": 204,
+      "live_jobs_before_stop": 1,
+      "live_jobs_after_stop": 0,
+      "seek_arguments": [],
+      "served_file_sha256": "e0aafb3120e8cb6d59a0a12b7844520d0c672d98259d5b1ed11dc265e7219a6d"
+    },
+    {
+      "source": "SDR Ten",
+      "requested_profile": "main10",
+      "ceiling": 10,
+      "first_segment": 25,
+      "manifest_main10": true,
+      "served_codec": "hevc",
+      "served_profile": "Main 10",
+      "served_pixel_format": "yuv420p10le",
+      "color_transfer": "bt709",
+      "bytes": 96089,
+      "decoded": true,
+      "subtitle_white_fraction": null,
+      "stop_http": 204,
+      "live_jobs_before_stop": 1,
+      "live_jobs_after_stop": 0,
+      "seek_arguments": [
+        "00:00:50.000"
+      ],
+      "served_file_sha256": "e8b4dc1bf220c51a171a9e499376cce42aaf0e36dec531fbb98c7532e4071b7b"
+    },
+    {
+      "source": "HDR Ten",
+      "requested_profile": "main10",
+      "ceiling": 10,
+      "first_segment": 0,
+      "manifest_main10": true,
+      "served_codec": "hevc",
+      "served_profile": "Main 10",
+      "served_pixel_format": "yuv420p10le",
+      "color_transfer": "bt709",
+      "bytes": 103834,
+      "decoded": true,
+      "subtitle_white_fraction": null,
+      "stop_http": 204,
+      "live_jobs_before_stop": 1,
+      "live_jobs_after_stop": 0,
+      "seek_arguments": [],
+      "served_file_sha256": "b08ea53d7faf884dc8a6a76eedfba1cfa75561d5a5b84c252fe3919c06eb1d34"
+    },
+    {
+      "source": "PGS Ten",
+      "requested_profile": "main10",
+      "ceiling": 10,
+      "first_segment": 0,
+      "manifest_main10": true,
+      "served_codec": "hevc",
+      "served_profile": "Main 10",
+      "served_pixel_format": "yuv420p10le",
+      "color_transfer": "bt709",
+      "bytes": 75735,
+      "decoded": true,
+      "subtitle_white_fraction": 1.0,
+      "stop_http": 204,
+      "live_jobs_before_stop": 1,
+      "live_jobs_after_stop": 0,
+      "seek_arguments": [],
+      "served_file_sha256": "b79ff9df8a099200956c275e39dacf7eb4501f2f56e69a2805a36dfcfbef0c61"
+    }
+  ],
+  "recorded_utc": "2026-11-06T19:55:54Z",
+  "platform": "Linux x64, native .NET 10.0.100 server; software encoding",
+  "source_base": "4a729133ebd04fbd907a746e65660618516e91a4",
+  "runtime_origin": {
+    "pr": 397,
+    "commit": "6be32dec64ac434bad62c5b1aaa8255761ce368f",
+    "run": 42274991467,
+    "artifact_id": 13533289931
+  },
+  "source_sha256": [
+    {
+      "path": "Tesserafin.Api/Helpers/DynamicHlsHelper.cs",
+      "sha256": "6621e03ff5f08f43390b91d20e13d9ec2c816e0f5aaae2d24ac63ce96de2f216"
+    },
+    {
+      "path": "Tesserafin.Controller/MediaEncoding/EncodingHelper.cs",
+      "sha256": "b2d3496426f200b999390420502daae6358c17a27acefcd7f8a73ff24144dee8"
+    },
+    {
+      "path": "Tesserafin.Controller/MediaEncoding/ISoftwareVideoEncoderCapabilities.cs",
+      "sha256": "0d31a60567502ec51fee946af4a8bab3ecfa02acb241df6e82fa4255876d8368"
+    },
+    {
+      "path": "Tesserafin.MediaEncoding/Encoder/EncoderValidator.cs",
+      "sha256": "59a310223589365798b2495ff78a61346738cc1a01baa657f44d02d25048c5eb"
+    },
+    {
+      "path": "Tesserafin.MediaEncoding/Encoder/MediaEncoder.cs",
+      "sha256": "4976f015d40beb229f8a413abd8c2766270d22d5ca26d23caed3406b42b847d2"
+    },
+    {
+      "path": "tests/Tesserafin.Controller.Tests/MediaEncoding/EncodingHelperHevcMain10Tests.cs",
+      "sha256": "4ff04b9267383af0de5a21cfeca0e5ec0e616ee19fff2588e79fc1881509cdbd"
+    },
+    {
+      "path": "tests/Tesserafin.MediaEncoding.Tests/Encoder/HevcMain10ProbeTests.cs",
+      "sha256": "d29dadd6cabf8813d59c989f5da59bbce1d03d05871536047e5cc43ec43b2a0b"
+    },
+    {
+      "path": "tools/playback-proof/hevc_main10.py",
+      "sha256": "d21509b53a0d34e06f0454d264e72acb657e6f6286401ab4b7857045e07a53d4"
+    }
+  ],
+  "assembly_sha256": [
+    {
+      "file": "tesserafin.dll",
+      "sha256": "37cbf88363476972ccb6213359861cf0b3907ecc10099e9dc16cd9c0612dde1f"
+    },
+    {
+      "file": "Tesserafin.Api.dll",
+      "sha256": "8c67246bbdb09c705cd918193464ba89afe2ad5f763b9bc79723de8909b2b06e"
+    },
+    {
+      "file": "Tesserafin.Controller.dll",
+      "sha256": "9dee3a8f68c98863229299e70870e71724265574d2c52f8cbc37631b15765be9"
+    },
+    {
+      "file": "Tesserafin.MediaEncoding.dll",
+      "sha256": "21f2d4e701783b3656136f7c078aa53d562ece37f075baa8b1529dd6737b2134"
+    }
+  ],
+  "validation": {
+    "server_build": {
+      "warnings": 0,
+      "errors": 0
+    },
+    "new_unit_tests": {
+      "passed": 21,
+      "failed": 0
+    },
+    "api_suite": {
+      "passed": 638,
+      "failed": 0,
+      "skipped": 0
+    },
+    "controller_suite": {
+      "passed": 398,
+      "failed": 0,
+      "skipped": 2
+    },
+    "media_encoding_suite": {
+      "passed": 295,
+      "failed": 1,
+      "skipped": 2
+    },
+    "whitespace_check": "passed for all changed C# files; full MSBuild formatter unavailable locally due to IPC permission error",
+    "known_failure": "Unchanged FfmpegProcessRunnerTests.RunProbeAsync_ProcessExceedsTimeout_IsKilledAndReportsTimedOut took 30 seconds instead of <10; reproduced in isolation in this environment."
+  },
+  "limitations": [
+    "HTTP and decoder proof only; no browser, GPU or display acceptance",
+    "HDR10 is tone-mapped to SDR; no Dolby Vision preservation claim",
+    "Server proof ran on x64 only; no Docker image published"
+  ]
+}

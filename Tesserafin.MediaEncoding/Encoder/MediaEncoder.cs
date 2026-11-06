@@ -41,7 +41,7 @@ namespace Tesserafin.MediaEncoding.Encoder
     /// <summary>
     /// Class MediaEncoder.
     /// </summary>
-    public partial class MediaEncoder : IMediaEncoder, IDisposable
+    public partial class MediaEncoder : IMediaEncoder, ISoftwareVideoEncoderCapabilities, IDisposable
     {
         /// <summary>
         /// The default SDR image extraction timeout in milliseconds.
@@ -144,6 +144,9 @@ namespace Tesserafin.MediaEncoding.Encoder
         public Version EncoderVersion => _ffmpegVersion;
 
         /// <inheritdoc />
+        public bool SupportsHevcMain10 { get; private set; }
+
+        /// <inheritdoc />
         public bool IsPkeyPauseSupported => _isPkeyPauseSupported;
 
         /// <inheritdoc />
@@ -180,6 +183,7 @@ namespace Tesserafin.MediaEncoding.Encoder
         /// <returns>bool indicates whether a valid ffmpeg is found.</returns>
         public bool SetFFmpegPath()
         {
+            SupportsHevcMain10 = false;
             var skipValidation = _config.GetFFmpegSkipValidation();
             if (skipValidation)
             {
@@ -231,6 +235,9 @@ namespace Tesserafin.MediaEncoding.Encoder
                 SetAvailableBitStreamFiltersWithOption(validator.GetBitStreamFiltersWithOption());
                 SetAvailableHwaccels(validator.GetHwaccels());
                 SetMediaEncoderVersion(validator);
+
+                SupportsHevcMain10 = SupportsEncoder("libx265") && validator.CheckSoftwareHevcMain10();
+                _logger.LogInformation("Software HEVC Main10 probe: {Supported}", SupportsHevcMain10);
 
                 _threads = EncodingHelper.GetNumberOfThreads(null, options, null);
 

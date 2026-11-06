@@ -804,6 +804,14 @@ public class DynamicHlsHelper
         }
         else if (!string.IsNullOrEmpty(codec))
         {
+            if (string.Equals(codec, "hevc", StringComparison.OrdinalIgnoreCase))
+            {
+                var options = _transcodeManager.GetEffectiveEncodingOptions(state.MediaSource?.Id)
+                    ?? _serverConfigurationManager.GetEncodingOptions();
+                var encoder = _encodingHelper.GetVideoEncoder(state, options);
+                return _encodingHelper.GetHevcOutputProfile(state, encoder);
+            }
+
             profileString = state.GetRequestedProfiles(codec).FirstOrDefault() ?? string.Empty;
             if (string.Equals(state.ActualOutputVideoCodec, "h264", StringComparison.OrdinalIgnoreCase))
             {
