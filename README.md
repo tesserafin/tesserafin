@@ -15,14 +15,14 @@ fork attribution.
 
 ## Project status
 
-**No public release yet.** `1.0.0` is reserved for the first public launch.
+**No supported public release yet.** `1.0.0` is reserved for the first public launch.
 
 Two pre-launch builds were published earlier as `1.0.0` (2026-08-05) and `1.1.0`
 (2026-09-13). They are renumbered **0.1.0** and **0.2.0**, their GitHub Releases
-and tags were withdrawn on 2026-11-05, and neither is supported. What they
+and tags are scheduled for deletion. Withdrawal was approved on 2026-11-05. What they
 contained is recorded in the [changelog](CHANGELOG.md). Nothing is
 Authenticode-signed yet; signing starts with the launch
-([plan](docs/distribution/W6-signing-and-msi-publication-plan.md)).
+([proposed signing plan](https://github.com/tesserafin/tesserafin/pull/385)).
 - `1.0.0` is the first public version epoch. The server and the web client share
   that number.
 - The build package `ghcr.io/tesserafin/tesserafin-server` and the
@@ -54,10 +54,9 @@ clients are roadmap items, not shipped software.
 
 ## Install and run
 
-[Choose an installation path](docs/install.md) for Docker/NAS, native Linux or
-the Windows `win-x64` portable ZIP. The guide identifies published artifacts,
-verification steps and the limitations of each path; building from source is
-[development](#development).
+The [installation guide](docs/install.md) records the status of Docker/NAS,
+native Linux and Windows packages. See [development](#development) for source
+builds.
 
 | Task | Start here |
 | --- | --- |
@@ -67,9 +66,9 @@ verification steps and the limitations of each path; building from source is
 | Find a guide or an engineering reference | [Documentation index](docs/README.md) |
 | Report a problem | [Support](docs/support.md) |
 
-No public container is published until the `1.0.0` launch; the former public
-image `ghcr.io/tesserafin/server:1.0.0` (pre-launch `0.1.0`) was withdrawn on
-2026-11-05. Private build packages and inherited development images are not
+No supported public image is available until the `1.0.0` launch. Withdrawal of
+`ghcr.io/tesserafin/server:1.0.0` (pre-launch `0.1.0`) was approved on 2026-11-05.
+Registry removal is a separate owner action. Private build packages and inherited development images are not
 installation fallbacks.
 No mutable public image channel is published.
 

@@ -7,7 +7,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ver
 follows [`docs/versioning-policy.md`](./docs/versioning-policy.md), which is authoritative:
 **`1.0.0` is reserved for the first public launch; everything before it is a pre-launch `0.x`.**
 
-**Pre-launch renumbering (2026-11-05).** The two builds published as `1.0.0` (2026-08-05) and `1.1.0` (2026-09-13) are pre-launch builds, renumbered **0.1.0** and **0.2.0**. Their GitHub Releases and Git tags were withdrawn; the commits remain (`6227dbef66`, `bb2234aebb`). Neither is supported. **`1.0.0` is reserved for the first public launch.**
+**Pre-launch renumbering (2026-11-05).** The builds originally published as
+`1.0.0` and `1.1.0` are recorded as **0.1.0** and **0.2.0**. Both are unsupported.
+Deletion of the original GitHub releases and tags follows the documentation
+and website updates (#386). The changelog links to the original commits.
 
 ## [Unreleased]
 
@@ -24,9 +27,8 @@ follows [`docs/versioning-policy.md`](./docs/versioning-policy.md), which is aut
 
 ### Changed
 
-- **Documentation: the native Linux packages are now downloadable from the 1.1.0 GitHub
-  Release.** They were attached on 2026-09-17, four days after the release and one day after
-  this changelog last said they were not. Attached today: `.deb` (`amd64`, `arm64`), `.rpm`
+- **Historical publication: the pre-launch 0.2.0 build received native Linux packages.** They were attached on 2026-09-17, four days after the release and one day after
+  this changelog last said they were not. Attached at the time: `.deb` (`amd64`, `arm64`), `.rpm`
   (`x86_64`, `aarch64`), `.tar.gz` (`linux-x64`, `linux-arm64`), the `linux-x64` Tesserafin
   FFmpeg runtime archive with its corresponding-source archive, and `SHA256SUMS-linux-x64.txt`.
   What that does and does not establish:
@@ -44,7 +46,7 @@ follows [`docs/versioning-policy.md`](./docs/versioning-policy.md), which is aut
 
 ## [0.2.0] - 2026-09-13
 
-Published as `1.1.0` (Git tag `v1.1.0`, commit `bb2234aebb`); release and tag withdrawn 2026-11-05.
+Published as `1.1.0` (Git tag `v1.1.0`, commit `bb2234aebb`); release and tag scheduled for deletion.
 0.2.0 adds native distribution surfaces to the contents of [0.1.0](#010---2026-08-05), below.
 The acceptance contract is
 [`docs/distribution/W5-A0-acceptance-contract.md`](./docs/distribution/W5-A0-acceptance-contract.md);
@@ -52,12 +54,12 @@ tracker [#276](https://github.com/tesserafin/tesserafin/issues/276).
 
 **Unsigned.** Nothing in 1.1.0 is Authenticode-signed. **The MSI is not attached** to the GitHub
 Release. On the release date the one attached asset was the unsigned `win-x64` ZIP pinned below;
-the native Linux packages were attached on 2026-09-17 (see [Unreleased](#unreleased)). `SharedVersion` is
-still `1.0.0`, which is why that ZIP is named `tesserafin-server_1.0.0_win-x64.zip`.
+the native Linux packages were attached on 2026-09-17 (see [Unreleased](#unreleased)). The application version was
+`1.0.0`, which is why that ZIP is named `tesserafin-server_1.0.0_win-x64.zip`.
 
 ### Added
 
-- **Linux container**, unchanged: the 1.0 path, still pinned by immutable digest.
+- **Linux container**, unchanged: the original 0.1.0 image, pinned by immutable digest at publication.
 - **Native Linux packages**: `.deb`, `.rpm` and a portable `.tar.gz`, for `linux-x64` and
   `linux-arm64`, accepted on architecture-native runners
   ([#225](https://github.com/tesserafin/tesserafin/issues/225)).
@@ -107,7 +109,7 @@ Stated rather than omitted:
 ## [0.1.0] - 2026-08-05
 
 Published as **1.0.0 — Foundation** (Git tag `1.0.0`, commit `6227dbef66`); release and tag
-withdrawn 2026-11-05.
+scheduled for deletion.
 
 Tesserafin is a fork of [Jellyfin](https://github.com/jellyfin/jellyfin). It inherited a
 `12.x` server line and a `13.x` web line from upstream history; those numbers describe a
