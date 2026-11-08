@@ -7,6 +7,9 @@ This branch contains the first concrete skeletons for the managed publication pa
 - `GET /System/RemoteAccess/Diagnostics` (R1-P) — elevation required
 - `PublicationInvariant` (R0-B) + unit tests
 - `IManagedCaddyService` + `ManagedCaddyService` (R2-L atomic apply/rollback)
+- `GatedManagedCaddyService` that enforces both gates before Apply
+- `SystemProcessRunner` (real Process.Start implementation)
+- `FileRestoreTokenStore` for crash-survivable restore snapshots
 - Process and network-config abstractions
 - `ServerNetworkConfigApplier` skeleton (in-memory restore token)
 - `CredentialStrengthGate` (D-5) + unit tests
@@ -18,9 +21,7 @@ This branch contains the first concrete skeletons for the managed publication pa
 ## Still required before merge
 
 - Map `INetworkConfigurationStore` onto the real server configuration manager
-- Persist the restore token across restarts
-- Call both gates before any public apply in the production path
-- Real `IProcessRunner` implementation (Process.Start with redirected output)
+- Wire `GatedManagedCaddyService` as the public `IManagedCaddyService` once facts/password sources exist
 - Integration test against a disposable Caddy (optional, post-MVP)
 
 Refs #241.
