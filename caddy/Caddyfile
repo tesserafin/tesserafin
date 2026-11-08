@@ -1,0 +1,34 @@
+# Companion Caddyfile for the R2-D overlay
+
+{
+    # Optional: email for Let's Encrypt
+    # email you@example.com
+}
+
+{$TESSERAFIN_HOSTNAME:media.example.com} {
+    log {
+        output file /data/access.log
+        format filter {
+            request>uri query {
+                replace ".*" ""
+            }
+            request>headers>Authorization delete
+            request>headers>X-Emby-Token delete
+        }
+    }
+
+    # Rate-limit auth (D-6)
+    rate_limit {
+        zone auth {
+            match path /Users/Authenticate*
+            events 10
+            window 1m
+        }
+    }
+
+    reverse_proxy tesserafin:8096 {
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+    }
+}
