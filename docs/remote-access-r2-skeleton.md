@@ -8,8 +8,10 @@ This branch contains the first concrete skeletons for the managed publication pa
 - `PublicationInvariant` (R0-B) + unit tests
 - `IManagedCaddyService` + `ManagedCaddyService` (R2-L atomic apply/rollback)
 - Process and network-config abstractions
+- `ServerNetworkConfigApplier` skeleton (in-memory restore token)
 - `CredentialStrengthGate` (D-5) + unit tests
 - DI registration (`AddManagedRemoteAccess`) wired in `Startup`
+- Admin publication controller (`GET/POST/DELETE /System/RemoteAccess/Publication`) + tests
 - Rollback tests for validate/reload failure paths
 - `docker-compose.public.yml` + companion `caddy/Caddyfile` (R2-D)
 
