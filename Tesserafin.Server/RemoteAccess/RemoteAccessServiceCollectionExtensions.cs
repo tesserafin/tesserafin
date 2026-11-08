@@ -36,21 +36,3 @@ public static class RemoteAccessServiceCollectionExtensions
         return services;
     }
 }
-
-/// <summary>
-/// Default process runner that shells out. Exists so the DI graph is complete;
-/// tests supply their own IProcessRunner.
-/// </summary>
-public sealed class SystemProcessRunner : IProcessRunner
-{
-    public async Task<(int ExitCode, string Output)> RunAsync(
-        string fileName,
-        string arguments,
-        CancellationToken cancellationToken)
-    {
-        // Skeleton: real implementation will use Process.Start with redirected output.
-        // Returning success keeps the service constructible without a Caddy binary in unit tests.
-        await Task.CompletedTask.ConfigureAwait(false);
-        return (0, string.Empty);
-    }
-}
