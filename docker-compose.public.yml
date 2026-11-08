@@ -1,0 +1,43 @@
+# R2-D — Official Docker Compose public-access overlay
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.public.yml up -d
+#
+# What this overlay does:
+# - Removes the direct host publication of port 8096
+# - Adds a Caddy companion that terminates HTTPS and proxies to the backend
+#   over a private Docker network
+# - Leaves the base docker-compose.yml untouched
+
+services:
+  tesserafin:
+    ports: !reset []
+    networks:
+      - tesserafin_internal
+    environment:
+      TESSERAFIN_KNOWN_PROXIES: "caddy"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: tesserafin-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - tesserafin_internal
+    depends_on:
+      tesserafin:
+        condition: service_healthy
+
+networks:
+  tesserafin_internal:
+    internal: true
+
+volumes:
+  caddy_data:
+  caddy_config:
