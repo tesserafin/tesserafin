@@ -35,6 +35,7 @@ using Tesserafin.Server.Core.Localization;
 using Tesserafin.Server.Extensions;
 using Tesserafin.Server.HealthChecks;
 using Tesserafin.Server.Implementations.Extensions;
+using Tesserafin.Server.RemoteAccess;
 using Tesserafin.XbmcMetadata;
 
 namespace Tesserafin.Server
@@ -93,6 +94,11 @@ namespace Tesserafin.Server
             // engine's own composition stay separable in review.
             services.AddPlaybackCredentials();
             services.AddRemoteAccessDiagnostics();
+
+            // R2-L: managed Caddy lifecycle (skeleton). Concrete process runner and network
+            // applier are registered so the service is constructible; production binding of
+            // INetworkConfigurationStore remains a follow-up.
+            services.AddManagedRemoteAccess();
 
             var productHeader = new ProductInfoHeaderValue(
                 _serverApplicationHost.Name.Replace(' ', '-'),
