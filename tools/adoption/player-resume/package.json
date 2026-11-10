@@ -1,0 +1,13 @@
+{
+    "name": "tesserafin-adoption-player-resume",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Playwright journey for the Jellyfin adoption rehearsal (#144): sign in, open Continue Watching, press Resume, measure the real player position. Repository CI harness only.",
+    "license": "GPL-2.0-or-later",
+    "scripts": {
+        "test": "playwright test"
+    },
+    "devDependencies": {
+        "@playwright/test": "1.61.1"
+    }
+}

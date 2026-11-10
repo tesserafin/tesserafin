@@ -5,6 +5,7 @@ on:
     paths:
       - 'tools/adoption/**'
       - 'docs/adoption/jellyfin-state-apply.md'
+      - 'docs/adoption/jellyfin-to-tesserafin.md'
       - '.github/workflows/adoption-state-apply.yml'
 
 permissions:
@@ -62,11 +63,36 @@ jobs:
             --target-image "$(cat "$RUNNER_TEMP/adoption-image-id")" \
             --expected-source "$CANDIDATE_SHA" \
             --output "$RUNNER_TEMP/adoption-evidence/result.json"
+      - name: Provide Node for the player journey
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+      - name: Install the pinned Playwright browser
+        working-directory: tools/adoption/player-resume
+        run: |
+          npm ci --no-audit --no-fund
+          npx --no-install playwright install --with-deps chromium
+      # Same image: distinct paths, two accounts with distinct positions, an
+      # ambiguous duplicate and pre-filled target state; idempotency and
+      # rollback before playback, then Resume in the bundled production Web.
+      - name: Import from Jellyfin and resume in the real Web player
+        run: |
+          python3 tools/adoption/rehearse_player_resume.py \
+            --target-image "$(cat "$RUNNER_TEMP/adoption-image-id")" \
+            --expected-source "$CANDIDATE_SHA" \
+            --output "$RUNNER_TEMP/adoption-evidence/player-resume.json" \
+            --artifacts "$RUNNER_TEMP/adoption-evidence/player"
       - name: Retain allowlisted image identities and result only
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: adoption-state-apply-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/adoption-evidence/result.json
+          # Results hold identities, statuses and positions; the screenshots
+          # show the synthetic test pattern only.
+          path: |
+            ${{ runner.temp }}/adoption-evidence/result.json
+            ${{ runner.temp }}/adoption-evidence/player-resume.json
+            ${{ runner.temp }}/adoption-evidence/player/*.png
           if-no-files-found: error
           retention-days: 14
       - name: Remove transient registry credentials
