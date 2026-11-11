@@ -16,27 +16,18 @@ Related docs:
 
 ## The image
 
-> **Epoch note.** Tesserafin public SemVer begins at `1.0.0`, published to the
-> public release package `ghcr.io/tesserafin/server` — see
-> [`../versioning-policy.md`](../versioning-policy.md).
-> `ghcr.io/tesserafin/tesserafin` is the frozen pre-v1 archive and never
-> receives another tag. This guide names the published `1.0.0` release, and no
-> moving channel (`latest`, `preview`, `1`, `1.0`) exists.
+**No supported public image is available until the `1.0.0` launch.** The
+pre-launch image `ghcr.io/tesserafin/server:1.0.0` (now `0.1.0`) is scheduled
+for withdrawal. These instructions require an immutable reference you already
+have access to. See the [versioning policy](../versioning-policy.md).
 
-All paths here use the immutable image published to GHCR:
-
-```
-ghcr.io/tesserafin/server:1.0.0
-```
+Historical provenance of the old public image:
 
 - Multi-arch manifest digest: `sha256:bc7587bc7d99b40d77770046d49a2931ff8162b6d1df3da8d3f108b7677d7dc3`
   (`linux/amd64` `sha256:63961ace461302693646a77e3204b1706d5cdc66a38152c910849c4a7b0912c8`,
   `linux/arm64` `sha256:27f555cc38c999dd9aa84ce66caa47f4dbb0f0e041a061c010e6a470ba004a28`).
   Built from `6227dbef66c631081e3179a521561b32b94dac59`. It reports version
-  `1.0.0`. This is what the checked-in `docker-compose.yml` pins, by digest — so
-  following this guide and running the shipped Compose file give you the same
-  image. The `1.0.0` tag is immutable too; it names this manifest and is never
-  re-pointed, so it is not a moving channel.
+  `1.0.0`. It was the checked-in Compose default at publication.
 - It supersedes `1.0.0-dev.28ace1b74f42`
   (`sha256:636c3038a7eb…`), the accepted B2 presentation/responsive/a11y release
   candidate ([tesserafin-web#55](https://github.com/tesserafin/tesserafin-web/issues/55)).
@@ -54,12 +45,7 @@ ghcr.io/tesserafin/server:1.0.0
   recorded in the image's `org.tesserafin.web.revision` label and in
   `/opt/tesserafin-web.revision.json` inside the image.
 
-- This is the published **1.0.0 release**, not a development channel. It does
-  not auto-update. Choose any future replacement deliberately and take a backup
-  first; see [A6](./A6-versioning-and-upgrades.md).
-- The release package is **public**. No GHCR login or GitHub token is needed.
-  The similarly named `tesserafin-server` build package and frozen `tesserafin`
-  archive are separate; do not substitute them for the release package.
+For upgrades and backups, see [A6](./A6-versioning-and-upgrades.md).
 
 > **Do not use `12.0.0-dev.e2999e4e2feb` for this guide.** That earlier image is
 > API-only: it runs with `--nowebclient` and bundles no web client, so
@@ -84,6 +70,7 @@ ghcr.io/tesserafin/server:1.0.0
   (`docker compose version` works), or a NAS with a container manager (Unraid /
   Synology sections below).
 - Somewhere to keep your media files, reachable from the host.
+- An accessible immutable image reference that bundles Tesserafin Web.
 
 You do **not** need: the Tesserafin source, a compiler, the .NET SDK, or Jellyfin's
 installation docs.
@@ -96,14 +83,17 @@ Steps are counted honestly: each is one action or one decision.
 root [`docker-compose.yml`](../../docker-compose.yml) into an empty folder, e.g.
 `~/tesserafin/docker-compose.yml`. Nothing else is required in that folder.
 
-**2. Point it at your media.** In the same folder create a `.env` file (copy
-[`.env.example`](../../.env.example)) and set your library path:
+**2. Select the image and media path.** In the same folder create a `.env` file (copy
+[`.env.example`](../../.env.example)) and replace the image placeholder with
+your accessible immutable reference:
 
 ```sh
+TESSERAFIN_IMAGE=<registry>/<image>@sha256:<digest>
 TESSERAFIN_MEDIA=/absolute/path/to/your/media
 ```
 
-Leave it unset to start with an empty `./media` and add real media later.
+Leave `TESSERAFIN_MEDIA` unset to start with an empty `./media`.
+`TESSERAFIN_IMAGE` is required.
 
 **3. Start the server.**
 
@@ -119,7 +109,7 @@ manual `chown`.
 `http://localhost:8096/` on the same machine). The server redirects `/` to
 `/web/` and serves the Tesserafin Web client from the same origin and the same
 port as the API. If you land on API documentation instead, you are running the
-superseded API-only image — check the tag against the one above.
+superseded API-only image. Verify that the selected image bundles Tesserafin Web.
 
 **5. Complete first-run onboarding.** In the browser wizard: pick your language →
 create your admin username + password → add a media library (type *Movies*, folder
@@ -186,29 +176,16 @@ spaces are supported (quote them). See A2 for the full permission model.
 
 ## Unraid
 
-Use the repository’s [Unraid template](../../deployment/unraid/docker-templates/tesserafin.xml);
-this does not claim a published Community Applications catalogue listing:
-
-1. Docker tab → Template Repositories →
-   `https://github.com/tesserafin/tesserafin/tree/master/deployment/unraid/docker-templates`
-2. Add Container → select **Tesserafin** from the template, if your Unraid version
-   supports adding template repositories; otherwise import the linked template
-   using its supported custom-template mechanism.
-3. Confirm the mappings: WebUI port `8096`; `/config`, `/data`, `/cache` under
-   `/mnt/user/appdata/tesserafin/…`; `/media` set to your library and **read-only**.
-4. Apply, then open `http://<unraid-ip>:8096/` and complete onboarding (as above).
-
-The template runs the container as `10000:10000` and points at the immutable GHCR
-image. See [`deployment/unraid/docker-templates/tesserafin.xml`](../../deployment/unraid/docker-templates/tesserafin.xml).
+The [Unraid template](../../deployment/unraid/docker-templates/tesserafin.xml)
+is suspended until launch. Its repository field is empty. Import resumes when
+the template contains a supported immutable image reference.
 
 ## Synology DSM (Container Manager)
 
 DSM 7.2+ with **Container Manager** installed.
 
-1. **Download the image.** Container Manager → *Registry*. If your DSM registry is
-   not configured for GHCR, the reliable path is SSH +
-   `docker pull ghcr.io/tesserafin/server:1.0.0`. The release package is
-   public, so no `docker login` is required.
+1. **Select your image.** Import the same accessible immutable reference used
+   for Compose. Authentication depends on your selected registry and image.
 2. **Create folders.** In *File Station*, under a `docker` shared folder create
    `tesserafin/config`, `tesserafin/data`, `tesserafin/cache`, and note your media
    share.

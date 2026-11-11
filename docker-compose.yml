@@ -12,42 +12,9 @@
 # host folders should use the documented bind-mount example instead (see the guide).
 services:
   tesserafin:
-    # IMMUTABLE by default, and deliberately a DIGEST (#92 / [A6]). Never
-    # `latest`, `preview`, or a moving major/minor tag: with one of those a
-    # `docker compose pull` could change your version — possibly across a schema
-    # migration — at a moment you did not choose. A digest cannot be re-pointed.
-    #
-    # This is the Tesserafin Server 1.0 development baseline, tag
-    # `1.0.0-dev.6227dbef66c6`, built from commit
-    # `6227dbef66c631081e3179a521561b32b94dac59`, bundling Tesserafin Web
-    # `a9a362eec764a9fe3fa6ba9b4a7dd7473677e35a`. It reports version `1.0.0`.
-    #
-    # It supersedes `1.0.0-dev.28ace1b74f42` (`sha256:636c3038a7eb…`), the
-    # accepted B2 presentation/responsive/a11y release candidate
-    # (tesserafin/tesserafin-web#55). That candidate's presentation
-    # evidence still stands, but the image carried three third-party metadata
-    # provider credentials inherited from upstream, compiled into
-    # `Tesserafin.Providers.dll`:
-    #
-    #   SUPERSEDED — contains inherited upstream provider credentials; do not use
-    #
-    # That digest stays published and immutable — it is not deleted — but it must
-    # not be an installation default. This image is built from the same tree with
-    # those credentials removed; TheMovieDb, TheAudioDB and OMDb are now
-    # operator-supplied only (docs/metadata-provider-keys.md) and nothing else
-    # about the build changed. See tesserafin/tesserafin#174.
-    #
-    # The public release package you install from is
-    # `ghcr.io/tesserafin/server`. `ghcr.io/tesserafin/tesserafin-server`
-    # is the private build package CI publishes every immutable build to, and
-    # `ghcr.io/tesserafin/tesserafin` is the frozen pre-v1 archive that
-    # never receives another tag (docs/versioning-policy.md §2). The digest below
-    # is the same manifest in all of them.
-    #
-    # Override with `TESSERAFIN_IMAGE=... docker compose up -d` or a .env file.
-    # Moving channels are an explicit opt-in; the risks and the upgrade procedure
-    # are in docs/container/A6-versioning-and-upgrades.md.
-    image: ${TESSERAFIN_IMAGE:-ghcr.io/tesserafin/server@sha256:bc7587bc7d99b40d77770046d49a2931ff8162b6d1df3da8d3f108b7677d7dc3}
+    # Set an accessible immutable image reference in .env. See the installation
+    # guide and the versioning policy before selecting or replacing an image.
+    image: ${TESSERAFIN_IMAGE:?set TESSERAFIN_IMAGE - no supported public Tesserafin image is available until the 1.0.0 launch}
     container_name: tesserafin
     # The image already runs as the fixed non-root identity 10000:10000; stated
     # here so the security posture is visible in the compose file itself.

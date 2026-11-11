@@ -631,7 +631,7 @@ workflow artifacts.
 That paragraph describes this work, and is still true of it. Separately, on
 2026-09-17 the `.deb`, `.rpm` and `.tar.gz` files for
 both architectures were attached to the
-[1.1.0 GitHub Release](https://github.com/tesserafin/tesserafin/releases/tag/v1.1.0),
+1.1.0 GitHub Release (pre-launch `0.2.0`, scheduled for deletion),
 with `SHA256SUMS-linux-x64.txt`. They are unsigned, there is still no APT or DNF
 repository, and no checksum file is attached for `linux-arm64`. The acceptance
 described in this document was made on the workflow's own outputs, and the

@@ -10,7 +10,7 @@ Status: **green hosted run with a real forward migration, 2026-10-23**, in [run 
 - Manifest: `sha256:fd1fa9e0f5a28a07e5872cc5ff13257a92d988717a33519f62c4b26c6ab36249`.
 - Source: `44f5ab62b522684b4fa58ed10de80b8c6a7bb392`.
 
-The source migration boundary exists: content-pack migration `20260807161612_AddContentPacks` is absent from the baseline and present in the source tree tagged `v1.1.0`. The [annotated tag](https://github.com/tesserafin/tesserafin/releases/tag/v1.1.0) resolves to `bb2234aebbf0ff2c1cbe291df48f2ffa62beea46`.
+The source migration boundary exists: content-pack migration `20260807161612_AddContentPacks` is absent from the baseline and present in the source tree tagged `v1.1.0`. The historical tag identifies [commit `bb2234aebb`](https://github.com/tesserafin/tesserafin/tree/bb2234aebbf0ff2c1cbe291df48f2ffa62beea46).
 
 That source fact does **not** prove publication of a matching container:
 

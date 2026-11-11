@@ -14,12 +14,23 @@ proven, and this document states the policy both of them serve.
 
 ## 1. The public version epoch
 
-**Tesserafin public SemVer begins at `1.0.0`.**
+**`1.0.0` is reserved for the first public launch.** Everything published before it
+is a pre-launch `0.x` build (owner ruling, 2026-11-05; tracker #386):
+
+| Pre-launch version | Published as | Commit | Status |
+| --- | --- | --- | --- |
+| `0.1.0` | `1.0.0` — Foundation, tag `1.0.0`, 2026-08-05 | `6227dbef66` | withdrawal approved 2026-11-05. Deletion pending. |
+| `0.2.0` | `1.1.0`, tag `v1.1.0`, 2026-09-13 | `bb2234aebb` | withdrawal approved 2026-11-05. Deletion pending. |
+
+Neither is supported; there is no upgrade commitment from them. The canonical
+version in the tree is `0.3.0` until the launch (#389). The reasoning below about
+the inherited `12.x` / `13.x` lines is unchanged: it is why the public line starts
+at `1`, not `12`.
 
 Tesserafin is a fork. It inherited a `12.x` server version line and a `13.x` web
 version line from its upstream history. Those numbers describe an upstream
-lineage, not a Tesserafin release history: Tesserafin has never published a
-release, so it has no releases numbered 1 through 11. Shipping a first public
+lineage, not a Tesserafin release history: the two unsupported pre-launch builds above do
+not establish a supported history of releases numbered 1 through 11. Shipping a first public
 release as `12.0.0` would claim eleven major versions of public compatibility
 history that does not exist.
 
@@ -78,7 +89,7 @@ claim over upstream plugin binaries, and it does not silently accept them either
 
 | Package | Role | Visibility |
 |---|---|---|
-| `ghcr.io/tesserafin/server` | **public release package** — the only thing a user installs from; contains released manifests and nothing else | public |
+| `ghcr.io/tesserafin/server` | **public release package** — the only thing a user installs from; contains released manifests and nothing else. Withdrawal of its pre-launch `1.0.0` tag (now `0.1.0`) was approved on 2026-11-05. Registry removal is a separate owner action. | pre-launch image pending withdrawal |
 | `ghcr.io/tesserafin/tesserafin` | **pre-v1 server archive** — every inherited `12.0.0-dev.*` image | private |
 | `ghcr.io/tesserafin/tesserafin-server` | **canonical v1+ build package** — every immutable CI build, including the ones that are never released | private |
 | `ghcr.io/tesserafin/tesserafin-web-assets` | web-assets package, spanning both epochs | private |
@@ -224,10 +235,10 @@ Contract: [W5-A0](./distribution/W5-A0-acceptance-contract.md).
 container. For 1.1, additionally:
 
 * **The Git tag and the GitHub Release are W5-A4, and owner-only.** No agent
-  slice, workflow or pull request creates either. W5-A4 has created both: Git
-  tag `v1.1.0` at `bb2234aebbf0ff2c1cbe291df48f2ffa62beea46`, and the
-  [GitHub Release](https://github.com/tesserafin/tesserafin/releases/tag/v1.1.0)
-  published 13 September 2026.
+  slice, workflow or pull request creates either. W5-A4 created both: Git
+  tag `v1.1.0` at `bb2234aebbf0ff2c1cbe291df48f2ffa62beea46`, and the GitHub
+  Release published 13 September 2026. The owner approved withdrawal of both on
+  2026-11-05. Deletion follows the documentation and website updates (#386), and that build is now the pre-launch `0.2.0` (§1).
 * **The unsigned `win-x64` ZIP digest is the W5-A1 pin**,
   [`ci/windows/w5/accepted-unsigned-zip.json`](../ci/windows/w5/accepted-unsigned-zip.json):
   `zipSha256` `c1f6261cb770bd3dcbf255f4dd15b287a7289adad5a619d31725c158cd20e2d8`,

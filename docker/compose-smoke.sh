@@ -21,8 +21,13 @@
 #   docker/browser-onboarding.sh's Playwright suite so the two paths share one
 #   definition of "onboarded".
 #
-# Usage: docker/compose-smoke.sh [host-port]
+# Usage: TESSERAFIN_IMAGE=<immutable-reference> docker/compose-smoke.sh [host-port]
 set -euo pipefail
+
+if [[ -z "${TESSERAFIN_IMAGE:-}" ]]; then
+  echo "compose-smoke: set TESSERAFIN_IMAGE to an accessible immutable image" >&2
+  exit 2
+fi
 
 PORT="${1:-8096}"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -66,6 +71,8 @@ mkdir -p "${WORK}/media"
 echo "hello-tesserafin" > "${WORK}/media/probe.txt"
 # Map the requested host port without editing the tracked compose file.
 printf 'TESSERAFIN_MEDIA=%s/media\n' "${WORK}" > "${WORK}/.env"
+# docker-compose.yml has no default image until the 1.0.0 launch; pass one through.
+printf 'TESSERAFIN_IMAGE=%s\n' "${TESSERAFIN_IMAGE}" >> "${WORK}/.env"
 [[ "${PORT}" != "8096" ]] && cat > "${WORK}/docker-compose.override.yml" <<YAML
 services:
   tesserafin:

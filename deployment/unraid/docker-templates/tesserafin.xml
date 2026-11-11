@@ -7,9 +7,9 @@
     Tesserafin is a free-software media server (a fork of Jellyfin). It manages and
     streams your own movies, shows, music and photos from your Unraid box to any
     device.[br][br]
-    This template runs the prebuilt Tesserafin image from GHCR — no building from
-    source. The server runs as the non-root user 10000:10000; the paths below are
-    created and owned accordingly on first start.[br][br]
+    [b]Installation suspended until the 1.0.0 launch.[/b] The repository field is
+    empty. Keep this template out of Community Applications until launch. The server
+    runs as the non-root user 10000:10000.[br][br]
     [b]/config[/b] : server + network configuration, plugins, SSL, logs. [b]Back up.[/b][br]
     [b]/data[/b] : SQLite databases, metadata, collections, playlists, watch state. [b]Back up.[/b][br]
     [b]/cache[/b] : regenerable transcode/image cache. Disposable.[br]
@@ -18,30 +18,14 @@
   </Description>
   <Overview>
     Tesserafin media server (Jellyfin fork). Streams your personal media library.
-    Immutable pre-release image; dev tags do not auto-update.
+    Installation suspended until the 1.0.0 launch.
   </Overview>
   <Support>https://github.com/tesserafin/tesserafin/issues</Support>
   <Project>https://github.com/tesserafin/tesserafin</Project>
   <GitHub>https://github.com/tesserafin/tesserafin</GitHub>
-  <!-- The Tesserafin Server 1.0 development baseline, built from commit
-       6227dbef66c631081e3179a521561b32b94dac59 and bundling Tesserafin Web
-       a9a362eec764a9fe3fa6ba9b4a7dd7473677e35a. Pinned by manifest digest so the
-       reference cannot be re-pointed; the equivalent immutable tag is
-       `1.0.0-dev.6227dbef66c6`.
-
-       It supersedes `1.0.0-dev.28ace1b74f42` (sha256:636c3038a7eb...), the
-       accepted B2 release candidate, which carried three third-party metadata
-       provider credentials inherited from upstream:
-       SUPERSEDED - contains inherited upstream provider credentials; do not use.
-       That digest stays published and immutable and is not deleted, but it must
-       not be an installation default. This image is the same tree with those
-       credentials removed; TheMovieDb, TheAudioDB and OMDb are operator-supplied
-       only (docs/metadata-provider-keys.md). See tesserafin#174.
-
-       `tesserafin` is the frozen pre-v1 archive package
-       and never receives another tag (docs/versioning-policy.md §2). -->
-  <Registry>https://github.com/orgs/tesserafin/packages/container/package/server</Registry>
-  <Repository>ghcr.io/tesserafin/server@sha256:bc7587bc7d99b40d77770046d49a2931ff8162b6d1df3da8d3f108b7677d7dc3</Repository>
+  <!-- Restore the registry and an accepted immutable repository reference at launch.
+       The pre-launch image provenance is recorded in docs/container/A6-versioning-and-upgrades.md. -->
+  <Repository/>
   <BindTime>true</BindTime>
   <Privileged>false</Privileged>
   <Networking>

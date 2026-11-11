@@ -1,5 +1,8 @@
 # A6 — Image versioning, channels and the upgrade contract
 
+The public pre-launch image `0.1.0` is unsupported and scheduled for
+withdrawal. No supported public replacement is available until launch.
+
 Issue [#92](https://github.com/tesserafin/tesserafin/issues/92). This is
 both the operator-facing upgrade contract and the A6 implementation note: the
 audit that preceded the change is recorded in the last section.
@@ -8,9 +11,8 @@ Prerequisites: [A1](./A1-implementation-note.md) (the image),
 [A2](./A2-persistent-state.md) (volumes, migrations, backup/restore),
 [A3](./A3-guided-install.md) (installation).
 
-> **Current operator scope.** Use the public release package
-> `ghcr.io/tesserafin/server` and the immutable reference selected in
-> [the installation guide](../install.md). The development/audit evidence in the
+> **Current operator scope.** Set an accessible immutable image reference as
+> described in [the installation guide](../install.md). The development/audit evidence in the
 > later sections is retained at its original paths and identities; it is not a
 > source of supported installation defaults. No mutable public channel exists.
 >
@@ -39,8 +41,8 @@ the application version of the artifact they describe.
 ## 2. The tag policy
 
 [The version policy](../versioning-policy.md) is authoritative for publication.
-The existing public container release is `ghcr.io/tesserafin/server:1.0.0`;
-the checked-in Compose file pins its immutable digest. There is no published
+The old public container default is unsupported and scheduled for withdrawal.
+Compose requires `TESSERAFIN_IMAGE`. There is no published
 `latest`, `stable`, `preview`, `1` or `1.0` channel. Do not invent one or use a
 private development package as an installation fallback.
 
@@ -50,22 +52,22 @@ belong to the frozen archive and are outside the supported `1.x` upgrade graph.
 
 ### Compose policy
 
-Keep `TESSERAFIN_IMAGE` unset to use the checked-in digest, or select an exact
-published immutable reference in `.env`. Pulling that reference does not choose
+Set `TESSERAFIN_IMAGE` in `.env` to an accessible immutable reference. Pulling that reference does not choose
 a future version for you. Before deliberately replacing it, record the old
-reference and take the backup in section 4. See section 3 for the current pin.
+reference and take the backup in section 4. See section 3 for inspection commands.
 
 ---
 
 ## 3. Inspecting what you are actually running
 
 Three independent surfaces, which must agree. If they ever disagree, the image
-was not produced by the contract and should not be trusted.
+was not produced by the contract and should not be trusted. Export
+`TESSERAFIN_IMAGE` in your shell for the commands below.
 
 ```console
 # What the image claims
 $ docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}} {{index .Config.Labels "org.opencontainers.image.revision"}}' \
-    ghcr.io/tesserafin/server:1.0.0
+    "$TESSERAFIN_IMAGE"
 
 # Which exact image is running, by digest
 $ docker inspect --format '{{.Image}} {{.Config.Image}}' tesserafin
@@ -84,24 +86,21 @@ the readiness contract, not a fault. Readiness is `200` **and**
 To check everything at once against a real container:
 
 ```console
-$ docker/version-verify.sh ghcr.io/tesserafin/server:1.0.0 --require-digest
+$ docker/version-verify.sh "$TESSERAFIN_IMAGE" --require-digest
 ```
 
 ### Pinning to an exact version or digest
 
 ```dotenv
-# .env — exact immutable version tag
-TESSERAFIN_IMAGE=ghcr.io/tesserafin/server:1.0.0
-
 # .env — digest pin, the strongest form; survives a tag being re-pointed
-TESSERAFIN_IMAGE=ghcr.io/tesserafin/server@sha256:bc7587bc7d99b40d77770046d49a2931ff8162b6d1df3da8d3f108b7677d7dc3
+TESSERAFIN_IMAGE=<registry>/<image>@sha256:<digest>
 ```
 
 Resolve a tag to its digest before pinning:
 
 ```console
-$ docker pull ghcr.io/tesserafin/server:1.0.0
-$ docker image inspect --format '{{index .RepoDigests 0}}' ghcr.io/tesserafin/server:1.0.0
+$ docker pull "$TESSERAFIN_IMAGE"
+$ docker image inspect --format '{{index .RepoDigests 0}}' "$TESSERAFIN_IMAGE"
 ```
 
 ---
@@ -267,8 +266,8 @@ $ docker pull ghcr.io/tesserafin/tesserafin@sha256:29493c0ecf956a61f06c2b801e7c8
 
 ## 5c. The published Tesserafin Server 1.0.0 release
 
-This is what `docker-compose.yml`, `.env.example`, the Unraid template and
-[`A3-guided-install.md`](./A3-guided-install.md) name today.
+Historical provenance of the unsupported pre-launch `0.1.0` image, published
+as `1.0.0`. It was the installation default before the withdrawal decision.
 
 ```
 ghcr.io/tesserafin/server:1.0.0
@@ -310,7 +309,7 @@ replacement above is the same tree with those credentials removed and nothing
 else changed; the three providers are now operator-supplied only. See
 [`../metadata-provider-keys.md`](../metadata-provider-keys.md),
 [`../provider-auth-audit.md`](../provider-auth-audit.md) and
-[tesserafin#174](https://github.com/tesserafin/tesserafin/issues/174). `docker-compose.yml` pins the manifest digest; the dev tag is
+[tesserafin#174](https://github.com/tesserafin/tesserafin/issues/174). `docker-compose.yml` originally pinned the manifest digest; the dev tag is
 provenance and an alternative spelling, never a moving channel. `1.0.0`, `1.0`,
 `1`, `latest`, `stable` and `preview` are **not** published.
 

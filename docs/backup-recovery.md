@@ -147,9 +147,10 @@ rollback. The Docker scripts (`docker/backup.sh`, `docker/restore.sh`) are not u
 
 ### Native `.deb` rehearsal evidence
 
-[`ci/native-recovery-deb.sh`](../ci/native-recovery-deb.sh), run by the
-`Native recovery rehearsal` workflow, performs that procedure on a disposable
-`ubuntu-24.04` amd64 hosted runner. It refuses to run outside such a host.
+[`ci/native-recovery-deb.sh`](../ci/native-recovery-deb.sh) performed this
+procedure on a disposable Ubuntu 24.04 amd64 runner. The former native recovery
+workflow downloaded the pre-launch packages and is retired ahead of their
+deletion. The script remains for a future rehearsal using the launch packages.
 
 | Step | What it asserts |
 | --- | --- |
