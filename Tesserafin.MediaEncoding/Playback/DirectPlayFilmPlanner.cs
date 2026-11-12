@@ -138,18 +138,24 @@ public sealed class DirectPlayFilmPlanner : IPlaybackSessionPlanner
         }
 
         var context = DlnaPlaybackAdapter.ToContext(options.ItemId, options.UserId, options.MediaSourceId, MediaKind.Video, PlaybackEngine.EngineVersion);
-        var decision = _engine.Decide(context, request.Capabilities, sources.Select(DlnaPlaybackAdapter.ToSnapshot).ToList(), WithUserDefaults(request.Constraints, sources[0]));
-        if (!decision.IsViable || decision.Method != PlaybackMethod.DirectPlay)
+        // Resolved track indices belong to a source, not to the film. A later playable version
+        // can have different indices from the first candidate. Preserve the engine's preference
+        // for the first direct-play candidate, while giving each candidate its own user defaults.
+        foreach (var source in sources)
         {
-            return null;
+            var decision = _engine.Decide(context, request.Capabilities, [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(request.Constraints, source));
+            if (!decision.IsViable || decision.Method != PlaybackMethod.DirectPlay)
+            {
+                continue;
+            }
+
+            if (PlaybackExecutionPlanBuilder.TryBuild(decision, out var plan, out _) && plan is not null)
+            {
+                return new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
+            }
         }
 
-        if (!PlaybackExecutionPlanBuilder.TryBuild(decision, out var plan, out _) || plan is null)
-        {
-            return null;
-        }
-
-        return new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
+        return null;
     }
 
     /// <summary>
