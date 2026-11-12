@@ -113,6 +113,28 @@ STAGE="${LAB}/stage"
 cp -a "${RUNTIME}" "${STAGE}"
 run_gate() { "${ROOT}/ci/ffmpeg/verify-runtime.sh" --stage "$1" --arch linux-x64; }
 
+# Simulate FFmpeg's silent pixel-format downgrade: the command succeeds and
+# writes a valid HEVC file, but Main10 has become Main/yuv420p. The contract
+# must inspect the produced bytes rather than trusting the requested format.
+cat > "${LAB}/drop-depth" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+args=("$@")
+if [[ " $* " == *' libx265 '* ]]; then
+    for i in "${!args[@]}"; do
+        case "${args[$i]}" in
+            +yuv420p10le) args[$i]=yuv420p ;;
+            main10) args[$i]=main ;;
+        esac
+    done
+fi
+exec "${HEVC_CONTROL_FFMPEG}" "${args[@]}"
+SH
+chmod +x "${LAB}/drop-depth"
+control "7  successful 8-bit downgrade is refused" "expected hevc/Main 10/yuv420p10le" \
+    env HEVC_CONTROL_FFMPEG="$(cd "${STAGE}" && pwd)/bin/ffmpeg" \
+    "${ROOT}/ci/ffmpeg/verify-hevc-depth.sh" --ffmpeg "${LAB}/drop-depth" --ffprobe "${STAGE}/bin/ffprobe"
+
 # patchelf runs in the pinned builder rather than relying on a workstation tool.
 BUILDER_TAG="tesserafin-ffmpeg-builder:${FF_BUILD_REVISION}"
 docker build --quiet --tag "${BUILDER_TAG}" "${ROOT}/ci/ffmpeg/builder" >/dev/null
