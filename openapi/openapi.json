@@ -48736,6 +48736,314 @@
         ]
       }
     },
+    "/Playback/Sessions/{id}/File": {
+      "get": {
+        "operationId": "GetPlaybackSessionFile",
+        "parameters": [
+          {
+            "description": "The session.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Opaque identifier for a Tesserafin.Controller.MediaEncoding.PlaybackSession.",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The item the session plays; must match the session.",
+            "in": "query",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The media source the session\u0027s plan selected; must match it.",
+            "in": "query",
+            "name": "mediaSourceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The session\u0027s play session id; must match it.",
+            "in": "query",
+            "name": "playSessionId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "video/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The file, or the requested range of it (206)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; profile=\u0022CamelCase\u0022": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; profile=\u0022PascalCase\u0022": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "No valid credential."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; profile=\u0022CamelCase\u0022": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; profile=\u0022PascalCase\u0022": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The caller does not own the session."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; profile=\u0022CamelCase\u0022": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; profile=\u0022PascalCase\u0022": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "No such direct-play session, or nothing servable for it."
+          },
+          "503": {
+            "content": {
+              "text/html": {}
+            },
+            "description": "The server is currently starting or is temporarily not available.",
+            "headers": {
+              "Message": {
+                "allowEmptyValue": true,
+                "description": "A short plain-text reason why the server is not available.",
+                "schema": {
+                  "format": "text",
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "allowEmptyValue": true,
+                "description": "A hint for when to retry the operation in full seconds.",
+                "schema": {
+                  "format": "int32",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "CustomAuthentication": [
+              "MediaDelivery",
+              "DefaultAuthorization"
+            ]
+          }
+        ],
+        "summary": "Serves the source file of a session decided as a direct play, with HTTP range support.",
+        "tags": [
+          "Playback"
+        ]
+      },
+      "head": {
+        "operationId": "HeadPlaybackSessionFile",
+        "parameters": [
+          {
+            "description": "The session.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Opaque identifier for a Tesserafin.Controller.MediaEncoding.PlaybackSession.",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The item the session plays; must match the session.",
+            "in": "query",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The media source the session\u0027s plan selected; must match it.",
+            "in": "query",
+            "name": "mediaSourceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The session\u0027s play session id; must match it.",
+            "in": "query",
+            "name": "playSessionId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "video/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The file, or the requested range of it (206)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; profile=\u0022CamelCase\u0022": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; profile=\u0022PascalCase\u0022": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "No valid credential."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; profile=\u0022CamelCase\u0022": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; profile=\u0022PascalCase\u0022": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The caller does not own the session."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; profile=\u0022CamelCase\u0022": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; profile=\u0022PascalCase\u0022": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "No such direct-play session, or nothing servable for it."
+          },
+          "503": {
+            "content": {
+              "text/html": {}
+            },
+            "description": "The server is currently starting or is temporarily not available.",
+            "headers": {
+              "Message": {
+                "allowEmptyValue": true,
+                "description": "A short plain-text reason why the server is not available.",
+                "schema": {
+                  "format": "text",
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "allowEmptyValue": true,
+                "description": "A hint for when to retry the operation in full seconds.",
+                "schema": {
+                  "format": "int32",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "CustomAuthentication": [
+              "MediaDelivery",
+              "DefaultAuthorization"
+            ]
+          }
+        ],
+        "summary": "Serves the source file of a session decided as a direct play, with HTTP range support.",
+        "tags": [
+          "Playback"
+        ]
+      }
+    },
     "/Playback/Sessions/{id}/Stream": {
       "get": {
         "operationId": "GetPlaybackSessionStream",
