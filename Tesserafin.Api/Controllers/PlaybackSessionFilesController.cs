@@ -123,6 +123,14 @@ public class PlaybackSessionFilesController : BaseTesserafinApiController
             return NotFound();
         }
 
+        // An alternate version is its own item, with its own access rules: the version the plan
+        // selected must still be visible to the owner too, not only the film it belongs to.
+        if (!Guid.TryParse(plan.SourceId, out var sourceItemId)
+            || (!sourceItemId.Equals(itemId) && _itemAccessService.GetVisibleItemById<BaseItem>(sourceItemId, owner!) is null))
+        {
+            return NotFound();
+        }
+
         var source = options.MediaSources.FirstOrDefault(s => string.Equals(s.Id, plan.SourceId, StringComparison.Ordinal));
         if (!DirectPlayFilmPlanner.IsLocalFileSource(source) || !System.IO.File.Exists(source!.Path))
         {

@@ -328,6 +328,7 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_AnotherUser_CanNeitherReadNorStopTheSession
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_AccessWithdrawnAfterPlanning_StopsServing
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_StoppedPosition_IsStoredAndAResumedSessionServesFromIt
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_UserSubtitlePreference_DecidesWhenTheClientNamesNoTrack
 
       # Diagnosis, not enforcement. The OpenAPI equality assertion is unchanged and still
       # fails the job; this only stops a cross-machine divergence from being unreproducible.

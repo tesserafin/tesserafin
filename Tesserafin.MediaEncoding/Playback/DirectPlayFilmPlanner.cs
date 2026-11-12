@@ -138,7 +138,7 @@ public sealed class DirectPlayFilmPlanner : IPlaybackSessionPlanner
         }
 
         var context = DlnaPlaybackAdapter.ToContext(options.ItemId, options.UserId, options.MediaSourceId, MediaKind.Video, PlaybackEngine.EngineVersion);
-        var decision = _engine.Decide(context, request.Capabilities, sources.Select(DlnaPlaybackAdapter.ToSnapshot).ToList(), request.Constraints);
+        var decision = _engine.Decide(context, request.Capabilities, sources.Select(DlnaPlaybackAdapter.ToSnapshot).ToList(), WithUserDefaults(request.Constraints, sources[0]));
         if (!decision.IsViable || decision.Method != PlaybackMethod.DirectPlay)
         {
             return null;
@@ -151,6 +151,27 @@ public sealed class DirectPlayFilmPlanner : IPlaybackSessionPlanner
 
         return new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
     }
+
+    /// <summary>
+    /// The user's own audio and subtitle preferences, as <c>MediaSourceManager</c> already resolved
+    /// them onto the source (<see cref="MediaSourceInfo.DefaultAudioStreamIndex"/>,
+    /// <see cref="MediaSourceInfo.DefaultSubtitleStreamIndex"/>: language preferences, subtitle mode,
+    /// remembered selections; <c>-1</c> or <see langword="null"/> for "no subtitle"), fill whatever the client did not choose
+    /// explicitly. An explicit index from the client still wins, exactly as on the legacy path; a
+    /// client-declared subtitle mode can therefore never turn on subtitles a user set to "None".
+    /// </summary>
+    /// <param name="declared">The constraints the client declared.</param>
+    /// <param name="source">The source the user defaults were resolved onto.</param>
+    /// <returns>The constraints the engine decides with.</returns>
+    internal static PlaybackConstraints WithUserDefaults(PlaybackConstraints declared, MediaSourceInfo source)
+        => declared with
+        {
+            PreferredAudioStreamIndex = declared.PreferredAudioStreamIndex ?? source.DefaultAudioStreamIndex,
+            // MediaSourceManager resolved the user's subtitle default onto every source it handed out;
+            // null there means "no subtitle" (mode None, or nothing matching), which the engine
+            // spells -1. Leaving it null would let the client's declared mode pick one instead.
+            PreferredSubtitleStreamIndex = declared.PreferredSubtitleStreamIndex ?? source.DefaultSubtitleStreamIndex ?? -1,
+        };
 
     private sealed class Scope : IDisposable
     {

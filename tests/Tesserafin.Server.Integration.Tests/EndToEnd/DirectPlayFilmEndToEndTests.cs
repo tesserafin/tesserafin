@@ -261,6 +261,52 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
         }
     }
 
+    [Theory]
+    [InlineData("None", false)]
+    [InlineData("Default", true)]
+    public async Task Film_UserSubtitlePreference_DecidesWhenTheClientNamesNoTrack(string userSubtitleMode, bool expectSubtitle)
+    {
+        var (client, userId) = await SignInAsync("film-subs-" + userSubtitleMode.ToLowerInvariant());
+        await UpdateConfigurationAsync(userId, configuration => configuration["SubtitleMode"] = userSubtitleMode);
+        var subtitlePath = EndToEndMediaFixtures.CreateExternalSrt(_workDir, $"film-{userSubtitleMode}.srt");
+        var itemId = LibraryItemSeeder.SeedVideo(
+            _libraryManager,
+            _mediaStreamRepository,
+            _fixturePath,
+            "mp4",
+            [.. _streams, new MediaStream { Index = 2, Type = MediaStreamType.Subtitle, Codec = "srt", IsExternal = true, Path = subtitlePath, Language = "eng" }],
+            $"Consolidation film subtitles {Guid.NewGuid()}",
+            runTimeTicks: TimeSpan.FromSeconds(FixtureSeconds).Ticks);
+
+        // What the Web client declares: an External srt capability, subtitle mode Default, no index.
+        var (capabilities, constraints) = EndToEndCapabilityPresets.DirectPlayWithExternalSubtitle(subtitleStreamIndex: 2);
+        constraints = constraints with { PreferredSubtitleStreamIndex = null, SubtitleMode = SubtitlePlaybackMode.Default };
+        var request = new CreatePlaybackSessionRequest(itemId, userId, capabilities, constraints, PlaySessionId: "film-subs-" + userSubtitleMode);
+        using var response = await client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.True(response.IsSuccessStatusCode, body);
+        var session = JsonSerializer.Deserialize<PlaybackSessionResponse>(body, JsonDefaults.Options)!;
+
+        Assert.Equal(PlaybackMethod.DirectPlay, session.Method);
+        if (expectSubtitle)
+        {
+            Assert.Equal(2, session.SelectedStreams.Subtitle?.Index);
+        }
+        else
+        {
+            Assert.Null(session.SelectedStreams.Subtitle);
+        }
+    }
+
+    private async Task UpdateConfigurationAsync(Guid userId, Action<JsonObject> change)
+    {
+        var configuration = JsonNode.Parse(await _admin.GetStringAsync(FormattableString.Invariant($"Users/{userId}"), TestContext.Current.CancellationToken))!["Configuration"]!.AsObject();
+        change(configuration);
+        using var content = new StringContent(configuration.ToJsonString(), System.Text.Encoding.UTF8, "application/json");
+        using var saved = await _admin.PostAsync(FormattableString.Invariant($"Users/Configuration?userId={userId}"), content, TestContext.Current.CancellationToken);
+        Assert.True(saved.IsSuccessStatusCode, FormattableString.Invariant($"POST Users/Configuration: {(int)saved.StatusCode}"));
+    }
+
     private Guid SeedFilm(string[]? tags = null) =>
         LibraryItemSeeder.SeedVideo(
             _libraryManager,
