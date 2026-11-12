@@ -55,6 +55,10 @@ public sealed class MediaRouteMetadataTests
             ["HEAD /Videos/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Videos/{itemId}/stream.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["HEAD /Videos/{itemId}/stream.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
+            // Consolidation step 1: a direct-play session's file route. The session id names the session;
+            // item, media source and play session are query values the action also matches against it.
+            ["GET /Playback/Sessions/{id}/File"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
+            ["HEAD /Playback/Sessions/{id}/File"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Audio/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["HEAD /Audio/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Audio/{itemId}/stream.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),

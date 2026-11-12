@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
@@ -55,6 +56,11 @@ public static class LibraryItemSeeder
     /// <param name="tags">The item's tags, for a test that restricts a user by tag.</param>
     /// <param name="parentId">The folder the item is in, for a test that restricts a user by library.</param>
     /// <param name="configure">Anything else a test wants the item to carry before it is saved.</param>
+    /// <param name="film">
+    /// <see langword="false"/> seeds a plain <see cref="Video"/> instead of a <see cref="Movie"/>: a
+    /// video that is not a film keeps the pre-consolidation playback chain (docs/playback-path-inventory.md §4).
+    /// <paramref name="configure"/> is not applied to it.
+    /// </param>
     /// <returns>The new item's id.</returns>
     public static Guid SeedVideo(
         ILibraryManager libraryManager,
@@ -66,29 +72,35 @@ public static class LibraryItemSeeder
         long runTimeTicks = EndToEndMediaFixtures.DurationTicks,
         string[]? tags = null,
         Guid parentId = default,
-        Action<Movie>? configure = null)
+        Action<Movie>? configure = null,
+        bool film = true)
     {
         ArgumentNullException.ThrowIfNull(libraryManager);
         ArgumentNullException.ThrowIfNull(mediaStreamRepository);
         ArgumentNullException.ThrowIfNull(streams);
 
-        var movie = new Movie
+        var movie = Fill(film ? new Movie() : new Video());
+        if (movie is Movie seededFilm)
         {
-            Id = Guid.NewGuid(),
-            Name = name,
-            Path = mediaPath,
-            Container = container,
-            Size = new FileInfo(mediaPath).Length,
-            RunTimeTicks = runTimeTicks,
-            VideoType = VideoType.VideoFile,
-            IsInMixedFolder = true,
-            DateCreated = DateTime.UtcNow,
-            DateModified = DateTime.UtcNow,
-            Tags = tags ?? [],
-            ParentId = parentId,
-        };
+            configure?.Invoke(seededFilm);
+        }
 
-        configure?.Invoke(movie);
+        Video Fill(Video video)
+        {
+            video.Id = Guid.NewGuid();
+            video.Name = name;
+            video.Path = mediaPath;
+            video.Container = container;
+            video.Size = new FileInfo(mediaPath).Length;
+            video.RunTimeTicks = runTimeTicks;
+            video.VideoType = VideoType.VideoFile;
+            video.IsInMixedFolder = true;
+            video.DateCreated = DateTime.UtcNow;
+            video.DateModified = DateTime.UtcNow;
+            video.Tags = tags ?? [];
+            video.ParentId = parentId;
+            return video;
+        }
 
         // What a scan's refresh would have set: without it every seeded item shares one (empty) key,
         // and a query that groups versions by that key answers with one of them for all.

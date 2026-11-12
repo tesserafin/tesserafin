@@ -34,6 +34,8 @@ public class MediaBoundaryStructuralTests
     {
         ("VideosController", "GetVideoStream", PlaybackCapabilityScope.Media),
         ("VideosController", "GetVideoStreamByContainer", PlaybackCapabilityScope.Media),
+        // Consolidation step 1: the file route of a session the engine alone decided to direct play.
+        ("PlaybackSessionFilesController", "GetPlaybackSessionFile", PlaybackCapabilityScope.Media),
         ("AudioController", "GetAudioStream", PlaybackCapabilityScope.Media),
         ("AudioController", "GetAudioStreamByContainer", PlaybackCapabilityScope.Media),
         ("UniversalAudioController", "GetUniversalAudioStream", PlaybackCapabilityScope.Media),

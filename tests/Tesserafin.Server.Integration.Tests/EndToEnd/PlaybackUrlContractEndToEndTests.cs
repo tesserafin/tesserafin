@@ -272,7 +272,10 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     [Fact]
     public async Task KillSwitch_ForcesLegacyOnNextRequest_UrlStillServable()
     {
-        var itemId = SeedItem();
+        // Not a film: since consolidation step 1 a film's direct play is decided by the engine alone
+        // and has no legacy fallback for the kill switch to restore (docs/playback-path-inventory.md §4).
+        // The kill switch still governs every journey that has not migrated.
+        var itemId = LibraryItemSeeder.SeedVideo(_libraryManager, _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 non-film fixture {Guid.NewGuid()}", film: false);
         var (capabilities, constraints) = EndToEndCapabilityPresets.DirectPlay();
 
         // V2 mode (not merely Canary): every session is v2-authoritative, no cohort-hash dependency -
