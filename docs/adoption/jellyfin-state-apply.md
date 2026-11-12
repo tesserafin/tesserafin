@@ -113,10 +113,13 @@ journals and refusal to follow credential-bearing redirects. Negative controls
 must distinguish the two users and detect lost state; an in-memory fake API is
 not evidence of the actual server's DTO semantics.
 
+The [operator guide](jellyfin-to-tesserafin.md) walks the whole path, and
+`rehearse_player_resume.py` replays it up to a real Resume in the Web player.
+
 Actual source-image → target-image rehearsal is a separate acceptance gate.
 Record exact image IDs/digests, candidate source and selected source version,
 and prove before/apply/restart/rollback preservation before promoting this tool
 for household use. A same-image backup recovery and a historical forward schema
 migration are different proofs. Neither this document nor loopback tests claim
-cross-version account migration, real playback resume, every media format or
+cross-version account migration, every media format or
 complete Jellyfin preservation.

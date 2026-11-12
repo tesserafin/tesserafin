@@ -26,10 +26,10 @@
 #
 # NOT covered, stated rather than silently omitted:
 #
-#   javascript-typescript — the only two tracked `.ts` files in this repository
-#              are `docker/browser-gate/playwright.config.ts` and
-#              `docker/browser-gate/tests/onboarding.spec.ts`: the container
-#              browser gate's Playwright config and its single spec. They are
+#   javascript-typescript — the only tracked `.ts` files in this repository
+#              are two Playwright configs and their specs:
+#              `docker/browser-gate/` (container browser gate) and
+#              `tools/adoption/player-resume/` (adoption resume journey). They are
 #              test tooling, they ship in no artifact, and they are not a
 #              production language "actually present" in the sense #94 means.
 #              The browser client is a separate repository with its own CodeQL
