@@ -1,0 +1,58 @@
+{
+  "entityStaticServiceAccessFiles": [
+    "Tesserafin.Controller/BaseItemManager/BaseItemManager.cs",
+    "Tesserafin.Controller/Entities/AggregateFolder.cs",
+    "Tesserafin.Controller/Entities/BaseItemExtensions.cs",
+    "Tesserafin.Controller/Entities/Folder.cs",
+    "Tesserafin.Controller/Library/ItemResolveArgs.cs",
+    "Tesserafin.Providers/Lyric/LyricManager.cs",
+    "Tesserafin.Providers/Subtitles/SubtitleManager.cs",
+    "Tesserafin.Server.Core/ApplicationHost.cs",
+    "Tesserafin.Server.Core/Dto/DtoService.cs",
+    "Tesserafin.Server.Core/Library/LibraryManager.cs",
+    "Tesserafin.Server.Core/Library/MediaSourceManager.cs",
+    "Tesserafin.Server.Core/Library/ResolverHelper.cs",
+    "Tesserafin.Server.Implementations/Trickplay/TrickplayManager.cs",
+    "src/Tesserafin.LiveTv/Recordings/RecordingsManager.cs"
+  ],
+  "entityStaticServices": [
+    "BaseItem.ChannelManager",
+    "BaseItem.ChapterManager",
+    "BaseItem.ConfigurationManager",
+    "BaseItem.FileSystem",
+    "BaseItem.ItemRepository",
+    "BaseItem.LibraryManager",
+    "BaseItem.LocalizationManager",
+    "BaseItem.MediaSegmentManager",
+    "BaseItem.MediaSourceManager",
+    "BaseItem.ProviderManager",
+    "BaseItem.UserDataManager",
+    "CollectionFolder.ApplicationHost",
+    "CollectionFolder.XmlSerializer",
+    "Episode.MediaEncoder",
+    "Folder.CollectionManager",
+    "Folder.LimitedConcurrencyLibraryScheduler",
+    "Folder.UserViewManager",
+    "UserView.TVSeriesManager",
+    "Video.RecordingsManager"
+  ],
+  "forbiddenDependencies": [
+    "Tesserafin.Data -\u003E Tesserafin.Database.Implementations",
+    "Tesserafin.MediaEncoding -\u003E Tesserafin.Playback.Shadow",
+    "Tesserafin.Model -\u003E Tesserafin.Data",
+    "Tesserafin.Model -\u003E Tesserafin.Database.Implementations",
+    "Tesserafin.Server.Core -\u003E Tesserafin.Api"
+  ],
+  "streamBuilderFiles": [
+    "Tesserafin.Api/Helpers/MediaInfoHelper.cs",
+    "Tesserafin.Api/Helpers/StreamingHelpers.cs",
+    "Tesserafin.MediaEncoding/Playback/PlaybackSessionPlanner.cs",
+    "Tesserafin.Model/Dlna/StreamBuilder.cs",
+    "Tesserafin.Model/Dlna/StreamInfo.cs",
+    "src/Tesserafin.Playback.Dlna/PlaybackExecutionPlanAdapter.cs"
+  ],
+  "toStreamInfoCallers": [
+    "Tesserafin.MediaEncoding/Playback/PlaybackLiveStreamResolver.cs",
+    "src/Tesserafin.Playback.Dlna/PlaybackExecutionPlanAdapter.cs"
+  ]
+}

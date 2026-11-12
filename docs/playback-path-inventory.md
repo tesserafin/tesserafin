@@ -2,7 +2,7 @@
 
 Status: consolidation programme, step 1 baseline (#129, owner #305). Measured on server `master`
 `ac6570e75f` and Web `main` `e7a33187de`, 2026-11-12. Update this file in the same change that
-removes or adds a path; the architecture check `ci/architecture-ratchet.sh` holds the
+removes or adds a path; the architecture check `tests/Tesserafin.Server.Tests/Architecture/ConsolidationRatchetTests.cs` (baseline `consolidation-ratchet-baseline.json` beside it) holds the
 named exceptions and may only shrink.
 
 ## 1. Server chain as it runs today
