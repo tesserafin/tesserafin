@@ -693,14 +693,21 @@ namespace Tesserafin.Server.Core
                 () => provider.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow,
                 provider.GetRequiredService<PlaybackOperationalMetrics>(),
                 provider.GetRequiredService<ILogger<PlaybackStopThresholdGuard>>()));
-            serviceCollection.AddSingleton<IPlaybackSessionPlanner>(provider => new ShadowPlaybackSessionPlanner(
-                provider.GetRequiredService<PlaybackSessionPlanner>(),
+            // Consolidation step 1 (docs/playback-path-inventory.md §4): the outermost planner offers a
+            // film's planning call to the v2 engine alone first; everything it does not own reaches
+            // the shadow/legacy chain below unchanged.
+            serviceCollection.AddSingleton<IPlaybackSessionPlanner>(provider => new DirectPlayFilmPlanner(
+                new ShadowPlaybackSessionPlanner(
+                    provider.GetRequiredService<PlaybackSessionPlanner>(),
+                    provider.GetRequiredService<IPlaybackEngine>(),
+                    provider.GetRequiredService<ILogger<ShadowPlaybackSessionPlanner>>(),
+                    () => provider.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow,
+                    provider.GetRequiredService<ShadowMetrics>(),
+                    provider.GetRequiredService<IShadowDiagnosticsStore>(),
+                    provider.GetRequiredService<IV2PlanStore>()),
                 provider.GetRequiredService<IPlaybackEngine>(),
-                provider.GetRequiredService<ILogger<ShadowPlaybackSessionPlanner>>(),
-                () => provider.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow,
-                provider.GetRequiredService<ShadowMetrics>(),
-                provider.GetRequiredService<IShadowDiagnosticsStore>(),
-                provider.GetRequiredService<IV2PlanStore>()));
+                provider.GetRequiredService<IV2PlanStore>(),
+                provider.GetRequiredService<ILogger<DirectPlayFilmPlanner>>()));
 
             serviceCollection.AddSingleton<IPlaybackSessionManager>(provider => new PlaybackSessionManager(
                 provider.GetRequiredService<IPlaybackSessionPlanner>(),
