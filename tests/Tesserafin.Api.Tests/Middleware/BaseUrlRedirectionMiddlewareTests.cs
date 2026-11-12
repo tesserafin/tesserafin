@@ -79,7 +79,8 @@ public sealed class BaseUrlRedirectionMiddlewareTests
         "/movies",
         "/a/b/c/d/e",
         "/movies?sort=name",
-        "/movies#anchor",
+        // A literal '#' fragment is never sent by a browser. A hash in the path is encoded.
+        "/movies%23anchor",
     };
 
     [Theory]
@@ -216,6 +217,7 @@ public sealed class BaseUrlRedirectionMiddlewareTests
     [InlineData("GET  HTTP/1.1")]
     [InlineData("GET * HTTP/1.1")]
     [InlineData("GET ../../etc/passwd HTTP/1.1")]
+    [InlineData("GET /movies#anchor HTTP/1.1")]
     [InlineData("GET / HTTP/9.9")]
     [InlineData("GET")]
     [InlineData("")]
