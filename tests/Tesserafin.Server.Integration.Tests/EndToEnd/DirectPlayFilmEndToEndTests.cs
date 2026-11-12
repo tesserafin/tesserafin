@@ -38,7 +38,11 @@ namespace Tesserafin.Server.Integration.Tests.EndToEnd;
 /// implementations that throw: any request of this journey that still reached the legacy chain
 /// fails with a 500 instead of producing a visually identical result.
 /// </summary>
-[Trait("Category", "Smoke")]
+/// <remarks>
+/// Deliberately not <c>Category=Smoke</c>: the hosted integration job installs ffmpeg (needed only
+/// to generate the fixture and to start the host) and runs these on every non-draft change, and
+/// requires each of them by name, so a rename, skip or filter turns the check red.
+/// </remarks>
 public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEndTests.LegacyFreeFactory>, IAsyncLifetime
 {
     private const int FixtureSeconds = 10;

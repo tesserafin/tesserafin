@@ -322,6 +322,12 @@ jobs:
           "$(command -v python3 || command -v python)" ci/summarize-test-results.py artifacts/test-results/integration
           --require Tesserafin.Server.Integration.Tests.OpenApiContractTests.CommittedContract_MatchesRunningServer
           --require Tesserafin.Server.Integration.Tests.OpenApiContractTests.Contract_IsByteIdentical_AcrossColdGenerations
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_StartAndSeek_ServesRangesFromTheSessionFile
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_ParametersThatDoNotMatchTheSession_AreNotServed
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_Stop_DeletesTheSessionAndRevokesItsCapability
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_AnotherUser_CanNeitherReadNorStopTheSession
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_AccessWithdrawnAfterPlanning_StopsServing
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_StoppedPosition_IsStoredAndAResumedSessionServesFromIt
 
       # Diagnosis, not enforcement. The OpenAPI equality assertion is unchanged and still
       # fails the job; this only stops a cross-machine divergence from being unreproducible.
