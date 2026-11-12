@@ -68,31 +68,48 @@ No Web journey is v2-authoritative: with the flag off nothing calls Sessions; wi
 Kept on purpose: hardware -> software fallback is an execution concern of the transcoding job; it
 does not require the legacy decision engine.
 
-## 4. Loop 1 slice: direct-play film
+## 4. Loop 1 slice: direct-play film (delivered)
 
-Target chain:
+Chain as built:
 
 ```
-Web (video item) -> POST /Playback/Sessions (generated SDK)
-  server: engine decides FIRST; DirectPlay with an executable plan -> session planned
-          from the v2 decision only, no StreamBuilder call, Plan.StreamInfo = null
-  -> GET /Playback/Sessions/{id}/Stream -> descriptor minted from the execution plan
-     (no StreamInfo), URL = Sessions-owned file delivery of the selected source
-  -> Web builds its player stream from the descriptor alone (no PlaybackInfo, no
-     createStreamInfo, no overlay)
-  -> stop = DELETE /Playback/Sessions/{id}; resume = startTimeTicks on GET Stream
+Web, film (Type Movie, file system) on the local HTML player
+  -> POST /Playback/Sessions          generated SDK, configured from TesserafinApi (not @jellyfin/sdk)
+     server: PlaybackSessionsController opens the film scope (item is Movie)
+             DirectPlayFilmPlanner: every candidate source is a local file -> the engine decides
+             from the DECLARED capabilities/constraints (no DeviceProfile round trip);
+             DirectPlay + executable plan -> V2PlanRecord published, PlaybackPlan(DirectPlay),
+             StreamInfo = null; StreamBuilder is never constructed
+  -> GET /Playback/Sessions/{id}/Stream    DirectPlayFileDescriptorMapper, from the retained plan
+  -> GET|HEAD /Playback/Sessions/{id}/File?itemId&mediaSourceId&playSessionId
+     PlaybackSessionFilesController: MediaDelivery + Media capability; per request: session
+     exists, caller owns it, item/source/play session match the plan, owner still sees the
+     item; serves the retained source with range support. The client names no file.
+  -> subtitles: /Videos/{item}/{source}/Subtitles/{index}/0/Stream.{vtt|ass} + Subtitles capability
+  -> stop: DELETE /Playback/Sessions/{id} (player `stopped` event); resume: client seek to the
+     stored position (the file is served verbatim)
 ```
 
-Every other decision (remux, transcode, audio, Live TV) keeps today's chain and the global flag.
+Any other decision for a film (remux, transcode, 422) releases its session and continues on the
+existing chain with direct play disabled, so a film never reaches the legacy direct-play path.
+A 401/403/404, a failed descriptor, broker or item read, or a cancellation ends the attempt
+(the session is released; the original error is kept if the release fails).
 
-Code deleted when the slice closes (named before implementation):
+What was deleted and what stays, by consumer:
 
-- Server: the DirectPlay branch of `PlaybackExecutionPlanAdapter.ToStreamInfo` and its tests, and
-  the legacy fallback for an engine-decided direct-play session in `PlaybackLiveStreamResolver`
-  (kill switch, stop threshold and source-mismatch fallbacks no longer apply to it).
-- Web: the DirectPlay handling of the V2 URL overlay (`applyResolvedV2ResultToStreamInfo` DirectPlay
-  case and the pre-#46 `directPlayMimeType` fallback) and the PlaybackInfo / `createStreamInfo`
-  route for a film the server direct-plays.
+- Server `StreamBuilder`, `PlaybackSessionPlanner`, `ShadowPlaybackSessionPlanner`: still reached by
+  every non-film video, audio and `PlaybackInfo`; never by the film journey (proved by
+  `DirectPlayFilmEndToEndTests` on a host where both throw).
+- `PlaybackExecutionPlanAdapter.ToStreamInfo` DirectPlay branch and the `PlaybackLiveStreamResolver`
+  fallback: still used by engine-authoritative non-film sessions (Mode V2/Canary) and by
+  `PlaybackInfo`; unreachable for a film. They go with their last consumer (step 2).
+- Kill switch: no longer applies to a film's direct play (there is no legacy fallback left for it);
+  `KillSwitch_ForcesLegacyOnNextRequest_UrlStillServable` now runs on a non-film video.
+- Web V2 URL overlay DirectPlay case and the pre-#46 `directPlayMimeType` fallback: still used by
+  non-film videos when the global flag is on. The flag stays until its last consumer migrates.
+- Web `PlaybackInfo` + `createStreamInfo` for a film: no longer reached on a direct play
+  (`directPlayFilmPlayback.test.ts` and the browser spec `directPlayFilm.spec.ts` fail if they are).
 
-Proof required on a real server: start, stop (session and capability gone), resume at a stored
-position, and per-user isolation (another user can neither read the descriptor nor stop the session).
+Remaining for the film journey itself (later journeys, not this slice): audio/subtitle track change
+during playback re-plans through the legacy `changeStream`; image subtitles are not offered on a
+direct play; `/Sessions/Playing*` reports still go through `jellyfin-apiclient` (step 3).
