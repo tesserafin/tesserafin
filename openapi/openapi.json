@@ -11030,7 +11030,7 @@
       },
       "PlaybackSessionStreamDescriptor": {
         "additionalProperties": false,
-        "description": "PR117 (docs/pr116d-url-contract-design.md \u00A72.2): the companion, client-facing descriptor of the\nexecutable URL for a session already planned via \u0060Playback/Sessions\u0060 - returned only from\n\u0060GET Playback/Sessions/{id}/Stream\u0060, never composed into Tesserafin.Api.Models.PlaybackSessionDtos.PlaybackSessionListItem\nor Tesserafin.Api.Models.PlaybackSessionDtos.PlaybackDiagnosticDetail (design doc \u00A71.4: those two reach the admin-elevated,\ncross-user diagnostics surface, and a URL there would leak the access token\nTesserafin.Api.Models.PlaybackSessionDtos.PlaybackSessionStreamDescriptor.Url carries to any administrator browsing another user\u0027s session).",
+        "description": "PR117 (docs/pr116d-url-contract-design.md \u00A72.2): the companion, client-facing descriptor of the\nexecutable URL for a session already planned via \u0060Playback/Sessions\u0060 - returned only from\n\u0060GET Playback/Sessions/{id}/Stream\u0060, never composed into Tesserafin.Api.Models.PlaybackSessionDtos.PlaybackSessionListItem\nor Tesserafin.Api.Models.PlaybackSessionDtos.PlaybackDiagnosticDetail (design doc \u00A71.4: those two reach the admin-elevated,\ncross-user diagnostics surface). Neither URL carries a credential: the client authenticates\neach request for the resource with its own session or a playback capability.",
         "properties": {
           "Container": {
             "description": "LANE S / issue #44 \u00A78 arbitrage A: the EFFECTIVE output container of the stream\nTesserafin.Api.Models.PlaybackSessionDtos.PlaybackSessionStreamDescriptor.Url resolves to - the very value the URL itself carries\n(\u0060/stream.{container}\u0060 on Tesserafin.Playback.Decision.StreamingProtocol.Http,\n\u0060\u0026SegmentContainer={container}\u0060 on Tesserafin.Playback.Decision.StreamingProtocol.Hls, where it is\ntherefore the SEGMENT container, not \u0060m3u8\u0060). Until this field existed the server picked a\ncontainer and reported it nowhere, so a client had no way to name what it was about to play\nwithout borrowing the legacy \u0060TranscodingContainer\u0060 - which is exactly why reefin-web #24\nhad to fall the whole remux/non-HLS-transcode decision back to legacy. null\nonly when the served stream carries no container at all.",
@@ -11083,7 +11083,7 @@
             "type": "string"
           },
           "Url": {
-            "description": "The executable URL, resolved at call time - direct output of \u0060StreamInfo.ToUrl(null, accessToken, null)\u0060,\nrelative (the client already knows its own \u0060baseUrl\u0060, same posture as the legacy\n\u0060TranscodingUrl\u0060).",
+            "description": "The executable URL, resolved at call time - without any credential,\nrelative (the client already knows its own \u0060baseUrl\u0060, same posture as the legacy\n\u0060TranscodingUrl\u0060).",
             "type": "string"
           }
         },

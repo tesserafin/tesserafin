@@ -32,9 +32,11 @@ public class PlaybackSessionStreamDescriptorMapperTests
             MediaSource = new MediaSourceInfo { Id = "source-1" },
         };
 
-        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>(), accessToken: "token-1");
+        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>());
 
-        Assert.Equal(streamInfo.ToUrl(null, "token-1", null), descriptor.Url);
+        Assert.Equal(streamInfo.ToUrl(null, null, null), descriptor.Url);
+        Assert.DoesNotContain("ApiKey", descriptor.Url, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("api_key", descriptor.Url, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -52,7 +54,7 @@ public class PlaybackSessionStreamDescriptorMapperTests
             MediaSource = new MediaSourceInfo { Id = "source-1" },
         };
 
-        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>(), accessToken: null);
+        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>());
 
         Assert.Equal(expected, descriptor.Protocol);
     }
@@ -69,11 +71,11 @@ public class PlaybackSessionStreamDescriptorMapperTests
             MediaSource = new MediaSourceInfo { Id = "source-1" },
         };
 
-        var served = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 6, fallbackReason: null, Mock.Of<ITranscoderSupport>(), accessToken: null);
+        var served = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 6, fallbackReason: null, Mock.Of<ITranscoderSupport>());
         Assert.Equal(6, served.ServedBy);
         Assert.Null(served.FallbackReason);
 
-        var fallback = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: PlaybackSessionResponse.LegacyDecisionVersion, fallbackReason: PlaybackLiveFallbackReason.KillSwitch, Mock.Of<ITranscoderSupport>(), accessToken: null);
+        var fallback = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: PlaybackSessionResponse.LegacyDecisionVersion, fallbackReason: PlaybackLiveFallbackReason.KillSwitch, Mock.Of<ITranscoderSupport>());
         Assert.Equal(PlaybackSessionResponse.LegacyDecisionVersion, fallback.ServedBy);
         Assert.Equal(PlaybackLiveFallbackReason.KillSwitch, fallback.FallbackReason);
     }
@@ -91,7 +93,7 @@ public class PlaybackSessionStreamDescriptorMapperTests
             MediaSource = new MediaSourceInfo { Id = "source-1" },
         };
 
-        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>(), accessToken: null);
+        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>());
 
         Assert.Null(descriptor.SubtitleUrl);
     }
@@ -126,7 +128,7 @@ public class PlaybackSessionStreamDescriptorMapperTests
             MediaSource = mediaSource,
         };
 
-        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>(), accessToken: null);
+        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>());
 
         Assert.Null(descriptor.SubtitleUrl);
     }
@@ -160,10 +162,12 @@ public class PlaybackSessionStreamDescriptorMapperTests
             MediaSource = mediaSource,
         };
 
-        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>(), accessToken: "token-1");
+        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>());
 
         Assert.NotNull(descriptor.SubtitleUrl);
         Assert.Contains("/Subtitles/0/", descriptor.SubtitleUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("api_key", descriptor.SubtitleUrl, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ApiKey", descriptor.SubtitleUrl, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -190,7 +194,7 @@ public class PlaybackSessionStreamDescriptorMapperTests
             MediaSource = new MediaSourceInfo { Id = "source-1" },
         };
 
-        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>(), accessToken: null);
+        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>());
 
         Assert.Equal(container, descriptor.Container);
         Assert.Equal(expectedMimeType, descriptor.MimeType);
@@ -219,7 +223,7 @@ public class PlaybackSessionStreamDescriptorMapperTests
             MediaSource = new MediaSourceInfo { Id = "source-1" },
         };
 
-        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>(), accessToken: null);
+        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>());
 
         Assert.Equal(segmentContainer, descriptor.Container);
         Assert.Equal("application/vnd.apple.mpegurl", descriptor.MimeType);
@@ -245,7 +249,7 @@ public class PlaybackSessionStreamDescriptorMapperTests
             MediaSource = new MediaSourceInfo { Id = "source-1" },
         };
 
-        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>(), accessToken: null);
+        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>());
 
         Assert.Null(descriptor.Container);
         Assert.Null(descriptor.MimeType);
@@ -269,7 +273,7 @@ public class PlaybackSessionStreamDescriptorMapperTests
             MediaSource = new MediaSourceInfo { Id = "source-1" },
         };
 
-        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>(), accessToken: null);
+        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(streamInfo, servedBy: 1, fallbackReason: null, Mock.Of<ITranscoderSupport>());
 
         Assert.Equal("notacontainer", descriptor.Container);
         Assert.Null(descriptor.MimeType);

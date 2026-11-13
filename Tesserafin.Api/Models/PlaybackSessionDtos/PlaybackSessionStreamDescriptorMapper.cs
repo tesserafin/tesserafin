@@ -12,7 +12,10 @@ namespace Tesserafin.Api.Models.PlaybackSessionDtos;
 /// <see cref="PlaybackSessionStreamDescriptor"/>. Reads only what is already on the resolved
 /// <see cref="StreamInfo"/> - never re-decides, never re-serializes via a new URL-building path
 /// (design doc §1.3: the executable parity invariant requires reusing <c>StreamInfo.ToUrl</c>
-/// verbatim).
+/// verbatim). No credential is written into either URL: a descriptor names a resource, and the
+/// client authenticates each request for it with its own session (an <c>Authorization</c> header)
+/// or a <c>playbackCapability</c> it mints. This is the same contract as the session-owned routes
+/// <see cref="EngineFilmDescriptorMapper"/> names.
 /// </summary>
 public static class PlaybackSessionStreamDescriptorMapper
 {
@@ -23,21 +26,19 @@ public static class PlaybackSessionStreamDescriptorMapper
     /// <param name="servedBy">The real engine version that produced <paramref name="streamInfo"/>, or <see cref="PlaybackSessionResponse.LegacyDecisionVersion"/> when it fell back to legacy.</param>
     /// <param name="fallbackReason">Why legacy was served instead of v2, or <see langword="null"/> when <paramref name="servedBy"/> is a real v2 version.</param>
     /// <param name="transcoderSupport">Used to resolve the external subtitle delivery URL, mirroring <c>MediaInfoHelper.SetDeviceSpecificSubtitleInfo</c>'s own resolution - never mutates <paramref name="streamInfo"/>'s media source.</param>
-    /// <param name="accessToken">The caller's own access token - the same value the legacy path already serializes into <c>&amp;ApiKey=</c>.</param>
     /// <returns>The mapped descriptor.</returns>
     public static PlaybackSessionStreamDescriptor Map(
         StreamInfo streamInfo,
         int servedBy,
         PlaybackLiveFallbackReason? fallbackReason,
-        ITranscoderSupport transcoderSupport,
-        string? accessToken)
+        ITranscoderSupport transcoderSupport)
     {
         return new PlaybackSessionStreamDescriptor(
-            streamInfo.ToUrl(null, accessToken, null),
+            streamInfo.ToUrl(null, null, null),
             streamInfo.SubProtocol == MediaStreamProtocol.hls ? Tesserafin.Playback.Decision.StreamingProtocol.Hls : Tesserafin.Playback.Decision.StreamingProtocol.Http,
             servedBy,
             fallbackReason,
-            ResolveSubtitleUrl(streamInfo, transcoderSupport, accessToken),
+            ResolveSubtitleUrl(streamInfo, transcoderSupport),
             streamInfo.Container,
             ResolveMimeType(streamInfo));
     }
@@ -74,7 +75,7 @@ public static class PlaybackSessionStreamDescriptorMapper
     /// <see cref="StreamInfo.GetSubtitleProfiles(ITranscoderSupport, bool, string, string)"/>'s own
     /// projection, since the descriptor never needs to mutate the caller's media source.
     /// </summary>
-    private static string? ResolveSubtitleUrl(StreamInfo streamInfo, ITranscoderSupport transcoderSupport, string? accessToken)
+    private static string? ResolveSubtitleUrl(StreamInfo streamInfo, ITranscoderSupport transcoderSupport)
     {
         if (streamInfo.SubtitleStreamIndex is not int index || index < 0
             || streamInfo.SubtitleDeliveryMethod != SubtitleDeliveryMethod.External)
@@ -83,7 +84,7 @@ public static class PlaybackSessionStreamDescriptorMapper
         }
 
         var profile = streamInfo
-            .GetSubtitleProfiles(transcoderSupport, includeSelectedTrackOnly: true, baseUrl: "-", accessToken)
+            .GetSubtitleProfiles(transcoderSupport, includeSelectedTrackOnly: true, baseUrl: "-", accessToken: null)
             .FirstOrDefault(p => p.Index == index && p.DeliveryMethod == SubtitleDeliveryMethod.External);
 
         return profile?.Url?.TrimStart('-');

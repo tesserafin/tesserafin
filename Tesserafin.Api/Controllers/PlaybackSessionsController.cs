@@ -452,12 +452,10 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             return UnprocessableEntity("Session has no plannable stream - this endpoint only serves sessions planned via Playback/Sessions.");
         }
 
-        // PR118 (moved up from after resolution): a URL without the caller's token would 401 at
-        // fetch time (silent client breakage), and a caller authenticated without a bearer token has
-        // no business triggering resolution at all - not just receiving a tokenized URL at the end.
-        // Checked before any operational effect (resolution, diagnostics, metrics).
-        var accessToken = User.GetToken();
-        if (string.IsNullOrEmpty(accessToken))
+        // PR118: a caller authenticated without a bearer token has no business triggering
+        // resolution at all. Checked before any operational effect (resolution, diagnostics,
+        // metrics). The token itself is not used: no descriptor carries a credential.
+        if (string.IsNullOrEmpty(User.GetToken()))
         {
             return Forbid();
         }
@@ -539,7 +537,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             resolvedStreamInfo.PlayMethod = PlayMethod.Transcode;
         }
 
-        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(resolvedStreamInfo, servedBy, outcome?.FallbackReason, _mediaEncoder, accessToken);
+        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(resolvedStreamInfo, servedBy, outcome?.FallbackReason, _mediaEncoder);
         return Ok(descriptor);
     }
 
