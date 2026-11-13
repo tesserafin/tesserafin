@@ -50,7 +50,7 @@
 #  10. ALWAYS tears down — server process AND temp directory — via a trap, on success, failure,
 #      Ctrl-C or SIGTERM alike. Pass --keep to retain the temp tree for debugging.
 #
-# MEDIA FIXTURES — four scenarios, two libraries:
+# MEDIA FIXTURES — five scenarios, three libraries:
 #
 #   library "Movies" (CollectionType=movies) — EXACTLY TWO ITEMS, SEE THE CONTRACT NOTE BELOW
 #     Smoke Test Movie (2020)/Smoke Test Movie (2020).mp4      H264 + AAC in MP4    -> DIRECT PLAY
@@ -59,6 +59,24 @@
 #
 #   library "Codec Probes" (CollectionType=homevideos)
 #     Remux Probe (2022)/Remux Probe (2022).mkv                H264 + AAC in MKV    -> REMUX
+#
+#   library "Film Probes" (no CollectionType: mixed content)
+#     Container Film (2023)/Container Film (2023).ts           H264 + AAC in MPEG-TS -> REMUX, AS A MOVIE
+#     Container Film (2023)/Container Film (2023).en.srt       SubRip sidecar       -> EXTERNAL SUB
+#
+#   WHY A THIRD LIBRARY FOR THE REMUX FILM: "Remux Probe" is a `Video` (homevideos resolves
+#   nothing else), and the film playback journey only owns items of type `Movie`. A Movie cannot
+#   go into "Movies" (exactly two items, below) and a second movies-typed library is ruled out
+#   too, so the film lives in a mixed-content library, where a folder named "Title (Year)"
+#   resolves as a Movie. It is 30 s long with a keyframe every second, unlike the 2 s fixtures:
+#   a copy can only be cut at keyframes, and a seek and a resume need somewhere to go.
+#
+#   WHY MPEG-TS AND NOT MATROSKA FOR THE FILM: measured on this rig (2026-11-13), the Chrome
+#   channel the specs run under answers canPlayType("video/x-matroska"), so the Web client
+#   declares mkv and the server rightly DIRECT PLAYS H264/AAC-in-Matroska - the film played,
+#   sought and resumed from the session file route. No browser plays a bare MPEG transport
+#   stream in <video>, and the client declares no such container, so the same codecs in .ts
+#   are a remux in every channel.
 #
 #   WHY MPEG-4 PART 2 + AC-3 FOR THE TRANSCODE FIXTURE: Chromium ships no MPEG-4 Part 2 (a.k.a.
 #   MPEG-4 Visual / DivX / Xvid, ffprobe codec_name "mpeg4") video decoder and no AC-3 audio
@@ -211,6 +229,7 @@ MEDIA_DIR="$DATADIR/media/movies"
 # Second media root, indexed as a separate non-movies library so the movies library keeps the
 # exactly-two-items shape reefin-web's library.spec.ts hard-codes (see the header).
 PROBE_DIR="$DATADIR/media/probes"
+FILM_ROOT="$DATADIR/media/films"
 LOG_FILE="$DATADIR/server.log"
 mkdir -p "$CONFIG_DIR" "$MEDIA_DIR" "$PROBE_DIR"
 
@@ -350,7 +369,10 @@ TRANSCODE_DIR="$MEDIA_DIR/Transcode Probe (2021)"
 TRANSCODE_FILE="$TRANSCODE_DIR/Transcode Probe (2021).mp4"
 REMUX_DIR="$PROBE_DIR/Remux Probe (2022)"
 REMUX_FILE="$REMUX_DIR/Remux Probe (2022).mkv"
-mkdir -p "$DIRECTPLAY_DIR" "$TRANSCODE_DIR" "$REMUX_DIR"
+FILM_DIR="$FILM_ROOT/Container Film (2023)"
+FILM_FILE="$FILM_DIR/Container Film (2023).ts"
+FILM_SUBTITLE_FILE="$FILM_DIR/Container Film (2023).en.srt"
+mkdir -p "$DIRECTPLAY_DIR" "$TRANSCODE_DIR" "$REMUX_DIR" "$FILM_DIR"
 
 banner "Synthesizing media fixtures with ffmpeg (each one ffprobe-verified)"
 
@@ -419,6 +441,34 @@ REMUX_FP="$(probe_fingerprint "$REMUX_FILE")"
     $DIRECTPLAY_FILE: $DIRECTPLAY_FP
     $REMUX_FILE: $REMUX_FP"
 log "    remux ok: stream fingerprints identical to the direct-play MP4 ($(printf '%s' "$DIRECTPLAY_FP" | tr '\n' ' '))"
+
+# --- 5. REMUX, AS A MOVIE: H264 + AAC in MPEG-TS, 30 s, a keyframe every second -----------
+log "fixture: $FILM_FILE (remux film — H264 + AAC in MPEG-TS, 30 s)"
+# -g/-keyint_min 15 at 15 fps: one keyframe per second, so a stream copy can be cut into
+# several HLS segments and a seek lands inside the film rather than at its only keyframe.
+ffmpeg -hide_banner -loglevel error -y \
+    -f lavfi -i "testsrc=size=320x240:rate=15:duration=30" \
+    -f lavfi -i "sine=frequency=1000:duration=30" \
+    -c:v libx264 -preset ultrafast -crf 36 -pix_fmt yuv420p \
+    -g 15 -keyint_min 15 -sc_threshold 0 \
+    -c:a aac -b:a 64k -f mpegts \
+    "$FILM_FILE"
+assert_container "$FILM_FILE" mpegts
+assert_codec     "$FILM_FILE" v:0 h264
+assert_codec     "$FILM_FILE" a:0 aac
+assert_under_1mib "$FILM_FILE"
+log "fixture: $FILM_SUBTITLE_FILE (external subtitle — SubRip sidecar of the remux film)"
+cat > "$FILM_SUBTITLE_FILE" <<'SRT'
+1
+00:00:00,500 --> 00:00:10,000
+Tesserafin E2E remux film subtitle, cue one.
+
+2
+00:00:10,000 --> 00:00:29,000
+Tesserafin E2E remux film subtitle, cue two.
+SRT
+assert_container "$FILM_SUBTITLE_FILE" srt
+assert_codec     "$FILM_SUBTITLE_FILE" s:0 subrip
 
 # ---------------------------------------------------------------------------
 # network.xml — the ONLY way to set the listen port (see this script's header).
@@ -600,6 +650,9 @@ add_library() {
 # library MUST be created as a movies collection — and must remain the ONLY one, because
 # library.spec.ts and theme-glass.spec.ts both resolve it with a first-match `.find()`.
 add_library "Movies" movies "$MEDIA_DIR" false
+# The remux FILM: a mixed-content library (no collection type), where it resolves as a Movie
+# without becoming a third card of the movies grid or a second movies-typed library.
+add_library "Film Probes" "" "$FILM_ROOT" false
 # The remux fixture lives here rather than in Movies so the movies grid keeps exactly two
 # cards. homevideos still resolves to Video items, so ffprobe metadata and external-subtitle
 # resolution work identically — only the card count of the contract library is protected.
@@ -609,7 +662,7 @@ add_library "Codec Probes" homevideos "$PROBE_DIR" true
 # ---------------------------------------------------------------------------
 # Wait for the library scan — asynchronous, so "server up" is NOT "view present".
 # ---------------------------------------------------------------------------
-banner "Waiting for both library views to materialize in /UserViews"
+banner "Waiting for the three library views to materialize in /UserViews"
 views_ready=0
 for _ in $(seq 1 "$READY_TIMEOUT"); do
     if ! kill -0 "$SERVER_PID" 2>/dev/null; then
@@ -626,7 +679,8 @@ try:
 except Exception:
     sys.exit(1)
 types = [i.get("CollectionType") for i in items]
-sys.exit(0 if types.count("movies") == 1 and "homevideos" in types else 1)
+names = [i.get("Name") for i in items]
+sys.exit(0 if types.count("movies") == 1 and "homevideos" in types and "Film Probes" in names else 1)
 ' 2>/dev/null; then
         views_ready=1
         break
@@ -634,15 +688,16 @@ sys.exit(0 if types.count("movies") == 1 and "homevideos" in types else 1)
     sleep 1
 done
 if [ "$views_ready" -ne 1 ]; then
-    echo "ERROR: /UserViews did not settle on exactly one movies view plus a homevideos view within ${READY_TIMEOUT}s." >&2
+    echo "ERROR: /UserViews did not settle on exactly one movies view plus a homevideos view and the Film Probes view within ${READY_TIMEOUT}s." >&2
     echo "Last /UserViews response: ${VIEWS:-<none>}" >&2
     tail -40 "$LOG_FILE" >&2 || true
     exit 1
 fi
-log "both library views are visible in /UserViews"
+log "the three library views are visible in /UserViews"
 
 MOVIES_VIEW_ID="$(printf '%s' "$VIEWS" | python3 -c 'import json,sys; print(next(i["Id"] for i in json.load(sys.stdin)["Items"] if i.get("CollectionType") == "movies"))')"
 PROBES_VIEW_ID="$(printf '%s' "$VIEWS" | python3 -c 'import json,sys; print(next(i["Id"] for i in json.load(sys.stdin)["Items"] if i.get("CollectionType") == "homevideos"))')"
+FILMS_VIEW_ID="$(printf '%s' "$VIEWS" | python3 -c 'import json,sys; print(next(i["Id"] for i in json.load(sys.stdin)["Items"] if i.get("Name") == "Film Probes"))')"
 
 # ---------------------------------------------------------------------------
 # Fixture materialization — ffprobe proved the bytes on disk; this proves the SERVER
@@ -674,12 +729,13 @@ for _ in $(seq 1 "$READY_TIMEOUT"); do
     fi
     ITEMS_MOVIES="$(fetch_items "$MOVIES_VIEW_ID")"
     ITEMS_PROBES="$(fetch_items "$PROBES_VIEW_ID")"
-    if [ -z "$ITEMS_MOVIES" ] || [ -z "$ITEMS_PROBES" ]; then
-        CHECK_REPORT="  /Items returned nothing (movies body: ${#ITEMS_MOVIES} bytes, probes body: ${#ITEMS_PROBES} bytes) — curl failed or the server answered non-2xx"
+    ITEMS_FILMS="$(fetch_items "$FILMS_VIEW_ID")"
+    if [ -z "$ITEMS_MOVIES" ] || [ -z "$ITEMS_PROBES" ] || [ -z "$ITEMS_FILMS" ]; then
+        CHECK_REPORT="  /Items returned nothing (movies body: ${#ITEMS_MOVIES} bytes, probes body: ${#ITEMS_PROBES} bytes, films body: ${#ITEMS_FILMS} bytes) — curl failed or the server answered non-2xx"
         sleep 1
         continue
     fi
-    if CHECK_REPORT="$(TESSERAFIN_ITEMS_MOVIES="$ITEMS_MOVIES" TESSERAFIN_ITEMS_PROBES="$ITEMS_PROBES" python3 -c '
+    if CHECK_REPORT="$(TESSERAFIN_ITEMS_MOVIES="$ITEMS_MOVIES" TESSERAFIN_ITEMS_PROBES="$ITEMS_PROBES" TESSERAFIN_ITEMS_FILMS="$ITEMS_FILMS" python3 -c '
 import json, os, sys
 
 def load(var):
@@ -690,6 +746,7 @@ def load(var):
 
 movies = [i for i in load("TESSERAFIN_ITEMS_MOVIES") if i.get("Type") == "Movie"]
 probes = [i for i in load("TESSERAFIN_ITEMS_PROBES") if i.get("Type") in ("Video", "Movie")]
+films = [i for i in load("TESSERAFIN_ITEMS_FILMS") if i.get("Type") in ("Video", "Movie")]
 
 problems = []
 
@@ -732,6 +789,19 @@ smoke = check(movies, "Smoke Test Movie", "h264", "aac", "mp4")
 check(movies, "Transcode Probe", "mpeg4", "ac3", "mp4")
 check(probes, "Remux Probe", "h264", "aac", "mkv")
 
+# The remux film must be a MOVIE: the film playback journey owns nothing else, and a fixture
+# that resolved as a plain Video would leave that journey untested behind a green rig.
+film = check(films, "Container Film", "h264", "aac", "ts")
+if len(films) != 1:
+    problems.append("film probes library holds %d items, expected exactly 1 (names: %s)"
+                    % (len(films), [i.get("Name") for i in films]))
+if film is not None:
+    if film.get("Type") != "Movie":
+        problems.append("Container Film resolved as %r, expected a Movie" % film.get("Type"))
+    if not any(s.get("Type") == "Subtitle" and s.get("IsExternal") and (s.get("Codec") or "").lower() == "subrip"
+               for s in film.get("MediaStreams", []) or []):
+        problems.append("Container Film has no external subrip subtitle stream")
+
 # The external subtitle must arrive as an IsExternal subtitle stream, not merely as a
 # file sitting in the folder.
 if smoke is not None:
@@ -752,6 +822,7 @@ if problems:
 
 print("  movies library: %s" % sorted(i.get("Name") for i in movies))
 print("  probes library: %s" % sorted(i.get("Name") for i in probes))
+print("  film probes library: %s" % sorted(i.get("Name") for i in films))
 ' 2>&1)"; then
         items_verified=1
         break
@@ -851,8 +922,10 @@ for _ in $(seq 1 30); do
         -H "Authorization: ${AUTH_CLIENT}, Token=\"${RESTRICTED_TOKEN}\"" 2>/dev/null || true)"
     if [ -n "$RVIEWS" ] && printf '%s' "$RVIEWS" | python3 -c '
 import json,sys
-types = [i.get("CollectionType") for i in json.load(sys.stdin).get("Items", [])]
-sys.exit(0 if types.count("movies") == 1 and "homevideos" not in types else 1)
+items = json.load(sys.stdin).get("Items", [])
+types = [i.get("CollectionType") for i in items]
+names = [i.get("Name") for i in items]
+sys.exit(0 if types.count("movies") == 1 and "homevideos" not in types and "Film Probes" not in names else 1)
 ' 2>/dev/null; then
         restricted_ok=1
         break
@@ -863,7 +936,7 @@ if [ "$restricted_ok" -ne 1 ]; then
     echo "ERROR: the restricted user still sees the wrong views. Last /UserViews: ${RVIEWS:-<none>}" >&2
     exit 1
 fi
-log "restricted /UserViews: movies visible, homevideos absent — fixture contract holds"
+log "restricted /UserViews: movies visible, homevideos and Film Probes absent — fixture contract holds"
 
 # OBSERVED, not asserted (see the header note): what direct addressing of the withheld
 # library answers for this user, so the semantics the browser spec pins are on record here.
