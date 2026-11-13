@@ -41,7 +41,7 @@ namespace Tesserafin.Server.Integration.Tests.EndToEnd;
 /// Not <c>Category=Smoke</c>, and required by name in the hosted integration job, for the reasons
 /// given on <see cref="DirectPlayFilmEndToEndTests"/>.
 /// </remarks>
-public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEndTests.LegacyFreeFactory>, IAsyncLifetime
+public sealed partial class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEndTests.LegacyFreeFactory>, IAsyncLifetime
 {
     private const int FixtureSeconds = 18;
     private const string Password = "remux-password";

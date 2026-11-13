@@ -20,11 +20,11 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// Consolidation step 1 (docs/playback-path-inventory.md §4 and §5): a film read from a local file
 /// is decided by the v2 engine alone. The engine receives the capabilities and constraints the
 /// client declared on <c>POST Playback/Sessions</c>, not a <c>DeviceProfile</c> round trip, and the
-/// legacy planner (<c>StreamBuilder</c>) is never invoked for it. Two answers are owned here:
+/// legacy planner (<c>StreamBuilder</c>) is never invoked for it. The supported answers are owned here:
 /// a direct play, served verbatim from the session's own file route, and a remux this server can
 /// execute as a pure stream copy (<see cref="IsExecutableRemux"/>), served from the session's own
-/// HLS route. In both cases the session carries no legacy <c>StreamInfo</c>: its plan is the
-/// retained <see cref="V2PlanRecord"/>. Any other answer — transcode, a remux outside that
+/// HLS route, and SDR H.264/AAC transcodes executed from the same retained plan. In these cases the session carries no legacy <c>StreamInfo</c>: its plan is the
+/// retained <see cref="V2PlanRecord"/>. Any other answer — a transcode or remux outside that
 /// definition, refusal, a source that is not a local file — falls through to the existing chain
 /// unchanged, inside the same planning call, so one request still produces exactly one session.
 /// </summary>
@@ -137,9 +137,12 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
             plan.SourceId,
             plan.Protocol,
             plan.Container);
-        return plan.Method == PlaybackMethod.DirectPlay
-            ? new PlaybackPlan(PlayMethod.DirectPlay, 0)
-            : new PlaybackPlan(PlayMethod.DirectStream, TranscodeReason.ContainerNotSupported);
+        return plan.Method switch
+        {
+            PlaybackMethod.DirectPlay => new PlaybackPlan(PlayMethod.DirectPlay, 0),
+            PlaybackMethod.Remux => new PlaybackPlan(PlayMethod.DirectStream, TranscodeReason.ContainerNotSupported),
+            _ => new PlaybackPlan(PlayMethod.Transcode, 0),
+        };
     }
 
     /// <summary>
@@ -160,6 +163,25 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
             && plan.Transforms.All(transform => transform is TransformKind.RemuxContainer or TransformKind.CopyVideo or TransformKind.CopyAudio or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle)
             && plan.SubtitleDelivery is null or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External;
 
+    /// <summary>
+    /// Whether the HLS executor implements this plan. Transcoding is bounded to SDR H.264/AAC;
+    /// copied axes must already carry those codecs. HDR conversion and subtitle burn-in are separate
+    /// journeys, never implicit work delegated to the legacy decision engine by this executor.
+    /// </summary>
+    /// <param name="plan">The retained plan.</param>
+    /// <returns>Whether this plan has a session-owned HLS delivery.</returns>
+    public static bool IsExecutableHls(PlaybackExecutionPlan? plan)
+        => IsExecutableRemux(plan) || (plan is { Method: PlaybackMethod.Transcode, Protocol: StreamingProtocol.Hls, VideoStreamIndex: not null }
+            && (string.Equals(plan.Container, "mp4", StringComparison.OrdinalIgnoreCase) || string.Equals(plan.Container, "ts", StringComparison.OrdinalIgnoreCase))
+            && !string.IsNullOrEmpty(plan.VideoCodec)
+            && (plan.AudioStreamIndex is null || !string.IsNullOrEmpty(plan.AudioCodec))
+            && (plan.Transforms.Contains(TransformKind.TranscodeVideo) || plan.Transforms.Contains(TransformKind.TranscodeAudio))
+            && string.Equals(plan.VideoCodec, "h264", StringComparison.OrdinalIgnoreCase)
+            && (plan.AudioStreamIndex is null || string.Equals(plan.AudioCodec, "aac", StringComparison.OrdinalIgnoreCase))
+            && plan.Transforms.All(transform => transform is TransformKind.RemuxContainer or TransformKind.CopyVideo or TransformKind.CopyAudio
+                or TransformKind.TranscodeVideo or TransformKind.TranscodeAudio or TransformKind.Downmix or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle)
+            && plan.SubtitleDelivery is null or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External);
+
     private V2PlanRecord? TryDecide(EngineFilmRequest request, MediaOptions options)
     {
         var sources = options.MediaSources
@@ -176,6 +198,7 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
         // for the first direct-play candidate - a remux is only taken when no candidate direct
         // plays - while giving each candidate its own user defaults.
         V2PlanRecord? remux = null;
+        V2PlanRecord? transcode = null;
         foreach (var source in sources)
         {
             var decision = _engine.Decide(context, request.Capabilities, [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(request.Constraints, source));
@@ -195,9 +218,15 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
             {
                 remux = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }
+
+            var video = source.MediaStreams.FirstOrDefault(stream => stream.Index == plan.VideoStreamIndex && stream.Type == MediaStreamType.Video);
+            if (transcode is null && IsExecutableHls(plan) && video is not null && video.VideoRangeType is VideoRangeType.Unknown or VideoRangeType.SDR)
+            {
+                transcode = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
+            }
         }
 
-        return remux;
+        return remux ?? transcode;
     }
 
     /// <summary>

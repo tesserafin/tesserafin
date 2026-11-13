@@ -1,12 +1,12 @@
 # Playback path inventory
 
 Status: consolidation programme, step 1 (#129, owner #305). Baseline (§1–§3) measured on server
-`master` `ac6570e75f` and Web `main` `e7a33187de`, 2026-11-12; §4 and §5 describe what has been
+`master` `ac6570e75f` and Web `main` `e7a33187de`, 2026-11-12; §4–§6 describe what has been
 delivered since. Update this file in the same change that
 removes or adds a path; the architecture check `tests/Tesserafin.Server.Tests/Architecture/ConsolidationRatchetTests.cs` (baseline `consolidation-ratchet-baseline.json` beside it) holds the
 named exceptions and may only shrink.
 
-## 1. Server chain as it runs today
+## 1. Server chain at the 2026-11-12 baseline
 
 ```
 POST /Playback/Sessions                       PlaybackSessionsController.CreatePlaybackSession
@@ -32,11 +32,11 @@ DELETE /Playback/Sessions/{id}
   -> credential revocation + StopTranscodingJobs for the owner (#301)
 ```
 
-Conclusion: in every mode a call to `/Playback/Sessions` still runs the legacy decision
+Baseline conclusion: in every mode a call to `/Playback/Sessions` still runs the legacy decision
 (`StreamBuilder`) and still executes through the legacy `StreamInfo` and the legacy streaming
 controller. Mode V2 only replaces the URL that `StreamInfo` produces.
 
-## 2. Web chain as it runs today
+## 2. Web chain at the 2026-11-12 baseline
 
 ```
 playbackmanager.playInternal
@@ -49,12 +49,12 @@ playbackmanager.playInternal
   -> reportPlaybackStart / Progress / Stopped (jellyfin-apiclient, /Sessions/Playing*)
 ```
 
-No Web journey is v2-authoritative: with the flag off nothing calls Sessions; with it on, the legacy
+At the baseline no Web journey was v2-authoritative: with the flag off nothing calls Sessions; with it on, the legacy
 `PlaybackInfo` decision still runs first and v2 only patches its result.
 
 ## 3. Legacy paths, consumers and removal conditions
 
-| Legacy path | Consumers today | Removal condition |
+| Legacy path | Consumers at the baseline | Removal condition |
 | --- | --- | --- |
 | `StreamBuilder` (`Tesserafin.Model/Dlna`) | `PlaybackSessionPlanner` (Sessions + PlaybackInfo), `StreamingHelpers` / `MediaInfoHelper` (container normalisation), `PlaybackExecutionPlanAdapter` (profile helpers), DLNA adapters, shadow projector | Every supported journey decided by the engine; PlaybackInfo retired or engine-backed; helpers moved to their owners |
 | `PlaybackSessionPlanner` (legacy planner) | `ShadowPlaybackSessionPlanner._inner`, `MediaInfoHelper` | Same as above |
@@ -193,3 +193,34 @@ deleted outright in this slice: each legacy path above still has a named consume
 
 Outside this slice: a remux over plain HTTP (a client with no HLS output profile), a remux that
 needs an audio transcode, transcoding, other media families, the global flag and the shadow.
+
+## 6. Local SDR film transcoding (candidate)
+
+The film planner also owns HLS Transcode plans whose encoded axes are H.264 video and/or AAC
+audio, without HDR conversion or subtitle burn-in. DirectPlay still wins over Remux, which wins
+over Transcode when selecting among alternate versions. Text subtitle handling is unchanged.
+
+The descriptor and byte routes are the same session-owned routes as §5. `SessionHlsRequest`
+projects the retained plan into the shared FFmpeg executor. `StreamingHelpers` skips legacy
+copy/encode and resolution heuristics for this request type. Selected stream indices, current
+encoding permissions, source range and copy feasibility are checked before a job can start;
+an unexecutable plan answers 422. Hardware encoder selection and software fallback remain in
+the existing execution machinery. A combined bitrate ceiling reserves the selected audio's
+budget before setting the video's ceiling; unknown copied bitrates cannot satisfy a known ceiling.
+
+The Web film module accepts a Transcode descriptor only for its own session HLS route. Track,
+quality and error recovery therefore stay on Sessions for this scope. The previous unconditional
+Transcode-decision release and PlaybackInfo fallback is gone; a descriptor outside this scope
+still identifies an unmigrated journey and is released before using the existing chain.
+
+Validation lives with the implementation: `Film_Transcode_ExecutesOnlyThePlannedAxesAndCleansUp`
+uses the legacy-free real host, FFmpeg and ffprobe for audio-only encoding, video-only encoding,
+and both axes. It verifies actual output codecs/resolution/channels, copy flags, current
+permissions, session teardown and eventual output cleanup. The hosted integration job requires
+this theory by name. The manager test proves a decode-error recovery into a Transcode never
+calls PlaybackInfo or createStreamInfo.
+
+Remaining consumers: HDR/tone mapping, burn-in, unsupported output codecs/protocols, non-film
+video, audio, Live TV and PlaybackInfo. Shared legacy decisions are not removed globally while
+those consumers remain. Steps 1 and 2 stay open. This candidate depends on the credential-free
+server descriptor contract in #409 and the Android authentication change in mobile#21.

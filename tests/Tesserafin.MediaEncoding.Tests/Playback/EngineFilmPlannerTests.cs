@@ -197,6 +197,31 @@ public sealed class EngineFilmPlannerTests
         Assert.False(EngineFilmPlanner.IsExecutableRemux(null));
     }
 
+    [Theory]
+    [InlineData("mpeg4", "aac", TransformKind.TranscodeVideo, TransformKind.CopyAudio)]
+    [InlineData("h264", "ac3", TransformKind.CopyVideo, TransformKind.TranscodeAudio)]
+    [InlineData("mpeg4", "ac3", TransformKind.TranscodeVideo, TransformKind.TranscodeAudio)]
+    public void Sdr_hls_transcoding_is_owned_without_the_legacy_planner(string videoCodec, string audioCodec, TransformKind videoTransform, TransformKind audioTransform)
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var source = Source("film", videoCodec, 1, 2, "mkv");
+        source.MediaStreams[1].Codec = audioCodec;
+        using var capture = store.BeginCapture();
+        using var request = EngineFilmPlanner.BeginRequest(new EngineFilmRequest(Browser(hlsOutput: true), _declared));
+        var planned = planner.PlanVideo(Options(source));
+        var record = store.TakeCaptured();
+
+        Assert.Equal(PlayMethod.Transcode, planned?.PlayMethod);
+        Assert.Null(planned?.StreamInfo);
+        Assert.NotNull(record?.ExecutionPlan);
+        Assert.Equal(PlaybackMethod.Transcode, record.ExecutionPlan.Method);
+        Assert.Equal("h264", record.ExecutionPlan.VideoCodec);
+        Assert.Equal("aac", record.ExecutionPlan.AudioCodec);
+        Assert.Contains(videoTransform, record.ExecutionPlan.Transforms);
+        Assert.Contains(audioTransform, record.ExecutionPlan.Transforms);
+        Assert.True(EngineFilmPlanner.IsExecutableHls(record.ExecutionPlan));
+    }
+
     private static (EngineFilmPlanner Planner, InMemoryV2PlanStore Store) Planner(IPlaybackSessionPlanner inner)
     {
         var store = new InMemoryV2PlanStore();

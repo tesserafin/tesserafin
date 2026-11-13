@@ -329,6 +329,7 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_AccessWithdrawnAfterPlanning_StopsServing
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_StoppedPosition_IsStoredAndAResumedSessionServesFromIt
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_UserSubtitlePreference_DecidesWhenTheClientNamesNoTrack
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.Film_Transcode_ExecutesOnlyThePlannedAxesAndCleansUp
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_StartSeekStop_CopiesBothStreamsInOneSessionAndOneJob
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_MediaElementCredential_ReadsOnlyWhileTheSessionLives
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_AnotherUser_CanNeitherReadNorStopNorTakeTheJob
