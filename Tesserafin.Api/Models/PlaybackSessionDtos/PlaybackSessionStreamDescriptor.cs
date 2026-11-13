@@ -8,11 +8,11 @@ namespace Tesserafin.Api.Models.PlaybackSessionDtos;
 /// executable URL for a session already planned via <c>Playback/Sessions</c> - returned only from
 /// <c>GET Playback/Sessions/{id}/Stream</c>, never composed into <see cref="PlaybackSessionListItem"/>
 /// or <see cref="PlaybackDiagnosticDetail"/> (design doc §1.4: those two reach the admin-elevated,
-/// cross-user diagnostics surface, and a URL there would leak the access token
-/// <see cref="Url"/> carries to any administrator browsing another user's session).
+/// cross-user diagnostics surface). Neither URL carries a credential: the client authenticates
+/// each request for the resource with its own session or a playback capability.
 /// </summary>
 /// <param name="Url">
-/// The executable URL, resolved at call time - direct output of <c>StreamInfo.ToUrl(null, accessToken, null)</c>,
+/// The executable URL, resolved at call time - without any credential,
 /// relative (the client already knows its own <c>baseUrl</c>, same posture as the legacy
 /// <c>TranscodingUrl</c>).
 /// </param>

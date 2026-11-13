@@ -1053,7 +1053,7 @@ public class PlaybackSessionsControllerTests
         // Independent oracle: the exact StreamInfo.ToUrl call the legacy path itself makes.
         streamInfo.PlaySessionId = "play-session-1";
         streamInfo.StartPositionTicks = 500;
-        var expectedUrl = streamInfo.ToUrl(null, "caller-token", null);
+        var expectedUrl = streamInfo.ToUrl(null, null, null);
         Assert.Equal(expectedUrl, descriptor.Url);
     }
 
@@ -1161,7 +1161,7 @@ public class PlaybackSessionsControllerTests
         var expectedStreamInfo = PlaybackExecutionPlanAdapter.ToStreamInfo(executionPlan, context, mediaSource, profile);
         expectedStreamInfo.PlaySessionId = "play-session-1";
         expectedStreamInfo.StartPositionTicks = 250;
-        Assert.Equal(expectedStreamInfo.ToUrl(null, "caller-token", null), descriptor.Url);
+        Assert.Equal(expectedStreamInfo.ToUrl(null, null, null), descriptor.Url);
     }
 
     // ---------------------------------------------------------------------------------------
