@@ -71,8 +71,16 @@ public sealed class PlaybackEngine : IPlaybackEngine
     /// container over plain HTTP. Decision-affecting for every remux of a client that declares
     /// such a profile (a browser: HLS).
     /// </para>
+    /// <para>
+    /// Consolidation step 1 (transcode film) bumped 8→9: a copy the request forbids
+    /// (<see cref="PlaybackConstraints.AllowVideoStreamCopy"/>,
+    /// <see cref="PlaybackConstraints.AllowAudioStreamCopy"/>) is re-encoded inside a
+    /// <see cref="PlaybackMethod.Transcode"/> too, and a demotion caused by such a prohibition
+    /// re-encodes the forbidden axis only. Decision-affecting for every transcode whose request
+    /// forbids a copy the media alone would have kept.
+    /// </para>
     /// </remarks>
-    public const int EngineVersion = 8;
+    public const int EngineVersion = 9;
 
     /// <summary>
     /// The transcoding target video codec used when the client declares no
@@ -494,10 +502,27 @@ public sealed class PlaybackEngine : IPlaybackEngine
         // selection, the output profile viability gate, the output bitrate ceilings, the transform
         // list and OutputSpec below are all driven off exactly these flags, so demotion reuses every
         // one of them verbatim instead of introducing a parallel path.
-        if (neededMethod == PlaybackMethod.Transcode && !wantsTranscode)
+        //
+        // v9 - a copy prohibition is honoured INSIDE a transcode too. Before, AllowVideoStreamCopy
+        // and AllowAudioStreamCopy only vetoed the Remux rung: a transcode the media asked for on
+        // one axis kept copying the other even when the request forbade that copy, so a caller
+        // whose copied stream turned out not to be copyable had no way to ask for it re-encoded.
+        // A demotion caused by a copy prohibition re-encodes the forbidden axis only; a demotion
+        // with no copy prohibition (direct stream forbidden as such) re-encodes both, as before.
+        if (neededMethod == PlaybackMethod.Transcode)
         {
-            needVideoTranscode = selectedVideo is not null;
-            needAudioTranscode = selectedAudio is not null;
+            var videoCopyForbidden = selectedVideo is not null && !constraints.AllowVideoStreamCopy;
+            var audioCopyForbidden = selectedAudio is not null && !constraints.AllowAudioStreamCopy;
+            if (!wantsTranscode && !videoCopyForbidden && !audioCopyForbidden)
+            {
+                needVideoTranscode = selectedVideo is not null;
+                needAudioTranscode = selectedAudio is not null;
+            }
+            else
+            {
+                needVideoTranscode |= videoCopyForbidden;
+                needAudioTranscode |= audioCopyForbidden;
+            }
         }
 
         // --- OUTPUT PROFILE (PR102, viability PR103) ---

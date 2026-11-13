@@ -495,7 +495,7 @@ public static class PlaybackEnginePhase2Tests
     }
 
     [Fact]
-    public static void EngineVersion_IsEight()
+    public static void EngineVersion_IsNine()
     {
         // PR111e bumped 5->6: CSV-aware container comparisons, Direct Play container resolution,
         // and the HDR10-or-SDR tonemap-target policy are all decision-affecting changes to Decide.
@@ -503,7 +503,9 @@ public static class PlaybackEnginePhase2Tests
         // allowed method instead of vetoing the source.
         // Consolidation step 1 bumped 7->8: a remux is delivered through the declared output profile
         // that can carry the copied streams (PlaybackEngineRemuxDeliveryTests).
-        Assert.Equal(8, PlaybackEngine.EngineVersion);
+        // Consolidation step 1 bumped 8->9: a forbidden stream copy is re-encoded inside a transcode
+        // too, and only the forbidden axis on a demotion (PlaybackEngineCopyProhibitionTests).
+        Assert.Equal(9, PlaybackEngine.EngineVersion);
     }
 
     // ---------------------------------------------------------------------------------------
