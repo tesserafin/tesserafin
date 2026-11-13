@@ -155,7 +155,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         // shadow mode is off (the default) the shadow run never executes and this scope costs one
         // AsyncLocal write and produces nothing.
         PlaybackSession? session;
-        using (BeginDirectPlayFilmScope(isFilm, request))
+        using (BeginEngineFilmScope(isFilm, request))
         using (_shadowDiagnosticsStore.BeginCapture(new ShadowCaptureInputs(request.Capabilities, HttpContext.Request.ContentLength, ReadCapturedScan())))
         {
             session = _playbackSessionManager.Create(
@@ -167,6 +167,13 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         if (session is null)
         {
             return NoViablePlan();
+        }
+
+        // A POST naming a play session that already has one replaces that session in place. When
+        // the new plan is the engine's, nothing of an earlier plan's job may be served for it.
+        if (session.Plan.StreamInfo is null)
+        {
+            await StopJobsOfAnEnginePlan(session.PlaySessionId, options.UserId).ConfigureAwait(false);
         }
 
         // Issue #43: the lifecycle line a browser e2e joins against X-Request-Id (the ambient
@@ -239,7 +246,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         // Issue #75: same ambient scope as the POST - a PUT re-plans with a complete new body, so it
         // carries its own declared capabilities and its own Content-Length.
         PlaybackSession? session;
-        using (BeginDirectPlayFilmScope(isFilm, request))
+        using (BeginEngineFilmScope(isFilm, request))
         using (_shadowDiagnosticsStore.BeginCapture(new ShadowCaptureInputs(request.Capabilities, HttpContext.Request.ContentLength, ReadCapturedScan())))
         {
             session = _playbackSessionManager.Patch(id, new PlaybackSessionRequest(kind, options), request.PlaybackAttemptId);
@@ -248,6 +255,14 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         if (session is null)
         {
             return NoViablePlan();
+        }
+
+        // The plan just changed and the play session did not: see StopJobsOfAnEnginePlan. Whether
+        // the previous plan or the new one is the engine's, the job writing the previous plan's
+        // output must be gone before the new plan's playlist is read.
+        if (existingSession.Plan.StreamInfo is null || session.Plan.StreamInfo is null)
+        {
+            await StopJobsOfAnEnginePlan(existingSession.PlaySessionId, existingSession.Request?.Options.UserId).ConfigureAwait(false);
         }
 
         // Issue #43: the re-plan transition, with the decision bits that actually change on a track/
@@ -406,20 +421,22 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             return Conflict("Session has no PlaySessionId - PUT a replacement request supplying one before requesting a stream URL.");
         }
 
-        // Consolidation step 1: a film the engine alone decided to direct play has no legacy
-        // StreamInfo at all. Its descriptor is minted from the retained execution plan and names the
-        // session's own file route; nothing below (kill switch, resolver, StreamInfo.ToUrl) applies.
+        // Consolidation step 1: a film the engine alone decided - a direct play, or a remux this
+        // server executes as a stream copy - has no legacy StreamInfo at all. Its descriptor is
+        // minted from the retained execution plan and names the session's own file or HLS route;
+        // nothing below (kill switch, resolver, StreamInfo.ToUrl) applies.
         if (session.Plan.StreamInfo is null
             && _v2PlanStore.TryGet(session.Id, out var engineDecided)
-            && engineDecided is { ExecutionPlan: { Method: PlaybackMethod.DirectPlay } directPlayPlan }
-            && session.Request?.Options is { } directPlayOptions)
+            && engineDecided is { ExecutionPlan: { } enginePlan }
+            && EngineFilmDescriptorMapper.CanMap(enginePlan)
+            && session.Request?.Options is { } engineOptions)
         {
             if (string.IsNullOrEmpty(User.GetToken()))
             {
                 return Forbid();
             }
 
-            return Ok(DirectPlayFileDescriptorMapper.Map(session.Id, session.PlaySessionId, directPlayOptions.ItemId, directPlayPlan, engineDecided.Decision.EngineVersion));
+            return Ok(EngineFilmDescriptorMapper.Map(session.Id, session.PlaySessionId, engineOptions.ItemId, enginePlan, engineDecided.Decision.EngineVersion));
         }
 
         var options = session.Request?.Options;
@@ -555,6 +572,23 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     }
 
     /// <summary>
+    /// A session the engine alone decided executes from its retained plan, into an output named
+    /// after its play session, not after its plan. A job started for an earlier plan under the
+    /// same play session (another audio track, or a transcode of the existing chain) would
+    /// otherwise be found there and served as the new plan's output. Only the owner's jobs, as
+    /// on DELETE (#301); a job of another user under the same client-chosen id is not touched.
+    /// </summary>
+    private async Task StopJobsOfAnEnginePlan(string? playSessionId, Guid? owner)
+    {
+        if (_transcodeManager is null || string.IsNullOrEmpty(playSessionId) || owner is not { } ownerId)
+        {
+            return;
+        }
+
+        await _transcodeManager.StopTranscodingJobs(playSessionId, job => ownerId.Equals(job.UserId)).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// #374: the refusal a client can act on when no delivery the request permits exists.
     /// </summary>
     private ObjectResult NoViablePlan() => UnprocessableEntity(new ProblemDetails
@@ -623,8 +657,8 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     /// <c>RequestCorrelationMiddleware</c> (issue #42), so lines emitted here carry BOTH the attempt
     /// id (same on a retry) and the request id (different on a retry).
     /// </summary>
-    private static IDisposable? BeginDirectPlayFilmScope(bool isFilm, PlaybackPlanRequestBase request)
-        => isFilm ? DirectPlayFilmPlanner.BeginRequest(new DirectPlayFilmRequest(request.Capabilities, request.Constraints)) : null;
+    private static IDisposable? BeginEngineFilmScope(bool isFilm, PlaybackPlanRequestBase request)
+        => isFilm ? EngineFilmPlanner.BeginRequest(new EngineFilmRequest(request.Capabilities, request.Constraints)) : null;
 
     private IDisposable? BeginAttemptScope(string? playbackAttemptId)
     {

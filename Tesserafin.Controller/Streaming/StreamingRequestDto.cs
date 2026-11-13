@@ -46,4 +46,10 @@ public class StreamingRequestDto : BaseEncodingJobOptions
     /// Gets or sets the actual segment length in ticks.
     /// </summary>
     public long ActualSegmentLengthTicks { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this request was built by the server from a
+    /// playback session's retained execution plan, rather than bound from a client's query.
+    /// </summary>
+    public bool BuiltFromRetainedPlan { get; set; }
 }

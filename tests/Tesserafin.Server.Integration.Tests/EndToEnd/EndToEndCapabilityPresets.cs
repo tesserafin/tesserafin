@@ -209,6 +209,34 @@ public static class EndToEndCapabilityPresets
     }
 
     /// <summary>
+    /// What a browser declares for the consolidation remux journey: H.264/AAC decodable in
+    /// <c>mp4</c> only, HLS supported, and two video output profiles in its own preference order -
+    /// fMP4 segments first, MPEG-TS second. Against a Matroska source the engine's answer is a
+    /// remux delivered through the first of them. Every method stays allowed.
+    /// </summary>
+    /// <returns>Browser-like capabilities with every delivery method allowed.</returns>
+    public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) BrowserRemuxOverHls()
+    {
+        var decode = new DecodeCapabilities(
+            DirectPlayProfiles: [new DecodeProfile(MediaKind.Video, [FixtureContainer], [FixtureVideoCodec], [FixtureAudioCodec])],
+            VideoCodecs: [new VideoCodecCapability(FixtureVideoCodec, [], null, null, [], null, null)],
+            AudioCodecs: [new AudioCodecCapability(FixtureAudioCodec, null, null, null, null)],
+            SubtitleDelivery: [new SubtitleCapability("vtt", SubtitleDeliveryMethod.External)],
+            SupportsHls: true,
+            SupportsDash: false);
+
+        var capabilities = new ClientCapabilities(
+            decode,
+            OutputProfiles:
+            [
+                new PlaybackOutputProfile(MediaKind.Video, StreamingProtocol.Hls, "mp4", [FixtureVideoCodec], [FixtureAudioCodec], null, null, null),
+                HlsOutputProfile(),
+            ]);
+
+        return (capabilities, BaseConstraints(allowDirectPlay: true, allowDirectStream: true, allowTranscoding: true));
+    }
+
+    /// <summary>
     /// DirectPlay preset augmented with an external subtitle declaration - the client declares it can
     /// render <c>srt</c> via external delivery, and explicitly prefers the given stream index (mirrors
     /// a real client that already knows which track it wants, rather than relying on

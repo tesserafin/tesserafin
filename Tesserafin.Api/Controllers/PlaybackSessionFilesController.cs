@@ -1,22 +1,14 @@
 using System;
 using System.ComponentModel.DataAnnotations;
-using System.IO;
-using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Tesserafin.Api.Attributes;
 using Tesserafin.Api.Constants;
-using Tesserafin.Api.Extensions;
+using Tesserafin.Api.Helpers;
 using Tesserafin.Common.Api;
-using Tesserafin.Controller.Entities;
-using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Net.PlaybackCredentials;
-using Tesserafin.Data;
-using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
-using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Model.Net;
 using Tesserafin.Playback.Decision;
 
@@ -30,38 +22,24 @@ namespace Tesserafin.Api.Controllers;
 /// which that controller's class-level default policy would not accept.
 /// </summary>
 /// <remarks>
-/// The client names no file. Every request re-reads the session, re-checks that the caller owns it
-/// (or is an administrator) and may still see the item, and serves the source the retained plan
-/// selected, from the source list retained when the session was planned. A deleted, expired or
-/// re-planned session stops serving immediately; a revoked capability is refused by authentication
-/// before this action runs.
+/// The client names no file. Every request goes through <see cref="PlaybackSessionDeliveryGuard"/>:
+/// the session is re-read, the caller must own it (or be an administrator) and its owner must
+/// still see the item and the selected version; what is served is the source the retained plan
+/// selected, from the source list retained when the session was planned.
 /// </remarks>
 [Route("Playback/Sessions")]
 [Tags("Playback")]
 public class PlaybackSessionFilesController : BaseTesserafinApiController
 {
-    private readonly IPlaybackSessionManager _playbackSessionManager;
-    private readonly IV2PlanStore _v2PlanStore;
-    private readonly IUserManager _userManager;
-    private readonly IItemAccessService _itemAccessService;
+    private readonly PlaybackSessionDeliveryGuard _deliveryGuard;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PlaybackSessionFilesController"/> class.
     /// </summary>
-    /// <param name="playbackSessionManager">Instance of the <see cref="IPlaybackSessionManager"/> interface.</param>
-    /// <param name="v2PlanStore">Instance of the <see cref="IV2PlanStore"/> interface.</param>
-    /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
-    /// <param name="itemAccessService">Instance of the <see cref="IItemAccessService"/> interface.</param>
-    public PlaybackSessionFilesController(
-        IPlaybackSessionManager playbackSessionManager,
-        IV2PlanStore v2PlanStore,
-        IUserManager userManager,
-        IItemAccessService itemAccessService)
+    /// <param name="deliveryGuard">Instance of <see cref="PlaybackSessionDeliveryGuard"/>.</param>
+    public PlaybackSessionFilesController(PlaybackSessionDeliveryGuard deliveryGuard)
     {
-        _playbackSessionManager = playbackSessionManager;
-        _v2PlanStore = v2PlanStore;
-        _userManager = userManager;
-        _itemAccessService = itemAccessService;
+        _deliveryGuard = deliveryGuard;
     }
 
     /// <summary>
@@ -91,48 +69,20 @@ public class PlaybackSessionFilesController : BaseTesserafinApiController
         [FromQuery, Required] string mediaSourceId,
         [FromQuery, Required] string playSessionId)
     {
-        var session = _playbackSessionManager.Get(id);
-        var options = session?.Request?.Options;
-        if (session is null || options is null)
-        {
-            return NotFound();
-        }
-
-        if (!User.IsInRole(UserRoles.Administrator) && !options.UserId.Equals(User.GetUserId()))
+        var delivery = _deliveryGuard.Resolve(
+            id,
+            User,
+            itemId,
+            mediaSourceId,
+            playSessionId,
+            plan => plan.Method == PlaybackMethod.DirectPlay,
+            allowAdministrator: true);
+        if (delivery.Outcome == PlaybackSessionDeliveryOutcome.Forbidden)
         {
             return Forbid();
         }
 
-        if (session.Plan.StreamInfo is not null
-            || !_v2PlanStore.TryGet(session.Id, out var record)
-            || record?.ExecutionPlan is not { Method: PlaybackMethod.DirectPlay } plan
-            || !options.ItemId.Equals(itemId)
-            || !string.Equals(plan.SourceId, mediaSourceId, StringComparison.Ordinal)
-            || string.IsNullOrEmpty(session.PlaySessionId)
-            || !string.Equals(session.PlaySessionId, playSessionId, StringComparison.Ordinal))
-        {
-            return NotFound();
-        }
-
-        // Access can be withdrawn after planning (library access, parental rating, disabled
-        // account): the session's owner must still see the item on every request.
-        var owner = _userManager.GetUserById(options.UserId);
-        if (owner is null || owner.HasPermission(PermissionKind.IsDisabled)
-            || _itemAccessService.GetVisibleItemById<BaseItem>(itemId, owner!) is null)
-        {
-            return NotFound();
-        }
-
-        // An alternate version is its own item, with its own access rules: the version the plan
-        // selected must still be visible to the owner too, not only the film it belongs to.
-        if (!Guid.TryParse(plan.SourceId, out var sourceItemId)
-            || (!sourceItemId.Equals(itemId) && _itemAccessService.GetVisibleItemById<BaseItem>(sourceItemId, owner!) is null))
-        {
-            return NotFound();
-        }
-
-        var source = options.MediaSources.FirstOrDefault(s => string.Equals(s.Id, plan.SourceId, StringComparison.Ordinal));
-        if (!DirectPlayFilmPlanner.IsLocalFileSource(source) || !System.IO.File.Exists(source!.Path))
+        if (delivery.Outcome != PlaybackSessionDeliveryOutcome.Granted || delivery.Source is not { } source)
         {
             return NotFound();
         }

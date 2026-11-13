@@ -59,6 +59,9 @@ public sealed class MediaRouteMetadataTests
             // item, media source and play session are query values the action also matches against it.
             ["GET /Playback/Sessions/{id}/File"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["HEAD /Playback/Sessions/{id}/File"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
+            // Consolidation step 1: a remux session's HLS routes, bound the same way.
+            ["GET /Playback/Sessions/{id}/Hls/main.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
+            ["GET /Playback/Sessions/{id}/Hls/hls1/{playlistId}/{segmentId}.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Audio/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["HEAD /Audio/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Audio/{itemId}/stream.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
@@ -171,8 +174,9 @@ public sealed class MediaRouteMetadataTests
 
         // Enumerated by controller type, not by path substring: a keyword filter over route
         // templates finds thirteen and silently drops Videos/ActiveEncodings, which is an endpoint
-        // of these controllers just as much as the segment routes are.
-        Assert.Equal(14, hidden.Length);
+        // of these controllers just as much as the segment routes are. Sixteen since the two
+        // HLS routes of a remux session (Playback/Sessions/{id}/Hls/...) joined DynamicHlsController.
+        Assert.Equal(16, hidden.Length);
 
         var anonymous = hidden
             .Where(endpoint => endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Count == 0

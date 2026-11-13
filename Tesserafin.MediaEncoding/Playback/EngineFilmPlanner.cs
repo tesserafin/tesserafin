@@ -17,15 +17,16 @@ using Tesserafin.Playback.Execution;
 namespace Tesserafin.MediaEncoding.Playback;
 
 /// <summary>
-/// Consolidation step 1, first journey (docs/playback-path-inventory.md §4): a film read from a
-/// local file is decided by the v2 engine alone. The engine receives the capabilities and
-/// constraints the client declared on <c>POST Playback/Sessions</c>, not a <c>DeviceProfile</c>
-/// round trip, and the legacy planner (<c>StreamBuilder</c>) is never invoked for it. When the
-/// engine's answer is a direct play, the session carries no legacy <c>StreamInfo</c>: its plan is
-/// the retained <see cref="V2PlanRecord"/> and its bytes come from the session's own file route.
-/// Any other answer — remux, transcode, refusal, a source that is not a local file — falls through
-/// to the existing chain unchanged, inside the same planning call, so one request still produces
-/// exactly one session.
+/// Consolidation step 1 (docs/playback-path-inventory.md §4 and §5): a film read from a local file
+/// is decided by the v2 engine alone. The engine receives the capabilities and constraints the
+/// client declared on <c>POST Playback/Sessions</c>, not a <c>DeviceProfile</c> round trip, and the
+/// legacy planner (<c>StreamBuilder</c>) is never invoked for it. Two answers are owned here:
+/// a direct play, served verbatim from the session's own file route, and a remux this server can
+/// execute as a pure stream copy (<see cref="IsExecutableRemux"/>), served from the session's own
+/// HLS route. In both cases the session carries no legacy <c>StreamInfo</c>: its plan is the
+/// retained <see cref="V2PlanRecord"/>. Any other answer — transcode, a remux outside that
+/// definition, refusal, a source that is not a local file — falls through to the existing chain
+/// unchanged, inside the same planning call, so one request still produces exactly one session.
 /// </summary>
 /// <remarks>
 /// The declared inputs reach the planner through an ambient request scope opened by the
@@ -33,29 +34,29 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// the same capture pattern <see cref="IV2PlanStore"/> already uses. Without a scope (the legacy
 /// <c>PlaybackInfo</c> path, an episode, audio, Live TV), this decorator only delegates.
 /// </remarks>
-public sealed class DirectPlayFilmPlanner : IPlaybackSessionPlanner
+public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
 {
-    private static readonly AsyncLocal<DirectPlayFilmRequest?> _current = new();
+    private static readonly AsyncLocal<EngineFilmRequest?> _current = new();
 
     private readonly IPlaybackSessionPlanner _inner;
     private readonly IPlaybackEngine _engine;
     private readonly IV2PlanStore _v2PlanStore;
-    private readonly ILogger<DirectPlayFilmPlanner> _logger;
+    private readonly ILogger<EngineFilmPlanner> _logger;
     private readonly TimeProvider _timeProvider;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="DirectPlayFilmPlanner"/> class.
+    /// Initializes a new instance of the <see cref="EngineFilmPlanner"/> class.
     /// </summary>
     /// <param name="inner">The existing chain, used for every decision this journey does not own.</param>
     /// <param name="engine">The v2 decision engine.</param>
     /// <param name="v2PlanStore">The store the decided plan is published into.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="timeProvider">The clock stamping the published record; the system clock when null.</param>
-    public DirectPlayFilmPlanner(
+    public EngineFilmPlanner(
         IPlaybackSessionPlanner inner,
         IPlaybackEngine engine,
         IV2PlanStore v2PlanStore,
-        ILogger<DirectPlayFilmPlanner> logger,
+        ILogger<EngineFilmPlanner> logger,
         TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(inner);
@@ -75,7 +76,7 @@ public sealed class DirectPlayFilmPlanner : IPlaybackSessionPlanner
     /// </summary>
     /// <param name="request">The capabilities and constraints the client declared.</param>
     /// <returns>The handle closing the scope.</returns>
-    public static IDisposable BeginRequest(DirectPlayFilmRequest request)
+    public static IDisposable BeginRequest(EngineFilmRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         var previous = _current.Value;
@@ -113,21 +114,53 @@ public sealed class DirectPlayFilmPlanner : IPlaybackSessionPlanner
             return _inner.PlanVideo(options);
         }
 
-        var record = TryDecideDirectPlay(request, options);
+        // A version the request names and this user's source list does not hold (withdrawn, or
+        // never there) is not a decision to hand to another planner: there is nothing to plan.
+        if (!string.IsNullOrEmpty(options.MediaSourceId)
+            && !options.MediaSources.Any(source => string.Equals(source.Id, options.MediaSourceId, StringComparison.Ordinal)))
+        {
+            return null;
+        }
+
+        var record = TryDecide(request, options);
         if (record is null)
         {
             return _inner.PlanVideo(options);
         }
 
         _v2PlanStore.Publish(record);
+        var plan = record.ExecutionPlan!;
         _logger.LogInformation(
-            "Playback for item {ItemId} decided by the v2 engine alone (direct play, source {MediaSourceId}).",
+            "Playback for item {ItemId} decided by the v2 engine alone ({Method}, source {MediaSourceId}, {Protocol} {Container}).",
             options.ItemId,
-            record.ExecutionPlan!.SourceId);
-        return new PlaybackPlan(PlayMethod.DirectPlay, 0);
+            plan.Method,
+            plan.SourceId,
+            plan.Protocol,
+            plan.Container);
+        return plan.Method == PlaybackMethod.DirectPlay
+            ? new PlaybackPlan(PlayMethod.DirectPlay, 0)
+            : new PlaybackPlan(PlayMethod.DirectStream, TranscodeReason.ContainerNotSupported);
     }
 
-    private V2PlanRecord? TryDecideDirectPlay(DirectPlayFilmRequest request, MediaOptions options)
+    /// <summary>
+    /// Determines whether a plan is a remux this server executes from the plan alone: the engine
+    /// chose <see cref="PlaybackMethod.Remux"/>, nothing is re-encoded, tone-mapped, down-mixed or
+    /// burnt in, a video stream is copied, and the delivery the client declared is HLS in fMP4 or
+    /// MPEG-TS segments. The executor copies; it never re-decides, so a plan outside this
+    /// definition is not offered to it.
+    /// </summary>
+    /// <param name="plan">The execution plan.</param>
+    /// <returns><see langword="true"/> if the plan is an executable stream-copy remux.</returns>
+    public static bool IsExecutableRemux(PlaybackExecutionPlan? plan)
+        => plan is { Method: PlaybackMethod.Remux, Protocol: StreamingProtocol.Hls, VideoStreamIndex: not null }
+            && !string.IsNullOrEmpty(plan.VideoCodec)
+            && (plan.AudioStreamIndex is null || !string.IsNullOrEmpty(plan.AudioCodec))
+            && (string.Equals(plan.Container, "mp4", StringComparison.OrdinalIgnoreCase) || string.Equals(plan.Container, "ts", StringComparison.OrdinalIgnoreCase))
+            && plan.Transforms.Contains(TransformKind.RemuxContainer)
+            && plan.Transforms.All(transform => transform is TransformKind.RemuxContainer or TransformKind.CopyVideo or TransformKind.CopyAudio or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle)
+            && plan.SubtitleDelivery is null or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External;
+
+    private V2PlanRecord? TryDecide(EngineFilmRequest request, MediaOptions options)
     {
         var sources = options.MediaSources
             .Where(source => string.IsNullOrEmpty(options.MediaSourceId) || string.Equals(source.Id, options.MediaSourceId, StringComparison.Ordinal))
@@ -140,22 +173,31 @@ public sealed class DirectPlayFilmPlanner : IPlaybackSessionPlanner
         var context = DlnaPlaybackAdapter.ToContext(options.ItemId, options.UserId, options.MediaSourceId, MediaKind.Video, PlaybackEngine.EngineVersion);
         // Resolved track indices belong to a source, not to the film. A later playable version
         // can have different indices from the first candidate. Preserve the engine's preference
-        // for the first direct-play candidate, while giving each candidate its own user defaults.
+        // for the first direct-play candidate - a remux is only taken when no candidate direct
+        // plays - while giving each candidate its own user defaults.
+        V2PlanRecord? remux = null;
         foreach (var source in sources)
         {
             var decision = _engine.Decide(context, request.Capabilities, [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(request.Constraints, source));
-            if (!decision.IsViable || decision.Method != PlaybackMethod.DirectPlay)
+            if (!decision.IsViable
+                || !PlaybackExecutionPlanBuilder.TryBuild(decision, out var plan, out _)
+                || plan is null)
             {
                 continue;
             }
 
-            if (PlaybackExecutionPlanBuilder.TryBuild(decision, out var plan, out _) && plan is not null)
+            if (plan.Method == PlaybackMethod.DirectPlay)
             {
                 return new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }
+
+            if (remux is null && IsExecutableRemux(plan))
+            {
+                remux = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
+            }
         }
 
-        return null;
+        return remux;
     }
 
     /// <summary>
@@ -181,9 +223,9 @@ public sealed class DirectPlayFilmPlanner : IPlaybackSessionPlanner
 
     private sealed class Scope : IDisposable
     {
-        private readonly DirectPlayFilmRequest? _previous;
+        private readonly EngineFilmRequest? _previous;
 
-        public Scope(DirectPlayFilmRequest? previous) => _previous = previous;
+        public Scope(EngineFilmRequest? previous) => _previous = previous;
 
         public void Dispose() => _current.Value = _previous;
     }

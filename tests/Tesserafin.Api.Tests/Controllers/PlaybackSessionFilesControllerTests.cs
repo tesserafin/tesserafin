@@ -128,7 +128,7 @@ public sealed class PlaybackSessionFilesControllerTests : IDisposable
         identity.AddClaim(new Claim(InternalClaimTypes.UserId, _ownerId.ToString("N", CultureInfo.InvariantCulture)));
         identity.AddClaim(new Claim(ClaimTypes.Role, UserRoles.User));
 
-        return new PlaybackSessionFilesController(manager.Object, store, users.Object, _access.Object)
+        return new PlaybackSessionFilesController(new Tesserafin.Api.Helpers.PlaybackSessionDeliveryGuard(manager.Object, store, users.Object, _access.Object))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) } },
         };

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -80,23 +81,44 @@ public static class EndToEndMediaFixtures
     /// </summary>
     /// <param name="directory">The directory to write the fixture into.</param>
     /// <param name="fileName">The file name (including extension) to write.</param>
+    /// <param name="durationSeconds">The duration of the fixture, in seconds.</param>
+    /// <param name="keyframeEverySecond">Whether to force one keyframe per second, so a stream copy can be cut into several segments.</param>
+    /// <param name="secondAudioTrack">Whether to add a second audio track, so the audio indices are 1 and 2.</param>
     /// <returns>The full path to the synthesized file.</returns>
-    public static async Task<string> CreateH264AacMkvAsync(string directory, string fileName = "fixture.mkv")
+    public static async Task<string> CreateH264AacMkvAsync(
+        string directory,
+        string fileName = "fixture.mkv",
+        int durationSeconds = DurationSeconds,
+        bool keyframeEverySecond = false,
+        bool secondAudioTrack = false)
     {
         var path = Path.Combine(directory, fileName);
-        string[] arguments =
+        var duration = durationSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        List<string> arguments =
         [
             "-hide_banner",
             "-y",
-            "-f", "lavfi", "-i", $"testsrc=size={Width}x{Height}:rate=15:duration={DurationSeconds}",
-            "-f", "lavfi", "-i", $"sine=frequency=1000:duration={DurationSeconds}",
-            "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
-            "-c:a", "aac",
-            "-f", "matroska",
-            path,
+            "-f", "lavfi", "-i", $"testsrc=size={Width}x{Height}:rate=15:duration={duration}",
+            "-f", "lavfi", "-i", $"sine=frequency=1000:duration={duration}",
         ];
 
-        await RunFfmpegAsync(arguments).ConfigureAwait(false);
+        if (secondAudioTrack)
+        {
+            // Stream 1 and stream 2 are both audio: a version whose track indices differ from a
+            // single-audio version of the same film.
+            arguments.AddRange(["-f", "lavfi", "-i", $"sine=frequency=440:duration={duration}", "-map", "0:v", "-map", "1:a", "-map", "2:a"]);
+        }
+
+        arguments.AddRange(["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p"]);
+        if (keyframeEverySecond)
+        {
+            // One keyframe per second, so a stream copy can be cut into several HLS segments.
+            arguments.AddRange(["-g", "15", "-keyint_min", "15", "-sc_threshold", "0"]);
+        }
+
+        arguments.AddRange(["-c:a", "aac", "-f", "matroska", path]);
+
+        await RunFfmpegAsync([.. arguments]).ConfigureAwait(false);
 
         if (!File.Exists(path) || new FileInfo(path).Length == 0)
         {

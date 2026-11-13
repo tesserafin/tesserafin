@@ -44,7 +44,7 @@ namespace Tesserafin.Api.Controllers;
 [Route("")]
 [Authorize(Policy = Policies.MediaDelivery)]
 [ApiExplorerSettings(IgnoreApi = true)]
-public class DynamicHlsController : BaseTesserafinApiController
+public partial class DynamicHlsController : BaseTesserafinApiController
 {
     /// <summary>
     /// Response header naming what a client can do about a failed transcode: <c>software</c> when
@@ -1530,7 +1530,7 @@ public class DynamicHlsController : BaseTesserafinApiController
             TranscodingJobType,
             cancellationToken);
 
-    private async Task<ActionResult> GetVariantPlaylistInternal(StreamingRequestDto streamingRequest, CancellationTokenSource cancellationTokenSource)
+    private async Task<ActionResult> GetVariantPlaylistInternal(StreamingRequestDto streamingRequest, CancellationTokenSource cancellationTokenSource, bool sessionOwnedRemux = false)
     {
         using var state = await ResolveStreamingState(streamingRequest, cancellationTokenSource.Token)
             .ConfigureAwait(false);
@@ -1538,10 +1538,23 @@ public class DynamicHlsController : BaseTesserafinApiController
         double fps = state.TargetFramerate ?? 0.0f;
         int segmentLength = state.SegmentLength * 1000;
 
-        // Track this session for diagnostics using the codecs/reasons the client already decided
-        // (this controller does not itself plan direct-play-vs-transcode). The session ends
-        // automatically when the transcoding job with this PlaySessionId ends.
-        _playbackSessionManager.TrackTranscodeOutput(state.OutputVideoCodec, state.OutputAudioCodec, state.TranscodeReasons, streamingRequest.PlaySessionId);
+        if (sessionOwnedRemux)
+        {
+            // The session already exists and already holds its plan (PlaybackSessionDeliveryGuard
+            // keeps it alive): nothing is tracked or replaced here, and a state that is not the
+            // plan - another stream, or one this server would have to encode - is refused.
+            if (!IsThePlannedCopy(state, streamingRequest))
+            {
+                return RemuxNotExecutable();
+            }
+        }
+        else
+        {
+            // Track this session for diagnostics using the codecs/reasons the client already decided
+            // (this controller does not itself plan direct-play-vs-transcode). The session ends
+            // automatically when the transcoding job with this PlaySessionId ends.
+            _playbackSessionManager.TrackTranscodeOutput(state.OutputVideoCodec, state.OutputAudioCodec, state.TranscodeReasons, streamingRequest.PlaySessionId);
+        }
 
         // If video is transcoded and framerate is fractional (i.e. 23.976), we need to slightly adjust segment length
         if (!EncodingHelper.IsCopyCodec(state.OutputVideoCodec) && Math.Abs(fps - Math.Floor(fps + 0.001f)) > 0.001)
@@ -1564,7 +1577,7 @@ public class DynamicHlsController : BaseTesserafinApiController
         return new FileContentResult(Encoding.UTF8.GetBytes(playlist), MimeTypes.GetMimeType("playlist.m3u8"));
     }
 
-    private async Task<ActionResult> GetDynamicSegment(StreamingRequestDto streamingRequest, int segmentId)
+    private async Task<ActionResult> GetDynamicSegment(StreamingRequestDto streamingRequest, int segmentId, bool sessionOwnedRemux = false)
     {
         // NO BRANCH ON THE REQUEST BEFORE THE AUTHORIZER, BY CONSTRUCTION. A caller-supplied
         // StartTimeTicks is refused by [RejectsStartTimeTicks] on both entry actions, at the MVC
@@ -1597,6 +1610,16 @@ public class DynamicHlsController : BaseTesserafinApiController
         {
             state.Dispose();
             return Unauthorized();
+        }
+
+        // A session-owned remux is executed from the engine's retained plan, and that plan copies
+        // both streams. The executor does not re-decide: a state that would encode is refused
+        // before anything is served or started. Derived from the server's own plan and source,
+        // and placed after the ownership decision above, which stays unconditional.
+        if (sessionOwnedRemux && !IsThePlannedCopy(state, streamingRequest))
+        {
+            state.Dispose();
+            return RemuxNotExecutable();
         }
 
         // NoSuchJob is not authorization to read what is already on disk. A finished job's

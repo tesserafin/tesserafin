@@ -395,7 +395,9 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     public async Task Remux_LegacyPath_UndeclaredSourceContainer_ServesDeclaredOutputNotSourceFile()
     {
         var mkvPath = await EndToEndMediaFixtures.CreateH264AacMkvAsync(_workDir);
-        var itemId = LibraryItemSeeder.SeedVideo(_libraryManager, _mediaStreamRepository, mkvPath, "mkv", _baseStreams, $"Issue 374 fixture {Guid.NewGuid()}");
+        // Not a film: a film's remux over HLS is decided and executed by the engine alone and has no
+        // legacy path left to assert (RemuxFilmEndToEndTests). Every other video still has this one.
+        var itemId = LibraryItemSeeder.SeedVideo(_libraryManager, _mediaStreamRepository, mkvPath, "mkv", _baseStreams, $"Issue 374 fixture {Guid.NewGuid()}", film: false);
 
         var (capabilities, constraints) = EndToEndCapabilityPresets.Remux();
         var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-374-remux");

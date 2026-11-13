@@ -71,7 +71,13 @@ public static class StreamingHelpers
             ParseParams(streamingRequest);
         }
 
-        streamingRequest.StreamOptions = ParseStreamOptions(httpRequest.Query);
+        // A request the server built from a retained plan takes nothing from the query: stream
+        // options are codec conditions (level, profile, bit depth) a client could otherwise add.
+        if (!streamingRequest.BuiltFromRetainedPlan)
+        {
+            streamingRequest.StreamOptions = ParseStreamOptions(httpRequest.Query);
+        }
+
         if (httpRequest.Path.Value is null)
         {
             throw new ResourceNotFoundException(nameof(httpRequest.Path));
