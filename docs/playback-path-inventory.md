@@ -1,12 +1,12 @@
 # Playback path inventory
 
 Status: consolidation programme, step 1 (#129, owner #305). Baseline (§1–§3) measured on server
-`master` `ac6570e75f` and Web `main` `e7a33187de`, 2026-11-12; §4 and §5 describe what has been
+`master` `ac6570e75f` and Web `main` `e7a33187de`, 2026-11-12; §4–§7 describe what has been
 delivered since. Update this file in the same change that
 removes or adds a path; the architecture check `tests/Tesserafin.Server.Tests/Architecture/ConsolidationRatchetTests.cs` (baseline `consolidation-ratchet-baseline.json` beside it) holds the
 named exceptions and may only shrink.
 
-## 1. Server chain as it runs today
+## 1. Server chain at the 2026-11-12 baseline
 
 ```
 POST /Playback/Sessions                       PlaybackSessionsController.CreatePlaybackSession
@@ -32,11 +32,11 @@ DELETE /Playback/Sessions/{id}
   -> credential revocation + StopTranscodingJobs for the owner (#301)
 ```
 
-Conclusion: in every mode a call to `/Playback/Sessions` still runs the legacy decision
+Baseline conclusion: in every mode a call to `/Playback/Sessions` still runs the legacy decision
 (`StreamBuilder`) and still executes through the legacy `StreamInfo` and the legacy streaming
 controller. Mode V2 only replaces the URL that `StreamInfo` produces.
 
-## 2. Web chain as it runs today
+## 2. Web chain at the 2026-11-12 baseline
 
 ```
 playbackmanager.playInternal
@@ -49,12 +49,12 @@ playbackmanager.playInternal
   -> reportPlaybackStart / Progress / Stopped (jellyfin-apiclient, /Sessions/Playing*)
 ```
 
-No Web journey is v2-authoritative: with the flag off nothing calls Sessions; with it on, the legacy
+At the baseline no Web journey was v2-authoritative: with the flag off nothing calls Sessions; with it on, the legacy
 `PlaybackInfo` decision still runs first and v2 only patches its result.
 
 ## 3. Legacy paths, consumers and removal conditions
 
-| Legacy path | Consumers today | Removal condition |
+| Legacy path | Consumers at the baseline | Removal condition |
 | --- | --- | --- |
 | `StreamBuilder` (`Tesserafin.Model/Dlna`) | `PlaybackSessionPlanner` (Sessions + PlaybackInfo), `StreamingHelpers` / `MediaInfoHelper` (container normalisation), `PlaybackExecutionPlanAdapter` (profile helpers), DLNA adapters, shadow projector | Every supported journey decided by the engine; PlaybackInfo retired or engine-backed; helpers moved to their owners |
 | `PlaybackSessionPlanner` (legacy planner) | `ShadowPlaybackSessionPlanner._inner`, `MediaInfoHelper` | Same as above |
@@ -77,11 +77,11 @@ Chain as built:
 Web, film (Type Movie, file system) on the local HTML player
   -> POST /Playback/Sessions          generated SDK, configured from TesserafinApi (not @jellyfin/sdk)
      server: PlaybackSessionsController opens the film scope (item is Movie)
-             EngineFilmPlanner: every candidate source is a local file -> the engine decides
+             LocalVideoPlanner: every candidate source is a local file -> the engine decides
              from the DECLARED capabilities/constraints (no DeviceProfile round trip);
              DirectPlay + executable plan -> V2PlanRecord published, PlaybackPlan(DirectPlay),
              StreamInfo = null; StreamBuilder is never constructed
-  -> GET /Playback/Sessions/{id}/Stream    EngineFilmDescriptorMapper, from the retained plan
+  -> GET /Playback/Sessions/{id}/Stream    LocalVideoDescriptorMapper, from the retained plan
   -> GET|HEAD /Playback/Sessions/{id}/File?itemId&mediaSourceId&playSessionId
      PlaybackSessionFilesController: MediaDelivery + Media capability; per request: session
      exists, caller owns it, item/source/play session match the plan, owner still sees the
@@ -100,15 +100,15 @@ A 401/403/404, a failed descriptor, broker or item read, or a cancellation ends 
 What was deleted and what stays, by consumer:
 
 - Server `StreamBuilder`, `PlaybackSessionPlanner`, `ShadowPlaybackSessionPlanner`: still reached by
-  every non-film video, audio and `PlaybackInfo`; never by the film journey (proved by
+  every video outside the film/episode scope, audio and `PlaybackInfo`; never by the film journey (proved by
   `DirectPlayFilmEndToEndTests` on a host where both throw).
 - `PlaybackExecutionPlanAdapter.ToStreamInfo` DirectPlay branch and the `PlaybackLiveStreamResolver`
-  fallback: still used by engine-authoritative non-film sessions (Mode V2/Canary) and by
+  fallback: still used by engine-authoritative unmigrated video sessions (Mode V2/Canary) and by
   `PlaybackInfo`; unreachable for a film. They go with their last consumer (step 2).
 - Kill switch: no longer applies to a film's direct play (there is no legacy fallback left for it);
-  `KillSwitch_ForcesLegacyOnNextRequest_UrlStillServable` now runs on a non-film video.
+  `KillSwitch_ForcesLegacyOnNextRequest_UrlStillServable` now runs on an unmigrated video.
 - Web V2 URL overlay DirectPlay case and the pre-#46 `directPlayMimeType` fallback: still used by
-  non-film videos when the global flag is on. The flag stays until its last consumer migrates.
+  unmigrated video families when the global flag is on. The flag stays until its last consumer migrates.
 - Web `PlaybackInfo` + `createStreamInfo` for a film: no longer reached on a direct play
   (`directPlayFilmPlayback.test.ts` and the browser spec `directPlayFilm.spec.ts` fail if they are).
 
@@ -131,7 +131,7 @@ Chain as built:
 ```
 Web, film (Type Movie, file system) on the local HTML player
   -> POST /Playback/Sessions          same request as §4
-     server: EngineFilmPlanner, per candidate source (each with its own user track defaults):
+     server: LocalVideoPlanner, per candidate source (each with its own user track defaults):
              a direct play wins; otherwise the first EXECUTABLE remux
              engine v8: a remux is delivered through the first declared OutputProfile that can
              carry BOTH copied codecs over a protocol the client supports (container + protocol
@@ -139,7 +139,7 @@ Web, film (Type Movie, file system) on the local HTML player
              executable = Remux, HLS, fMP4 or TS, only RemuxContainer/CopyVideo/CopyAudio (+ text
              subtitle extraction/conversion), subtitle none or External
              -> V2PlanRecord published, PlaybackPlan(DirectStream), StreamInfo = null
-  -> GET /Playback/Sessions/{id}/Stream    EngineFilmDescriptorMapper, from the retained plan:
+  -> GET /Playback/Sessions/{id}/Stream    LocalVideoDescriptorMapper, from the retained plan:
              /Playback/Sessions/{id}/Hls/main.m3u8?itemId&mediaSourceId&playSessionId  (Protocol Hls)
              no codec, container, stream index, offset or credential in the url
   -> GET /Playback/Sessions/{id}/Hls/main.m3u8
@@ -186,10 +186,81 @@ Not reached by this journey (proved by `RemuxFilmEndToEndTests` on the host wher
 
 What lost its consumer: the `#374` legacy remux path for a film over HLS
 (`PlaybackSessionPlanner` re-planning onto a declared output profile, then the `DirectStream ->
-Transcode` url normalisation in `GET Stream`). Both remain for every non-film video and for a film
+Transcode` url normalisation in `GET Stream`). Both remain for every video outside the film/episode scope and for a film
 remux the client declared no HLS output for; their test
-(`Remux_LegacyPath_UndeclaredSourceContainer_…`) now runs on a non-film video. Nothing could be
+(`Remux_LegacyPath_UndeclaredSourceContainer_…`) now runs on an unmigrated video. Nothing could be
 deleted outright in this slice: each legacy path above still has a named consumer in §3.
 
 Outside this slice: a remux over plain HTTP (a client with no HLS output profile), a remux that
 needs an audio transcode, transcoding, other media families, the global flag and the shadow.
+
+## 6. Local SDR film transcoding (candidate)
+
+The film planner also owns HLS Transcode plans whose encoded axes are H.264 video and/or AAC
+audio, without HDR conversion or subtitle burn-in. DirectPlay still wins over Remux, which wins
+over Transcode when selecting among alternate versions. Text subtitle handling is unchanged.
+
+The descriptor and byte routes are the same session-owned routes as §5. `SessionHlsRequest`
+projects the retained plan into the shared FFmpeg executor. `StreamingHelpers` skips legacy
+copy/encode and resolution heuristics for this request type. Selected stream indices, current
+encoding permissions, source range and copy feasibility are checked before a job can start;
+an unexecutable plan answers 422. Hardware encoder selection and software fallback remain in
+the existing execution machinery. A combined bitrate ceiling reserves the selected audio's
+budget before setting the video's ceiling; unknown copied bitrates cannot satisfy a known ceiling.
+
+The Web film module accepts a Transcode descriptor only for its own session HLS route. Track,
+quality and error recovery therefore stay on Sessions for this scope. The previous unconditional
+Transcode-decision release and PlaybackInfo fallback is gone; a descriptor outside this scope
+still identifies an unmigrated journey and is released before using the existing chain.
+
+Validation lives with the implementation: `Film_Transcode_ExecutesOnlyThePlannedAxesAndCleansUp`
+uses the legacy-free real host, FFmpeg and ffprobe for audio-only encoding, video-only encoding,
+and both axes. It verifies actual output codecs/resolution/channels, copy flags, current
+permissions, session teardown and eventual output cleanup. The hosted integration job requires
+this theory by name. The manager test proves a decode-error recovery into a Transcode never
+calls PlaybackInfo or createStreamInfo.
+
+Remaining consumers: HDR/tone mapping, burn-in, unsupported output codecs/protocols, non-film
+video, audio, Live TV and PlaybackInfo. Shared legacy decisions are not removed globally while
+those consumers remain. Steps 1 and 2 stay open. This candidate depends on the credential-free
+server descriptor contract in #409 and the Android authentication change in mobile#21.
+
+
+## 7. Local episodes share the session-owned video path (candidate)
+
+`PlaybackSessionsController` opens the engine request scope for `Movie` **or** `Episode`, on
+both POST and PUT. `LocalVideoPlanner` (formerly `EngineFilmPlanner`), `LocalVideoRequest` and
+`LocalVideoDescriptorMapper` are the shared implementation, not an episode-specific adapter.
+The local-file checks and executable-output limits of §4–§6 apply unchanged. Episode direct
+plays, HLS remuxes and supported SDR H.264/AAC transcodes carry no `StreamInfo` and never call
+the legacy planner or resolver, regardless of the global mode. Other video families, remote/live
+sources, HDR/tone mapping, burn-in and unsupported delivery still have the consumers listed above.
+
+The Web manager selects the shared, lazily loaded `sessionVideo.ts` module for local HTML
+playback of either item type. The old film-only module and candidate predicate are removed,
+without compatibility aliases. Unsupported output is still released before the existing chain;
+permission/authentication failures still terminate the attempt. No HTTP contract changed and no
+new SDK generation or compatibility fallback is needed.
+
+The real-host file scenarios now run for both item types: ranges/HEAD, request binding, stop and
+capability revocation, user isolation, withdrawn access and persisted resume position. HLS start,
+seek and stop, capability lifetime and resumed segments also run for episodes, as do all three
+transcode-axis combinations with ffprobe output verification and job cleanup. The host's legacy
+planner and resolver throw, so an accidental return to the former episode chain fails these
+requests rather than producing an indistinguishable successful playback.
+
+`sessionVideoPlayback.test.ts` runs the manager scenarios for both films and episodes, including
+track changes, error recovery, refusal and teardown. A queued successor is also planned through
+Sessions after completion, with each session released once. `PlaybackInfo` and `createStreamInfo`
+are observed and forbidden on supported output. This checks the existing queue; implicit series
+queue construction is a separate feature, not delivered here.
+
+`HlsOutputIsolationEndToEndTests` explicitly seeds the unmigrated plain `Video` type: it asserts
+legacy `/Videos` URL reuse by another authenticated caller, who creates a separate job, whereas
+session-owned URLs correctly reject that caller. Its existing status/output/cleanup assertions
+are unchanged; the film and episode session isolation checks remain on the legacy-free host.
+
+Acceptance remains partial: the preceding film-transcode Web commit passed the canonical
+production build and delivery gates in hosted CI (run `43521960781`). That result is not evidence
+for the subsequent episode changes. Neither new episode playback nor the new film transcode has
+a real-browser or physical Android acceptance result from this environment. Steps 1–2 remain open.

@@ -19,7 +19,7 @@ namespace Tesserafin.MediaEncoding.Tests.Playback;
 /// #404 review P1: the user's own track preferences, resolved onto the source by
 /// <c>MediaSourceManager</c>, fill whatever the client did not choose; an explicit choice still wins.
 /// </summary>
-public sealed class EngineFilmPlannerTests
+public sealed class LocalVideoPlannerTests
 {
     private static readonly PlaybackConstraints _declared = new(
         AllowDirectPlay: true,
@@ -41,7 +41,7 @@ public sealed class EngineFilmPlannerTests
     {
         var source = new MediaSourceInfo { DefaultAudioStreamIndex = 3, DefaultSubtitleStreamIndex = -1 };
 
-        var constraints = EngineFilmPlanner.WithUserDefaults(_declared, source);
+        var constraints = LocalVideoPlanner.WithUserDefaults(_declared, source);
 
         Assert.Equal(3, constraints.PreferredAudioStreamIndex);
         Assert.Equal(-1, constraints.PreferredSubtitleStreamIndex);
@@ -52,7 +52,7 @@ public sealed class EngineFilmPlannerTests
     {
         var source = new MediaSourceInfo { DefaultSubtitleStreamIndex = null };
 
-        Assert.Equal(-1, EngineFilmPlanner.WithUserDefaults(_declared, source).PreferredSubtitleStreamIndex);
+        Assert.Equal(-1, LocalVideoPlanner.WithUserDefaults(_declared, source).PreferredSubtitleStreamIndex);
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class EngineFilmPlannerTests
     {
         var source = new MediaSourceInfo { DefaultAudioStreamIndex = 3, DefaultSubtitleStreamIndex = -1 };
 
-        var constraints = EngineFilmPlanner.WithUserDefaults(
+        var constraints = LocalVideoPlanner.WithUserDefaults(
             _declared with { PreferredAudioStreamIndex = 1, PreferredSubtitleStreamIndex = 4 },
             source);
 
@@ -90,14 +90,14 @@ public sealed class EngineFilmPlannerTests
             Profile = new DeviceProfile(),
         };
         var store = new InMemoryV2PlanStore();
-        var planner = new EngineFilmPlanner(
+        var planner = new LocalVideoPlanner(
             new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object,
             new PlaybackEngine(),
             store,
-            NullLogger<EngineFilmPlanner>.Instance);
+            NullLogger<LocalVideoPlanner>.Instance);
 
         using var capture = store.BeginCapture();
-        using var request = EngineFilmPlanner.BeginRequest(new EngineFilmRequest(capabilities, _declared));
+        using var request = LocalVideoPlanner.BeginRequest(new LocalVideoRequest(capabilities, _declared));
         var plan = planner.PlanVideo(options);
         var record = store.TakeCaptured();
 
@@ -114,7 +114,7 @@ public sealed class EngineFilmPlannerTests
         var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
 
         using var capture = store.BeginCapture();
-        using var request = EngineFilmPlanner.BeginRequest(new EngineFilmRequest(Browser(hlsOutput: true), _declared));
+        using var request = LocalVideoPlanner.BeginRequest(new LocalVideoRequest(Browser(hlsOutput: true), _declared));
         var plan = planner.PlanVideo(Options(Source("film", "h264", 1, 2, "mkv")));
         var record = store.TakeCaptured();
 
@@ -126,7 +126,7 @@ public sealed class EngineFilmPlannerTests
         Assert.Equal(StreamingProtocol.Hls, record.ExecutionPlan.Protocol);
         Assert.Equal("mp4", record.ExecutionPlan.Container);
         Assert.Equal(1, record.ExecutionPlan.AudioStreamIndex);
-        Assert.True(EngineFilmPlanner.IsExecutableRemux(record.ExecutionPlan));
+        Assert.True(LocalVideoPlanner.IsExecutableRemux(record.ExecutionPlan));
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public sealed class EngineFilmPlannerTests
         var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
 
         using var capture = store.BeginCapture();
-        using var request = EngineFilmPlanner.BeginRequest(new EngineFilmRequest(Browser(hlsOutput: true), _declared));
+        using var request = LocalVideoPlanner.BeginRequest(new LocalVideoRequest(Browser(hlsOutput: true), _declared));
         var plan = planner.PlanVideo(Options(Source("matroska", "h264", 1, 3, "mkv"), Source("mp4", "h264", 2, 4)));
         var record = store.TakeCaptured();
 
@@ -153,7 +153,7 @@ public sealed class EngineFilmPlannerTests
         var (planner, store) = Planner(inner.Object);
 
         using var capture = store.BeginCapture();
-        using var request = EngineFilmPlanner.BeginRequest(new EngineFilmRequest(Browser(hlsOutput: false), _declared));
+        using var request = LocalVideoPlanner.BeginRequest(new LocalVideoRequest(Browser(hlsOutput: false), _declared));
         var plan = planner.PlanVideo(Options(Source("film", "h264", 1, 2, "mkv")));
 
         Assert.Same(existing, plan);
@@ -188,19 +188,44 @@ public sealed class EngineFilmPlannerTests
             SubtitleFormat: null,
             Transforms: [TransformKind.RemuxContainer, TransformKind.CopyVideo, TransformKind.CopyAudio]);
 
-        Assert.True(EngineFilmPlanner.IsExecutableRemux(copy));
-        Assert.False(EngineFilmPlanner.IsExecutableRemux(copy with { Transforms = [.. copy.Transforms, encoding] }));
-        Assert.False(EngineFilmPlanner.IsExecutableRemux(copy with { Protocol = StreamingProtocol.Http }));
-        Assert.False(EngineFilmPlanner.IsExecutableRemux(copy with { Container = "mkv" }));
-        Assert.False(EngineFilmPlanner.IsExecutableRemux(copy with { Method = PlaybackMethod.Transcode }));
-        Assert.False(EngineFilmPlanner.IsExecutableRemux(copy with { SubtitleStreamIndex = 2, SubtitleDelivery = Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Burn }));
-        Assert.False(EngineFilmPlanner.IsExecutableRemux(null));
+        Assert.True(LocalVideoPlanner.IsExecutableRemux(copy));
+        Assert.False(LocalVideoPlanner.IsExecutableRemux(copy with { Transforms = [.. copy.Transforms, encoding] }));
+        Assert.False(LocalVideoPlanner.IsExecutableRemux(copy with { Protocol = StreamingProtocol.Http }));
+        Assert.False(LocalVideoPlanner.IsExecutableRemux(copy with { Container = "mkv" }));
+        Assert.False(LocalVideoPlanner.IsExecutableRemux(copy with { Method = PlaybackMethod.Transcode }));
+        Assert.False(LocalVideoPlanner.IsExecutableRemux(copy with { SubtitleStreamIndex = 2, SubtitleDelivery = Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Burn }));
+        Assert.False(LocalVideoPlanner.IsExecutableRemux(null));
     }
 
-    private static (EngineFilmPlanner Planner, InMemoryV2PlanStore Store) Planner(IPlaybackSessionPlanner inner)
+    [Theory]
+    [InlineData("mpeg4", "aac", TransformKind.TranscodeVideo, TransformKind.CopyAudio)]
+    [InlineData("h264", "ac3", TransformKind.CopyVideo, TransformKind.TranscodeAudio)]
+    [InlineData("mpeg4", "ac3", TransformKind.TranscodeVideo, TransformKind.TranscodeAudio)]
+    public void Sdr_hls_transcoding_is_owned_without_the_legacy_planner(string videoCodec, string audioCodec, TransformKind videoTransform, TransformKind audioTransform)
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var source = Source("film", videoCodec, 1, 2, "mkv");
+        source.MediaStreams[1].Codec = audioCodec;
+        using var capture = store.BeginCapture();
+        using var request = LocalVideoPlanner.BeginRequest(new LocalVideoRequest(Browser(hlsOutput: true), _declared));
+        var planned = planner.PlanVideo(Options(source));
+        var record = store.TakeCaptured();
+
+        Assert.Equal(PlayMethod.Transcode, planned?.PlayMethod);
+        Assert.Null(planned?.StreamInfo);
+        Assert.NotNull(record?.ExecutionPlan);
+        Assert.Equal(PlaybackMethod.Transcode, record.ExecutionPlan.Method);
+        Assert.Equal("h264", record.ExecutionPlan.VideoCodec);
+        Assert.Equal("aac", record.ExecutionPlan.AudioCodec);
+        Assert.Contains(videoTransform, record.ExecutionPlan.Transforms);
+        Assert.Contains(audioTransform, record.ExecutionPlan.Transforms);
+        Assert.True(LocalVideoPlanner.IsExecutableHls(record.ExecutionPlan));
+    }
+
+    private static (LocalVideoPlanner Planner, InMemoryV2PlanStore Store) Planner(IPlaybackSessionPlanner inner)
     {
         var store = new InMemoryV2PlanStore();
-        return (new EngineFilmPlanner(inner, new PlaybackEngine(), store, NullLogger<EngineFilmPlanner>.Instance), store);
+        return (new LocalVideoPlanner(inner, new PlaybackEngine(), store, NullLogger<LocalVideoPlanner>.Instance), store);
     }
 
     private static MediaOptions Options(params MediaSourceInfo[] sources)

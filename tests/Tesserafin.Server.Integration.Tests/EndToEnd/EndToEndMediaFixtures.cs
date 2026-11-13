@@ -150,6 +150,22 @@ public static class EndToEndMediaFixtures
         return stdout.Trim();
     }
 
+    /// <summary>Probes the actual encoded streams of a produced file.</summary>
+    /// <param name="path">The produced file.</param>
+    /// <returns>FFprobe stream metadata as JSON.</returns>
+    public static async Task<string> ProbeStreamsJsonAsync(string path)
+    {
+        var (exitCode, stdout, stderr) = await RunAsync(
+            FfprobePath,
+            ["-v", "error", "-show_streams", "-of", "json", path]).ConfigureAwait(false);
+        if (exitCode != 0)
+        {
+            throw new InvalidOperationException($"ffprobe exited {exitCode}: {Tail(stderr)}");
+        }
+
+        return stdout;
+    }
+
     /// <summary>
     /// Writes a real, valid external SubRip (.srt) subtitle sidecar - no ffmpeg needed, an external
     /// subtitle is a plain sidecar file by definition (PR117 design doc §2.2's <c>SubtitleUrl</c>).

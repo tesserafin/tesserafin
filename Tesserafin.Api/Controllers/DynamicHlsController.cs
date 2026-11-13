@@ -1530,7 +1530,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
             TranscodingJobType,
             cancellationToken);
 
-    private async Task<ActionResult> GetVariantPlaylistInternal(StreamingRequestDto streamingRequest, CancellationTokenSource cancellationTokenSource, bool sessionOwnedRemux = false)
+    private async Task<ActionResult> GetVariantPlaylistInternal(StreamingRequestDto streamingRequest, CancellationTokenSource cancellationTokenSource, bool sessionOwnedPlan = false)
     {
         using var state = await ResolveStreamingState(streamingRequest, cancellationTokenSource.Token)
             .ConfigureAwait(false);
@@ -1538,14 +1538,14 @@ public partial class DynamicHlsController : BaseTesserafinApiController
         double fps = state.TargetFramerate ?? 0.0f;
         int segmentLength = state.SegmentLength * 1000;
 
-        if (sessionOwnedRemux)
+        if (sessionOwnedPlan)
         {
             // The session already exists and already holds its plan (PlaybackSessionDeliveryGuard
-            // keeps it alive): nothing is tracked or replaced here, and a state that is not the
-            // plan - another stream, or one this server would have to encode - is refused.
-            if (!IsThePlannedCopy(state, streamingRequest))
+            // keeps it alive): nothing is tracked or replaced here, and a state that cannot
+            // execute the retained plan is refused.
+            if (!IsThePlannedOutput(state, streamingRequest))
             {
-                return RemuxNotExecutable();
+                return SessionPlanNotExecutable();
             }
         }
         else
@@ -1577,7 +1577,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
         return new FileContentResult(Encoding.UTF8.GetBytes(playlist), MimeTypes.GetMimeType("playlist.m3u8"));
     }
 
-    private async Task<ActionResult> GetDynamicSegment(StreamingRequestDto streamingRequest, int segmentId, bool sessionOwnedRemux = false)
+    private async Task<ActionResult> GetDynamicSegment(StreamingRequestDto streamingRequest, int segmentId, bool sessionOwnedPlan = false)
     {
         // NO BRANCH ON THE REQUEST BEFORE THE AUTHORIZER, BY CONSTRUCTION. A caller-supplied
         // StartTimeTicks is refused by [RejectsStartTimeTicks] on both entry actions, at the MVC
@@ -1612,14 +1612,14 @@ public partial class DynamicHlsController : BaseTesserafinApiController
             return Unauthorized();
         }
 
-        // A session-owned remux is executed from the engine's retained plan, and that plan copies
-        // both streams. The executor does not re-decide: a state that would encode is refused
+        // A session-owned HLS output is executed from the engine's retained plan.
+        // The executor does not re-decide: an unexecutable plan is refused
         // before anything is served or started. Derived from the server's own plan and source,
         // and placed after the ownership decision above, which stays unconditional.
-        if (sessionOwnedRemux && !IsThePlannedCopy(state, streamingRequest))
+        if (sessionOwnedPlan && !IsThePlannedOutput(state, streamingRequest))
         {
             state.Dispose();
-            return RemuxNotExecutable();
+            return SessionPlanNotExecutable();
         }
 
         // NoSuchJob is not authorization to read what is already on disk. A finished job's

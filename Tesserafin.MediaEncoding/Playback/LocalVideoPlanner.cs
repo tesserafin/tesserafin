@@ -17,14 +17,14 @@ using Tesserafin.Playback.Execution;
 namespace Tesserafin.MediaEncoding.Playback;
 
 /// <summary>
-/// Consolidation step 1 (docs/playback-path-inventory.md §4 and §5): a film read from a local file
+/// Consolidation step 1 (docs/playback-path-inventory.md §4 and §5): a film or episode read from a local file
 /// is decided by the v2 engine alone. The engine receives the capabilities and constraints the
 /// client declared on <c>POST Playback/Sessions</c>, not a <c>DeviceProfile</c> round trip, and the
-/// legacy planner (<c>StreamBuilder</c>) is never invoked for it. Two answers are owned here:
+/// legacy planner (<c>StreamBuilder</c>) is never invoked for it. The supported answers are owned here:
 /// a direct play, served verbatim from the session's own file route, and a remux this server can
 /// execute as a pure stream copy (<see cref="IsExecutableRemux"/>), served from the session's own
-/// HLS route. In both cases the session carries no legacy <c>StreamInfo</c>: its plan is the
-/// retained <see cref="V2PlanRecord"/>. Any other answer — transcode, a remux outside that
+/// HLS route, and SDR H.264/AAC transcodes executed from the same retained plan. In these cases the session carries no legacy <c>StreamInfo</c>: its plan is the
+/// retained <see cref="V2PlanRecord"/>. Any other answer — a transcode or remux outside that
 /// definition, refusal, a source that is not a local file — falls through to the existing chain
 /// unchanged, inside the same planning call, so one request still produces exactly one session.
 /// </summary>
@@ -32,31 +32,31 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// The declared inputs reach the planner through an ambient request scope opened by the
 /// controller around <see cref="IPlaybackSessionManager.Create"/>/<see cref="IPlaybackSessionManager.Patch"/>,
 /// the same capture pattern <see cref="IV2PlanStore"/> already uses. Without a scope (the legacy
-/// <c>PlaybackInfo</c> path, an episode, audio, Live TV), this decorator only delegates.
+/// <c>PlaybackInfo</c> path, audio, Live TV, other video families), this decorator only delegates.
 /// </remarks>
-public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
+public sealed class LocalVideoPlanner : IPlaybackSessionPlanner
 {
-    private static readonly AsyncLocal<EngineFilmRequest?> _current = new();
+    private static readonly AsyncLocal<LocalVideoRequest?> _current = new();
 
     private readonly IPlaybackSessionPlanner _inner;
     private readonly IPlaybackEngine _engine;
     private readonly IV2PlanStore _v2PlanStore;
-    private readonly ILogger<EngineFilmPlanner> _logger;
+    private readonly ILogger<LocalVideoPlanner> _logger;
     private readonly TimeProvider _timeProvider;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="EngineFilmPlanner"/> class.
+    /// Initializes a new instance of the <see cref="LocalVideoPlanner"/> class.
     /// </summary>
     /// <param name="inner">The existing chain, used for every decision this journey does not own.</param>
     /// <param name="engine">The v2 decision engine.</param>
     /// <param name="v2PlanStore">The store the decided plan is published into.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="timeProvider">The clock stamping the published record; the system clock when null.</param>
-    public EngineFilmPlanner(
+    public LocalVideoPlanner(
         IPlaybackSessionPlanner inner,
         IPlaybackEngine engine,
         IV2PlanStore v2PlanStore,
-        ILogger<EngineFilmPlanner> logger,
+        ILogger<LocalVideoPlanner> logger,
         TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(inner);
@@ -72,11 +72,11 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
 
     /// <summary>
     /// Opens the scope in which a video planning call is offered to the engine first. Open it only
-    /// for a film; the scope ends when the returned handle is disposed.
+    /// for a film or episode; the scope ends when the returned handle is disposed.
     /// </summary>
     /// <param name="request">The capabilities and constraints the client declared.</param>
     /// <returns>The handle closing the scope.</returns>
-    public static IDisposable BeginRequest(EngineFilmRequest request)
+    public static IDisposable BeginRequest(LocalVideoRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         var previous = _current.Value;
@@ -137,9 +137,12 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
             plan.SourceId,
             plan.Protocol,
             plan.Container);
-        return plan.Method == PlaybackMethod.DirectPlay
-            ? new PlaybackPlan(PlayMethod.DirectPlay, 0)
-            : new PlaybackPlan(PlayMethod.DirectStream, TranscodeReason.ContainerNotSupported);
+        return plan.Method switch
+        {
+            PlaybackMethod.DirectPlay => new PlaybackPlan(PlayMethod.DirectPlay, 0),
+            PlaybackMethod.Remux => new PlaybackPlan(PlayMethod.DirectStream, TranscodeReason.ContainerNotSupported),
+            _ => new PlaybackPlan(PlayMethod.Transcode, 0),
+        };
     }
 
     /// <summary>
@@ -160,7 +163,26 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
             && plan.Transforms.All(transform => transform is TransformKind.RemuxContainer or TransformKind.CopyVideo or TransformKind.CopyAudio or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle)
             && plan.SubtitleDelivery is null or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External;
 
-    private V2PlanRecord? TryDecide(EngineFilmRequest request, MediaOptions options)
+    /// <summary>
+    /// Whether the HLS executor implements this plan. Transcoding is bounded to SDR H.264/AAC;
+    /// copied axes must already carry those codecs. HDR conversion and subtitle burn-in are separate
+    /// journeys, never implicit work delegated to the legacy decision engine by this executor.
+    /// </summary>
+    /// <param name="plan">The retained plan.</param>
+    /// <returns>Whether this plan has a session-owned HLS delivery.</returns>
+    public static bool IsExecutableHls(PlaybackExecutionPlan? plan)
+        => IsExecutableRemux(plan) || (plan is { Method: PlaybackMethod.Transcode, Protocol: StreamingProtocol.Hls, VideoStreamIndex: not null }
+            && (string.Equals(plan.Container, "mp4", StringComparison.OrdinalIgnoreCase) || string.Equals(plan.Container, "ts", StringComparison.OrdinalIgnoreCase))
+            && !string.IsNullOrEmpty(plan.VideoCodec)
+            && (plan.AudioStreamIndex is null || !string.IsNullOrEmpty(plan.AudioCodec))
+            && (plan.Transforms.Contains(TransformKind.TranscodeVideo) || plan.Transforms.Contains(TransformKind.TranscodeAudio))
+            && string.Equals(plan.VideoCodec, "h264", StringComparison.OrdinalIgnoreCase)
+            && (plan.AudioStreamIndex is null || string.Equals(plan.AudioCodec, "aac", StringComparison.OrdinalIgnoreCase))
+            && plan.Transforms.All(transform => transform is TransformKind.RemuxContainer or TransformKind.CopyVideo or TransformKind.CopyAudio
+                or TransformKind.TranscodeVideo or TransformKind.TranscodeAudio or TransformKind.Downmix or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle)
+            && plan.SubtitleDelivery is null or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External);
+
+    private V2PlanRecord? TryDecide(LocalVideoRequest request, MediaOptions options)
     {
         var sources = options.MediaSources
             .Where(source => string.IsNullOrEmpty(options.MediaSourceId) || string.Equals(source.Id, options.MediaSourceId, StringComparison.Ordinal))
@@ -171,11 +193,12 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
         }
 
         var context = DlnaPlaybackAdapter.ToContext(options.ItemId, options.UserId, options.MediaSourceId, MediaKind.Video, PlaybackEngine.EngineVersion);
-        // Resolved track indices belong to a source, not to the film. A later playable version
+        // Resolved track indices belong to a source, not to the item. A later playable version
         // can have different indices from the first candidate. Preserve the engine's preference
         // for the first direct-play candidate - a remux is only taken when no candidate direct
         // plays - while giving each candidate its own user defaults.
         V2PlanRecord? remux = null;
+        V2PlanRecord? transcode = null;
         foreach (var source in sources)
         {
             var decision = _engine.Decide(context, request.Capabilities, [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(request.Constraints, source));
@@ -195,9 +218,15 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
             {
                 remux = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }
+
+            var video = source.MediaStreams.FirstOrDefault(stream => stream.Index == plan.VideoStreamIndex && stream.Type == MediaStreamType.Video);
+            if (transcode is null && IsExecutableHls(plan) && video is not null && video.VideoRangeType is VideoRangeType.Unknown or VideoRangeType.SDR)
+            {
+                transcode = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
+            }
         }
 
-        return remux;
+        return remux ?? transcode;
     }
 
     /// <summary>
@@ -223,9 +252,9 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
 
     private sealed class Scope : IDisposable
     {
-        private readonly EngineFilmRequest? _previous;
+        private readonly LocalVideoRequest? _previous;
 
-        public Scope(EngineFilmRequest? previous) => _previous = previous;
+        public Scope(LocalVideoRequest? previous) => _previous = previous;
 
         public void Dispose() => _current.Value = _previous;
     }

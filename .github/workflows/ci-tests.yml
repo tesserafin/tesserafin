@@ -329,6 +329,7 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_AccessWithdrawnAfterPlanning_StopsServing
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_StoppedPosition_IsStoredAndAResumedSessionServesFromIt
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_UserSubtitlePreference_DecidesWhenTheClientNamesNoTrack
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.Film_Transcode_ExecutesOnlyThePlannedAxesAndCleansUp
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_StartSeekStop_CopiesBothStreamsInOneSessionAndOneJob
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_MediaElementCredential_ReadsOnlyWhileTheSessionLives
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_AnotherUser_CanNeitherReadNorStopNorTakeTheJob
@@ -338,6 +339,18 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_Replanned_NeverServesThePreviousPlansOutput
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_PostedAgainUnderTheSamePlaySession_NeverServesThePreviousPlansOutput
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_ClientStreamOptionsAndForeignCapabilities_ChangeNothing
+          --require 'Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_AccessWithdrawnAfterPlanning_StopsServing(episode: True)'
+          --require 'Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_AnotherUser_CanNeitherReadNorStopTheSession(episode: True)'
+          --require 'Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_ParametersThatDoNotMatchTheSession_AreNotServed(episode: True)'
+          --require 'Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_StartAndSeek_ServesRangesFromTheSessionFile(episode: True)'
+          --require 'Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_Stop_DeletesTheSessionAndRevokesItsCapability(episode: True)'
+          --require 'Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_StoppedPosition_IsStoredAndAResumedSessionServesFromIt(episode: True)'
+          --require 'Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.Film_Transcode_ExecutesOnlyThePlannedAxesAndCleansUp(encodeVideo: False, encodeAudio: True, episode: True)'
+          --require 'Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.Film_Transcode_ExecutesOnlyThePlannedAxesAndCleansUp(encodeVideo: True, encodeAudio: False, episode: True)'
+          --require 'Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.Film_Transcode_ExecutesOnlyThePlannedAxesAndCleansUp(encodeVideo: True, encodeAudio: True, episode: True)'
+          --require 'Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_MediaElementCredential_ReadsOnlyWhileTheSessionLives(episode: True)'
+          --require 'Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_StartSeekStop_CopiesBothStreamsInOneSessionAndOneJob(episode: True)'
+          --require 'Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_StoppedPosition_IsStoredAndAResumedSessionServesFromIt(episode: True)'
 
       # Diagnosis, not enforcement. The OpenAPI equality assertion is unchanged and still
       # fails the job; this only stops a cross-machine divergence from being unreproducible.

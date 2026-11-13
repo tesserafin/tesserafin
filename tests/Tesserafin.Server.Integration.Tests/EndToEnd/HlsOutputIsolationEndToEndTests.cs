@@ -84,6 +84,9 @@ public sealed class HlsOutputIsolationEndToEndTests : IClassFixture<HlsIsolation
 
         _workDir = Directory.CreateTempSubdirectory("tesserafin-p2r4-e2e-").FullName;
         var fixture = await EndToEndMediaFixtures.CreateH264AacMp4Async(_workDir, durationSeconds: Seconds);
+        // These assertions exercise the legacy Videos routes, including a foreign caller
+        // creating its own job from a released URL. A session-owned film/episode URL instead
+        // refuses that caller; its isolation is covered by RemuxFilmEndToEndTests.
         _item = LibraryItemSeeder.SeedVideo(
             _factory.Services.GetRequiredService<ILibraryManager>(),
             _factory.Services.GetRequiredService<IMediaStreamRepository>(),
@@ -91,7 +94,8 @@ public sealed class HlsOutputIsolationEndToEndTests : IClassFixture<HlsIsolation
             "mp4",
             _streams,
             "POLISH-2-R4 fixture " + suffix,
-            Seconds * TimeSpan.TicksPerSecond);
+            Seconds * TimeSpan.TicksPerSecond,
+            film: false);
 
         _transcodes = _factory.Services.GetRequiredService<IServerConfigurationManager>().GetTranscodePath();
         _fileSystem = (FailingRemovals)_factory.Services.GetRequiredService<IFileSystem>();

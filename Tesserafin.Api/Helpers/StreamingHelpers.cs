@@ -211,96 +211,103 @@ public static class StreamingHelpers
 
         encodingHelper.AttachMediaSourceInfo(state, encodingOptions, mediaSource, url);
 
-        string? containerInternal = Path.GetExtension(state.RequestedUrl);
-
-        if (string.IsNullOrEmpty(containerInternal)
-            && (!string.IsNullOrWhiteSpace(streamingRequest.LiveStreamId)
-                || (mediaSource != null && mediaSource.IsInfiniteStream)))
+        if (streamingRequest is SessionHlsRequest retained)
         {
-            containerInternal = ".ts";
-        }
-
-        if (!string.IsNullOrEmpty(streamingRequest.Container))
-        {
-            containerInternal = streamingRequest.Container;
-        }
-
-        if (string.IsNullOrEmpty(containerInternal))
-        {
-            containerInternal = streamingRequest.Static ?
-                StreamBuilder.NormalizeMediaSourceFormatIntoSingleContainer(state.InputContainer, null, DlnaProfileType.Audio)
-                : GetOutputFileExtension(state, mediaSource);
-        }
-
-        var outputAudioCodec = streamingRequest.AudioCodec;
-        state.OutputAudioCodec = outputAudioCodec;
-        state.OutputContainer = (containerInternal ?? string.Empty).TrimStart('.');
-        state.OutputAudioChannels = encodingHelper.GetNumAudioChannelsParam(state, state.AudioStream, state.OutputAudioCodec);
-        if (EncodingHelper.LosslessAudioCodecs.Contains(outputAudioCodec))
-        {
-            state.OutputAudioBitrate = state.AudioStream.BitRate ?? 0;
+            retained.Apply(state, encodingHelper);
         }
         else
         {
-            state.OutputAudioBitrate = encodingHelper.GetAudioBitrateParam(streamingRequest.AudioBitRate, streamingRequest.AudioCodec, state.AudioStream, state.OutputAudioChannels) ?? 0;
-        }
+            string? containerInternal = Path.GetExtension(state.RequestedUrl);
 
-        if (outputAudioCodec.StartsWith("pcm_", StringComparison.Ordinal))
-        {
-            containerInternal = ".pcm";
-        }
-
-        if (state.VideoRequest is not null)
-        {
-            state.OutputVideoCodec = state.Request.VideoCodec;
-            state.OutputVideoBitrate = encodingHelper.GetVideoBitrateParamValue(state.VideoRequest, state.VideoStream, state.OutputVideoCodec);
-
-            encodingHelper.TryStreamCopy(state, encodingOptions);
-
-            // No bitrate limit requested means no reason to reduce the resolution either.
-            if (!EncodingHelper.IsCopyCodec(state.OutputVideoCodec) && state.OutputVideoBitrate.HasValue && state.VideoRequest.VideoBitRate.HasValue)
+            if (string.IsNullOrEmpty(containerInternal)
+                && (!string.IsNullOrWhiteSpace(streamingRequest.LiveStreamId)
+                    || (mediaSource != null && mediaSource.IsInfiniteStream)))
             {
-                var isVideoResolutionNotRequested = !state.VideoRequest.Width.HasValue
-                    && !state.VideoRequest.Height.HasValue
-                    && !state.VideoRequest.MaxWidth.HasValue
-                    && !state.VideoRequest.MaxHeight.HasValue;
-
-                if (isVideoResolutionNotRequested
-                    && state.VideoStream is not null
-                    && state.VideoRequest.VideoBitRate.HasValue
-                    && state.VideoStream.BitRate.HasValue
-                    && state.VideoRequest.VideoBitRate.Value >= state.VideoStream.BitRate.Value)
-                {
-                    // Don't downscale the resolution if the width/height/MaxWidth/MaxHeight is not requested,
-                    // and the requested video bitrate is greater than source video bitrate.
-                    if (state.VideoStream.Width.HasValue || state.VideoStream.Height.HasValue)
-                    {
-                        state.VideoRequest.MaxWidth = state.VideoStream?.Width;
-                        state.VideoRequest.MaxHeight = state.VideoStream?.Height;
-                    }
-                }
-                else
-                {
-                    var h264EquivalentBitrate = EncodingHelper.ScaleBitrate(
-                        state.OutputVideoBitrate.Value,
-                        state.ActualOutputVideoCodec,
-                        "h264");
-                    var resolution = ResolutionNormalizer.Normalize(
-                        state.VideoStream?.BitRate,
-                        state.OutputVideoBitrate.Value,
-                        h264EquivalentBitrate,
-                        state.VideoRequest.MaxWidth,
-                        state.VideoRequest.MaxHeight,
-                        state.TargetFramerate);
-
-                    state.VideoRequest.MaxWidth = resolution.MaxWidth;
-                    state.VideoRequest.MaxHeight = resolution.MaxHeight;
-                }
+                containerInternal = ".ts";
             }
 
-            if (state.AudioStream is not null && !EncodingHelper.IsCopyCodec(state.OutputAudioCodec) && string.Equals(state.AudioStream.Codec, state.OutputAudioCodec, StringComparison.OrdinalIgnoreCase) && state.OutputAudioBitrate.HasValue)
+            if (!string.IsNullOrEmpty(streamingRequest.Container))
             {
-                state.OutputAudioCodec = state.SupportedAudioCodecs.Where(c => !EncodingHelper.LosslessAudioCodecs.Contains(c)).FirstOrDefault(mediaEncoder.CanEncodeToAudioCodec);
+                containerInternal = streamingRequest.Container;
+            }
+
+            if (string.IsNullOrEmpty(containerInternal))
+            {
+                containerInternal = streamingRequest.Static ?
+                    StreamBuilder.NormalizeMediaSourceFormatIntoSingleContainer(state.InputContainer, null, DlnaProfileType.Audio)
+                    : GetOutputFileExtension(state, mediaSource);
+            }
+
+            var outputAudioCodec = streamingRequest.AudioCodec;
+            state.OutputAudioCodec = outputAudioCodec;
+            state.OutputContainer = (containerInternal ?? string.Empty).TrimStart('.');
+            state.OutputAudioChannels = encodingHelper.GetNumAudioChannelsParam(state, state.AudioStream, state.OutputAudioCodec);
+            if (EncodingHelper.LosslessAudioCodecs.Contains(outputAudioCodec))
+            {
+                state.OutputAudioBitrate = state.AudioStream.BitRate ?? 0;
+            }
+            else
+            {
+                state.OutputAudioBitrate = encodingHelper.GetAudioBitrateParam(streamingRequest.AudioBitRate, streamingRequest.AudioCodec, state.AudioStream, state.OutputAudioChannels) ?? 0;
+            }
+
+            if (outputAudioCodec.StartsWith("pcm_", StringComparison.Ordinal))
+            {
+                containerInternal = ".pcm";
+            }
+
+            if (state.VideoRequest is not null)
+            {
+                state.OutputVideoCodec = state.Request.VideoCodec;
+                state.OutputVideoBitrate = encodingHelper.GetVideoBitrateParamValue(state.VideoRequest, state.VideoStream, state.OutputVideoCodec);
+
+                encodingHelper.TryStreamCopy(state, encodingOptions);
+
+                // No bitrate limit requested means no reason to reduce the resolution either.
+                if (!EncodingHelper.IsCopyCodec(state.OutputVideoCodec) && state.OutputVideoBitrate.HasValue && state.VideoRequest.VideoBitRate.HasValue)
+                {
+                    var isVideoResolutionNotRequested = !state.VideoRequest.Width.HasValue
+                        && !state.VideoRequest.Height.HasValue
+                        && !state.VideoRequest.MaxWidth.HasValue
+                        && !state.VideoRequest.MaxHeight.HasValue;
+
+                    if (isVideoResolutionNotRequested
+                        && state.VideoStream is not null
+                        && state.VideoRequest.VideoBitRate.HasValue
+                        && state.VideoStream.BitRate.HasValue
+                        && state.VideoRequest.VideoBitRate.Value >= state.VideoStream.BitRate.Value)
+                    {
+                        // Don't downscale the resolution if the width/height/MaxWidth/MaxHeight is not requested,
+                        // and the requested video bitrate is greater than source video bitrate.
+                        if (state.VideoStream.Width.HasValue || state.VideoStream.Height.HasValue)
+                        {
+                            state.VideoRequest.MaxWidth = state.VideoStream?.Width;
+                            state.VideoRequest.MaxHeight = state.VideoStream?.Height;
+                        }
+                    }
+                    else
+                    {
+                        var h264EquivalentBitrate = EncodingHelper.ScaleBitrate(
+                            state.OutputVideoBitrate.Value,
+                            state.ActualOutputVideoCodec,
+                            "h264");
+                        var resolution = ResolutionNormalizer.Normalize(
+                            state.VideoStream?.BitRate,
+                            state.OutputVideoBitrate.Value,
+                            h264EquivalentBitrate,
+                            state.VideoRequest.MaxWidth,
+                            state.VideoRequest.MaxHeight,
+                            state.TargetFramerate);
+
+                        state.VideoRequest.MaxWidth = resolution.MaxWidth;
+                        state.VideoRequest.MaxHeight = resolution.MaxHeight;
+                    }
+                }
+
+                if (state.AudioStream is not null && !EncodingHelper.IsCopyCodec(state.OutputAudioCodec) && string.Equals(state.AudioStream.Codec, state.OutputAudioCodec, StringComparison.OrdinalIgnoreCase) && state.OutputAudioBitrate.HasValue)
+                {
+                    state.OutputAudioCodec = state.SupportedAudioCodecs.Where(c => !EncodingHelper.LosslessAudioCodecs.Contains(c)).FirstOrDefault(mediaEncoder.CanEncodeToAudioCodec);
+                }
             }
         }
 
