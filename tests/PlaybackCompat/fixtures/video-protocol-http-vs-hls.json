@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-protocol-http-vs-hls",
   "category": "protocol-selection",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "The client declares HLS support and an HLS output profile; a transcode is required (source VP9 is undecodable). Expect OutputSpec.Protocol to reflect the used output profile's declared protocol (Hls), not the neutral HTTP default that Direct Play/Remux/no-matching-profile transcodes always carry.",
   "input": {
     "context": { "mediaKind": "Video" },

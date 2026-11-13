@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-resolution-limit",
   "category": "bitrate-resolution-limit",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "4K H.264 exceeding the client's 1080p max (a per-codec limit on the H.264 VideoCodecCapability, PR102b), with every OTHER dimension deliberately within limits (level, bit depth, range, bitrate all generous) so ONLY resolution trips. Video downscales (targeting the client's declared H.264 output profile); audio copied.",
   "input": {
     "context": {

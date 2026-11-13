@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-requested-source-served",
   "category": "requested-source",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "Two sources: an H.264 one that would direct play, and an HEVC one that needs a transcode. requestedMediaSourceId explicitly names the HEVC (worse) source, so the engine must serve exactly that one and transcode it - never silently substituting the other, direct-playable source, even though it would otherwise be 'better'.",
   "input": {
     "context": { "mediaKind": "Video" },

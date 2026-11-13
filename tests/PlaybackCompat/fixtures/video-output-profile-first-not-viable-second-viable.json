@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-output-profile-first-not-viable-second-viable",
   "category": "output-profile-order",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "Client declares two output profiles: the first asks for HLS delivery but the client does NOT declare HLS support (structurally not viable, IsOutputProfileViable rejects it), the second asks for plain HTTP H.264 (viable). A transcode is required (source VP9 is undecodable). Expect the engine to skip the non-viable first profile and use the second, without falling back to the named legacy default (a real client-declared profile was still used).",
   "input": {
     "context": { "mediaKind": "Video" },

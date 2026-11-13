@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "subtitle-forced-auto-selected",
   "category": "subtitle-auto-select",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "No preferredSubtitleStreamIndex, SubtitleMode Default. Two embedded VTT subtitle streams, neither default nor external; one is flagged forced. Expect SelectDefaultSubtitle to skip the plain (non-default/non-forced/non-external) stream - which the Default-mode predicate excludes entirely - and auto-select the forced one.",
   "input": {
     "context": { "mediaKind": "Video" },

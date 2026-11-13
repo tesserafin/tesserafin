@@ -495,13 +495,15 @@ public static class PlaybackEnginePhase2Tests
     }
 
     [Fact]
-    public static void EngineVersion_IsSeven()
+    public static void EngineVersion_IsEight()
     {
         // PR111e bumped 5->6: CSV-aware container comparisons, Direct Play container resolution,
         // and the HDR10-or-SDR tonemap-target policy are all decision-affecting changes to Decide.
         // Issue #70 bumped 6->7: a constraint-forbidden method now demotes to the next heavier
         // allowed method instead of vetoing the source.
-        Assert.Equal(7, PlaybackEngine.EngineVersion);
+        // Consolidation step 1 bumped 7->8: a remux is delivered through the declared output profile
+        // that can carry the copied streams (PlaybackEngineRemuxDeliveryTests).
+        Assert.Equal(8, PlaybackEngine.EngineVersion);
     }
 
     // ---------------------------------------------------------------------------------------

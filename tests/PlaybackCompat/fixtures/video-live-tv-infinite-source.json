@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-live-tv-infinite-source",
   "category": "live-tv",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "Live TV channel: an H.264/AAC TS source with no runtime (RunTimeTicks null represents an unbounded/live stream - PR104 deliberately adds no separate IsLive flag, since the engine never branches on duration; see fixture.schema.json's 'mediaSource.runTimeTicks' remark). Everything else is a normal direct-playable source. Expect direct play, same as any other direct-play case.",
   "input": {
     "context": { "mediaKind": "Video" },

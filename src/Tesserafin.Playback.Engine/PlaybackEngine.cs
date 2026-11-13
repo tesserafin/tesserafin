@@ -64,8 +64,15 @@ public sealed class PlaybackEngine : IPlaybackEngine
     /// vetoing the source outright - decision-affecting for every request whose constraints forbid
     /// a method the media alone would have chosen.
     /// </para>
+    /// <para>
+    /// Consolidation step 1 (remux film) bumped 7→8: a <see cref="PlaybackMethod.Remux"/> is now
+    /// delivered through the first client-declared <see cref="PlaybackOutputProfile"/> that can
+    /// carry both copied streams - its container and its protocol - instead of always a decode
+    /// container over plain HTTP. Decision-affecting for every remux of a client that declares
+    /// such a profile (a browser: HLS).
+    /// </para>
     /// </remarks>
-    public const int EngineVersion = 7;
+    public const int EngineVersion = 8;
 
     /// <summary>
     /// The transcoding target video codec used when the client declares no
@@ -507,6 +514,20 @@ public sealed class PlaybackEngine : IPlaybackEngine
             : null;
         var usedOutputProfileFallback = false;
 
+        // A remux is delivered the way the client declared it wants a produced stream delivered:
+        // the first declared PlaybackOutputProfile of this MediaKind that can carry BOTH copied
+        // streams over a protocol the client supports gives the container and the protocol (for a
+        // browser: fMP4 or TS segments over HLS, not a progressive file it cannot seek in). A
+        // profile naming the container the source already has is not a remux target (issue #70: a
+        // Remux is defined by its container change). With no such profile the pre-existing choice
+        // stands: a container the client decodes these codecs in, over plain HTTP.
+        var remuxOutputProfile = neededMethod == PlaybackMethod.Remux
+            ? capabilities.OutputProfiles.FirstOrDefault(p =>
+                p.Type == context.MediaKind
+                && CarriesCopiedStreams(p, capabilities.Decode, selectedVideo?.Codec, selectedAudio?.Codec)
+                && !ContainsContainer(source.Container, p.Container))
+            : null;
+
         // --- CONTAINER ---
         string targetContainer;
         if (neededMethod == PlaybackMethod.DirectPlay)
@@ -518,6 +539,10 @@ public sealed class PlaybackEngine : IPlaybackEngine
         else if (matchingOutputProfile is not null)
         {
             targetContainer = matchingOutputProfile.Container;
+        }
+        else if (remuxOutputProfile is not null)
+        {
+            targetContainer = remuxOutputProfile.Container;
         }
         else if (neededMethod == PlaybackMethod.Remux)
         {
@@ -649,10 +674,11 @@ public sealed class PlaybackEngine : IPlaybackEngine
 
         // --- OUTPUT ---
         // PR102b: Protocol comes from the client-declared PlaybackOutputProfile actually used for
-        // this decision - only ever non-null when transcoding to a matched profile. Direct Play,
-        // Remux, and the no-matching-profile transcode fallback all carry no server-chosen delivery
-        // protocol, so they use the neutral value (plain HTTP).
-        var outputProtocol = matchingOutputProfile?.Protocol ?? StreamingProtocol.Http;
+        // this decision - non-null when transcoding to a matched profile, or when remuxing into a
+        // declared profile that carries the copied streams (remuxOutputProfile). Direct Play, a
+        // remux no declared profile can carry, and the no-matching-profile transcode fallback carry
+        // no server-chosen delivery protocol, so they use the neutral value (plain HTTP).
+        var outputProtocol = (matchingOutputProfile ?? remuxOutputProfile)?.Protocol ?? StreamingProtocol.Http;
 
         var output = new OutputSpec(
             Container: targetContainer,
@@ -991,6 +1017,18 @@ public sealed class PlaybackEngine : IPlaybackEngine
 
         return true;
     }
+
+    /// <summary>
+    /// Whether a client-declared <see cref="PlaybackOutputProfile"/> can deliver a remux: a named
+    /// container, a protocol the client supports, and every stream that is copied listed among the
+    /// profile's codecs. Nothing is encoded, so an empty codec list on an axis the source has is a
+    /// profile that cannot carry that stream, not a wildcard.
+    /// </summary>
+    private static bool CarriesCopiedStreams(PlaybackOutputProfile profile, DecodeCapabilities decode, string? videoCodec, string? audioCodec)
+        => !string.IsNullOrEmpty(profile.Container)
+            && IsProtocolViable(profile.Protocol, decode)
+            && (videoCodec is null || profile.VideoCodecs.Contains(videoCodec, StringComparer.OrdinalIgnoreCase))
+            && (audioCodec is null || profile.AudioCodecs.Contains(audioCodec, StringComparer.OrdinalIgnoreCase));
 
     /// <summary>
     /// Whether the client has declared support for the delivery protocol an output profile asks for.

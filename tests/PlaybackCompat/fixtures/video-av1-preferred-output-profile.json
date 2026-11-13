@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-av1-preferred-output-profile",
   "category": "av1-preferred",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "The client's declared output profile lists AV1 first among its target video codecs (av1, h264, vp9 - mirrors the real Firefox HLS/MP4 TranscodingProfile, PR98/PR102). A transcode is required (source HEVC is undecodable). Expect the engine to target AV1, the client's actual first preference, not a hardcoded server default codec.",
   "input": {
     "context": { "mediaKind": "Video" },

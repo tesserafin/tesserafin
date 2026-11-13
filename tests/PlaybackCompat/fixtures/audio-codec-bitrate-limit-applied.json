@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "audio-codec-bitrate-limit-applied",
   "category": "codec-bitrate-limit",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "PR103: per-codec audio bitrate ceiling (AudioCodecCapability.MaxBitrate), isolated from the container-wide MaxBitrate check (constraints.maxBitrate is left null here). The source's FLAC audio stream exceeds the client's declared FLAC bitrate ceiling, forcing an audio transcode to the client's declared AAC output profile; the output's AudioBitrate/TotalBitrate cascade the output profile's ceiling against the target codec's own per-codec ceiling.",
   "input": {
     "context": { "mediaKind": "Audio" },

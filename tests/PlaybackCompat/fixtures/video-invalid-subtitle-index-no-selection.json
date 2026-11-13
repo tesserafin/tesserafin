@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-invalid-subtitle-index-no-selection",
   "category": "invalid-index",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "preferredSubtitleStreamIndex names an index that does not exist on the source, even though the source DOES have a default-flagged subtitle stream. Unlike SelectAudio, SelectSubtitle does not revalidate an explicit index against the source's actual streams (mirrors legacy StreamBuilder.BuildVideoItem's plain '??'): expect NO subtitle selected, not a fall-through to the default one.",
   "input": {
     "context": { "mediaKind": "Video" },

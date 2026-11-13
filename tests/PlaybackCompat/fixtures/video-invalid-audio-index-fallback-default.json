@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-invalid-audio-index-fallback-default",
   "category": "invalid-index",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "preferredAudioStreamIndex names an index that does not exist on the source. Per SelectAudio's characterization of MediaSourceManager.SetDefaultAudioStreamIndex, a stale/invalid explicit index degrades to 'no preference' rather than 'no audio': the engine falls through to the computed default (the stream flagged isDefault), not the first stream in list order (they differ here, disambiguating the two).",
   "input": {
     "context": { "mediaKind": "Video" },

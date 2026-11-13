@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-alternate-versions-best-selected",
   "category": "alternate-versions",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "Two alternate versions of the same item, no requestedMediaSourceId: a worse HEVC source (needs transcode, since the client only decodes H.264) listed first, and a better H.264 source (direct playable) listed second. The engine must pick the best viable method across ALL sources (DirectPlay > Remux > Transcode), not just the first source in list order - so the second source wins despite being listed after the first.",
   "input": {
     "context": { "mediaKind": "Video" },

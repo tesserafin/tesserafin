@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-codec-incompatible",
   "category": "video-codec-incompatible",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "AV1 video the client cannot decode, in an accepted MP4 container with accepted AAC audio. Only the video codec fails, so video transcodes (to the client's declared H.264 output profile) and audio is copied; container is unchanged (no remux).",
   "input": {
     "context": {

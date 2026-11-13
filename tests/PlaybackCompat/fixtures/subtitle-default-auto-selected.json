@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "subtitle-default-auto-selected",
   "category": "subtitle-auto-select",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "No preferredSubtitleStreamIndex and SubtitleMode omitted (defaults to Default). Two external VTT subtitle streams, only one flagged default. Expect SelectDefaultSubtitle to auto-select the default-flagged stream, not the first stream in list order (they differ here) and not the non-default one.",
   "input": {
     "context": { "mediaKind": "Video" },

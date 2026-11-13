@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-hdr-tonemap-hdr10-recovery",
   "category": "hdr-tonemap",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "PR111e named policy: HEVC Dolby-Vision-tagged source (DOVIWithHDR10) whose codec, level, bit depth and resolution are all accepted, but the client's hevc decode profile does not list DOVIWithHDR10 among its supported video ranges - only SDR and HDR10 - so the range trips and a tonemap is required, same as video-hdr-tonemap.json. UNLIKE that fixture, the target codec here DOES declare HDR10 support, so v2's tonemap-target policy (output HDR10 if the target codec supports it, else SDR) recovers HDR10 instead of falling all the way back to SDR: video re-encodes with tonemapping to HDR10 (targeting the client's declared HEVC output profile); audio copied; container unchanged.",
   "input": {
     "context": {

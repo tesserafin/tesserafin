@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "subtitle-pgs-burn-in",
   "category": "subtitle-burn-in",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "Video and audio are directly playable, but the requested PGS subtitle (image-based) has no supported delivery \u2014 only external SRT is. Burning it in forces a video re-encode (targeting the client's declared H.264 output profile); audio copied; container unchanged.",
   "input": {
     "context": {

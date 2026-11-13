@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-h264-aac-mp4-directplay",
   "category": "direct-play",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "H.264/AAC in MP4; client declares that exact container+codec combination directly, resolution and bitrate are within the codec's own limits. Expect direct play with no transforms.",
   "input": {
     "context": {

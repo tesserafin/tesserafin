@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "subtitle-srt-external",
   "category": "subtitle-external",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "Directly playable video and audio plus a requested external SRT subtitle the client accepts as an external sidecar. Nothing forces a transcode: direct play, subtitle delivered externally.",
   "input": {
     "context": {

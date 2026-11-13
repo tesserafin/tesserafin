@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-per-codec-resolution-limit-hevc-4k-directplay",
   "category": "per-codec-limit",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "PR102b: per-codec resolution ceilings do not leak between codecs. The client caps H.264 at 1080p and HEVC at 2160p separately; the media is 4K (2160p) HEVC. A client wrongly collapsed to a single global 1080p ceiling (the minimum of the two) would force a downscale/transcode here; per-codec limits correctly allow direct play.",
   "input": {
     "context": { "mediaKind": "Video" },

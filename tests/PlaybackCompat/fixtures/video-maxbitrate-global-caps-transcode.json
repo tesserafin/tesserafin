@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-maxbitrate-global-caps-transcode",
   "category": "bitrate-resolution-limit",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "PR103: PlaybackConstraints.MaxBitrate is a request-wide cap on the source's overall bitrate. Video and audio codecs are both otherwise directly playable (container, codecs, profile/level/resolution all within the client's own per-codec limits), but the request's MaxBitrate is below the source's own bitrate - Direct Play/Remux cannot honor a cap tighter than the source's muxed bitrate, so only a transcode can. Expect a forced video transcode (audio copied) with TotalBitrate/VideoBitrate capped at the requested ceiling.",
   "input": {
     "context": { "mediaKind": "Video" },

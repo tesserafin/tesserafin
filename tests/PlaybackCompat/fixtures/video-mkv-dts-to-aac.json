@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-mkv-dts-to-aac",
   "category": "audio-transcode",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "The plan's canonical case: MKV container refused, H.264 video is copyable, DTS audio is not decodable by the client. Expect remux + audio transcode to AAC, video copied. The client's declared output profile targets mp4/h264/aac.",
   "input": {
     "context": {

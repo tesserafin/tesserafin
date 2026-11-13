@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-hdr-tonemap",
   "category": "hdr-tonemap",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "HEVC HDR10 whose codec, level, bit depth and resolution are all accepted, but the client supports only SDR. Only the video range trips: video re-encodes with tonemapping to SDR (targeting the client's declared HEVC output profile); audio copied; container unchanged.",
   "input": {
     "context": {

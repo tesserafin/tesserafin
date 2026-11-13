@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-direct-play-cross-container-codec-invalid",
   "category": "direct-play-mismatch",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "PR102b problem #1: the client declares MP4+H.264+AAC and, SEPARATELY, WebM+VP9+AAC as two distinct DirectPlayProfile entries - never MP4+VP9. The media is MP4 container with VP9 video (individually decodable) and AAC audio (individually decodable): a cartesian-flattened engine would wrongly direct play this as an accepted combination. Expect NOT direct play - a remux into WebM (the one container declared together with VP9), streams copied unchanged.",
   "input": {
     "context": { "mediaKind": "Video" },

@@ -2,7 +2,7 @@
   "fixtureVersion": 5,
   "id": "video-output-profile-order-first-viable",
   "category": "output-profile-order",
-  "engineVersion": 7,
+  "engineVersion": 8,
   "description": "Client declares two output profiles, both structurally viable: HEVC first, H.264 second. A transcode is required (source AV1 is undecodable). Expect the FIRST viable profile (HEVC) to win, the client's declared preference order - not a server-side codec preference.",
   "input": {
     "context": { "mediaKind": "Video" },
