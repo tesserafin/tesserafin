@@ -16,18 +16,21 @@ namespace Tesserafin.Server.Integration.Tests.EndToEnd;
 public sealed partial class RemuxFilmEndToEndTests
 {
     [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    [InlineData(true, true)]
-    public async Task Film_Transcode_ExecutesOnlyThePlannedAxesAndCleansUp(bool encodeVideo, bool encodeAudio)
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public async Task Film_Transcode_ExecutesOnlyThePlannedAxesAndCleansUp(bool encodeVideo, bool encodeAudio, bool episode)
     {
-        var (client, userId) = await SignInAsync($"encode-{encodeVideo}-{encodeAudio}");
+        var (client, userId) = await SignInAsync($"encode-{encodeVideo}-{encodeAudio}-{episode}");
         var streams = new[]
         {
             new MediaStream { Index = 0, Type = MediaStreamType.Video, Codec = "h264", Width = EndToEndMediaFixtures.Width, Height = EndToEndMediaFixtures.Height, BitRate = 500_000, IsDefault = true },
             new MediaStream { Index = 1, Type = MediaStreamType.Audio, Codec = "aac", Channels = 2, BitRate = 128_000, IsDefault = true },
         };
-        var itemId = SeedFilm(_fixturePath, streams);
+        var itemId = SeedFilm(_fixturePath, streams, episode: episode);
         var (capabilities, constraints) = EndToEndCapabilityPresets.BrowserRemuxOverHls();
         capabilities = capabilities with
         {
@@ -44,7 +47,7 @@ public sealed partial class RemuxFilmEndToEndTests
             MaxAudioChannels = encodeAudio ? 1 : null,
             MaxBitrate = encodeVideo ? 400_000 : null,
         };
-        var request = new CreatePlaybackSessionRequest(itemId, userId, capabilities, constraints, PlaySessionId: $"encode-{encodeVideo}-{encodeAudio}-ps");
+        var request = new CreatePlaybackSessionRequest(itemId, userId, capabilities, constraints, PlaySessionId: $"encode-{encodeVideo}-{encodeAudio}-{episode}-ps");
         using var response = await client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, TestContext.Current.CancellationToken);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.True(response.IsSuccessStatusCode, body);

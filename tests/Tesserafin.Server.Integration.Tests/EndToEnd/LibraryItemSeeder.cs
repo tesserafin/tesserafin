@@ -58,9 +58,10 @@ public static class LibraryItemSeeder
     /// <param name="configure">Anything else a test wants the item to carry before it is saved.</param>
     /// <param name="film">
     /// <see langword="false"/> seeds a plain <see cref="Video"/> instead of a <see cref="Movie"/>: a
-    /// video that is not a film keeps the pre-consolidation playback chain (docs/playback-path-inventory.md §4).
+    /// video outside the migrated film/episode scope keeps the pre-consolidation playback chain.
     /// <paramref name="configure"/> is not applied to it.
     /// </param>
+    /// <param name="video">An explicit video subtype, for example an episode; overrides <paramref name="film"/>.</param>
     /// <returns>The new item's id.</returns>
     public static Guid SeedVideo(
         ILibraryManager libraryManager,
@@ -73,13 +74,14 @@ public static class LibraryItemSeeder
         string[]? tags = null,
         Guid parentId = default,
         Action<Movie>? configure = null,
-        bool film = true)
+        bool film = true,
+        Video? video = null)
     {
         ArgumentNullException.ThrowIfNull(libraryManager);
         ArgumentNullException.ThrowIfNull(mediaStreamRepository);
         ArgumentNullException.ThrowIfNull(streams);
 
-        var movie = Fill(film ? new Movie() : new Video());
+        var movie = Fill(video ?? (film ? new Movie() : new Video()));
         if (movie is Movie seededFilm)
         {
             configure?.Invoke(seededFilm);

@@ -13,6 +13,7 @@ using Tesserafin.Api.Models.PlaybackSessionDtos;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
@@ -108,12 +109,14 @@ public sealed partial class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFil
         return ValueTask.CompletedTask;
     }
 
-    [Fact]
-    public async Task RemuxFilm_StartSeekStop_CopiesBothStreamsInOneSessionAndOneJob()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RemuxFilm_StartSeekStop_CopiesBothStreamsInOneSessionAndOneJob(bool episode)
     {
         const string PlaySession = "remux-start-ps";
-        var (client, userId) = await SignInAsync("remux-start");
-        var itemId = SeedFilm(_fixturePath, _streams);
+        var (client, userId) = await SignInAsync($"remux-start-{episode}");
+        var itemId = SeedFilm(_fixturePath, _streams, episode: episode);
         var session = await CreateSessionAsync(client, itemId, userId, PlaySession);
 
         // Decision: the engine's, and a remux into what the client declared first (fMP4 over HLS).
@@ -189,12 +192,14 @@ public sealed partial class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFil
         Assert.Single(FfmpegLogs(itemId));
     }
 
-    [Fact]
-    public async Task RemuxFilm_MediaElementCredential_ReadsOnlyWhileTheSessionLives()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RemuxFilm_MediaElementCredential_ReadsOnlyWhileTheSessionLives(bool episode)
     {
         const string PlaySession = "remux-capability-ps";
-        var (client, userId) = await SignInAsync("remux-capability");
-        var itemId = SeedFilm(_fixturePath, _streams);
+        var (client, userId) = await SignInAsync($"remux-capability-{episode}");
+        var itemId = SeedFilm(_fixturePath, _streams, episode: episode);
         var session = await CreateSessionAsync(client, itemId, userId, PlaySession);
         var descriptor = await GetDescriptorAsync(client, session.Id);
         var capability = await MintMediaCapabilityAsync(client, itemId, itemId.ToString("N"), PlaySession);
@@ -460,16 +465,18 @@ public sealed partial class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFil
     /// the browser suite measures. Nothing server-side starts "from" a position on this route.
     /// </summary>
     /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Fact]
-    public async Task RemuxFilm_StoppedPosition_IsStoredAndAResumedSessionServesFromIt()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RemuxFilm_StoppedPosition_IsStoredAndAResumedSessionServesFromIt(bool episode)
     {
         var configuration = _configManager.Configuration;
         var minResumeSeconds = configuration.MinResumeDurationSeconds;
         configuration.MinResumeDurationSeconds = 0;
         try
         {
-            var (client, userId) = await SignInAsync("remux-resume");
-            var itemId = SeedFilm(_fixturePath, _streams);
+            var (client, userId) = await SignInAsync($"remux-resume-{episode}");
+            var itemId = SeedFilm(_fixturePath, _streams, episode: episode);
             var first = await CreateSessionAsync(client, itemId, userId, "remux-resume-1");
             var position = TimeSpan.FromSeconds(FixtureSeconds / 2).Ticks;
 
@@ -499,7 +506,7 @@ public sealed partial class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFil
         }
     }
 
-    private Guid SeedFilm(string path, MediaStream[] streams, string[]? tags = null) =>
+    private Guid SeedFilm(string path, MediaStream[] streams, string[]? tags = null, bool episode = false) =>
         LibraryItemSeeder.SeedVideo(
             _libraryManager,
             _mediaStreamRepository,
@@ -508,7 +515,8 @@ public sealed partial class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFil
             streams,
             $"Consolidation remux film {Guid.NewGuid()}",
             runTimeTicks: TimeSpan.FromSeconds(FixtureSeconds).Ticks,
-            tags: tags);
+            tags: tags,
+            video: episode ? new Episode { IndexNumber = 1, ParentIndexNumber = 1 } : null);
 
     private async Task<(Guid ItemId, Guid VersionId)> SeedFilmWithAlternateVersionAsync(string[]? versionTags)
     {

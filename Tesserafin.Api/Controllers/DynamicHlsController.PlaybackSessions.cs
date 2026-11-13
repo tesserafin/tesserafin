@@ -143,7 +143,7 @@ public partial class DynamicHlsController
         string mediaSourceId,
         string playSessionId)
     {
-        var delivery = deliveryGuard.Resolve(id, User, itemId, mediaSourceId, playSessionId, EngineFilmPlanner.IsExecutableHls, allowAdministrator: false);
+        var delivery = deliveryGuard.Resolve(id, User, itemId, mediaSourceId, playSessionId, LocalVideoPlanner.IsExecutableHls, allowAdministrator: false);
         if (delivery.Outcome == PlaybackSessionDeliveryOutcome.Forbidden)
         {
             return (Forbid(), null);
