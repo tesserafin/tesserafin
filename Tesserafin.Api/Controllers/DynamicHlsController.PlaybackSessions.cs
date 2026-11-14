@@ -16,8 +16,8 @@ using Tesserafin.Model.Dlna;
 namespace Tesserafin.Api.Controllers;
 
 /// <summary>
-/// The HLS routes of a playback session the v2 engine alone decided to remux
-/// (docs/playback-path-inventory.md §5). They live on this controller because they execute through
+/// The HLS routes of a playback session the v2 engine alone decided to remux or to transcode
+/// (docs/playback-path-inventory.md §5 and §6). They live on this controller because they execute through
 /// the same playlist generator, segment path, job ownership and transcode manager as every other
 /// HLS output; what differs is where the encoding request comes from. Here the client names no
 /// codec, container, stream or offset: the request is built from the session's retained execution
@@ -26,7 +26,7 @@ namespace Tesserafin.Api.Controllers;
 public partial class DynamicHlsController
 {
     /// <summary>
-    /// Gets the media playlist of a session decided as a remux.
+    /// Gets the media playlist of a session decided as a remux or a transcode.
     /// </summary>
     /// <param name="id">The session.</param>
     /// <param name="itemId">The item the session plays; must match the session.</param>
@@ -35,8 +35,8 @@ public partial class DynamicHlsController
     /// <param name="deliveryGuard">Instance of <see cref="PlaybackSessionDeliveryGuard"/>.</param>
     /// <response code="200">Playlist returned.</response>
     /// <response code="403">The caller does not own the session.</response>
-    /// <response code="404">No such remux session, or nothing servable for it.</response>
-    /// <response code="422">The retained plan cannot be executed as a stream copy.</response>
+    /// <response code="404">No such session-executed plan, or nothing servable for it.</response>
+    /// <response code="422">The retained plan cannot be executed as planned.</response>
     /// <returns>The media playlist, naming this session's segment route.</returns>
     [HttpGet("Playback/Sessions/{id}/Hls/main.m3u8")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -49,19 +49,19 @@ public partial class DynamicHlsController
         [FromQuery, Required] string playSessionId,
         [FromServices] PlaybackSessionDeliveryGuard deliveryGuard)
     {
-        var (refusal, request) = ResolveSessionRemux(deliveryGuard, id, itemId, mediaSourceId, playSessionId);
+        var (refusal, request) = ResolveSessionOutput(deliveryGuard, id, itemId, mediaSourceId, playSessionId);
         if (refusal is not null)
         {
             return refusal;
         }
 
         using var cancellationTokenSource = new CancellationTokenSource();
-        return await GetVariantPlaylistInternal(request!, cancellationTokenSource, sessionOwnedRemux: true).ConfigureAwait(false);
+        return await GetVariantPlaylistInternal(request!, cancellationTokenSource, sessionOwned: true).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Gets a segment (or, at <c>-1</c>, the fMP4 initialisation segment) of a session decided as a
-    /// remux, starting the session's own stream-copy job when the segment is not there yet.
+    /// remux or a transcode, starting the session's own job when the segment is not there yet.
     /// </summary>
     /// <param name="id">The session.</param>
     /// <param name="playlistId">The playlist id the media playlist named.</param>
@@ -75,8 +75,8 @@ public partial class DynamicHlsController
     /// <param name="deliveryGuard">Instance of <see cref="PlaybackSessionDeliveryGuard"/>.</param>
     /// <response code="200">Segment returned.</response>
     /// <response code="403">The session belongs to another user.</response>
-    /// <response code="404">No such remux session, no such segment container, or nothing servable.</response>
-    /// <response code="422">The source cannot be copied as the retained plan says.</response>
+    /// <response code="404">No such session-executed plan, no such segment container, or nothing servable.</response>
+    /// <response code="422">The source cannot be copied or encoded as the retained plan says.</response>
     /// <returns>The segment file.</returns>
     [HttpGet("Playback/Sessions/{id}/Hls/hls1/{playlistId}/{segmentId}.{container}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -95,7 +95,7 @@ public partial class DynamicHlsController
         [FromQuery, Required] string playSessionId,
         [FromServices] PlaybackSessionDeliveryGuard deliveryGuard)
     {
-        var (refusal, request) = ResolveSessionRemux(deliveryGuard, id, itemId, mediaSourceId, playSessionId);
+        var (refusal, request) = ResolveSessionOutput(deliveryGuard, id, itemId, mediaSourceId, playSessionId);
         if (refusal is not null)
         {
             return refusal;
@@ -109,42 +109,48 @@ public partial class DynamicHlsController
 
         request.CurrentRuntimeTicks = runtimeTicks;
         request.ActualSegmentLengthTicks = actualSegmentLengthTicks;
-        return await GetDynamicSegment(request, segmentId, sessionOwnedRemux: true).ConfigureAwait(false);
+        return await GetDynamicSegment(request, segmentId, sessionOwned: true).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Whether the state the executor resolved is the plan and nothing else: both streams copied,
-    /// and they are the streams the plan selected. The executor falls back to a first stream when
-    /// an index no longer exists (a file replaced since planning); that is a different playback,
-    /// not this plan.
+    /// Whether the state the executor resolved is the plan and nothing else: the streams the plan
+    /// selected, each copied exactly when the plan copies it, and each encoded stream encoded to
+    /// the plan's codec. The executor falls back to a first stream when an index no longer exists
+    /// (a file replaced since planning) and refuses a copy it cannot make; either is a different
+    /// playback, not this plan.
     /// </summary>
-    private static bool IsThePlannedCopy(StreamState state, StreamingRequestDto request)
-        => EncodingHelper.IsCopyCodec(state.OutputVideoCodec)
-            && state.VideoStream?.Index == request.VideoStreamIndex
+    private static bool IsThePlan(StreamState state, StreamingRequestDto request)
+        => state.VideoStream?.Index == request.VideoStreamIndex
             && state.AudioStream?.Index == request.AudioStreamIndex
-            && (state.AudioStream is null || EncodingHelper.IsCopyCodec(state.OutputAudioCodec));
+            && IsThePlannedCodec(state.OutputVideoCodec, request.AllowVideoStreamCopy, (request as VideoRequestDto)?.VideoCodec)
+            && (state.AudioStream is null || IsThePlannedCodec(state.OutputAudioCodec, request.AllowAudioStreamCopy, request.AudioCodec));
 
-    private ObjectResult RemuxNotExecutable() => UnprocessableEntity(new ProblemDetails
+    private static bool IsThePlannedCodec(string? outputCodec, bool planCopies, string? plannedCodec)
+        => planCopies
+            ? EncodingHelper.IsCopyCodec(outputCodec)
+            : !EncodingHelper.IsCopyCodec(outputCodec) && string.Equals(outputCodec, plannedCodec, StringComparison.OrdinalIgnoreCase);
+
+    private ObjectResult PlanNotExecutable() => UnprocessableEntity(new ProblemDetails
     {
         Status = StatusCodes.Status422UnprocessableEntity,
-        Title = "Remux not executable",
-        Detail = "The session's plan copies the selected streams, and this source cannot be copied as planned. Plan the session again without stream copy.",
+        Title = "Plan not executable",
+        Detail = "This source cannot be copied or encoded as the session's plan says. Plan the session again, forbidding the stream copy.",
     });
 
     /// <summary>
     /// Asks <see cref="PlaybackSessionDeliveryGuard"/> whether this caller is served this session's
-    /// remux and, when it is, builds the encoding request from the retained plan alone. Only the
-    /// session's owner: the job a segment request starts is owned by its caller, and the session's
-    /// stop ends its owner's jobs.
+    /// HLS output and, when it is, builds the encoding request from the retained plan alone
+    /// (<see cref="EnginePlanEncodingRequest"/>). Only the session's owner: the job a segment
+    /// request starts is owned by its caller, and the session's stop ends its owner's jobs.
     /// </summary>
-    private (ActionResult? Refusal, VideoRequestDto? Request) ResolveSessionRemux(
+    private (ActionResult? Refusal, VideoRequestDto? Request) ResolveSessionOutput(
         PlaybackSessionDeliveryGuard deliveryGuard,
         PlaybackSessionId id,
         Guid itemId,
         string mediaSourceId,
         string playSessionId)
     {
-        var delivery = deliveryGuard.Resolve(id, User, itemId, mediaSourceId, playSessionId, EngineFilmPlanner.IsExecutableRemux, allowAdministrator: false);
+        var delivery = deliveryGuard.Resolve(id, User, itemId, mediaSourceId, playSessionId, EngineFilmPlanner.IsExecutableHlsOutput, allowAdministrator: false);
         if (delivery.Outcome == PlaybackSessionDeliveryOutcome.Forbidden)
         {
             return (Forbid(), null);
@@ -155,25 +161,12 @@ public partial class DynamicHlsController
             return (NotFound(), null);
         }
 
-        return (null, new VideoRequestDto
-        {
-            Id = itemId,
-            MediaSourceId = plan.SourceId,
-            PlaySessionId = session.PlaySessionId,
-            DeviceId = options.DeviceId,
-            SegmentContainer = plan.Container,
-            MinSegments = 1,
-            VideoCodec = plan.VideoCodec,
-            AudioCodec = plan.AudioCodec,
-            VideoStreamIndex = plan.VideoStreamIndex,
-            AudioStreamIndex = plan.AudioStreamIndex,
-            EnableAutoStreamCopy = true,
-            AllowVideoStreamCopy = true,
-            AllowAudioStreamCopy = true,
-            SubtitleMethod = SubtitleDeliveryMethod.External,
-            Context = EncodingContext.Streaming,
-            TranscodeReasons = nameof(Tesserafin.Model.Session.TranscodeReason.ContainerNotSupported),
-            BuiltFromRetainedPlan = true,
-        });
+        return (null, EnginePlanEncodingRequest.Build(
+            plan,
+            itemId,
+            session.PlaySessionId,
+            options.DeviceId,
+            delivery.Source,
+            session.Plan.TranscodeReasons == 0 ? null : session.Plan.TranscodeReasons.ToString()));
     }
 }

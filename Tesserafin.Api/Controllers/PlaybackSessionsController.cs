@@ -421,8 +421,8 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             return Conflict("Session has no PlaySessionId - PUT a replacement request supplying one before requesting a stream URL.");
         }
 
-        // Consolidation step 1: a film the engine alone decided - a direct play, or a remux this
-        // server executes as a stream copy - has no legacy StreamInfo at all. Its descriptor is
+        // Consolidation step 1: a film the engine alone decided - a direct play, or a remux or a
+        // transcode this server executes from the plan - has no legacy StreamInfo at all. Its descriptor is
         // minted from the retained execution plan and names the session's own file or HLS route;
         // nothing below (kill switch, resolver, StreamInfo.ToUrl) applies.
         if (session.Plan.StreamInfo is null

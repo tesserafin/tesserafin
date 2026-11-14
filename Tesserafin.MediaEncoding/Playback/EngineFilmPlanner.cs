@@ -20,13 +20,16 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// Consolidation step 1 (docs/playback-path-inventory.md §4 and §5): a film read from a local file
 /// is decided by the v2 engine alone. The engine receives the capabilities and constraints the
 /// client declared on <c>POST Playback/Sessions</c>, not a <c>DeviceProfile</c> round trip, and the
-/// legacy planner (<c>StreamBuilder</c>) is never invoked for it. Two answers are owned here:
-/// a direct play, served verbatim from the session's own file route, and a remux this server can
-/// execute as a pure stream copy (<see cref="IsExecutableRemux"/>), served from the session's own
-/// HLS route. In both cases the session carries no legacy <c>StreamInfo</c>: its plan is the
-/// retained <see cref="V2PlanRecord"/>. Any other answer — transcode, a remux outside that
-/// definition, refusal, a source that is not a local file — falls through to the existing chain
-/// unchanged, inside the same planning call, so one request still produces exactly one session.
+/// legacy planner (<c>StreamBuilder</c>) is never invoked for it. Three answers are owned here:
+/// a direct play, served verbatim from the session's own file route; a remux this server can
+/// execute as a pure stream copy (<see cref="IsExecutableRemux"/>); and an SDR transcode to
+/// H.264 and/or AAC (<see cref="IsExecutableTranscode"/>). The last two are served from the
+/// session's own HLS route, which builds its encoding request from the retained plan. In every
+/// case the session carries no legacy <c>StreamInfo</c>: its plan is the retained
+/// <see cref="V2PlanRecord"/>. Any other answer — tone mapping, a burnt-in subtitle, a delivery
+/// that is not HLS, refusal, a source that is not a local file — falls through to the existing
+/// chain unchanged, inside the same planning call, so one request still produces exactly one
+/// session.
 /// </summary>
 /// <remarks>
 /// The declared inputs reach the planner through an ambient request scope opened by the
@@ -137,10 +140,47 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
             plan.SourceId,
             plan.Protocol,
             plan.Container);
-        return plan.Method == PlaybackMethod.DirectPlay
-            ? new PlaybackPlan(PlayMethod.DirectPlay, 0)
-            : new PlaybackPlan(PlayMethod.DirectStream, TranscodeReason.ContainerNotSupported);
+        return plan.Method switch
+        {
+            PlaybackMethod.DirectPlay => new PlaybackPlan(PlayMethod.DirectPlay, 0),
+            PlaybackMethod.Remux => new PlaybackPlan(PlayMethod.DirectStream, TranscodeReason.ContainerNotSupported),
+            _ => new PlaybackPlan(PlayMethod.Transcode, TranscodeReasonsOf(record.Decision.Reasoning)),
+        };
     }
+
+    /// <summary>
+    /// Determines whether a plan is one the session's HLS route executes from the plan alone: an
+    /// executable remux or an executable transcode.
+    /// </summary>
+    /// <param name="plan">The execution plan.</param>
+    /// <returns><see langword="true"/> if the session's HLS route produces this plan.</returns>
+    public static bool IsExecutableHlsOutput(PlaybackExecutionPlan? plan)
+        => IsExecutableRemux(plan) || IsExecutableTranscode(plan);
+
+    /// <summary>
+    /// Determines whether a plan is a transcode this server executes from the plan alone: the
+    /// engine chose <see cref="PlaybackMethod.Transcode"/>, delivered over HLS in fMP4 or MPEG-TS
+    /// segments; each stream is either copied or re-encoded, video to H.264 and audio to AAC
+    /// (optionally down-mixed); the output stays in the source's video range. Tone mapping and a
+    /// burnt-in subtitle are not this definition: they are decided, but not executed from here.
+    /// </summary>
+    /// <param name="plan">The execution plan.</param>
+    /// <returns><see langword="true"/> if the plan is an executable SDR transcode.</returns>
+    public static bool IsExecutableTranscode(PlaybackExecutionPlan? plan)
+        => plan is { Method: PlaybackMethod.Transcode, Protocol: StreamingProtocol.Hls, VideoStreamIndex: not null, VideoRange: null }
+            && !string.IsNullOrEmpty(plan.VideoCodec)
+            && (plan.AudioStreamIndex is null || !string.IsNullOrEmpty(plan.AudioCodec))
+            && (string.Equals(plan.Container, "mp4", StringComparison.OrdinalIgnoreCase) || string.Equals(plan.Container, "ts", StringComparison.OrdinalIgnoreCase))
+            && (plan.Transforms.Contains(TransformKind.TranscodeVideo) || plan.Transforms.Contains(TransformKind.TranscodeAudio))
+            && plan.Transforms.Contains(TransformKind.TranscodeVideo) != plan.Transforms.Contains(TransformKind.CopyVideo)
+            && (plan.AudioStreamIndex is null || plan.Transforms.Contains(TransformKind.TranscodeAudio) != plan.Transforms.Contains(TransformKind.CopyAudio))
+            && (!plan.Transforms.Contains(TransformKind.TranscodeVideo) || string.Equals(plan.VideoCodec, "h264", StringComparison.OrdinalIgnoreCase))
+            && (!plan.Transforms.Contains(TransformKind.TranscodeAudio) || string.Equals(plan.AudioCodec, "aac", StringComparison.OrdinalIgnoreCase))
+            && plan.Transforms.All(transform => transform is TransformKind.RemuxContainer
+                or TransformKind.TranscodeVideo or TransformKind.CopyVideo
+                or TransformKind.TranscodeAudio or TransformKind.CopyAudio or TransformKind.Downmix
+                or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle)
+            && plan.SubtitleDelivery is null or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External;
 
     /// <summary>
     /// Determines whether a plan is a remux this server executes from the plan alone: the engine
@@ -174,8 +214,10 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
         // Resolved track indices belong to a source, not to the film. A later playable version
         // can have different indices from the first candidate. Preserve the engine's preference
         // for the first direct-play candidate - a remux is only taken when no candidate direct
-        // plays - while giving each candidate its own user defaults.
+        // plays, a transcode only when none can be copied either - while giving each candidate
+        // its own user defaults.
         V2PlanRecord? remux = null;
+        V2PlanRecord? transcode = null;
         foreach (var source in sources)
         {
             var decision = _engine.Decide(context, request.Capabilities, [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(request.Constraints, source));
@@ -195,9 +237,13 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
             {
                 remux = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }
+            else if (transcode is null && IsExecutableTranscode(plan))
+            {
+                transcode = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
+            }
         }
 
-        return remux;
+        return remux ?? transcode;
     }
 
     /// <summary>
@@ -220,6 +266,27 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
             // spells -1. Leaving it null would let the client's declared mode pick one instead.
             PreferredSubtitleStreamIndex = declared.PreferredSubtitleStreamIndex ?? source.DefaultSubtitleStreamIndex ?? -1,
         };
+
+    /// <summary>
+    /// The legacy-shaped reason flags of a transcode, for the session's diagnostics slot only:
+    /// every rejection the engine recorded whose code has a <see cref="TranscodeReason"/> of the
+    /// same name. Nothing is decided from them.
+    /// </summary>
+    private static TranscodeReason TranscodeReasonsOf(ReasonNode reasoning)
+    {
+        TranscodeReason reasons = 0;
+        if (reasoning.Outcome == ReasonOutcome.Rejected && Enum.TryParse<TranscodeReason>(reasoning.Code.ToString(), out var reason))
+        {
+            reasons |= reason;
+        }
+
+        foreach (var child in reasoning.Children)
+        {
+            reasons |= TranscodeReasonsOf(child);
+        }
+
+        return reasons;
+    }
 
     private sealed class Scope : IDisposable
     {

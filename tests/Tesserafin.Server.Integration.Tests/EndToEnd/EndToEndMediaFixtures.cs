@@ -129,6 +129,91 @@ public static class EndToEndMediaFixtures
     }
 
     /// <summary>
+    /// Synthesizes a real Matroska (or AVI) file whose codecs the caller chooses among FFmpeg's built-in
+    /// encoders, for the transcode journeys: a video or an audio stream a browser-like client does
+    /// not decode (MPEG-4 Part 2, AC-3) beside one it does, and two audio tracks that differ
+    /// (1000 Hz and 440 Hz) so a track change is distinguishable in what is produced.
+    /// </summary>
+    /// <param name="directory">The directory to write the fixture into.</param>
+    /// <param name="fileName">The file name (including extension) to write.</param>
+    /// <param name="durationSeconds">The duration of the fixture, in seconds.</param>
+    /// <param name="videoEncoder">The FFmpeg video encoder: <c>libx264</c> or <c>mpeg4</c>.</param>
+    /// <param name="audioEncoder">The FFmpeg audio encoder: <c>aac</c> or <c>ac3</c>.</param>
+    /// <param name="secondAudioTrack">Whether to add a second audio track, so the audio indices are 1 and 2.</param>
+    /// <param name="format">The FFmpeg muxer: <c>matroska</c> or <c>avi</c>.</param>
+    /// <returns>The full path to the synthesized file.</returns>
+    public static async Task<string> CreateFilmAsync(
+        string directory,
+        string fileName,
+        int durationSeconds,
+        string videoEncoder,
+        string audioEncoder,
+        bool secondAudioTrack = false,
+        string format = "matroska")
+    {
+        var path = Path.Combine(directory, fileName);
+        var duration = durationSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        List<string> arguments =
+        [
+            "-hide_banner",
+            "-y",
+            "-f", "lavfi", "-i", $"testsrc=size={Width}x{Height}:rate=15:duration={duration}",
+            "-f", "lavfi", "-i", $"sine=frequency=1000:duration={duration}",
+        ];
+
+        if (secondAudioTrack)
+        {
+            arguments.AddRange(["-f", "lavfi", "-i", $"sine=frequency=440:duration={duration}", "-map", "0:v", "-map", "1:a", "-map", "2:a"]);
+        }
+
+        arguments.AddRange(["-c:v", videoEncoder, "-pix_fmt", "yuv420p", "-g", "15"]);
+        if (string.Equals(videoEncoder, "libx264", StringComparison.Ordinal))
+        {
+            arguments.AddRange(["-preset", "ultrafast", "-keyint_min", "15", "-sc_threshold", "0"]);
+        }
+
+        arguments.AddRange(["-c:a", audioEncoder, "-ac", "2", "-f", format, path]);
+
+        await RunFfmpegAsync([.. arguments]).ConfigureAwait(false);
+
+        if (!File.Exists(path) || new FileInfo(path).Length == 0)
+        {
+            throw new InvalidOperationException($"ffmpeg did not produce a non-empty fixture at {path}.");
+        }
+
+        return path;
+    }
+
+    /// <summary>
+    /// Runs the REAL ffprobe binary against a file on disk and returns, per stream, its type, codec
+    /// and (for video) width: what was actually produced, not what a command line or a label says.
+    /// </summary>
+    /// <param name="path">The file to probe.</param>
+    /// <returns>One <c>codec_type,codec_name[,width]</c> line per stream, in stream order.</returns>
+    public static async Task<IReadOnlyList<string>> ProbeStreamsAsync(string path)
+    {
+        var (exitCode, stdout, stderr) = await RunAsync(
+            FfprobePath,
+            ["-hide_banner", "-v", "error", "-show_entries", "stream=codec_type,codec_name,width", "-of", "csv=p=0", path]).ConfigureAwait(false);
+
+        if (exitCode != 0)
+        {
+            throw new InvalidOperationException($"ffprobe exited {exitCode} probing '{path}'.\nstderr tail: {Tail(stderr)}");
+        }
+
+        // ffprobe prints the entries in its own order (codec_name, codec_type, width), whatever
+        // order they were asked in.
+        var streams = new List<string>();
+        foreach (var line in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var fields = line.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            streams.Add(fields.Length > 2 ? $"{fields[1]},{fields[0]},{fields[2]}" : $"{fields[1]},{fields[0]}");
+        }
+
+        return streams;
+    }
+
+    /// <summary>
     /// Runs the REAL ffprobe binary against a file on disk and returns its <c>format_name</c> - the
     /// same identification a client-side player performs, and the strongest available statement about
     /// what a byte buffer actually IS (as opposed to what a header claims). Used by the issue #57

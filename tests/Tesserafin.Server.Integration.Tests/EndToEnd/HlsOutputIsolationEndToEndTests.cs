@@ -91,7 +91,10 @@ public sealed class HlsOutputIsolationEndToEndTests : IClassFixture<HlsIsolation
             "mp4",
             _streams,
             "POLISH-2-R4 fixture " + suffix,
-            Seconds * TimeSpan.TicksPerSecond);
+            Seconds * TimeSpan.TicksPerSecond,
+            // Not a film: these are the existing chain's HLS routes (/Videos/{id}/master.m3u8 ...),
+            // which a film's transcode no longer reaches; its isolation is TranscodeFilmEndToEndTests.
+            film: false);
 
         _transcodes = _factory.Services.GetRequiredService<IServerConfigurationManager>().GetTranscodePath();
         _fileSystem = (FailingRemovals)_factory.Services.GetRequiredService<IFileSystem>();

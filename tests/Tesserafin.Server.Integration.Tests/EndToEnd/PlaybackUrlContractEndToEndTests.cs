@@ -201,7 +201,10 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     [Fact(Timeout = 90_000)]
     public async Task Transcode_Hls_PostThenGetStream_ServesManifestAndSegment()
     {
-        var itemId = SeedItem();
+        // Not a film: a film's transcode over HLS is decided and executed by the engine alone, from
+        // the session's own route (TranscodeFilmEndToEndTests). This is the existing chain's
+        // contract - master playlist, then variant, then segment - which every other video keeps.
+        var itemId = LibraryItemSeeder.SeedVideo(_libraryManager, _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 non-film transcode fixture {Guid.NewGuid()}", film: false);
         var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHls();
 
         var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-transcode-hls");
