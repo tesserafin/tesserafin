@@ -36,7 +36,7 @@ internal enum PlaybackSessionRemovalReason
     /// <summary>The <see cref="PlaybackSessionManager.SweepExpired"/> TTL backstop.</summary>
     TtlSweep,
 
-    /// <summary><see cref="ISessionManager.DeviceLoggedOut"/> - the owning device's token was revoked (#413).</summary>
+    /// <summary><see cref="IDeviceLoggedOutSource.DeviceLoggedOut"/> - the owning device's token was revoked (#413).</summary>
     DeviceLoggedOut,
 }
 
@@ -54,6 +54,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     private readonly IPlaybackSessionPlanner _planner;
     private readonly ITranscodeManager _transcodeManager;
     private readonly ISessionManager _sessionManager;
+    private readonly IDeviceLoggedOutSource? _deviceLogouts;
     private readonly IShadowDiagnosticsStore _diagnosticsStore;
     private readonly IV2PlanStore _v2PlanStore;
     private readonly IPlaybackLiveWiringDiagnosticsStore _liveWiringDiagnosticsStore;
@@ -186,7 +187,14 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         transcodeManager.TranscodingJobStarted += OnTranscodingJobStarted;
         sessionManager.PlaybackStart += OnPlaybackStart;
         sessionManager.PlaybackStopped += OnPlaybackStopped;
-        sessionManager.DeviceLoggedOut += OnDeviceLoggedOut;
+        // #413: the session manager is also the source of device revocations (a separate interface,
+        // so ISessionManager's published surface does not change).
+        _deviceLogouts = sessionManager as IDeviceLoggedOutSource;
+        if (_deviceLogouts is not null)
+        {
+            _deviceLogouts.DeviceLoggedOut += OnDeviceLoggedOut;
+        }
+
         _sweepTimer = new Timer(_ => SweepExpired(_timeProvider.GetUtcNow()), null, SweepInterval, SweepInterval);
     }
 
@@ -428,7 +436,11 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         _transcodeManager.TranscodingJobStarted -= OnTranscodingJobStarted;
         _sessionManager.PlaybackStart -= OnPlaybackStart;
         _sessionManager.PlaybackStopped -= OnPlaybackStopped;
-        _sessionManager.DeviceLoggedOut -= OnDeviceLoggedOut;
+        if (_deviceLogouts is not null)
+        {
+            _deviceLogouts.DeviceLoggedOut -= OnDeviceLoggedOut;
+        }
+
         _sweepTimer.Dispose();
     }
 

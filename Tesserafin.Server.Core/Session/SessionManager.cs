@@ -48,7 +48,7 @@ namespace Tesserafin.Server.Core.Session
     /// <summary>
     /// Class SessionManager.
     /// </summary>
-    public sealed class SessionManager : ISessionManager, IAsyncDisposable
+    public sealed class SessionManager : ISessionManager, IDeviceLoggedOutSource, IAsyncDisposable
     {
         private readonly IUserDataManager _userDataManager;
         private readonly IServerConfigurationManager _config;

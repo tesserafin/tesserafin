@@ -46,13 +46,6 @@ namespace Tesserafin.Controller.Session
         /// </summary>
         event EventHandler<SessionEventArgs> SessionEnded;
 
-        /// <summary>
-        /// Occurs, synchronously, when a device's access token is revoked (<see cref="Logout(Device)"/>):
-        /// after its capabilities are revoked and before the call returns, so what the device holds
-        /// open can be ended by the time the revocation is answered.
-        /// </summary>
-        event EventHandler<DeviceLoggedOutEventArgs> DeviceLoggedOut;
-
         event EventHandler<SessionEventArgs> SessionActivity;
 
         /// <summary>
