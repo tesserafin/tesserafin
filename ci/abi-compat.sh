@@ -13,6 +13,7 @@
 #      newly introduced assembly, see ci/abi-new-assemblies.txt)
 #   1  a breaking change, a missing assembly, a malformed manifest, a tool
 #      failure, or any other outcome that does not PROVE compatibility
+#      (ABI_ALLOW_BREAKING=1 accepts classified changes, not missing evidence)
 #
 # There is no fail-open path. The predecessor of this script ran ApiCompat
 # with `|| true` and then compared its stdout against one exact English
@@ -28,6 +29,8 @@
 #                                (default ci/abi-version-epoch.txt; absent = none)
 #   ABI_EXPECTED_ASSEMBLY_COUNT  override the protected-assembly count assertion
 #   ABI_REPORT_FILE              also write the Markdown report to this path
+#   ABI_ALLOW_BREAKING           1 explicitly accepts classified API changes;
+#                                missing artifacts/tool failures still fail (default 0)
 #   ABI_APICOMPAT_CMD            TEST ONLY — replaces the ApiCompat invocation.
 #                                Never set by the workflow.
 
@@ -73,6 +76,11 @@ HEAD_DIR="$2"
 MANIFEST="${3:-$REPO_ROOT/ci/abi-assemblies.txt}"
 NEW_MANIFEST="${ABI_NEW_ASSEMBLIES_MANIFEST:-$REPO_ROOT/ci/abi-new-assemblies.txt}"
 EXPECTED_COUNT="${ABI_EXPECTED_ASSEMBLY_COUNT:-$ABI_EXPECTED_ASSEMBLY_COUNT_DEFAULT}"
+ALLOW_BREAKING="${ABI_ALLOW_BREAKING:-0}"
+case "$ALLOW_BREAKING" in
+    0|1) ;;
+    *) die "ABI_ALLOW_BREAKING must be 0 or 1" ;;
+esac
 
 [ -d "$BASE_DIR" ] || die "base directory not found: $BASE_DIR"
 [ -d "$HEAD_DIR" ] || die "head directory not found: $HEAD_DIR"
@@ -302,6 +310,8 @@ emit ""
 
 if [ "$breaking" -eq 0 ] && [ "$missing_head" -eq 0 ] && [ "$indeterminate" -eq 0 ]; then
     emit "**Verdict: COMPATIBLE.**"
+elif [ "$ALLOW_BREAKING" -eq 1 ] && [ "$missing_head" -eq 0 ] && [ "$indeterminate" -eq 0 ]; then
+    emit "**Verdict: ACCEPTED — breaking changes explicitly allowed.** $breaking incompatible assemblies; no backward-compatibility claim."
 else
     emit "**Verdict: FAILED** — $((breaking + missing_head)) breaking, $indeterminate indeterminate."
 fi
@@ -315,7 +325,7 @@ if [ -n "${ABI_REPORT_FILE:-}" ]; then
     cat "$REPORT" >> "$ABI_REPORT_FILE"
 fi
 
-if [ "$breaking" -ne 0 ] || [ "$missing_head" -ne 0 ] || [ "$indeterminate" -ne 0 ]; then
+if { [ "$breaking" -ne 0 ] && [ "$ALLOW_BREAKING" -eq 0 ]; } || [ "$missing_head" -ne 0 ] || [ "$indeterminate" -ne 0 ]; then
     exit 1
 fi
 

@@ -109,7 +109,7 @@ public class PlaybackSessionsControllerTests
         MaxAudioChannels: null,
         PreferredAudioStreamIndex: null,
         PreferredSubtitleStreamIndex: null,
-        SubtitleMode: SubtitlePlaybackMode.Default,
+        SubtitleMode: Tesserafin.Playback.Decision.SubtitlePlaybackMode.Default,
         PreferredSubtitleLanguages: [],
         AlwaysBurnInSubtitleWhenTranscoding: false,
         StartTimeTicks: 0);

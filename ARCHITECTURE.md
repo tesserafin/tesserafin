@@ -198,6 +198,11 @@ The data layer is **EF Core**, and it is intentionally split:
 - The namespace/assembly move is a breaking source change. It introduces no compatibility
   facade or duplicate types. The current SQLite model snapshot names the new POCO namespaces;
   historical migration snapshots and their schema operations retain their original identity.
+- This pre-launch programme permits source/binary breaks (owner ruling in `AGENTS.md`). CI still
+  runs ApiCompat and retains every finding, with `ABI_ALLOW_BREAKING=1` explicitly accepting
+  classified changes instead of requiring compatibility facades. Missing assemblies, invalid
+  manifests, tool failures and zero comparisons remain failures. The report distinguishes an
+  accepted break from a compatible result; the strict standalone script remains the default.
 
 ### Stages 3–4 — Playback decision & execution
 

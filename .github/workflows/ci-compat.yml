@@ -1,4 +1,7 @@
 # RESTORED on 2026-07-30 (#94). Automatic on every pull request again.
+# Policy 2026-11-14 (#129, AGENTS.md): binary/source breaks are allowed before launch.
+# The comparison remains visible, with ABI_ALLOW_BREAKING=1 on the verdict step;
+# infrastructure and incomplete-artifact failures remain blocking.
 #
 # What was wrong. Run 30230606251 (pull request #132) is the record: the two
 # build jobs succeeded on hosted runners — allocation was never the problem
@@ -264,13 +267,14 @@ jobs:
       - name: Restore pinned tools
         run: dotnet tool restore
 
-      # The verdict. ci/abi-compat.sh exits non-zero for a breaking change,
-      # for a protected assembly missing on either side, for a manifest it
-      # cannot fully validate, for an ApiCompat failure and for a run that
-      # compared zero assemblies. Nothing downstream can turn that green.
+      # Owner policy (#129, AGENTS.md): pre-launch source/binary breaks are allowed.
+      # Keep the comparison and its findings visible; missing artifacts, malformed
+      # manifests, tool failures and zero comparisons still fail. No forwarding
+      # types or legacy facade should be added solely to preserve the old ABI.
       - name: Compare the protected assemblies
         env:
           ABI_REPORT_FILE: abi-report.md
+          ABI_ALLOW_BREAKING: '1'
           BASE_SHA: ${{ needs.abi-base.outputs.base_sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |

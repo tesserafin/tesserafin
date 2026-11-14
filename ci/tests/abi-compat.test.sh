@@ -349,6 +349,21 @@ expect_red "removed public member" "CP0002" \
 expect_red "incompatible public signature change" "breaking change" \
     "$WORK/base" "$WORK/head-signature" "$MANIFEST"
 
+ABI_ALLOW_BREAKING=1 expect_green "explicit policy accepts a classified breaking change" \
+    "$WORK/base" "$WORK/head-removed" "$MANIFEST"
+if printf '%s' "$LAST_OUTPUT" | grep -qF "no backward-compatibility claim"; then
+    ok "accepted breaks are reported without claiming compatibility"
+else
+    bad "accepted break was reported as compatible"
+fi
+ABI_ALLOW_BREAKING=1 expect_red "breaking policy still refuses a missing head artifact" "missing from head" \
+    "$WORK/base" "$WORK/head-partial" "$MANIFEST"
+ABI_ALLOW_BREAKING=1 ABI_APICOMPAT_CMD="$BROKEN_TOOL" \
+    expect_red "breaking policy still refuses a crashed tool" "ApiCompat failed" \
+    "$WORK/base" "$WORK/head-identical" "$MANIFEST"
+ABI_ALLOW_BREAKING=invalid expect_red "invalid breaking policy is rejected" "ABI_ALLOW_BREAKING must be 0 or 1" \
+    "$WORK/base" "$WORK/head-identical" "$MANIFEST"
+
 expect_red "protected assembly missing from head" "missing from head" \
     "$WORK/base" "$WORK/head-partial" "$MANIFEST"
 
