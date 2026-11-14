@@ -63,7 +63,7 @@
 #   library "Film Probes" (no CollectionType: mixed content)
 #     Container Film (2023)/Container Film (2023).ts           H264 + AAC in MPEG-TS -> REMUX, AS A MOVIE
 #     Container Film (2023)/Container Film (2023).en.srt       SubRip sidecar       -> EXTERNAL SUB
-#     Dubbed Film (2024)/Dubbed Film (2024).mkv                H264 + 2 x AC-3 in MKV -> TRANSCODE, AS A MOVIE
+#     Dubbed Film (2024)/Dubbed Film (2024).mkv                H264 1.2 Mbps + 2 x AC-3 in MKV -> TRANSCODE, AS A MOVIE
 #     Dubbed Film (2024)/Dubbed Film (2024).en.srt             SubRip sidecar       -> EXTERNAL SUB
 #       (video a browser decodes, audio it does not: the video is copied and the audio encoded;
 #        two audio tracks that differ - 1000 Hz French, 440 Hz English and default - so a track
@@ -344,6 +344,15 @@ assert_container() {
     log "    ffprobe ok: format_name=$actual (contains '$2')"
 }
 
+assert_under_mib() {
+    # assert_under_mib FILE N — for a fixture whose purpose needs more bytes than the 1 MiB rule.
+    local bytes
+    bytes="$(stat -c %s "$1" 2>/dev/null || echo 0)"
+    [ "$bytes" -gt 0 ] || fixture_fail "$1: file is empty or missing"
+    [ "$bytes" -lt $(( $2 * 1048576 )) ] || fixture_fail "$1: ${bytes} bytes — this fixture must stay under $2 MiB"
+    log "    size ok: ${bytes} bytes (cap $2 MiB)"
+}
+
 assert_under_1mib() {
     local bytes
     bytes="$(stat -c %s "$1" 2>/dev/null || echo 0)"
@@ -481,13 +490,17 @@ assert_container "$FILM_SUBTITLE_FILE" srt
 # --- 6. TRANSCODE, AS A MOVIE: H264 + two AC-3 tracks in Matroska, 30 s ---------------------
 log "fixture: $DUBBED_FILE (transcode film — H264 + 2 x AC-3 in Matroska, 30 s)"
 # The second track is the default one, so the track the server selects for a user with no
-# preference (index 2) is not simply the first; the two tones tell the tracks apart.
+# preference is not simply the first; the two tones tell the tracks apart.
+# The video is a constant 1.2 Mbps, not the near-empty CRF stream of the other fixtures: the
+# player's quality menu only offers ceilings BELOW the source bitrate, and the browser proof needs
+# one that forces the video to be encoded. That is why this fixture is allowed 8 MiB.
 ffmpeg -hide_banner -loglevel error -y \
-    -f lavfi -i "testsrc=size=320x240:rate=15:duration=30" \
+    -f lavfi -i "testsrc2=size=320x240:rate=15:duration=30" \
     -f lavfi -i "sine=frequency=1000:duration=30" \
     -f lavfi -i "sine=frequency=440:duration=30" \
     -map 0:v -map 1:a -map 2:a \
-    -c:v libx264 -preset ultrafast -crf 36 -pix_fmt yuv420p \
+    -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
+    -b:v 1200k -minrate 1200k -maxrate 1200k -bufsize 1200k -x264-params nal-hrd=cbr \
     -g 15 -keyint_min 15 -sc_threshold 0 \
     -c:a ac3 -b:a 64k -ac 2 \
     -metadata:s:a:0 language=fre -metadata:s:a:1 language=eng \
@@ -498,7 +511,7 @@ assert_container "$DUBBED_FILE" matroska
 assert_codec     "$DUBBED_FILE" v:0 h264
 assert_codec     "$DUBBED_FILE" a:0 ac3
 assert_codec     "$DUBBED_FILE" a:1 ac3
-assert_under_1mib "$DUBBED_FILE"
+assert_under_mib "$DUBBED_FILE" 8
 log "fixture: $DUBBED_SUBTITLE_FILE (external subtitle — SubRip sidecar of the transcode film)"
 cat > "$DUBBED_SUBTITLE_FILE" <<'SRT'
 1
