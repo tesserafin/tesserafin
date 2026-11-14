@@ -332,3 +332,38 @@ compiled assembly references. Existing playback and OpenAPI integration tests ve
 composition. This candidate is stacked on #414 and inherits #412's pending SDK-pair merge
 requirement. It changes neither the HTTP contract nor the set of supported playback journeys;
 audio and other unmigrated consumers still require the comparison decorator.
+
+
+## 11. Played-state commands leave the entities (consolidation step 5, candidate)
+
+"Mark played / unplayed" is a service command. `IItemPlayedStateService` (Controller) and
+`ItemPlayedStateService` (Server.Core) own target selection, the transitions
+(`PlayedStateTransitions`, pure) and persistence through `IUserDataManager`. Its dependencies are
+injected: `IUserDataManager`, `IItemQueryService`, `IItemAccessService`, `IItemLookupService`,
+`ILinkedChildrenService`, `IChannelManager`, `IServerConfigurationManager`, `TimeProvider`.
+`PlaystateController` and `SessionManager` (a completed version marks the other versions) call it.
+The HTTP contract is unchanged.
+
+Removed: `BaseItem.MarkPlayed`, `BaseItem.MarkUnplayed`, `BaseItem.ResetPlayedState`, the `Folder`
+and `BoxSet` overrides, `Video.MarkPlayed`, `Video.MarkUnplayed` and `Video.PropagatePlayedState`.
+The command no longer reaches `BaseItem.UserDataManager`, `BaseItem.LibraryManager`,
+`BaseItem.ChannelManager`, `BaseItem.ConfigurationManager`, `BaseItem.FileSystem`,
+`Folder.CollectionManager`, `Folder.UserViewManager` or `UserView.TVSeriesManager`; its recursive
+selection no longer calls the obsolete five-argument `Folder.GetItemList`.
+`PlayedStateCommandBoundaryTests` fails if one of these methods returns on a media entity.
+
+Selection rules carried over: a leaf marks itself and its other versions; a folder marks its
+non-folder descendants (the user root and aggregate root stand for the whole library), excluding
+virtual items when marking played for a user who hides missing episodes, and never an unaired
+virtual episode; a series marks its real episodes by series key; a season marks the episodes of
+its number (specials per `DisplaySpecialsWithinSeasons`); a collection with members marks the
+members the user may see, each by its own rule; a channel folder asks the channel.
+
+Deliberate narrowing: a `UserView` marks nothing (it was routed through `UserViewBuilder`);
+collection members are resolved by `ItemId` only, not by legacy path links.
+
+Still on `BaseItem.UserDataManager` (read and filter paths, not this command):
+`BaseItem.IsPlayed`, `IsUnplayed`, `IsFavoriteOrLiked`; `Folder.GetRawQueryItems` and the
+children filter in `Folder` via `UserViewBuilder.Filter`; `Season.GetItemsInternal`;
+`UserView.GetItemsInternal`. The static and its `ApplicationHost` assignment therefore stay; the
+ratchet baseline is unchanged. Stacked on #415.
