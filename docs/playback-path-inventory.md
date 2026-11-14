@@ -1,7 +1,7 @@
 # Playback path inventory
 
 Status: consolidation programme, step 1 (#129, owner #305). Baseline (§1–§3) measured on server
-`master` `ac6570e75f` and Web `main` `e7a33187de`, 2026-11-12; §4 and §5 describe what has been
+`master` `ac6570e75f` and Web `main` `e7a33187de`, 2026-11-12; §4, §5 and §6 describe what has been
 delivered since. Update this file in the same change that
 removes or adds a path; the architecture check `tests/Tesserafin.Server.Tests/Architecture/ConsolidationRatchetTests.cs` (baseline `consolidation-ratchet-baseline.json` beside it) holds the
 named exceptions and may only shrink.
@@ -91,9 +91,9 @@ Web, film (Type Movie, file system) on the local HTML player
      stored position (the file is served verbatim)
 ```
 
-A remux the server executes from the session is §5. Any other decision for a film (transcode, a
-remux outside §5, 422) releases its session and continues on the existing chain with direct play
-disabled, so a film never reaches the legacy direct-play path.
+A remux the server executes from the session is §5, an SDR transcode §6. Any other decision for a
+film (a remux or a transcode outside §5 and §6, 422) releases its session and continues on the
+existing chain with direct play disabled, so a film never reaches the legacy direct-play path.
 A 401/403/404, a failed descriptor, broker or item read, or a cancellation ends the attempt
 (the session is released; the original error is kept if the release fails).
 
@@ -191,5 +191,79 @@ remux the client declared no HLS output for; their test
 (`Remux_LegacyPath_UndeclaredSourceContainer_…`) now runs on a non-film video. Nothing could be
 deleted outright in this slice: each legacy path above still has a named consumer in §3.
 
-Outside this slice: a remux over plain HTTP (a client with no HLS output profile), a remux that
-needs an audio transcode, transcoding, other media families, the global flag and the shadow.
+Outside this slice: a remux over plain HTTP (a client with no HLS output profile), other media
+families, the global flag and the shadow. A remux that needs an audio transcode, and transcoding,
+are §6.
+
+## 6. Loop 3 slice: local film in SDR transcode (delivered)
+
+Scenario: a `Movie` in a local file that cannot be delivered by copying both streams - an audio or
+a video codec the client does not decode, a bitrate ceiling under the source's, a resolution
+ceiling the client declares for the codec, or a stream copy the request forbids - played by a
+client that declares HLS output profiles. The server tests use Matroska sources with AC-3 audio or
+MPEG-4 Part 2 video; the browser rig uses "Dubbed Film (2024)" (H.264 + two AC-3 tracks) and the
+existing "Transcode Probe (2021)" (MPEG-4 Part 2 + AC-3), both `Movie`s.
+
+Chain as built - the same planner, descriptor mapper, guard and HLS route as §5, extended, not a
+third pipeline:
+
+```
+POST /Playback/Sessions          same request as §4
+  server: EngineFilmPlanner, per candidate source: a direct play wins, then the first executable
+          remux (§5), then the first EXECUTABLE TRANSCODE
+          executable = Transcode, HLS, fMP4 or TS; each stream copied or encoded, video to H.264,
+          audio to AAC (down-mix allowed); output in the source's video range; subtitle none or
+          External (text extraction/conversion). Tone mapping and a burnt-in subtitle are decided
+          by the engine but not executed from here: they stay on the existing chain.
+          engine v9: a stream copy the request forbids (AllowVideoStreamCopy /
+          AllowAudioStreamCopy) is re-encoded inside a transcode too, and a remux demoted by such
+          a prohibition re-encodes the forbidden stream only
+          -> V2PlanRecord published, PlaybackPlan(Transcode, reasons), StreamInfo = null
+GET /Playback/Sessions/{id}/Stream    EngineFilmDescriptorMapper: the same url as a remux,
+          /Playback/Sessions/{id}/Hls/main.m3u8?itemId&mediaSourceId&playSessionId
+          no codec, bitrate, resolution, stream index, offset or credential in the url
+GET /Playback/Sessions/{id}/Hls/main.m3u8, .../Hls/hls1/main/{n}.{mp4|ts}
+          PlaybackSessionDeliveryGuard as §5 (owner only, plan/ids match, item and version still
+          visible), now for any plan EngineFilmPlanner.IsExecutableHlsOutput accepts
+          EnginePlanEncodingRequest.Build renders the executor's input from the retained plan:
+            source and stream indices; per stream "copy" or the plan's target codec
+            VideoBitRate = the plan's video ceiling narrowed to (total ceiling - audio share)
+            MaxWidth/MaxHeight = the plan's resolution; audio bitrate and channel ceilings
+          nothing is bound from the query (BuiltFromRetainedPlan: stream options are not parsed)
+          StreamingHelpers.GetStreamingState -> EncodingHelper -> TranscodeManager.StartFfMpeg:
+          hardware selection and the hardware -> software fallback are the existing execution
+          refused (422 "Plan not executable") unless the resulting state IS the plan: the planned
+          stream indices, each stream copied exactly when the plan copies it, each encoded stream
+          encoded to the plan's codec. The executor never re-decides.
+stop, re-plan (PUT, or POST under the same play session): as §5 - the owner's job under the play
+          session is stopped and its output removed before the new plan is served
+```
+
+A plan the executor refuses (422) is planned again by the client with the copy that failed
+forbidden; the engine then answers a transcode of that stream on the same session
+(`TranscodeFilm_RemuxTheExecutorCannotCopy_…`: Annex-B H.264 in AVI). No legacy planner is involved.
+
+Web: `directPlayFilm.ts` accepts `Method: Transcode` when the descriptor names the session's HLS
+route, exactly like a remux. A quality change (`MaxBitrate`), a track change and a retry after an
+error re-plan through `Playback/Sessions` (`replanSessionOwnedStream`) and stay there.
+`PlaybackInfo`/`createStreamInfo` are reached for a film only when the server answers something it
+does not serve from the session.
+
+Not reached by this journey (proved by `TranscodeFilmEndToEndTests` on the host where they throw):
+the same list as §5. Encoding options a client adds to the address change nothing
+(`TranscodeFilm_EncodingOptionsInTheQuery_ChangeNothing`).
+
+What lost its consumer: for a local film with an HLS output profile, the legacy transcode decision
+(`PlaybackSessionPlanner`/`StreamBuilder`), the `ToStreamInfo` Transcode branch and the
+`/Videos/{id}/master.m3u8` url are no longer reached for an SDR transcode. Remaining consumers of
+those paths, by name - nothing is deleted globally while they exist:
+
+| Legacy path | Still reached by |
+| --- | --- |
+| `PlaybackSessionPlanner` / `StreamBuilder` | non-film video (episodes, home videos), audio, Live TV, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a film needing tone mapping, a burnt-in subtitle, or with no HLS output profile; a film source that is not a local file |
+| `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
+| `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a film served from its session |
+| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | non-film video, audio, Live TV; a film the server does not serve from the session |
+
+Outside this slice: HDR tone mapping and subtitle burn-in (explicitly), a transcode over plain HTTP,
+target codecs other than H.264/AAC, other media families, the global flag and the shadow.

@@ -63,6 +63,11 @@
 #   library "Film Probes" (no CollectionType: mixed content)
 #     Container Film (2023)/Container Film (2023).ts           H264 + AAC in MPEG-TS -> REMUX, AS A MOVIE
 #     Container Film (2023)/Container Film (2023).en.srt       SubRip sidecar       -> EXTERNAL SUB
+#     Dubbed Film (2024)/Dubbed Film (2024).mkv                H264 + 2 x AC-3 in MKV -> TRANSCODE, AS A MOVIE
+#     Dubbed Film (2024)/Dubbed Film (2024).en.srt             SubRip sidecar       -> EXTERNAL SUB
+#       (video a browser decodes, audio it does not: the video is copied and the audio encoded;
+#        two audio tracks that differ - 1000 Hz "fre", 440 Hz "eng" - so a track change is audible
+#        in what is produced; a bitrate ceiling under the source's turns it into a video encode)
 #
 #   WHY A THIRD LIBRARY FOR THE REMUX FILM: "Remux Probe" is a `Video` (homevideos resolves
 #   nothing else), and the film playback journey only owns items of type `Movie`. A Movie cannot
@@ -372,7 +377,10 @@ REMUX_FILE="$REMUX_DIR/Remux Probe (2022).mkv"
 FILM_DIR="$FILM_ROOT/Container Film (2023)"
 FILM_FILE="$FILM_DIR/Container Film (2023).ts"
 FILM_SUBTITLE_FILE="$FILM_DIR/Container Film (2023).en.srt"
-mkdir -p "$DIRECTPLAY_DIR" "$TRANSCODE_DIR" "$REMUX_DIR" "$FILM_DIR"
+DUBBED_DIR="$FILM_ROOT/Dubbed Film (2024)"
+DUBBED_FILE="$DUBBED_DIR/Dubbed Film (2024).mkv"
+DUBBED_SUBTITLE_FILE="$DUBBED_DIR/Dubbed Film (2024).en.srt"
+mkdir -p "$DIRECTPLAY_DIR" "$TRANSCODE_DIR" "$REMUX_DIR" "$FILM_DIR" "$DUBBED_DIR"
 
 banner "Synthesizing media fixtures with ffmpeg (each one ffprobe-verified)"
 
@@ -468,6 +476,39 @@ Tesserafin E2E remux film subtitle, cue one.
 Tesserafin E2E remux film subtitle, cue two.
 SRT
 assert_container "$FILM_SUBTITLE_FILE" srt
+
+# --- 6. TRANSCODE, AS A MOVIE: H264 + two AC-3 tracks in Matroska, 30 s ---------------------
+log "fixture: $DUBBED_FILE (transcode film — H264 + 2 x AC-3 in Matroska, 30 s)"
+# The second track is the default one, so the track the server selects for a user with no
+# preference (index 2) is not simply the first; the two tones tell the tracks apart.
+ffmpeg -hide_banner -loglevel error -y \
+    -f lavfi -i "testsrc=size=320x240:rate=15:duration=30" \
+    -f lavfi -i "sine=frequency=1000:duration=30" \
+    -f lavfi -i "sine=frequency=440:duration=30" \
+    -map 0:v -map 1:a -map 2:a \
+    -c:v libx264 -preset ultrafast -crf 36 -pix_fmt yuv420p \
+    -g 15 -keyint_min 15 -sc_threshold 0 \
+    -c:a ac3 -b:a 64k -ac 2 \
+    -metadata:s:a:0 language=fre -metadata:s:a:1 language=eng \
+    -disposition:a:0 0 -disposition:a:1 default \
+    -f matroska \
+    "$DUBBED_FILE"
+assert_container "$DUBBED_FILE" matroska
+assert_codec     "$DUBBED_FILE" v:0 h264
+assert_codec     "$DUBBED_FILE" a:0 ac3
+assert_codec     "$DUBBED_FILE" a:1 ac3
+assert_under_1mib "$DUBBED_FILE"
+log "fixture: $DUBBED_SUBTITLE_FILE (external subtitle — SubRip sidecar of the transcode film)"
+cat > "$DUBBED_SUBTITLE_FILE" <<'SRT'
+1
+00:00:00,500 --> 00:00:10,000
+Tesserafin E2E transcode film subtitle, cue one.
+
+2
+00:00:10,000 --> 00:00:29,000
+Tesserafin E2E transcode film subtitle, cue two.
+SRT
+assert_container "$DUBBED_SUBTITLE_FILE" srt
 assert_codec     "$FILM_SUBTITLE_FILE" s:0 subrip
 
 # ---------------------------------------------------------------------------
@@ -792,9 +833,17 @@ check(probes, "Remux Probe", "h264", "aac", "mkv")
 # The remux film must be a MOVIE: the film playback journey owns nothing else, and a fixture
 # that resolved as a plain Video would leave that journey untested behind a green rig.
 film = check(films, "Container Film", "h264", "aac", "ts")
-if len(films) != 1:
-    problems.append("film probes library holds %d items, expected exactly 1 (names: %s)"
+dubbed = check(films, "Dubbed Film", "h264", "ac3", "mkv")
+if len(films) != 2:
+    problems.append("film probes library holds %d items, expected exactly 2 (names: %s)"
                     % (len(films), [i.get("Name") for i in films]))
+if dubbed is not None:
+    if dubbed.get("Type") != "Movie":
+        problems.append("Dubbed Film resolved as %r, expected a Movie" % dubbed.get("Type"))
+    audio = [s for s in dubbed.get("MediaStreams", []) or [] if s.get("Type") == "Audio"]
+    if sorted((s.get("Language") or "") for s in audio) != ["eng", "fre"]:
+        problems.append("Dubbed Film audio tracks are %s, expected one 'fre' and one 'eng'"
+                        % [(s.get("Index"), s.get("Language"), s.get("Codec")) for s in audio])
 if film is not None:
     if film.get("Type") != "Movie":
         problems.append("Container Film resolved as %r, expected a Movie" % film.get("Type"))

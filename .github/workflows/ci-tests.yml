@@ -337,7 +337,16 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_StoppedPosition_IsStoredAndAResumedSessionServesFromIt
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_Replanned_NeverServesThePreviousPlansOutput
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_PostedAgainUnderTheSamePlaySession_NeverServesThePreviousPlansOutput
-          --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_ClientStreamOptionsAndForeignCapabilities_ChangeNothing
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.RemuxFilmEndToEndTests.RemuxFilm_ClientStreamOptionsAndForeignCapabilities_ChangeNothing \
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_AudioTheClientDoesNotDecode_CopiesVideoAndEncodesAudioInOneSessionAndOneJob \
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_VideoTheClientDoesNotDecode_EncodesH264AndCopiesAudio \
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_BitrateAndResolutionCeilings_AreThePlansAndReachTheEncoder \
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_AudioTrackChanged_ReplansTheSameSessionAndLeavesNoJobBehind \
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_RemuxTheExecutorCannotCopy_IsRefusedThenReplannedAsATranscodeOfThatStream \
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_AnotherUser_CanNeitherReadNorStopNorTakeTheJob \
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_MediaElementCredential_ReadsOnlyWhileTheSessionLives \
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_AlternateVersionWithdrawn_StopsServingAndCannotBePlannedAgain \
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_EncodingOptionsInTheQuery_ChangeNothing
 
       # Diagnosis, not enforcement. The OpenAPI equality assertion is unchanged and still
       # fails the job; this only stops a cross-machine divergence from being unreproducible.
