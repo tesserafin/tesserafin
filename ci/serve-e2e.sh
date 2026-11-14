@@ -66,8 +66,9 @@
 #     Dubbed Film (2024)/Dubbed Film (2024).mkv                H264 + 2 x AC-3 in MKV -> TRANSCODE, AS A MOVIE
 #     Dubbed Film (2024)/Dubbed Film (2024).en.srt             SubRip sidecar       -> EXTERNAL SUB
 #       (video a browser decodes, audio it does not: the video is copied and the audio encoded;
-#        two audio tracks that differ - 1000 Hz "fre", 440 Hz "eng" - so a track change is audible
-#        in what is produced; a bitrate ceiling under the source's turns it into a video encode)
+#        two audio tracks that differ - 1000 Hz French, 440 Hz English and default - so a track
+#        change is audible in what is produced; a bitrate ceiling under the source's turns it into
+#        a video encode. The server lists the external subtitle first: its audio indices are 2, 3)
 #
 #   WHY A THIRD LIBRARY FOR THE REMUX FILM: "Remux Probe" is a `Video` (homevideos resolves
 #   nothing else), and the film playback journey only owns items of type `Movie`. A Movie cannot
@@ -841,8 +842,9 @@ if dubbed is not None:
     if dubbed.get("Type") != "Movie":
         problems.append("Dubbed Film resolved as %r, expected a Movie" % dubbed.get("Type"))
     audio = [s for s in dubbed.get("MediaStreams", []) or [] if s.get("Type") == "Audio"]
-    if sorted((s.get("Language") or "") for s in audio) != ["eng", "fre"]:
-        problems.append("Dubbed Film audio tracks are %s, expected one 'fre' and one 'eng'"
+    # The server normalises the bibliographic "fre" to the terminology code "fra".
+    if sorted((s.get("Language") or "").replace("fre", "fra") for s in audio) != ["eng", "fra"]:
+        problems.append("Dubbed Film audio tracks are %s, expected one French and one English"
                         % [(s.get("Index"), s.get("Language"), s.get("Codec")) for s in audio])
 if film is not None:
     if film.get("Type") != "Movie":
