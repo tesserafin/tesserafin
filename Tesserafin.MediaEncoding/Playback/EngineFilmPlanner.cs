@@ -220,7 +220,7 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
         V2PlanRecord? transcode = null;
         foreach (var source in sources)
         {
-            var decision = _engine.Decide(context, request.Capabilities, [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(request.Constraints, source));
+            var decision = _engine.Decide(context, WithExecutableTargetsFirst(request.Capabilities), [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(request.Constraints, source));
             if (!decision.IsViable
                 || !PlaybackExecutionPlanBuilder.TryBuild(decision, out var plan, out _)
                 || plan is null)
@@ -245,6 +245,33 @@ public sealed class EngineFilmPlanner : IPlaybackSessionPlanner
 
         return remux ?? transcode;
     }
+
+    /// <summary>
+    /// The client's declared output profiles, with the target codecs this server executes from a
+    /// session moved to the front of each profile: H.264 for video, AAC for audio. The engine
+    /// encodes to a profile's first codec, and a browser declares its fMP4 HLS profile as
+    /// <c>av1, hevc, h264</c> - which this server does not encode from a session (nor, by default,
+    /// on the existing chain: <c>AllowHevcEncoding</c> and <c>AllowAv1Encoding</c> are off). The
+    /// other codecs stay in the profile, after these, because a profile also says which copied
+    /// streams it can carry: an HEVC source is still remuxed into fMP4. Nothing is added and
+    /// nothing a client does not decode becomes a target.
+    /// </summary>
+    /// <param name="declared">The capabilities the client declared.</param>
+    /// <returns>The capabilities the engine decides with.</returns>
+    internal static Tesserafin.Playback.Decision.ClientCapabilities WithExecutableTargetsFirst(Tesserafin.Playback.Decision.ClientCapabilities declared)
+        => declared with
+        {
+            OutputProfiles = declared.OutputProfiles
+                .Select(profile => profile with
+                {
+                    VideoCodecs = ExecutableFirst(profile.VideoCodecs, "h264"),
+                    AudioCodecs = ExecutableFirst(profile.AudioCodecs, "aac"),
+                })
+                .ToList(),
+        };
+
+    private static string[] ExecutableFirst(System.Collections.Generic.IReadOnlyList<string> codecs, string executable)
+        => codecs.OrderBy(codec => string.Equals(codec, executable, StringComparison.OrdinalIgnoreCase) ? 0 : 1).ToArray();
 
     /// <summary>
     /// The user's own audio and subtitle preferences, as <c>MediaSourceManager</c> already resolved

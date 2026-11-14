@@ -215,6 +215,9 @@ POST /Playback/Sessions          same request as §4
           audio to AAC (down-mix allowed); output in the source's video range; subtitle none or
           External (text extraction/conversion). Tone mapping and a burnt-in subtitle are decided
           by the engine but not executed from here: they stay on the existing chain.
+          the engine encodes to a profile's FIRST codec; a browser lists av1, hevc, h264. The
+          planner hands the engine each declared profile with H.264 / AAC moved to the front
+          (nothing added, nothing removed: a profile also says which copied streams it carries)
           engine v9: a stream copy the request forbids (AllowVideoStreamCopy /
           AllowAudioStreamCopy) is re-encoded inside a transcode too, and a remux demoted by such
           a prohibition re-encodes the forbidden stream only

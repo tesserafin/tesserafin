@@ -127,6 +127,53 @@ public sealed class EnginePlanEncodingRequestTests
     }
 
     [Fact]
+    public void A_browser_that_lists_av1_and_hevc_first_still_gets_an_h264_transcode_and_keeps_its_hevc_remux()
+    {
+        var chrome = Browser() with
+        {
+            OutputProfiles = [new PlaybackOutputProfile(MediaKind.Video, StreamingProtocol.Hls, "mp4", ["av1", "hevc", "h264"], ["aac"], null, null, null)],
+        };
+
+        var executable = EngineFilmPlanner.WithExecutableTargetsFirst(chrome);
+
+        Assert.Equal(["h264", "av1", "hevc"], executable.OutputProfiles[0].VideoCodecs);
+        Assert.Equal(["aac"], executable.OutputProfiles[0].AudioCodecs);
+        Assert.Equal(chrome.Decode, executable.Decode);
+
+        var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
+        var store = new InMemoryV2PlanStore();
+        var planner = new EngineFilmPlanner(inner.Object, new PlaybackEngine(), store, NullLogger<EngineFilmPlanner>.Instance);
+        var options = new MediaOptions
+        {
+            ItemId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            MediaSources = [Source("aac", videoCodec: "mpeg4")],
+            Profile = new DeviceProfile(),
+        };
+
+        // MPEG-4 Part 2 is decoded by no browser: the video is encoded, to H.264, and the plan is
+        // one the session's HLS route executes. Without the reordering it would be AV1, which it
+        // does not - and the film would fall to the legacy planner (a strict mock here).
+        using (EngineFilmPlanner.BeginRequest(new EngineFilmRequest(chrome, _allowed)))
+        {
+            Assert.Equal(PlayMethod.Transcode, planner.PlanVideo(options)!.PlayMethod);
+        }
+
+        inner.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void Encoded_audio_takes_at_most_a_quarter_of_a_total_ceiling()
+    {
+        var plan = _audioOnly with { TotalBitrate = 200_000 };
+
+        Assert.Equal(50_000, EnginePlanEncodingRequest.Build(plan, Guid.NewGuid(), "ps", "device", Source("ac3"), null).AudioBitRate);
+        Assert.Equal(
+            EnginePlanEncodingRequest.MinimumAudioBitrate,
+            EnginePlanEncodingRequest.Build(plan with { TotalBitrate = 64_000 }, Guid.NewGuid(), "ps", "device", Source("ac3"), null).AudioBitRate);
+    }
+
+    [Fact]
     public void A_copied_stream_is_requested_as_a_copy_and_an_encoded_one_with_the_plans_codec()
     {
         var audio = EnginePlanEncodingRequest.Build(_audioOnly, Guid.NewGuid(), "ps", "device", Source("ac3"), "AudioCodecNotSupported");
@@ -199,7 +246,7 @@ public sealed class EnginePlanEncodingRequestTests
                 false),
             [new PlaybackOutputProfile(MediaKind.Video, StreamingProtocol.Hls, "mp4", ["h264"], ["aac"], null, null, null)]);
 
-    private static MediaSourceInfo Source(string audioCodec, int? audioBitrate = null)
+    private static MediaSourceInfo Source(string audioCodec, int? audioBitrate = null, string videoCodec = "h264")
         => new()
         {
             Id = "film",
@@ -213,7 +260,7 @@ public sealed class EnginePlanEncodingRequestTests
             DefaultAudioStreamIndex = 1,
             MediaStreams =
             [
-                new MediaStream { Index = 0, Type = MediaStreamType.Video, Codec = "h264" },
+                new MediaStream { Index = 0, Type = MediaStreamType.Video, Codec = videoCodec },
                 new MediaStream { Index = 1, Type = MediaStreamType.Audio, Codec = audioCodec, Channels = 2, BitRate = audioBitrate, IsDefault = true },
             ],
         };

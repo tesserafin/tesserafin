@@ -30,6 +30,11 @@ public static class EnginePlanEncodingRequest
     internal const int MinimumVideoBitrate = 100_000;
 
     /// <summary>
+    /// The lowest bitrate encoded audio is given under a total ceiling.
+    /// </summary>
+    internal const int MinimumAudioBitrate = 32_000;
+
+    /// <summary>
     /// Whether the plan copies its video stream.
     /// </summary>
     /// <param name="plan">The execution plan.</param>
@@ -131,7 +136,13 @@ public static class EnginePlanEncodingRequest
     private static int DefaultAudioBitrate(PlaybackExecutionPlan plan, MediaSourceInfo? source)
     {
         var channels = plan.AudioChannels ?? AudioStream(plan, source)?.Channels ?? 2;
-        return DefaultAudioBitratePerChannelPair * Math.Clamp((channels + 1) / 2, 1, 4);
+        var bitrate = DefaultAudioBitratePerChannelPair * Math.Clamp((channels + 1) / 2, 1, 4);
+
+        // Under a total ceiling the encoded audio takes at most a quarter of it, so the ceiling
+        // the client chose bounds the whole output, not only its video.
+        return plan.TotalBitrate is int total
+            ? Math.Min(bitrate, Math.Max(MinimumAudioBitrate, total / 4))
+            : bitrate;
     }
 
     private static MediaStream? AudioStream(PlaybackExecutionPlan plan, MediaSourceInfo? source)
