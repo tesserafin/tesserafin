@@ -12,6 +12,7 @@ using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Session;
+using Tesserafin.Playback.Shadow;
 using Xunit;
 
 namespace Tesserafin.Api.Tests.Controllers;

@@ -18,7 +18,7 @@ using Tesserafin.Playback.Shadow;
 using Xunit;
 using DomainClientCapabilities = Tesserafin.Playback.Decision.ClientCapabilities;
 
-namespace Tesserafin.MediaEncoding.Tests.Playback;
+namespace Tesserafin.Playback.Shadow.Tests.Runtime;
 
 /// <summary>
 /// Tests for <see cref="PlaybackExecutionPlanResolver"/> (PR115a): unit-level unknown/refused/viable

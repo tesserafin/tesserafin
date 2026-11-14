@@ -20,15 +20,8 @@
     <ProjectReference Include="..\Tesserafin.Common\Tesserafin.Common.csproj" />
     <ProjectReference Include="..\Tesserafin.Controller\Tesserafin.Controller.csproj" />
     <ProjectReference Include="..\Tesserafin.Model\Tesserafin.Model.csproj" />
-    <!-- PR98 shadow mode: ShadowPlaybackSessionPlanner runs the v2 engine alongside the legacy
-         planner. None of these sink back into Tesserafin.MediaEncoding or Tesserafin.Controller, so no
-         reference cycle is introduced. -->
-    <ProjectReference Include="..\src\Tesserafin.Playback.Shadow\Tesserafin.Playback.Shadow.csproj" />
     <ProjectReference Include="..\src\Tesserafin.Playback.Engine\Tesserafin.Playback.Engine.csproj" />
     <ProjectReference Include="..\src\Tesserafin.Playback.Dlna\Tesserafin.Playback.Dlna.csproj" />
-    <!-- PR114a: IPlaybackExecutionPlanResolver builds a PlaybackExecutionPlan from the
-         ShadowDiagnosticRecord.Decision already retained per session by IShadowDiagnosticsStore - no
-         cycle, Tesserafin.Playback.Execution references only Tesserafin.Playback.Decision. -->
     <ProjectReference Include="..\src\Tesserafin.Playback.Execution\Tesserafin.Playback.Execution.csproj" />
   </ItemGroup>
 

@@ -6,7 +6,7 @@ using Tesserafin.Playback.Decision;
 using Tesserafin.Playback.Shadow;
 using Xunit;
 
-namespace Tesserafin.MediaEncoding.Tests.Playback;
+namespace Tesserafin.Playback.Shadow.Tests.Runtime;
 
 /// <summary>
 /// Unit tests for the ambient capture-scope hardening added in PR113a: <see cref="IShadowDiagnosticsStore.Publish"/>
@@ -16,6 +16,51 @@ namespace Tesserafin.MediaEncoding.Tests.Playback;
 /// </summary>
 public class InMemoryShadowDiagnosticsStoreTests
 {
+    [Fact]
+    public void PlanningCapture_InheritsInputs_AttachesItsRecord_AndRestoresOuterScope()
+    {
+        var store = new InMemoryShadowDiagnosticsStore();
+        var inputs = new ShadowCaptureInputs(null, 123);
+        var outerRecord = CreateRecord();
+        var innerRecord = CreateRecord();
+        var id = new PlaybackSessionId(Guid.NewGuid());
+        using (store.BeginCapture(inputs))
+        {
+            store.Publish(outerRecord);
+            using (var capture = ((IPlaybackSessionDiagnostics)store).BeginPlanning())
+            {
+                Assert.Same(inputs, store.CapturedInputs);
+                Assert.Null(store.TakeCaptured());
+                store.Publish(innerRecord);
+                capture.AttachTo(id);
+            }
+
+            Assert.Same(outerRecord, store.TakeCaptured());
+            Assert.Same(inputs, store.CapturedInputs);
+        }
+
+        Assert.True(store.TryGet(id, out var attached));
+        Assert.Same(innerRecord, attached);
+        Assert.Null(store.CapturedInputs);
+        Assert.Null(store.TakeCaptured());
+    }
+
+    [Fact]
+    public void EmptyPlanningCapture_EvictsPreviousDiagnosticAndEvents()
+    {
+        var store = new InMemoryShadowDiagnosticsStore();
+        var id = new PlaybackSessionId(Guid.NewGuid());
+        store.Attach(id, CreateRecord());
+        store.RecordEvent(id, new PlaybackLifecycleEvent("PlaybackStarted", DateTimeOffset.UtcNow));
+        using (var capture = store.BeginPlanning())
+        {
+            capture.AttachTo(id);
+        }
+
+        Assert.False(store.TryGet(id, out _));
+        Assert.Empty(store.GetEvents(id));
+    }
+
     [Fact]
     public void Publish_NoActiveScope_IsIgnoredAndDoesNotThrow()
     {

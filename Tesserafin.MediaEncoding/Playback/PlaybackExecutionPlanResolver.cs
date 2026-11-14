@@ -15,7 +15,7 @@ public sealed class PlaybackExecutionPlanResolver : IPlaybackExecutionPlanResolv
     /// <param name="v2PlanStore">
     /// PR115a: the store to read a session's retained AUTHORITATIVE <see cref="V2PlanRecord"/> from -
     /// the same singleton <see cref="PlaybackSessionManager"/> attaches records to. This resolver no
-    /// longer reads <see cref="IShadowDiagnosticsStore"/>: that store only ever holds observability
+    /// longer reads <c>IShadowDiagnosticsStore</c>: that store only ever holds observability
     /// data, never an authoritative decision.
     /// </param>
     public PlaybackExecutionPlanResolver(IV2PlanStore v2PlanStore)

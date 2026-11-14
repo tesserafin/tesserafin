@@ -21,7 +21,7 @@ using Tesserafin.Playback.Engine;
 using Tesserafin.Playback.Shadow;
 using Xunit;
 
-namespace Tesserafin.MediaEncoding.Tests.Playback;
+namespace Tesserafin.Playback.Shadow.Tests.Runtime;
 
 /// <summary>
 /// Shadow-safety tests for <see cref="ShadowPlaybackSessionPlanner"/> (PR98): the v2 engine runs
@@ -1024,7 +1024,7 @@ public class ShadowPlaybackSessionPlannerTests
     private static MediaOptions CreateOptions() => new() { Profile = new DeviceProfile() };
 
     /// <summary>
-    /// Loads real fixture data shared with <see cref="PlaybackSessionPlannerTests"/> - same helper,
+    /// Loads real fixture data shared with the encoding planner tests - same helper,
     /// same "Test Data" JSON files, so the CSV-container regression test above exercises a genuine
     /// production fixture rather than a hand-built one.
     /// </summary>

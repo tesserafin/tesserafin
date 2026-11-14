@@ -3,8 +3,9 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using Tesserafin.Controller.MediaEncoding;
+using Tesserafin.MediaEncoding.Playback;
 
-namespace Tesserafin.MediaEncoding.Playback;
+namespace Tesserafin.Playback.Shadow;
 
 /// <summary>
 /// Default <see cref="IShadowDiagnosticsStore"/> implementation: an in-process, thread-safe
@@ -33,14 +34,17 @@ public sealed class InMemoryShadowDiagnosticsStore : IShadowDiagnosticsStore
     public IDisposable BeginCapture() => BeginCapture(null);
 
     /// <inheritdoc/>
-    public IDisposable BeginCapture(ShadowCaptureInputs? inputs)
+    public IDisposable BeginCapture(ShadowCaptureInputs? inputs) => OpenCapture(inputs);
+
+    /// <inheritdoc/>
+    public IPlaybackPlanningDiagnostics BeginPlanning() => OpenCapture(CapturedInputs);
+
+    private CaptureScope OpenCapture(ShadowCaptureInputs? inputs)
     {
-        // PR113a: save the enclosing scope's state (null if there is none) so a nested
-        // BeginCapture - however unlikely in the current single-level Create/Patch usage -
-        // restores the exact parent state on Dispose instead of clobbering it with null.
         var previous = _ambient.Value;
-        _ambient.Value = new AmbientState { Inputs = inputs };
-        return new CaptureScope(_ambient, previous);
+        var captured = new AmbientState { Inputs = inputs };
+        _ambient.Value = captured;
+        return new CaptureScope(this, _ambient, previous, captured);
     }
 
     /// <inheritdoc/>
@@ -95,16 +99,33 @@ public sealed class InMemoryShadowDiagnosticsStore : IShadowDiagnosticsStore
         public ShadowCaptureInputs? Inputs { get; init; }
     }
 
-    private sealed class CaptureScope : IDisposable
+    private sealed class CaptureScope : IPlaybackPlanningDiagnostics
     {
+        private readonly InMemoryShadowDiagnosticsStore _owner;
+        private readonly AmbientState _captured;
         private readonly AsyncLocal<AmbientState?> _ambient;
         private readonly AmbientState? _previous;
         private bool _disposed;
 
-        public CaptureScope(AsyncLocal<AmbientState?> ambient, AmbientState? previous)
+        public CaptureScope(InMemoryShadowDiagnosticsStore owner, AsyncLocal<AmbientState?> ambient, AmbientState? previous, AmbientState captured)
         {
+            _owner = owner;
+            _captured = captured;
             _ambient = ambient;
             _previous = previous;
+        }
+
+        public void AttachTo(PlaybackSessionId id)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_captured.Record is { } record)
+            {
+                _owner.Attach(id, record);
+            }
+            else
+            {
+                _owner.Remove(id);
+            }
         }
 
         public void Dispose()

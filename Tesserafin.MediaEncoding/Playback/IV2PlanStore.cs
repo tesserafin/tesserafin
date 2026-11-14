@@ -6,14 +6,14 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// <summary>
 /// Retains at most one authoritative <see cref="V2PlanRecord"/> per live
 /// <see cref="PlaybackSessionId"/> (PR115a). This is the execution authority a canary session's v2
-/// plan lives in - NOT <see cref="IShadowDiagnosticsStore"/>, which remains a pure observability
+/// plan lives in - NOT <c>IShadowDiagnosticsStore</c>, which remains a pure observability
 /// projection: the shadow store may be disabled, sampled out, or evicted without a live playback
 /// ever noticing, so nothing on a live path may depend on it.
 /// </summary>
 /// <remarks>
 /// Correlation uses the same two-step ambient-capture handshake as
-/// <see cref="IShadowDiagnosticsStore"/> (see its remarks): no session id exists yet when
-/// <see cref="ShadowPlaybackSessionPlanner"/> runs the engine, so the planner publishes into a
+/// <c>IShadowDiagnosticsStore</c> (see its remarks): no session id exists yet when
+/// <c>ShadowPlaybackSessionPlanner</c> runs the engine, so the planner publishes into a
 /// scope <see cref="PlaybackSessionManager"/> opens around its synchronous <c>Plan()</c> call, and
 /// the manager attaches the captured record once the real id is known.
 /// </remarks>
@@ -21,14 +21,14 @@ public interface IV2PlanStore
 {
     /// <summary>
     /// Opens a fresh ambient capture scope for one synchronous planning call. Nesting restores the
-    /// enclosing scope's state on dispose, same as <see cref="IShadowDiagnosticsStore.BeginCapture()"/>.
+    /// enclosing scope's state on dispose, same as <c>IShadowDiagnosticsStore</c>.
     /// </summary>
     /// <returns>A disposable that closes the scope, restoring whatever scope (if any) enclosed it.</returns>
     IDisposable BeginCapture();
 
     /// <summary>
     /// Publishes a record into the currently open ambient capture scope. Called by
-    /// <see cref="ShadowPlaybackSessionPlanner"/> only when the effective mode made v2
+    /// <c>ShadowPlaybackSessionPlanner</c> only when the effective mode made v2
     /// authoritative for this planning call - never for a pure observability (shadow) run. Silently
     /// dropped when no scope is open on this async flow.
     /// </summary>

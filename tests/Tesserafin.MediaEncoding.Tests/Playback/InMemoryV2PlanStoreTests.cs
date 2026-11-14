@@ -9,7 +9,7 @@ namespace Tesserafin.MediaEncoding.Tests.Playback;
 
 /// <summary>
 /// Tests for <see cref="InMemoryV2PlanStore"/> (PR115a): the ambient capture handshake and the
-/// retention lifecycle, mirroring <see cref="InMemoryShadowDiagnosticsStoreTests"/> - same
+/// retention lifecycle, mirroring the diagnostics store tests - same
 /// mechanics, but this store is execution authority rather than observability, so its correctness
 /// is what keeps a canary session on the engine its configuration granted it.
 /// </summary>

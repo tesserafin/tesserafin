@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Playback.Decision;
+using Tesserafin.Playback.Shadow;
 
 namespace Tesserafin.Api.Models.PlaybackSessionDtos;
 

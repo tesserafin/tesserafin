@@ -10,6 +10,7 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Playback.Contract.Diagnostics;
 using Tesserafin.Playback.Contract.Scan;
+using Tesserafin.Playback.Shadow;
 
 namespace Tesserafin.Api.Playback;
 

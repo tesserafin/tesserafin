@@ -10,9 +10,10 @@ using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Session;
 using Tesserafin.Playback.Decision;
 using Tesserafin.Playback.Engine;
+using Tesserafin.Playback.Shadow;
 using Xunit;
 
-namespace Tesserafin.MediaEncoding.Tests.Playback;
+namespace Tesserafin.Playback.Shadow.Tests.Runtime;
 
 /// <summary>
 /// End-to-end retention tests for PR113: wires the real <see cref="ShadowPlaybackSessionPlanner"/>

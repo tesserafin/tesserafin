@@ -5,11 +5,11 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// <summary>
 /// Retains at most one <see cref="PlaybackLiveWiringOutcome"/> per live <see cref="PlaybackSessionId"/>
 /// (PR115c): whether the request was actually served from the v2 execution plan, or why it fell back
-/// to legacy - for the admin diagnostics surface, mirroring <see cref="IShadowDiagnosticsStore"/>'s
+/// to legacy - for the admin diagnostics surface, mirroring <c>IShadowDiagnosticsStore</c>'s
 /// lookup shape (docs/pr92-design-playback-api-and-diagnostics.md §4.3).
 /// </summary>
 /// <remarks>
-/// Deliberately simpler than <see cref="IShadowDiagnosticsStore"/>/<see cref="IV2PlanStore"/>: both of
+/// Deliberately simpler than <c>IShadowDiagnosticsStore</c>/<see cref="IV2PlanStore"/>: both of
 /// those need the two-step ambient-capture handshake because their producer
 /// (<c>ShadowPlaybackSessionPlanner</c>) runs before the real session id is minted. The live-wiring
 /// decision this store records is made by <c>MediaInfoHelper.SetDeviceSpecificData</c>, strictly

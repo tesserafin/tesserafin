@@ -36,9 +36,7 @@
     "UserView.TVSeriesManager",
     "Video.RecordingsManager"
   ],
-  "forbiddenDependencies": [
-    "Tesserafin.MediaEncoding -\u003E Tesserafin.Playback.Shadow"
-  ],
+  "forbiddenDependencies": [],
   "streamBuilderFiles": [
     "Tesserafin.Api/Helpers/MediaInfoHelper.cs",
     "Tesserafin.Api/Helpers/StreamingHelpers.cs",

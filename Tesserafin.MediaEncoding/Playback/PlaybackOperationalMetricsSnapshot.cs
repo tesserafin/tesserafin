@@ -8,7 +8,7 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// <summary>
 /// PR115d: an immutable point-in-time view of <see cref="PlaybackOperationalMetrics"/>' counters,
 /// suitable for the admin diagnostics endpoint or a single structured log line - mirrors
-/// <see cref="Tesserafin.Playback.Shadow.ShadowMetricsSnapshot"/>'s shape and role.
+/// <c>ShadowMetricsSnapshot</c>'s shape and role.
 /// </summary>
 /// <param name="ServedByV2Count">The number of live requests actually served from the v2 execution plan.</param>
 /// <param name="FallbackReasonCounts">Count of fallback-to-legacy requests, per typed <see cref="PlaybackLiveFallbackReason"/>.</param>

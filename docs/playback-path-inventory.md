@@ -282,7 +282,7 @@ explicitly take a database context. The architecture baseline loses the three Mo
 exceptions; direct or transitive EF packages are forbidden for Data, Model and Controller.
 
 The `Server.Core -> Api` inversion is addressed in §9; `MediaEncoding -> Playback.Shadow`
-remains open. No playback path or delivery mode is added by this boundary change.
+is addressed in §10. No playback path or delivery mode is added by this boundary change.
 
 
 ## 9. Core / HTTP boundary (consolidation step 4, candidate)
@@ -307,3 +307,28 @@ assembly ownership and DI lifetimes, and a compiled-reference test verifies the 
 no API reference. Credential inventory follows the new WebSocket manager path. The HTTP contract
 is unchanged; no SDK generation or pair-lock movement belongs to this slice. This candidate is
 stacked on #412 and retains that parent's pending SDK-pair merge requirement.
+
+
+## 10. Encoding / comparison boundary (consolidation step 4, candidate)
+
+`MediaEncoding` no longer reaches `Playback.Shadow`, directly or transitively. The comparison
+assembly now owns its planner decorator, diagnostic records, request metadata and retention
+stores. It references MediaEncoding to implement the execution-owned `IPlaybackSessionDiagnostics`
+port. Core composes that implementation and supplies the same singleton to the manager, API
+capture scopes and administrative diagnostics. No forwarding types or duplicate stores remain.
+
+The session manager opens an opaque `IPlaybackPlanningDiagnostics` capture around each synchronous
+planning attempt. Only a successful create or replan attaches it to the resulting session; an
+empty capture evicts stale observations. Refusal or an exception disposes it without modifying
+retained diagnostics. The implementation inherits request metadata, restores enclosing scopes,
+and evicts lifecycle events with the session. Authoritative `IV2PlanStore` records and execution
+remain separate; the manager never reads a comparison record or divergence.
+
+The final forbidden-dependency exception is deleted from the ratchet baseline; the rule remains.
+Tests of combined comparison/session behavior live in Playback.Shadow.Tests, while execution-only
+tests remain in MediaEncoding.Tests without a comparison dependency. Port-level tests cover
+attachment/disposal ordering and failure; a booted-host check verifies singleton identity and
+compiled assembly references. Existing playback and OpenAPI integration tests verify runtime
+composition. This candidate is stacked on #414 and inherits #412's pending SDK-pair merge
+requirement. It changes neither the HTTP contract nor the set of supported playback journeys;
+audio and other unmigrated consumers still require the comparison decorator.

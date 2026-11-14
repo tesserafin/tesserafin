@@ -27,6 +27,7 @@ using Tesserafin.Model.Session;
 using Tesserafin.Playback.Contract.Diagnostics;
 using Tesserafin.Playback.Decision;
 using Tesserafin.Playback.Dlna;
+using Tesserafin.Playback.Shadow;
 
 namespace Tesserafin.Api.Controllers;
 

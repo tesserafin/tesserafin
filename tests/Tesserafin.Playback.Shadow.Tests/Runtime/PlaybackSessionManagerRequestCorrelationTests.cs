@@ -7,9 +7,10 @@ using Tesserafin.Controller.Session;
 using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Session;
+using Tesserafin.Playback.Shadow;
 using Xunit;
 
-namespace Tesserafin.MediaEncoding.Tests.Playback;
+namespace Tesserafin.Playback.Shadow.Tests.Runtime;
 
 /// <summary>
 /// Issue #42: the request correlation id is stamped onto each individual

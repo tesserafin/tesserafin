@@ -55,7 +55,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     private readonly ITranscodeManager _transcodeManager;
     private readonly ISessionManager _sessionManager;
     private readonly IDeviceLoggedOutSource? _deviceLogouts;
-    private readonly IShadowDiagnosticsStore _diagnosticsStore;
+    private readonly IPlaybackSessionDiagnostics? _diagnosticsStore;
     private readonly IV2PlanStore _v2PlanStore;
     private readonly IPlaybackLiveWiringDiagnosticsStore _liveWiringDiagnosticsStore;
     private readonly PlaybackOperationalMetrics _operationalMetrics;
@@ -102,15 +102,8 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     /// <param name="transcodeManager">Instance of the <see cref="ITranscodeManager"/> interface.</param>
     /// <param name="sessionManager">Instance of the <see cref="ISessionManager"/> interface.</param>
     /// <param name="diagnosticsStore">
-    /// PR113: retains whatever shadow diagnostic <paramref name="planner"/> produced for a
-    /// <see cref="Create"/>/<see cref="Patch"/> call, keyed by the resulting session id, for the
-    /// admin diagnostics endpoint. Defaults to a no-op instance when not supplied, so every
-    /// pre-PR113 (3-arg) call site - including existing test constructors - keeps compiling and
-    /// behaving exactly as before: no diagnostic is ever retained. PR113b: also the sink for real
-    /// lifecycle events (<see cref="ITranscodeManager.TranscodingJobStarted"/>,
-    /// <see cref="ISessionManager.PlaybackStart"/>/<see cref="ISessionManager.PlaybackStopped"/>),
-    /// which this constructor subscribes to unconditionally - correlation against a tracked session
-    /// silently no-ops when the store is the no-op default, same as every other diagnostics path.
+    /// Optional observation sink. Captures planning diagnostics and lifecycle events without
+    /// exposing comparison records to the execution path. When absent, no observations are retained.
     /// </param>
     /// <param name="v2PlanStore">
     /// PR115a: retains the AUTHORITATIVE v2 plan (<see cref="V2PlanRecord"/>) <paramref name="planner"/>
@@ -165,7 +158,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         IPlaybackSessionPlanner planner,
         ITranscodeManager transcodeManager,
         ISessionManager sessionManager,
-        IShadowDiagnosticsStore? diagnosticsStore = null,
+        IPlaybackSessionDiagnostics? diagnosticsStore = null,
         IV2PlanStore? v2PlanStore = null,
         IPlaybackLiveWiringDiagnosticsStore? liveWiringDiagnosticsStore = null,
         PlaybackOperationalMetrics? operationalMetrics = null,
@@ -179,7 +172,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         _planner = planner;
         _transcodeManager = transcodeManager;
         _sessionManager = sessionManager;
-        _diagnosticsStore = diagnosticsStore ?? NoOpShadowDiagnosticsStore.Instance;
+        _diagnosticsStore = diagnosticsStore;
         _v2PlanStore = v2PlanStore ?? NoOpV2PlanStore.Instance;
         _liveWiringDiagnosticsStore = liveWiringDiagnosticsStore ?? NoOpPlaybackLiveWiringDiagnosticsStore.Instance;
         _operationalMetrics = operationalMetrics ?? new PlaybackOperationalMetrics();
@@ -202,19 +195,12 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     public PlaybackSession? Create(PlaybackSessionRequest request, string? playSessionId = null, string? playbackAttemptId = null)
     {
         PlaybackPlan? plan;
-        ShadowDiagnosticRecord? captured;
         V2PlanRecord? v2Captured;
-        // Issue #75: inherit whatever ShadowCaptureInputs an ENCLOSING scope was opened with
-        // (PlaybackSessionsController opens one carrying the v2 request body's declared
-        // capabilities and Content-Length). PR113a's nesting rule means this inner scope would
-        // otherwise shadow the outer one with null inputs, and the shadow run - which publishes
-        // into the innermost scope - would see nothing. Null everywhere else, which is exactly the
-        // legacy MediaInfoHelper path's situation.
-        using (_diagnosticsStore.BeginCapture(_diagnosticsStore.CapturedInputs))
+        // Diagnostics own capture and correlation; execution never reads comparison records.
+        using var diagnostics = _diagnosticsStore?.BeginPlanning();
         using (_v2PlanStore.BeginCapture())
         {
             plan = Plan(request);
-            captured = _diagnosticsStore.TakeCaptured();
             v2Captured = _v2PlanStore.TakeCaptured();
         }
 
@@ -243,14 +229,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         // admin diagnostics endpoint would show the new plan next to a stale context/capabilities/
         // reasoning from an earlier call. Remove is a documented no-op when nothing is retained, so
         // this is safe (if slightly redundant) for the brand-new-session case too.
-        if (captured is not null)
-        {
-            _diagnosticsStore.Attach(session.Id, captured);
-        }
-        else
-        {
-            _diagnosticsStore.Remove(session.Id);
-        }
+        diagnostics?.AttachTo(session.Id);
 
         // PR115a: same attach-or-remove discipline for the authoritative v2 record. A replan that is
         // no longer authoritative (mode changed, cohort resized) must evict the stale authoritative
@@ -272,19 +251,12 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     public PlaybackSession? Patch(PlaybackSessionId id, PlaybackSessionRequest request, string? playbackAttemptId = null)
     {
         PlaybackPlan? plan;
-        ShadowDiagnosticRecord? captured;
         V2PlanRecord? v2Captured;
-        // Issue #75: inherit whatever ShadowCaptureInputs an ENCLOSING scope was opened with
-        // (PlaybackSessionsController opens one carrying the v2 request body's declared
-        // capabilities and Content-Length). PR113a's nesting rule means this inner scope would
-        // otherwise shadow the outer one with null inputs, and the shadow run - which publishes
-        // into the innermost scope - would see nothing. Null everywhere else, which is exactly the
-        // legacy MediaInfoHelper path's situation.
-        using (_diagnosticsStore.BeginCapture(_diagnosticsStore.CapturedInputs))
+        // Diagnostics own capture and correlation; execution never reads comparison records.
+        using var diagnostics = _diagnosticsStore?.BeginPlanning();
         using (_v2PlanStore.BeginCapture())
         {
             plan = Plan(request);
-            captured = _diagnosticsStore.TakeCaptured();
             v2Captured = _v2PlanStore.TakeCaptured();
         }
 
@@ -348,14 +320,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         // PR113a: attach-or-remove unconditionally (see the matching comment in Create) - a
         // successful Patch with no new capture must evict whatever record was retained from an
         // earlier Create/Patch on this id, not leave it attached to the freshly replanned session.
-        if (captured is not null)
-        {
-            _diagnosticsStore.Attach(updated.Id, captured);
-        }
-        else
-        {
-            _diagnosticsStore.Remove(updated.Id);
-        }
+        diagnostics?.AttachTo(updated.Id);
 
         // PR115a: same attach-or-remove discipline for the authoritative v2 record. A replan that is
         // no longer authoritative (mode changed, cohort resized) must evict the stale authoritative
@@ -675,7 +640,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         // PR113: evicts whatever shadow diagnostic was retained for this session, if any - covers
         // every removal path (Delete, DeleteByPlaySessionId, the transcoding-job-ended/playback-stopped
         // handlers, and SweepExpired), since they all funnel through here.
-        _diagnosticsStore.Remove(id);
+        _diagnosticsStore?.Remove(id);
 
         // PR115a: evicts whatever authoritative v2 record was retained for this session, if any -
         // same removal paths as the diagnostics store above.
@@ -862,7 +827,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         // Issue #42: the request id is stamped per EVENT, alongside (never instead of) the
         // session-scoped grouping key `id`. Usually null here — these three signals arrive from
         // ffmpeg and session callbacks, not from a request — and null is the honest answer.
-        _diagnosticsStore.RecordEvent(
+        _diagnosticsStore?.RecordEvent(
             id,
             new PlaybackLifecycleEvent(stage, DateTimeOffset.UtcNow, _requestCorrelation.CurrentRequestId));
     }

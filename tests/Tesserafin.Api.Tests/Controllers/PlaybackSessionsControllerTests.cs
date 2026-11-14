@@ -29,6 +29,7 @@ using Tesserafin.Model.Session;
 using Tesserafin.Playback.Decision;
 using Tesserafin.Playback.Dlna;
 using Tesserafin.Playback.Execution;
+using Tesserafin.Playback.Shadow;
 using Xunit;
 
 namespace Tesserafin.Api.Tests.Controllers;

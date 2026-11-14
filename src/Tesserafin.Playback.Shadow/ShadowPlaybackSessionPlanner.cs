@@ -5,15 +5,15 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Extensions;
+using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dlna;
 using Tesserafin.Playback.Decision;
 using Tesserafin.Playback.Dlna;
 using Tesserafin.Playback.Engine;
 using Tesserafin.Playback.Execution;
-using Tesserafin.Playback.Shadow;
 
-namespace Tesserafin.MediaEncoding.Playback;
+namespace Tesserafin.Playback.Shadow;
 
 /// <summary>
 /// Decorates an <see cref="IPlaybackSessionPlanner"/> to run the v2 <see cref="IPlaybackEngine"/> in
@@ -64,7 +64,7 @@ public sealed class ShadowPlaybackSessionPlanner : IPlaybackSessionPlanner
     /// <summary>
     /// Initializes a new instance of the <see cref="ShadowPlaybackSessionPlanner"/> class with
     /// shadow mode always enabled at full sample rate and a fresh <see cref="ShadowMetrics"/>
-    /// instance. Kept for source/binary compatibility with PR98 call sites and tests; production
+    /// instance. Used by comparison fixtures; production
     /// wiring should use the overload that accepts an options accessor bound to live server
     /// configuration.
     /// </summary>
@@ -93,8 +93,7 @@ public sealed class ShadowPlaybackSessionPlanner : IPlaybackSessionPlanner
     /// <param name="diagnosticsStore">
     /// PR113: where a successful shadow run publishes its <see cref="ShadowDiagnosticRecord"/> for
     /// later correlation by <see cref="PlaybackSessionManager"/>. Defaults to a no-op instance when
-    /// not supplied, keeping every pre-PR113 call site source/binary compatible - the shadow run
-    /// then simply retains nothing, same as before this parameter existed.
+    /// not supplied; the shadow run then retains nothing.
     /// </param>
     /// <param name="v2PlanStore">
     /// PR115a: where an AUTHORITATIVE v2 run (canary cohort member, or full v2 mode) publishes its

@@ -7,6 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Diagnostics implement the runtime observation port; encoding never references this assembly. -->
+    <ProjectReference Include="../../Tesserafin.MediaEncoding/Tesserafin.MediaEncoding.csproj" />
     <ProjectReference Include="../Tesserafin.Playback.Decision/Tesserafin.Playback.Decision.csproj" />
     <!-- Issue #75: the closed diagnostic vocabulary ContractMappingDiagnosticFactory produces. That
          assembly references nothing itself; the string handling the comparison needs stays here. -->

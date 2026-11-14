@@ -662,6 +662,7 @@ namespace Tesserafin.Server.Core
             // Plan() call) and the manager (which attaches that record to the real session id and
             // evicts it on removal) - see IShadowDiagnosticsStore's remarks for the full handshake.
             serviceCollection.AddSingleton<IShadowDiagnosticsStore, InMemoryShadowDiagnosticsStore>();
+            serviceCollection.AddSingleton<IPlaybackSessionDiagnostics>(provider => provider.GetRequiredService<IShadowDiagnosticsStore>());
             // PR115a: one IV2PlanStore singleton, separate from IShadowDiagnosticsStore - this is the
             // authority channel (the AUTHORITATIVE v2 plan for a canary/v2 session), not an
             // observability one, so it must never share lifecycle/eviction semantics with the
@@ -703,7 +704,7 @@ namespace Tesserafin.Server.Core
                 provider.GetRequiredService<IPlaybackSessionPlanner>(),
                 provider.GetRequiredService<ITranscodeManager>(),
                 provider.GetRequiredService<ISessionManager>(),
-                provider.GetRequiredService<IShadowDiagnosticsStore>(),
+                provider.GetRequiredService<IPlaybackSessionDiagnostics>(),
                 provider.GetRequiredService<IV2PlanStore>(),
                 provider.GetRequiredService<IPlaybackLiveWiringDiagnosticsStore>(),
                 provider.GetRequiredService<PlaybackOperationalMetrics>(),

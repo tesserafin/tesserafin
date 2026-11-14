@@ -1,8 +1,10 @@
+using Tesserafin.Playback.Shadow;
+
 namespace Tesserafin.Api.Models.PlaybackSessionDtos;
 
 /// <summary>
 /// A playback-compatibility-lab fixture (PR93, schema v5: tests/PlaybackCompat/schema/fixture.schema.json),
-/// built from a real, retained <see cref="Tesserafin.MediaEncoding.Playback.ShadowDiagnosticRecord"/> by
+/// built from a real, retained <see cref="ShadowDiagnosticRecord"/> by
 /// <see cref="PlaybackCompatFixtureExporter"/> (PR113b), so a production case observed via the admin
 /// diagnostics endpoint can be replayed as a fixture in tests/PlaybackCompat/fixtures/.
 /// </summary>

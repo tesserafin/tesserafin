@@ -74,7 +74,7 @@ namespace Tesserafin.Model.Dlna
 
         /// <summary>
         /// Gets or sets the requesting user id. PR113b: carried through so a shadow v2 decision
-        /// engine run (<c>Tesserafin.MediaEncoding.Playback.ShadowPlaybackSessionPlanner</c>) can stamp
+        /// engine run (<c>Tesserafin.Playback.Shadow.ShadowPlaybackSessionPlanner</c>) can stamp
         /// its <c>PlaybackRequestContext.UserId</c> with the real requester instead of
         /// <see cref="Guid.Empty"/>. Defaults to <see cref="Guid.Empty"/>, matching the pre-PR113b
         /// behavior for every caller that does not set it.

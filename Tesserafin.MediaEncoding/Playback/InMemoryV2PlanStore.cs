@@ -9,7 +9,7 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// Default <see cref="IV2PlanStore"/> implementation: an in-process, thread-safe dictionary of
 /// retained records plus the <see cref="AsyncLocal{T}"/>-backed ambient capture scope used to
 /// correlate a planning call's v2 outcome with the session id minted after it. Same mechanics as
-/// <see cref="InMemoryShadowDiagnosticsStore"/> (see that type's comments for the null-vs-instance
+/// <c>InMemoryShadowDiagnosticsStore</c> (see that type's comments for the null-vs-instance
 /// ambient rationale), kept separate because this store is execution authority, not observability.
 /// </summary>
 public sealed class InMemoryV2PlanStore : IV2PlanStore

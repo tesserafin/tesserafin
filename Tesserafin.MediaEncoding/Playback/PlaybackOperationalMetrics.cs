@@ -10,7 +10,7 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// decision (<c>MediaInfoHelper.ResolveServedStreamInfo</c>) and, best-effort, for ffmpeg transcode
 /// start outcomes on v2-served sessions - the operational gate that must exist before
 /// <see cref="Tesserafin.Model.Configuration.PlaybackShadowOptions.CanaryPercentage"/> is opened above 0
-/// in production. Mirrors <see cref="Tesserafin.Playback.Shadow.ShadowMetrics"/>'s conventions
+/// in production. Mirrors <c>ShadowMetrics</c>'s conventions
 /// deliberately: one singleton shared across every live request, <see cref="Interlocked"/> rather
 /// than a lock (this sits on the same hot playback-decision/streaming path ShadowMetrics already
 /// avoids allocating or blocking on), and a separate immutable <see cref="PlaybackOperationalMetricsSnapshot"/>

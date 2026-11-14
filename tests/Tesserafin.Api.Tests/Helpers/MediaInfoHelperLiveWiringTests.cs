@@ -26,6 +26,7 @@ using Tesserafin.Model.MediaInfo;
 using Tesserafin.Model.Session;
 using Tesserafin.Playback.Decision;
 using Tesserafin.Playback.Execution;
+using Tesserafin.Playback.Shadow;
 using Xunit;
 
 namespace Tesserafin.Api.Tests.Helpers;

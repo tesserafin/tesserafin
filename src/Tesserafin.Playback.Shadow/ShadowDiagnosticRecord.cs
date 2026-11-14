@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using Tesserafin.Controller.MediaEncoding;
+using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Playback.Contract.Diagnostics;
 using Tesserafin.Playback.Decision;
-using Tesserafin.Playback.Shadow;
 
-namespace Tesserafin.MediaEncoding.Playback;
+namespace Tesserafin.Playback.Shadow;
 
 /// <summary>
 /// Everything a shadow run (<see cref="ShadowPlaybackSessionPlanner"/>, PR98) computed for a single

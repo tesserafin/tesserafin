@@ -10,7 +10,7 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// ever published for a session the effective <see cref="Tesserafin.Model.Configuration.PlaybackEngineMode"/>
 /// made v2 authoritative for (canary cohort member, or full v2 mode) - its presence in
 /// <see cref="IV2PlanStore"/> IS the statement of authority. This is deliberately independent of
-/// <see cref="ShadowDiagnosticRecord"/>/<see cref="IShadowDiagnosticsStore"/>: diagnostics are an
+/// <c>ShadowDiagnosticRecord</c>/<c>IShadowDiagnosticsStore</c>: diagnostics are an
 /// observability projection that may be disabled, sampled out, or evicted without ever affecting
 /// which engine owns a live session's plan.
 /// </summary>

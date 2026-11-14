@@ -7,6 +7,7 @@ using Tesserafin.Api.Models.PlaybackSessionDtos;
 using Tesserafin.Common.Api;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.MediaEncoding.Playback;
+using Tesserafin.Playback.Shadow;
 
 namespace Tesserafin.Api.Controllers;
 

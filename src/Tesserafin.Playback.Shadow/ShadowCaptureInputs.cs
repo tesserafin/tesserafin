@@ -1,7 +1,8 @@
+using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Playback.Contract.Diagnostics;
 using Tesserafin.Playback.Decision;
 
-namespace Tesserafin.MediaEncoding.Playback;
+namespace Tesserafin.Playback.Shadow;
 
 /// <summary>
 /// Issue #75: the request-scoped facts the shadow run cannot recover on its own, handed to it

@@ -5,7 +5,7 @@ namespace Tesserafin.MediaEncoding.Playback;
 
 /// <summary>
 /// The default <see cref="IV2PlanStore"/> used when none is supplied - by
-/// <see cref="PlaybackSessionManager"/>'s and <see cref="ShadowPlaybackSessionPlanner"/>'s
+/// <see cref="PlaybackSessionManager"/>'s and <c>ShadowPlaybackSessionPlanner</c>'s
 /// pre-PR115a constructor shapes, kept for source/binary compatibility. Retains nothing and
 /// captures nothing: <see cref="TryGet"/> always reports no record, so every session stays
 /// legacy-authoritative, matching pre-PR115a behavior exactly.

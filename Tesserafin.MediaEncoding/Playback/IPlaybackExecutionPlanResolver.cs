@@ -42,7 +42,7 @@ public enum PlaybackExecutionPlanResolution
 /// </summary>
 /// <remarks>
 /// PR115a: resolves from the AUTHORITATIVE <see cref="V2PlanRecord"/> <see cref="IV2PlanStore"/>
-/// retains for a canary/v2 session - never from <see cref="IShadowDiagnosticsStore"/>, which only
+/// retains for a canary/v2 session - never from <c>IShadowDiagnosticsStore</c>, which only
 /// ever holds observability data and is free to be disabled or evicted without affecting this
 /// resolver. The retained record's <see cref="V2PlanRecord.ExecutionPlan"/> is already built at
 /// publish time by <c>ShadowPlaybackSessionPlanner</c>/<c>PlaybackSessionManager</c>, so this

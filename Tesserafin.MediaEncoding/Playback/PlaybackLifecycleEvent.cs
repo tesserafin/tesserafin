@@ -7,8 +7,8 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// received from <see cref="Tesserafin.Controller.MediaEncoding.ITranscodeManager"/> or
 /// <see cref="Tesserafin.Controller.Session.ISessionManager"/>, stamped with the wall-clock time it was
 /// received - never a value approximated or backfilled from some other timestamp. Retained by
-/// <see cref="IShadowDiagnosticsStore"/> alongside (but independent of) any
-/// <see cref="ShadowDiagnosticRecord"/>, so the admin timeline (docs/pr92-design-playback-api-and-diagnostics.md
+/// the <see cref="IPlaybackSessionDiagnostics"/> observation sink, independently of planning
+/// comparisons, so the admin timeline (docs/pr92-design-playback-api-and-diagnostics.md
 /// §4.3) is populated even when shadow mode itself is disabled.
 /// </summary>
 /// <param name="Stage">

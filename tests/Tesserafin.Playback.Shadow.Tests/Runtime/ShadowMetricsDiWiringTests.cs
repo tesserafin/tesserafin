@@ -8,7 +8,7 @@ using Tesserafin.Playback.Engine;
 using Tesserafin.Playback.Shadow;
 using Xunit;
 
-namespace Tesserafin.MediaEncoding.Tests.Playback;
+namespace Tesserafin.Playback.Shadow.Tests.Runtime;
 
 /// <summary>
 /// Reproduces the exact ApplicationHost wiring (ApplicationHost.cs, PR104) for the shadow playback

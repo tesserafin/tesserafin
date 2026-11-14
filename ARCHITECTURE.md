@@ -93,7 +93,7 @@ libraries. Every project has a matching `*.Tests` project in `tests/`.
 | `Tesserafin.Data` | Shared POCO entities, enums, interfaces, query objects and event args. No EF Core dependency. |
 | `Tesserafin.Common` / `Tesserafin.Photos` | Small shared utilities; photo-library support. |
 
-### `src/` projects — rewritten leaf libraries
+### `src/` projects — rewritten libraries
 
 | Project | Responsibility |
 |---|---|
@@ -101,7 +101,7 @@ libraries. Every project has a matching `*.Tests` project in `tests/`.
 | `Tesserafin.Playback.Engine` | The decision **engine** (`IPlaybackEngine.Decide`). |
 | `Tesserafin.Playback.Execution` | Projects a decision into a frozen **execution plan**. |
 | `Tesserafin.Playback.Dlna` | Legacy adapters bridging DLNA/`StreamInfo` in and out of the domain. |
-| `Tesserafin.Playback.Shadow` | Runs v2 in parallel with legacy and compares the results. |
+| `Tesserafin.Playback.Shadow` | Comparison planner, metrics and diagnostic retention; implements the encoding observation port. |
 | `Tesserafin.Playback.Contract.Scan` / `.Contract.Diagnostics` | Structurally-closed contract-drift observability. |
 | `Tesserafin.Database` (+ `.Implementations`, `.Providers.Sqlite`) | **EF Core** data layer: `TesserafinDbContext` and pluggable DB providers. |
 | `Tesserafin.MediaEncoding.Hls` / `.Keyframes` | HLS playlist generation and keyframe extraction. |
@@ -309,6 +309,14 @@ Tesserafin splits that into a layered, DLNA-free pipeline of small projects
   (`Equivalent`, `ExpectedImprovement`, `KnownV2Limitation`, `PotentialRegression`,
   `Unexplained`). It is **off by default**, log-only, sampled and time-budgeted —
   its job is to route divergences to a human, not to certify correctness.
+
+**Comparison boundary.** `MediaEncoding` has no reference to `Playback.Shadow`. Its session
+manager depends on `IPlaybackSessionDiagnostics` and an opaque planning capture, which can
+attach observations to a successful session or discard them on failure. The Shadow assembly
+references MediaEncoding and owns the decorator, records and stores. Core injects the same store
+through the execution port and the admin diagnostics interface. `IV2PlanStore` remains the separate
+execution authority. `ConsolidationRatchetTests` forbids the old edge transitively, with no
+remaining forbidden-dependency exceptions. See `docs/playback-path-inventory.md` §10.
 
 **How it reaches ffmpeg.** Execution does not call `MediaEncoding` directly. A
 plan is retained per session and read back by `PlaybackExecutionPlanResolver`

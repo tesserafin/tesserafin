@@ -1,15 +1,12 @@
 using System;
 using System.Collections.Generic;
 using Tesserafin.Controller.MediaEncoding;
+using Tesserafin.MediaEncoding.Playback;
 
-namespace Tesserafin.MediaEncoding.Playback;
+namespace Tesserafin.Playback.Shadow;
 
 /// <summary>
-/// The default <see cref="IShadowDiagnosticsStore"/> used when none is supplied - by
-/// <see cref="PlaybackSessionManager"/>'s and <see cref="ShadowPlaybackSessionPlanner"/>'s existing
-/// constructors that predate PR113, kept for source/binary compatibility. Retains nothing and
-/// captures nothing: <see cref="TryGet"/> always reports no record, matching the pre-PR113 behavior
-/// of there being no diagnostic to retain at all.
+/// Discards optional shadow observations when no retention store is configured.
 /// </summary>
 public sealed class NoOpShadowDiagnosticsStore : IShadowDiagnosticsStore
 {
@@ -31,6 +28,9 @@ public sealed class NoOpShadowDiagnosticsStore : IShadowDiagnosticsStore
 
     /// <inheritdoc/>
     public IDisposable BeginCapture(ShadowCaptureInputs? inputs) => NullScope.Instance;
+
+    /// <inheritdoc/>
+    public IPlaybackPlanningDiagnostics BeginPlanning() => NullScope.Instance;
 
     /// <inheritdoc/>
     public void Publish(ShadowDiagnosticRecord record)
@@ -69,9 +69,13 @@ public sealed class NoOpShadowDiagnosticsStore : IShadowDiagnosticsStore
     /// <inheritdoc/>
     public IReadOnlyList<PlaybackLifecycleEvent> GetEvents(PlaybackSessionId id) => Array.Empty<PlaybackLifecycleEvent>();
 
-    private sealed class NullScope : IDisposable
+    private sealed class NullScope : IPlaybackPlanningDiagnostics
     {
         public static NullScope Instance { get; } = new();
+
+        public void AttachTo(PlaybackSessionId id)
+        {
+        }
 
         public void Dispose()
         {
