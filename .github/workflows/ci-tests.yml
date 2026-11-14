@@ -347,6 +347,7 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_MediaElementCredential_ReadsOnlyWhileTheSessionLives
           --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_AlternateVersionWithdrawn_StopsServingAndCannotBePlannedAgain
           --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_EncodingOptionsInTheQuery_ChangeNothing
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeFilmEndToEndTests.TranscodeFilm_DeviceRevoked_EndsItsSessionJobAndOutput_AndOnlyThatDevicesOnes
 
       # Diagnosis, not enforcement. The OpenAPI equality assertion is unchanged and still
       # fails the job; this only stops a cross-machine divergence from being unreproducible.

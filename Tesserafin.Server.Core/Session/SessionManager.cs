@@ -161,6 +161,9 @@ namespace Tesserafin.Server.Core.Session
         public event EventHandler<SessionEventArgs> SessionEnded;
 
         /// <inheritdoc />
+        public event EventHandler<DeviceLoggedOutEventArgs> DeviceLoggedOut;
+
+        /// <inheritdoc />
         public event EventHandler<SessionEventArgs> SessionActivity;
 
         /// <inheritdoc />
@@ -1820,6 +1823,17 @@ namespace Tesserafin.Server.Core.Session
             _credentialService.RevokeDevice(device.DeviceId);
 
             await _deviceManager.DeleteDevice(device).ConfigureAwait(false);
+
+            // #413: what the device holds open on the playback side (its Playback/Sessions sessions,
+            // their jobs and output) ends with its token, not at the session TTL hours later.
+            try
+            {
+                DeviceLoggedOut?.Invoke(this, new DeviceLoggedOutEventArgs(device.DeviceId, device.UserId));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error ending what a revoked device held open");
+            }
 
             var sessions = Sessions
                 .Where(i => string.Equals(i.DeviceId, device.DeviceId, StringComparison.OrdinalIgnoreCase))

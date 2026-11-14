@@ -445,6 +445,51 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
         await StopAsync(client, session.Id);
     }
 
+    /// <summary>
+    /// #413: revoking a device ends the playback sessions it holds, with the cleanup of an explicit
+    /// stop - session, job and output - instead of leaving them to the 6 h TTL. The same user's
+    /// session on another device plays on.
+    /// </summary>
+    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
+    [Fact]
+    public async Task TranscodeFilm_DeviceRevoked_EndsItsSessionJobAndOutput_AndOnlyThatDevicesOnes()
+    {
+        const string Revoked = "transcode-revoked-ps";
+        const string Kept = "transcode-kept-ps";
+        var (phone, userId) = await SignInAsync("transcode-revoke");
+        var tablet = await SignInAgainAsync("transcode-revoke", "tablet-transcode-revoke");
+        var itemId = await SeedFilmAsync("libx264", Ac3);
+
+        var revoked = await CreateSessionAsync(phone, itemId, userId, Revoked);
+        var kept = await CreateSessionAsync(tablet, itemId, userId, Kept);
+        var revokedPlaylist = await ReadPlaylistAsync(phone, (await GetDescriptorAsync(phone, revoked.Id)).Url);
+        var keptPlaylist = await ReadPlaylistAsync(tablet, (await GetDescriptorAsync(tablet, kept.Id)).Url);
+        Assert.NotEmpty(await GetBytesAsync(phone, revokedPlaylist.Segments[0]));
+        Assert.NotEmpty(await GetBytesAsync(tablet, keptPlaylist.Segments[0]));
+        var job = _transcodeManager.GetTranscodingJob(Revoked);
+        Assert.NotNull(job);
+        var jobPlaylist = job.Path!;
+
+        using (var revoke = await _admin.DeleteAsync("Devices?id=device-transcode-revoke", TestContext.Current.CancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
+        }
+
+        // The revocation's answer already finds the session gone, not hours later.
+        Assert.DoesNotContain(_sessionManager.GetAll(), s => s.Id.Value.Equals(revoked.Id));
+        await WaitUntilAsync(() => _transcodeManager.GetTranscodingJob(Revoked) is null, "the revoked device's job to stop");
+        await WaitUntilAsync(
+            () => !File.Exists(jobPlaylist) && !Directory.EnumerateFiles(Path.GetDirectoryName(jobPlaylist)!, Path.GetFileNameWithoutExtension(jobPlaylist) + "*").Any(),
+            "the revoked device's output to be removed");
+        Assert.Equal(HttpStatusCode.Unauthorized, await StatusAsync(phone, revokedPlaylist.Segments[0]));
+
+        // The same user on the other device plays on, from the same server state.
+        Assert.Contains(_sessionManager.GetAll(), s => s.Id.Value.Equals(kept.Id));
+        Assert.NotNull(_transcodeManager.GetTranscodingJob(Kept));
+        Assert.NotEmpty(await GetBytesAsync(tablet, keptPlaylist.Segments[^1]));
+        await StopAsync(tablet, kept.Id);
+    }
+
     [GeneratedRegex(@"-codec:a:0 (aac|libfdk_aac|aac_at)\b")]
     private static partial Regex AudioEncodedToAac();
 
@@ -643,6 +688,27 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
         using var content = new StringContent(policy.ToJsonString(), System.Text.Encoding.UTF8, "application/json");
         using var saved = await _admin.PostAsync(FormattableString.Invariant($"Users/{userId}/Policy"), content, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, saved.StatusCode);
+    }
+
+    /// <summary>
+    /// Signs an existing user in again from another device: a second token, a second device.
+    /// </summary>
+    private async Task<HttpClient> SignInAgainAsync(string name, string deviceId)
+    {
+        using var anonymous = _factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/Users/AuthenticateByName");
+        request.Headers.TryAddWithoutValidation(AuthHelper.AuthHeaderName, MediaBoundaryFixture.AuthorizationHeader(deviceId, null));
+        request.Content = JsonContent.Create(new { Username = name, Pw = Password }, options: JsonDefaults.Options);
+        using var authenticated = await anonymous.SendAsync(request, TestContext.Current.CancellationToken);
+        authenticated.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await authenticated.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+
+        var client = _factory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(120);
+        client.DefaultRequestHeaders.TryAddWithoutValidation(
+            AuthHelper.AuthHeaderName,
+            MediaBoundaryFixture.AuthorizationHeader(deviceId, document.RootElement.GetProperty("AccessToken").GetString()));
+        return client;
     }
 
     private async Task<(HttpClient Client, Guid UserId)> SignInAsync(string name)

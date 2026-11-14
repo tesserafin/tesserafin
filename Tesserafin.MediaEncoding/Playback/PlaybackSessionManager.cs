@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Tesserafin.Controller.Diagnostics;
@@ -34,6 +35,9 @@ internal enum PlaybackSessionRemovalReason
 
     /// <summary>The <see cref="PlaybackSessionManager.SweepExpired"/> TTL backstop.</summary>
     TtlSweep,
+
+    /// <summary><see cref="ISessionManager.DeviceLoggedOut"/> - the owning device's token was revoked (#413).</summary>
+    DeviceLoggedOut,
 }
 
 /// <inheritdoc cref="IPlaybackSessionManager"/>
@@ -182,6 +186,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         transcodeManager.TranscodingJobStarted += OnTranscodingJobStarted;
         sessionManager.PlaybackStart += OnPlaybackStart;
         sessionManager.PlaybackStopped += OnPlaybackStopped;
+        sessionManager.DeviceLoggedOut += OnDeviceLoggedOut;
         _sweepTimer = new Timer(_ => SweepExpired(_timeProvider.GetUtcNow()), null, SweepInterval, SweepInterval);
     }
 
@@ -423,6 +428,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         _transcodeManager.TranscodingJobStarted -= OnTranscodingJobStarted;
         _sessionManager.PlaybackStart -= OnPlaybackStart;
         _sessionManager.PlaybackStopped -= OnPlaybackStopped;
+        _sessionManager.DeviceLoggedOut -= OnDeviceLoggedOut;
         _sweepTimer.Dispose();
     }
 
@@ -731,6 +737,59 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     /// </summary>
     private void OnPlaybackStart(object? sender, PlaybackProgressEventArgs e) =>
         RecordLifecycleEvent(e.PlaySessionId, "PlaybackStarted");
+
+    /// <summary>
+    /// #413: a revoked device's sessions end with its token, the way an explicit
+    /// <c>DELETE /Playback/Sessions/{id}</c> ends one: the session and its retained plan are
+    /// removed, then its owner's jobs under its play session are stopped and their output removed.
+    /// Its capabilities were already revoked by device. Only sessions planned for that device and
+    /// that user: a session of the same user on another device plays on.
+    /// </summary>
+    private void OnDeviceLoggedOut(object? sender, DeviceLoggedOutEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.DeviceId))
+        {
+            return;
+        }
+
+        List<PlaybackSession> ended;
+        lock (_lock)
+        {
+            ended = _sessions.Values
+                .Where(s => s.Request?.Options is { } options
+                    && options.UserId.Equals(e.UserId)
+                    && string.Equals(options.DeviceId, e.DeviceId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            foreach (var session in ended)
+            {
+                RemoveNoLock(session.Id, PlaybackSessionRemovalReason.DeviceLoggedOut);
+            }
+        }
+
+        foreach (var session in ended)
+        {
+            _logger.LogInformation(
+                "Playback session {SessionId} ended: its device's token was revoked.",
+                session.Id.Value.ToString("N"));
+            if (!string.IsNullOrEmpty(session.PlaySessionId))
+            {
+                var owner = e.UserId;
+                _ = StopJobsOfRevokedSessionAsync(session.PlaySessionId, owner);
+            }
+        }
+    }
+
+    private async Task StopJobsOfRevokedSessionAsync(string playSessionId, Guid owner)
+    {
+        try
+        {
+            await _transcodeManager.StopTranscodingJobs(playSessionId, job => owner.Equals(job.UserId)).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Stopping the jobs of a revoked device's play session {PlaySessionId} failed.", playSessionId);
+        }
+    }
 
     private void OnPlaybackStopped(object? sender, PlaybackStopEventArgs e)
     {
