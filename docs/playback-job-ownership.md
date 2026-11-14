@@ -38,8 +38,11 @@ A play session id is client-chosen, so two users can use the same one: each plan
 | --- | --- |
 | `POST Sessions/Playing/Stopped` | the reporting session's user, on its device |
 | `DELETE Playback/Sessions/{id}` | the session owner's, on all of that user's devices |
+| Device revoked (`DELETE /Devices`, sign-out, other tokens revoked) | every capability of that device; its `Playback/Sessions` sessions end too (#413) |
 
 The two differ on purpose, and only within one user. A stop report speaks for its device, as it does for jobs. A delete names the user's session, which any of that user's devices or an administrator may end. Between users there is no difference: nothing of another user ends. A revoked capability link answers 401 and starts nothing. A link carrying a durable token stays valid as long as that token: fetching it again is a new playback.
+
+A revoked device ends what it held open with its token (#413). `SessionManager.Logout(Device)` raises `DeviceLoggedOut` before it returns. `PlaybackSessionManager` then removes every session planned for that device and that user, and stops that user's jobs under each session's play session, with their output, as a `DELETE` does. A session of the same user on another device plays on.
 
 A client that disappears without stopping is covered by the existing ping timeout: 60 s for HLS.
 
