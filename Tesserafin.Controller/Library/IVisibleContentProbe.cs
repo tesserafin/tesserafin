@@ -1,5 +1,5 @@
 using Tesserafin.Controller.Entities;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 
 namespace Tesserafin.Controller.Library
 {

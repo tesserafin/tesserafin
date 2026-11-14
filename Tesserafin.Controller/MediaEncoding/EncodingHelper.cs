@@ -20,7 +20,6 @@ using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Streaming;
 using Tesserafin.Data;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dlna;

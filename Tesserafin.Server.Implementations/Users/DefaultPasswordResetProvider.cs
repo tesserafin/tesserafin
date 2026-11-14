@@ -10,7 +10,7 @@ using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Authentication;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Library;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.Users;
 

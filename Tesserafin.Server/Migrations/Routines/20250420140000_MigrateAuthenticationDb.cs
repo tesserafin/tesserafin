@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Library;
+using Tesserafin.Data.Entities.Security;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities.Security;
 using Tesserafin.Server.Core.Data;
 
 namespace Tesserafin.Server.Migrations.Routines

@@ -13,7 +13,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Net.PlaybackCredentials;
 using Tesserafin.Controller.Session;
 using Tesserafin.Controller.Sorting;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Xunit;
 
 namespace Tesserafin.Server.Implementations.Tests.SessionManager;

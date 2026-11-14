@@ -235,7 +235,7 @@ public sealed class ContentPacksControllerTests : IClassFixture<TesserafinApplic
         Assert.NotNull(user.Configuration);
         var original = user.Configuration.ContentPackBrowsingPreference;
 
-        user.Configuration.ContentPackBrowsingPreference = Database.Implementations.Enums.ContentPackBrowsingPreference.ContentPackFirst;
+        user.Configuration.ContentPackBrowsingPreference = global::Tesserafin.Data.Enums.ContentPackBrowsingPreference.ContentPackFirst;
 
         using (var update = await client.PostAsJsonAsync(
             $"Users/{user.Id:N}/Configuration",
@@ -248,7 +248,7 @@ public sealed class ContentPacksControllerTests : IClassFixture<TesserafinApplic
 
         var reread = await AuthHelper.GetUserDtoAsync(client);
         Assert.Equal(
-            Database.Implementations.Enums.ContentPackBrowsingPreference.ContentPackFirst,
+            global::Tesserafin.Data.Enums.ContentPackBrowsingPreference.ContentPackFirst,
             reread.Configuration!.ContentPackBrowsingPreference);
 
         // Put it back so the shared fixture is left as it was found.

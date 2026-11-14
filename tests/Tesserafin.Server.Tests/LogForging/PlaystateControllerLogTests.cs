@@ -182,7 +182,7 @@ namespace Tesserafin.Server.Tests.LogForging
                         It.IsAny<string?>(),
                         It.IsAny<string?>(),
                         It.IsAny<string?>(),
-                        It.IsAny<Tesserafin.Database.Implementations.Entities.User?>()))
+                        It.IsAny<Tesserafin.Data.Entities.User?>()))
                     .ReturnsAsync(() => new SessionInfo(sessionManager.Object, NullLogger.Instance) { Id = "session-1" });
 
                 var transcodeManager = new Mock<ITranscodeManager>();

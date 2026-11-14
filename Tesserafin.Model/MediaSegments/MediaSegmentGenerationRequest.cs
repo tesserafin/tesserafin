@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.MediaSegments;
 
 namespace Tesserafin.Model;

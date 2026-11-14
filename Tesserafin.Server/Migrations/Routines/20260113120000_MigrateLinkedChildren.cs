@@ -8,10 +8,10 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Extensions;
-using LinkedChildType = Tesserafin.Database.Implementations.Entities.LinkedChildType;
+using LinkedChildType = Tesserafin.Data.Entities.LinkedChildType;
 
 namespace Tesserafin.Server.Migrations.Routines;
 

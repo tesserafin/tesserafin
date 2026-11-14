@@ -4,7 +4,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Playlists;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Extensions;
 using Tesserafin.Server.Core.Playlists;
 

@@ -5,7 +5,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Events;
 using Tesserafin.Controller.Lyrics;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Activity;
 using Tesserafin.Model.Globalization;
 using Episode = Tesserafin.Controller.Entities.TV.Episode;

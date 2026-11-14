@@ -1,8 +1,8 @@
 #pragma warning disable CS1591
 
 using System;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Entities;
 
 namespace Tesserafin.Model.Library
 {

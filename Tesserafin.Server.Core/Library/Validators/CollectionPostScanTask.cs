@@ -9,7 +9,6 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 
 namespace Tesserafin.Server.Core.Library.Validators;
 

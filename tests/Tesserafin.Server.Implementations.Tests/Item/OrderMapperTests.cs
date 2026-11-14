@@ -1,7 +1,7 @@
 using System;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Server.Implementations.Item;
 using Xunit;
 

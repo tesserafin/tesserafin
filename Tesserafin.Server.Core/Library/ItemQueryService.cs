@@ -16,8 +16,8 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Querying;
 

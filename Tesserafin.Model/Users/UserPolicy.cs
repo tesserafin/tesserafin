@@ -6,8 +6,7 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Xml.Serialization;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
-using AccessSchedule = Tesserafin.Database.Implementations.Entities.AccessSchedule;
+using AccessSchedule = Tesserafin.Data.Entities.AccessSchedule;
 
 namespace Tesserafin.Model.Users
 {

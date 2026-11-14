@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Events;
 using Tesserafin.Data.Queries;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Model.Querying;
 
 namespace Tesserafin.Model.Activity;

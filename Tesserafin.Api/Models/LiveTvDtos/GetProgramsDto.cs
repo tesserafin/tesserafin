@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Text.Json.Serialization;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Extensions.Json.Converters;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Querying;

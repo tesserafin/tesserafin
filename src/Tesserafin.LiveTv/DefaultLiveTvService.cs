@@ -18,7 +18,6 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Data.Enums;
 using Tesserafin.Data.Events;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.LiveTv.Configuration;
 using Tesserafin.LiveTv.Timers;

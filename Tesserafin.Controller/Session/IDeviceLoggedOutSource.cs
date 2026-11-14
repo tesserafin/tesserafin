@@ -12,7 +12,7 @@ public interface IDeviceLoggedOutSource
 {
     /// <summary>
     /// Occurs, synchronously, when a device's access token is revoked
-    /// (<see cref="ISessionManager.Logout(Tesserafin.Database.Implementations.Entities.Security.Device)"/>):
+    /// (<see cref="ISessionManager.Logout(Tesserafin.Data.Entities.Security.Device)"/>):
     /// after its capabilities are revoked and before the call returns, so what the device holds
     /// open can be ended by the time the revocation is answered.
     /// </summary>

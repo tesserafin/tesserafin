@@ -10,8 +10,8 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.TV;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Model.Querying;
 
 namespace Tesserafin.Server.Core.Playlists

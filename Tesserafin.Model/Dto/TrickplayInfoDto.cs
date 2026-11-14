@@ -1,5 +1,5 @@
 using System;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 
 namespace Tesserafin.Model.Dto;
 

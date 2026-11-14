@@ -13,7 +13,6 @@ using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Channels;
 using Tesserafin.Model.Dto;

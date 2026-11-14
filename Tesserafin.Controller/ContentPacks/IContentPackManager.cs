@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Enums;
 
 namespace Tesserafin.Controller.ContentPacks;
 

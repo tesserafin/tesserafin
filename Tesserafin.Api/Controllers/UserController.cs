@@ -23,7 +23,7 @@ using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.QuickConnect;
 using Tesserafin.Controller.Session;
 using Tesserafin.Data;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;

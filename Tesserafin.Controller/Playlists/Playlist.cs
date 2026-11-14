@@ -15,9 +15,8 @@ using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Model.Entities;
 
 namespace Tesserafin.Controller.Playlists

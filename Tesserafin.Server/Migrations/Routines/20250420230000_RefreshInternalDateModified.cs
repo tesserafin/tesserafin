@@ -9,8 +9,8 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
+using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Extensions;
 using Tesserafin.Model.IO;
 

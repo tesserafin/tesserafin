@@ -4,8 +4,8 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Authentication;
 using Tesserafin.Controller.Net;
 using Tesserafin.Data;
+using Tesserafin.Data.Enums;
 using Tesserafin.Data.Events;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Model.Activity;
 using Tesserafin.Model.Session;
 

@@ -13,16 +13,16 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Database.Implementations.Locking;
 using Tesserafin.Database.Providers.Sqlite;
 using Tesserafin.Model.Entities;
 using Tesserafin.Server.Implementations.Item;
 using Tesserafin.Server.Implementations.Tests.Library.LibraryManager;
 using Xunit;
-using DbLinkedChildType = Tesserafin.Database.Implementations.Entities.LinkedChildType;
+using DbLinkedChildType = Tesserafin.Data.Entities.LinkedChildType;
 
 namespace Tesserafin.Server.Implementations.Tests.Item;
 

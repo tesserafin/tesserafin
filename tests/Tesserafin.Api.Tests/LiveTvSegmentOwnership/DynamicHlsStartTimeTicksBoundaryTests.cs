@@ -34,7 +34,7 @@ using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Net.PlaybackCredentials;
 using Tesserafin.Controller.Session;
 using Tesserafin.Controller.Trickplay;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.MediaEncoding.Hls.Playlist;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
@@ -654,7 +654,7 @@ public sealed class DynamicHlsStartTimeTicksBoundaryTests : IDisposable
         };
         var mediaSourceManager = new Mock<IMediaSourceManager>();
         mediaSourceManager
-            .Setup(m => m.GetPlaybackMediaSources(It.IsAny<BaseItem>(), It.IsAny<Tesserafin.Database.Implementations.Entities.User>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .Setup(m => m.GetPlaybackMediaSources(It.IsAny<BaseItem>(), It.IsAny<Tesserafin.Data.Entities.User>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<MediaSourceInfo> { mediaSource });
 
         var mediaEncoder = new Mock<IMediaEncoder>();

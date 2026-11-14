@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 
 namespace Tesserafin.Api.Models.ContentPackDtos;
 

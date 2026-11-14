@@ -88,7 +88,7 @@ public class CleanupOrphanedExtras : IAsyncMigrationRoutine
                 var batch = orphanedItemIds.GetRange(offset, Math.Min(deleteBatchSize, orphanedItemIds.Count - offset));
                 var itemsToDelete = batch
                     .Select(itemId => BaseItemMapper.DeserializeBaseItem(
-                        new Database.Implementations.Entities.BaseItemEntity()
+                        new global::Tesserafin.Data.Entities.BaseItemEntity()
                         {
                             Id = itemId.Id,
                             Path = itemId.Path,

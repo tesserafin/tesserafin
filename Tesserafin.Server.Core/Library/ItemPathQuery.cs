@@ -1,7 +1,6 @@
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 
 namespace Tesserafin.Server.Core.Library
 {

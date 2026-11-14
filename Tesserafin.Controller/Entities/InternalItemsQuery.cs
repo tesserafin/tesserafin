@@ -6,9 +6,8 @@ using System.Linq;
 using Diacritics.Extensions;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Data;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Querying;
 

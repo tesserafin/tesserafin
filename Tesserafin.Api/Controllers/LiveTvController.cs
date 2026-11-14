@@ -25,7 +25,6 @@ using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Streaming;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;

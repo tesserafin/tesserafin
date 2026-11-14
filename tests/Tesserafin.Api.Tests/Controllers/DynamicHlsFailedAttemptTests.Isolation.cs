@@ -494,7 +494,7 @@ public sealed partial class DynamicHlsFailedAttemptTests
         var path = legacyRoute ? FormattableString.Invariant($"/PlayingItems/{_item:N}") : "/Sessions/Playing/Stopped";
         var theirs = await StartPlayback(hardware: false, segments: 6);
         _sessionManager
-            .Setup(s => s.LogSessionActivity(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<Tesserafin.Database.Implementations.Entities.User?>()))
+            .Setup(s => s.LogSessionActivity(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<Tesserafin.Data.Entities.User?>()))
             .ReturnsAsync(() => new SessionInfo(_sessionManager.Object, NullLogger.Instance) { Id = "a-session" });
 
         var httpContext = reporter == "stranger"
@@ -534,7 +534,7 @@ public sealed partial class DynamicHlsFailedAttemptTests
         var mine = await StartPlayback(hardware: false, segments: 6);
         mine.Job.Process = System.Diagnostics.Process.GetProcessById(mine.Process.Id);
         _sessionManager
-            .Setup(s => s.LogSessionActivity(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<Tesserafin.Database.Implementations.Entities.User?>()))
+            .Setup(s => s.LogSessionActivity(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<Tesserafin.Data.Entities.User?>()))
             .ReturnsAsync(() => new SessionInfo(_sessionManager.Object, NullLogger.Instance) { Id = "a-session" });
         var controller = new PlaystateController(
             Mock.Of<IUserManager>(),

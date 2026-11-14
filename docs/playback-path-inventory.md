@@ -270,3 +270,16 @@ those paths, by name - nothing is deleted globally while they exist:
 
 Outside this slice: HDR tone mapping and subtitle burn-in (explicitly), a transcode over plain HTTP,
 target codecs other than H.264/AAC, other media families, the global flag and the shadow.
+
+
+## 8. Shared model boundary (consolidation step 4, candidate)
+
+`Model -> Data -> Database.Implementations` has been removed. Shared entities, enums and
+interfaces now belong to the EF-free `Tesserafin.Data` assembly and namespace. The EF project
+references Data; Model and Controller no longer acquire EF through their shared values.
+`IItemQueryHelpers` moved from Controller to Server.Implementations because its query operations
+explicitly take a database context. The architecture baseline loses the three Model/Data
+exceptions; direct or transitive EF packages are forbidden for Data, Model and Controller.
+
+The two other project inversions, `Server.Core -> Api` and `MediaEncoding -> Playback.Shadow`,
+remain open. No playback path or delivery mode is added by this boundary change.

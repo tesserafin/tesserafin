@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Enums;
 
 namespace Tesserafin.Server.Implementations.FullSystemBackup;
 

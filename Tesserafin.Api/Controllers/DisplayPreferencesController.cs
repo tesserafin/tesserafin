@@ -10,8 +10,8 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Api.Helpers;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Dto;
 

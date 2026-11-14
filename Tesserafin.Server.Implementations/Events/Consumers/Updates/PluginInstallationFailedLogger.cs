@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using Tesserafin.Common.Updates;
 using Tesserafin.Controller.Events;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Activity;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.Notifications;

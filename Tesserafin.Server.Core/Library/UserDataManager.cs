@@ -12,8 +12,8 @@ using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
+using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using AudioBook = Tesserafin.Controller.Entities.AudioBook;
@@ -296,7 +296,7 @@ namespace Tesserafin.Server.Core.Library
             {
                 using var dbContext = _repository.CreateDbContext();
                 withLocalAlternates = dbContext.LinkedChildren
-                    .Where(lc => lc.ChildType == Tesserafin.Database.Implementations.Entities.LinkedChildType.LocalAlternateVersion
+                    .Where(lc => lc.ChildType == Tesserafin.Data.Entities.LinkedChildType.LocalAlternateVersion
                         && localProbeIds.Contains(lc.ParentId))
                     .Select(lc => lc.ParentId)
                     .Distinct()

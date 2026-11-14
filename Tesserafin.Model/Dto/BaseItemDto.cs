@@ -4,8 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Model.Drawing;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Library;

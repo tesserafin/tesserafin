@@ -191,7 +191,7 @@ public sealed class ContentPackMigrationTests : IDisposable
             var user = ctx.Users.Single(u => u.Username == "existing");
             Assert.Equal("existing", user.Username);
             Assert.Equal(
-                Database.Implementations.Enums.ContentPackBrowsingPreference.MediaFamilyFirst,
+                global::Tesserafin.Data.Enums.ContentPackBrowsingPreference.MediaFamilyFirst,
                 user.ContentPackBrowsingPreference);
 
             Assert.Equal(itemId, ctx.BaseItems.Single(e => e.Name == "Untouched").Id);

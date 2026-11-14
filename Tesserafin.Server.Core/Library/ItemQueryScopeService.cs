@@ -9,9 +9,8 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Data;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Library;
 

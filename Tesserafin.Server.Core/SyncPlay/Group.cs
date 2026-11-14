@@ -13,7 +13,7 @@ using Tesserafin.Controller.SyncPlay;
 using Tesserafin.Controller.SyncPlay.GroupStates;
 using Tesserafin.Controller.SyncPlay.Queue;
 using Tesserafin.Controller.SyncPlay.Requests;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Extensions;
 using Tesserafin.Model.SyncPlay;
 

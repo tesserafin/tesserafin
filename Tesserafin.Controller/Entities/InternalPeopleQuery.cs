@@ -4,7 +4,7 @@
 
 using System;
 using System.Collections.Generic;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 
 namespace Tesserafin.Controller.Entities
 {

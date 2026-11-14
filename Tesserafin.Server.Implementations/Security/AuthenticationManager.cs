@@ -3,8 +3,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Tesserafin.Controller.Security;
+using Tesserafin.Data.Entities.Security;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities.Security;
 
 namespace Tesserafin.Server.Implementations.Security
 {

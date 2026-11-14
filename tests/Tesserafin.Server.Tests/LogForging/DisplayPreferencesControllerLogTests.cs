@@ -9,7 +9,7 @@ using Moq;
 using Tesserafin.Api.Constants;
 using Tesserafin.Api.Controllers;
 using Tesserafin.Controller;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Dto;
 using Xunit;
 

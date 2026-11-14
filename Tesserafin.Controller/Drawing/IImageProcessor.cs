@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Tesserafin.Controller.Entities;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Drawing;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;

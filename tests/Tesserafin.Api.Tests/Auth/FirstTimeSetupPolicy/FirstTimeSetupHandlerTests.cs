@@ -15,8 +15,8 @@ using Tesserafin.Api.Constants;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Net;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Enums;
 using Xunit;
 
 namespace Tesserafin.Api.Tests.Auth.FirstTimeSetupPolicy

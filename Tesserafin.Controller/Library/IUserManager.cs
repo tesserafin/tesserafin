@@ -3,8 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Events;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Users;

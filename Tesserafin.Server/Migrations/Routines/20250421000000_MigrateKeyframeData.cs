@@ -9,9 +9,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Common.Extensions;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Extensions.Json;
 using Tesserafin.Server.ServerSetupApp;
 

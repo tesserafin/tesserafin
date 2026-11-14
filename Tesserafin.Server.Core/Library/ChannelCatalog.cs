@@ -7,7 +7,7 @@ using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Channels;
 using Tesserafin.Model.Querying;

@@ -9,7 +9,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations.Locking;
 using Tesserafin.Model.Entities;
 using Tesserafin.Server.Implementations.Item;

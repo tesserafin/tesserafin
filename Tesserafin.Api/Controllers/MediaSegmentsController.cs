@@ -10,7 +10,7 @@ using Tesserafin.Api.Extensions;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaSegments;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 using Tesserafin.Model.MediaSegments;
 using Tesserafin.Model.Querying;
 

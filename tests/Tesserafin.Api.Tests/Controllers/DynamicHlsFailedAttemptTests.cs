@@ -32,7 +32,7 @@ using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Session;
 using Tesserafin.Controller.Streaming;
 using Tesserafin.Controller.Trickplay;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.MediaEncoding.Hls.Playlist;
 using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.MediaEncoding.Transcoding;
@@ -747,7 +747,7 @@ public sealed partial class DynamicHlsFailedAttemptTests : IDisposable
         };
         var mediaSourceManager = new Mock<IMediaSourceManager>();
         mediaSourceManager
-            .Setup(m => m.GetPlaybackMediaSources(It.IsAny<BaseItem>(), It.IsAny<Tesserafin.Database.Implementations.Entities.User>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .Setup(m => m.GetPlaybackMediaSources(It.IsAny<BaseItem>(), It.IsAny<Tesserafin.Data.Entities.User>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<MediaSourceInfo> { mediaSource });
 
         // An encoder that can do everything it is asked about: which pipeline a command uses is

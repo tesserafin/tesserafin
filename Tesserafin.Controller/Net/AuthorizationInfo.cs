@@ -1,6 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 
 namespace Tesserafin.Controller.Net
 {

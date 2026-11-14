@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 
 namespace Tesserafin.Controller.Collections
 {

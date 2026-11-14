@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.MediaInfo;

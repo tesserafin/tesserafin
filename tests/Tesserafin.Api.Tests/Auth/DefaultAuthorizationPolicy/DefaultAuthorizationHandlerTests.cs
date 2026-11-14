@@ -12,7 +12,7 @@ using Tesserafin.Api.Auth.DefaultAuthorizationPolicy;
 using Tesserafin.Api.Constants;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Library;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Server.Implementations.Security;
 using Xunit;
 

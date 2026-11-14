@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Api;
 using Tesserafin.Data.Enums;
 using Tesserafin.Data.Queries;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Model.Activity;
 using Tesserafin.Model.Querying;
 

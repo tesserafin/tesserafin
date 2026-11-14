@@ -2,8 +2,8 @@ using System;
 using System.Globalization;
 using System.Threading.Tasks;
 using Tesserafin.Controller.Events;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Events.Users;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Model.Activity;
 using Tesserafin.Model.Globalization;
 

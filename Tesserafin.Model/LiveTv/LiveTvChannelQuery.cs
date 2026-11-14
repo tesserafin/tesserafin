@@ -3,7 +3,6 @@
 
 using System;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 
 namespace Tesserafin.Model.LiveTv
 {

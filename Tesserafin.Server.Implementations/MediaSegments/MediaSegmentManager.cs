@@ -12,9 +12,9 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model;
 using Tesserafin.Model.Configuration;
@@ -290,7 +290,7 @@ public class MediaSegmentManager : IMediaSegmentManager
     /// <inheritdoc/>
     public bool IsTypeSupported(BaseItem baseItem)
     {
-        return baseItem.MediaType is Data.Enums.MediaType.Video or Data.Enums.MediaType.Audio;
+        return baseItem.MediaType is global::Tesserafin.Data.Enums.MediaType.Video or global::Tesserafin.Data.Enums.MediaType.Audio;
     }
 
     /// <inheritdoc/>

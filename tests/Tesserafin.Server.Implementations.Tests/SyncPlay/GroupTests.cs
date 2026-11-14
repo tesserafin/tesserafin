@@ -5,7 +5,7 @@ using Moq;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Session;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Server.Core.SyncPlay;
 using Xunit;
 

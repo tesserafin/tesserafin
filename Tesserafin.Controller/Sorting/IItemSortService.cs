@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
 
 namespace Tesserafin.Controller.Sorting;
 

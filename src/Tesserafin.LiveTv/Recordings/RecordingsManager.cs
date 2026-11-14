@@ -20,7 +20,6 @@ using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.LiveTv.Configuration;
 using Tesserafin.LiveTv.IO;
 using Tesserafin.LiveTv.Timers;

@@ -1,6 +1,6 @@
 #pragma warning disable CS1591
 
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 
 namespace Tesserafin.Model.LiveTv
 {

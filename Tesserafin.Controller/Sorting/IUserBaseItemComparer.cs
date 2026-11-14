@@ -1,7 +1,7 @@
 #nullable disable
 
 using Tesserafin.Controller.Library;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 
 namespace Tesserafin.Controller.Sorting
 {

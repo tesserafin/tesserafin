@@ -6,9 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Tesserafin.Controller.ContentPacks;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
 
 namespace Tesserafin.Server.Implementations.ContentPacks;
 

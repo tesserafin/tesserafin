@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Persistence;
+using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Model.Entities;
 
 namespace Tesserafin.Server.Implementations.Item;

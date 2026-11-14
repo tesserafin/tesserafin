@@ -9,14 +9,13 @@ using System.Linq;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Querying;
-using BaseItemEntity = Tesserafin.Database.Implementations.Entities.BaseItemEntity;
+using BaseItemEntity = Tesserafin.Data.Entities.BaseItemEntity;
 
 namespace Tesserafin.Server.Implementations.Item;
 
@@ -138,7 +137,7 @@ public sealed partial class BaseItemRepository
 
         // Single JOIN: manual links to BoxSet parents, restricted to currentIds children.
         var manualBoxSetLinks = context.LinkedChildren
-            .Where(lc => lc.ChildType == Database.Implementations.Entities.LinkedChildType.Manual
+            .Where(lc => lc.ChildType == global::Tesserafin.Data.Entities.LinkedChildType.Manual
                 && currentIds.Contains(lc.ChildId))
             .Join(
                 context.BaseItems.Where(bs => bs.Type == boxSetTypeName && !excludedIds.Contains(bs.Id)),
@@ -175,7 +174,7 @@ public sealed partial class BaseItemRepository
     {
         // Single JOIN: manual links to BoxSet parents, restricted to currentIds children.
         var manualBoxSetLinks = context.LinkedChildren
-            .Where(lc => lc.ChildType == Database.Implementations.Entities.LinkedChildType.Manual
+            .Where(lc => lc.ChildType == global::Tesserafin.Data.Entities.LinkedChildType.Manual
                 && currentIds.Contains(lc.ChildId))
             .Join(
                 context.BaseItems.Where(bs => bs.Type == boxSetTypeName && !excludedIds.Contains(bs.Id)),

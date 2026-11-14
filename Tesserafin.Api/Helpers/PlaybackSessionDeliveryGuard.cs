@@ -7,7 +7,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Data;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Dto;

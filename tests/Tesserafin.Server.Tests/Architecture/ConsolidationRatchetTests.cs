@@ -28,9 +28,10 @@ public sealed partial class ConsolidationRatchetTests
     // Projects whose purpose forbids reaching another project, directly or transitively.
     private static readonly (string From, string To, string Why)[] _forbiddenProjects =
     [
-        ("Tesserafin.Model", "Tesserafin.Data", "Model must not depend on persistence"),
+        // Data owns the shared POCOs and enums; Model may use it, but neither may reach EF.
         ("Tesserafin.Model", "Tesserafin.Database.Implementations", "Model must not depend on EF"),
         ("Tesserafin.Data", "Tesserafin.Database.Implementations", "shared values must not depend on EF"),
+        ("Tesserafin.Controller", "Tesserafin.Database.Implementations", "service contracts must not depend on EF"),
         ("Tesserafin.Server.Core", "Tesserafin.Api", "the core must not depend on HTTP composition"),
         ("Tesserafin.MediaEncoding", "Tesserafin.Playback.Shadow", "encoding must not depend on the shadow comparison"),
     ];
@@ -48,6 +49,8 @@ public sealed partial class ConsolidationRatchetTests
         "Microsoft.EntityFrameworkCore",
         "Microsoft.AspNetCore",
     ];
+
+    private static readonly string[] _efFreeModels = ["Tesserafin.Data", "Tesserafin.Model", "Tesserafin.Controller"];
 
     [Fact]
     public void Measured_legacy_surfaces_match_the_baseline()
@@ -137,6 +140,17 @@ public sealed partial class ConsolidationRatchetTests
                 foreach (var package in (packages.GetValueOrDefault(project) ?? []).Where(p => _forbiddenDomainPackages.Any(f => p.StartsWith(f, StringComparison.Ordinal))))
                 {
                     violations.Add($"{domain} -> package:{package}");
+                }
+            }
+        }
+
+        foreach (var model in _efFreeModels.Where(projects.ContainsKey))
+        {
+            foreach (var project in Closure(model).Append(model))
+            {
+                foreach (var package in (packages.GetValueOrDefault(project) ?? []).Where(p => p.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal)))
+                {
+                    violations.Add($"{model} -> package:{package}");
                 }
             }
         }

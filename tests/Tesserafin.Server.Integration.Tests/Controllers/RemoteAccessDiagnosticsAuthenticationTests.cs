@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Controller.Library;
 using Tesserafin.Data;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 using Xunit;
 
 namespace Tesserafin.Server.Integration.Tests.Controllers;

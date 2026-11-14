@@ -5,7 +5,6 @@ using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.SyncPlay;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 
 namespace Tesserafin.Api.Auth.SyncPlayAccessPolicy
 {

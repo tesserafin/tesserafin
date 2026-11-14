@@ -3,8 +3,8 @@
 using System;
 using System.Linq;
 using System.Linq.Expressions;
+using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 
 namespace Tesserafin.Server.Implementations.Item;
 

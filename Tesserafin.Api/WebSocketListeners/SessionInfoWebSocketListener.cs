@@ -7,7 +7,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Net;
 using Tesserafin.Controller.Session;
 using Tesserafin.Data;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Session;
 

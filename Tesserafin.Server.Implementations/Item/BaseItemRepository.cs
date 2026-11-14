@@ -8,12 +8,12 @@ using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Persistence;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Extensions;
 using BaseItemDto = Tesserafin.Controller.Entities.BaseItem;
-using BaseItemEntity = Tesserafin.Database.Implementations.Entities.BaseItemEntity;
+using BaseItemEntity = Tesserafin.Data.Entities.BaseItemEntity;
 
 namespace Tesserafin.Server.Implementations.Item;
 

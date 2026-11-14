@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Tesserafin.Database.Implementations.Entities.Security;
+using Tesserafin.Data.Entities.Security;
 
 namespace Tesserafin.Database.Implementations.ModelConfiguration
 {

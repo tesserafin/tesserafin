@@ -1,6 +1,6 @@
 using System;
 using System.ComponentModel;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 
 namespace Tesserafin.Model.MediaSegments;
 

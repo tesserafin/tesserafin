@@ -12,11 +12,11 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Playlists;
+using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Extensions;
 using BaseItemDto = Tesserafin.Controller.Entities.BaseItem;
-using DbLinkedChildType = Tesserafin.Database.Implementations.Entities.LinkedChildType;
+using DbLinkedChildType = Tesserafin.Data.Entities.LinkedChildType;
 using LinkedChildType = Tesserafin.Controller.Entities.LinkedChildType;
 
 namespace Tesserafin.Server.Implementations.Item;

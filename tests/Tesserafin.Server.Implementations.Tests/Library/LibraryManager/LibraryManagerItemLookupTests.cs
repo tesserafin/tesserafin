@@ -19,8 +19,8 @@ using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Resolvers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Data;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Enums;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Naming.Common;
@@ -63,7 +63,7 @@ public class LibraryManagerItemLookupTests
         _persistenceServiceMock = fixture.Freeze<Mock<IItemPersistenceService>>();
 
         // No user is known to this manager: any user id names nobody.
-        fixture.Freeze<Mock<IUserManager>>().Setup(u => u.GetUserById(It.IsAny<Guid>())).Returns((Tesserafin.Database.Implementations.Entities.User?)null);
+        fixture.Freeze<Mock<IUserManager>>().Setup(u => u.GetUserById(It.IsAny<Guid>())).Returns((Tesserafin.Data.Entities.User?)null);
 
         _externalDataManagerMock = fixture.Freeze<Mock<IExternalDataManager>>();
         fixture.Register(() => new Lazy<IExternalDataManager>(() => _externalDataManagerMock.Object));

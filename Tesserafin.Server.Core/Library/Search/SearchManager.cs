@@ -11,12 +11,13 @@ using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Playlists;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Querying;
 using Tesserafin.Model.Search;
+using Tesserafin.Server.Implementations.Item;
 
 namespace Tesserafin.Server.Core.Library.Search;
 

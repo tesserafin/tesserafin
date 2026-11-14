@@ -90,7 +90,7 @@ libraries. Every project has a matching `*.Tests` project in `tests/`.
 | `Tesserafin.LocalMetadata` / `Tesserafin.XbmcMetadata` | Local metadata: BoxSet/Playlist XML, and Kodi/XBMC `.nfo` read/write. |
 | `Tesserafin.Naming` | Pure filename/path parser (episode/season/movie/stack detection). No DB. |
 | `Tesserafin.MediaEncoding` | The transcoding engine: `TranscodeManager`, `MediaEncoder`, ffmpeg process control. |
-| `Tesserafin.Data` | Query objects, DTOs, enums, event args for the data layer (**not** the EF layer itself). |
+| `Tesserafin.Data` | Shared POCO entities, enums, interfaces, query objects and event args. No EF Core dependency. |
 | `Tesserafin.Common` / `Tesserafin.Photos` | Small shared utilities; photo-library support. |
 
 ### `src/` projects — rewritten leaf libraries
@@ -185,7 +185,19 @@ The data layer is **EF Core**, and it is intentionally split:
   `ChapterRepository`, `MediaStreamRepository`), all resolving an
   `IDbContextFactory<TesserafinDbContext>`.
 - `Tesserafin.Data` (root) is **not** the EF layer — it holds query objects and
-  DTOs and *references* the database implementations.
+  DTOs, plus the shared POCOs under `Entities/`, their enums and interfaces. It references no
+  database implementation or EF Core package. `Tesserafin.Model` consumes these types through
+  `Data`; `Tesserafin.Database.Implementations` also consumes `Data` and owns all EF configuration,
+  `TesserafinDbContext` and persistence operations. The dependency points from persistence to
+  shared values, never the reverse.
+- `IItemQueryHelpers`, whose signatures take `TesserafinDbContext`, lives with its implementor in
+  `Tesserafin.Server.Implementations/Item/`, rather than leaking the context through Controller's
+  service contracts. `Data`, `Model` and `Controller` are checked for direct and transitive EF
+  package references by `ConsolidationRatchetTests`; Model's allowance to use Data is conditional
+  on Data remaining EF-free. Shared-type assembly ownership is checked in `SharedDataBoundaryTests`.
+- The namespace/assembly move is a breaking source change. It introduces no compatibility
+  facade or duplicate types. The current SQLite model snapshot names the new POCO namespaces;
+  historical migration snapshots and their schema operations retain their original identity.
 
 ### Stages 3–4 — Playback decision & execution
 

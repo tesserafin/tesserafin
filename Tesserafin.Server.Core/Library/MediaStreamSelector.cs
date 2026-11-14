@@ -3,7 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Entities;
 

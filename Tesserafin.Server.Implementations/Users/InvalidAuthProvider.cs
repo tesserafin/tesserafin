@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using Tesserafin.Controller.Authentication;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 
 namespace Tesserafin.Server.Implementations.Users
 {

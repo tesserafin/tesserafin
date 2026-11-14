@@ -1,7 +1,7 @@
 #pragma warning disable CS1591
 
 using System.Threading.Tasks;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Users;
 
 namespace Tesserafin.Controller.Authentication

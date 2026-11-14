@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
 using Tesserafin.Data.Dtos;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Entities.Security;
 using Tesserafin.Data.Events;
 using Tesserafin.Data.Queries;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Entities.Security;
 using Tesserafin.Model.Devices;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Querying;

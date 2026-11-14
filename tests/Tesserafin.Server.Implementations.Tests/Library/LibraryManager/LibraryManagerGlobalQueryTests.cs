@@ -15,7 +15,7 @@ using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Resolvers;
 using Tesserafin.Controller.Sorting;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.Library;

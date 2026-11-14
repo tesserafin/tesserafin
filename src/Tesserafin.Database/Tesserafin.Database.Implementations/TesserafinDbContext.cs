@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Entities.Security;
-using Tesserafin.Database.Implementations.Interfaces;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Entities.Security;
+using Tesserafin.Data.Interfaces;
 using Tesserafin.Database.Implementations.Locking;
 
 namespace Tesserafin.Database.Implementations;

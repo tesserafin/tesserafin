@@ -14,7 +14,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Library;
 using Tesserafin.Model.Querying;
 

@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Api.Auth.UserPermissionPolicy;
 using Tesserafin.Api.Controllers;
 using Tesserafin.Common.Api;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 using Tesserafin.Server.Extensions;
 using Xunit;
 

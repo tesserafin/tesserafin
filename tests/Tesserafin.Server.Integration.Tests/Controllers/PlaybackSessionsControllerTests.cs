@@ -16,7 +16,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dlna;

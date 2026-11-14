@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 
 namespace Tesserafin.Model.Dto
 {

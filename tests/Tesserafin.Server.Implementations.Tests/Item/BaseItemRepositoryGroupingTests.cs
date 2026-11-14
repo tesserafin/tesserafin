@@ -7,8 +7,8 @@ using Moq;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Database.Implementations.Locking;
 using Tesserafin.Database.Providers.Sqlite;
 using Tesserafin.Model.Configuration;
@@ -110,7 +110,7 @@ public sealed class BaseItemRepositoryGroupingTests : IDisposable
     {
         // IncludeOwnedItems keeps the alternate version rows in the query so the
         // grouping collapse is what picks the group representative.
-        return new InternalItemsQuery(new Database.Implementations.Entities.User("test", "auth", "reset"))
+        return new InternalItemsQuery(new global::Tesserafin.Data.Entities.User("test", "auth", "reset"))
         {
             IncludeItemTypes = [BaseItemKind.Movie],
             IncludeOwnedItems = true

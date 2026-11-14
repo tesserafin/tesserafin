@@ -6,7 +6,7 @@ using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.Sorting;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Library;
 using Tesserafin.Model.Querying;
 using Tesserafin.Server.Core.Library;

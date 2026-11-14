@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 

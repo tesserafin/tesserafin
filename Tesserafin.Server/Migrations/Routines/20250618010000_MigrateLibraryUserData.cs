@@ -10,8 +10,8 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller;
+using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Server.Core.Data;
 using Tesserafin.Server.Implementations.Item;
 using Tesserafin.Server.ServerSetupApp;
@@ -57,7 +57,7 @@ internal class MigrateLibraryUserData : IAsyncMigrationRoutine
             {
                 // the placeholder baseitem has been deleted by the librarydb migration so we need to readd it.
                 await dbContext.BaseItems.AddAsync(
-                    new Database.Implementations.Entities.BaseItemEntity()
+                    new global::Tesserafin.Data.Entities.BaseItemEntity()
                     {
                         Id = BaseItemRepository.PlaceholderId,
                         Type = "PLACEHOLDER",

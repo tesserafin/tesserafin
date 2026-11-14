@@ -6,7 +6,7 @@ using System;
 using System.Collections.Generic;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Session;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Dto;
 
 namespace Tesserafin.Controller.Library

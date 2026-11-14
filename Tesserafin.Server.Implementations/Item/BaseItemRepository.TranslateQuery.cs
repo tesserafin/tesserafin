@@ -12,14 +12,14 @@ using System.Linq;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Database.Implementations.MatchCriteria;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Entities;
 using Tesserafin.Server.Implementations.Extensions;
-using BaseItemEntity = Tesserafin.Database.Implementations.Entities.BaseItemEntity;
+using BaseItemEntity = Tesserafin.Data.Entities.BaseItemEntity;
 
 namespace Tesserafin.Server.Implementations.Item;
 

@@ -17,7 +17,7 @@ using Tesserafin.Controller.Net;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.QuickConnect;
 using Tesserafin.Controller.Session;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Users;
 using Xunit;
 

@@ -2,7 +2,7 @@ namespace Tesserafin.Playback.Decision;
 
 /// <summary>
 /// How a user wants subtitles auto-selected when no explicit stream index is requested. Mirrors
-/// the legacy <c>Tesserafin.Database.Implementations.Enums.SubtitlePlaybackMode</c> (same member names
+/// the legacy <c>Tesserafin.Data.Enums.SubtitlePlaybackMode</c> (same member names
 /// and numeric values) without depending on it: the domain assembly references nothing outside
 /// itself (RFC PR91 §4/§7), so this is a domain-local copy of the vocabulary, not a reuse of the
 /// legacy type.

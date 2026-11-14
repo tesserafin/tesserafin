@@ -7,7 +7,6 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Model.Configuration;
 
 namespace Tesserafin.Server.Core.Library.SimilarItems;

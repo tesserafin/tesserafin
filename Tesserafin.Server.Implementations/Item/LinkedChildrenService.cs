@@ -10,7 +10,7 @@ using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
-using DbLinkedChildType = Tesserafin.Database.Implementations.Entities.LinkedChildType;
+using DbLinkedChildType = Tesserafin.Data.Entities.LinkedChildType;
 using LinkedChildType = Tesserafin.Controller.Entities.LinkedChildType;
 
 namespace Tesserafin.Server.Implementations.Item;
@@ -159,7 +159,7 @@ public class LinkedChildrenService : ILinkedChildrenService
 
         if (existingLink is null)
         {
-            context.LinkedChildren.Add(new Tesserafin.Database.Implementations.Entities.LinkedChildEntity
+            context.LinkedChildren.Add(new Tesserafin.Data.Entities.LinkedChildEntity
             {
                 ParentId = parentId,
                 ChildId = childId,

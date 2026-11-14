@@ -5,10 +5,10 @@ using Tesserafin.Controller.Devices;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Session;
 using Tesserafin.Data;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Enums;
 using Tesserafin.Data.Events;
 using Tesserafin.Data.Queries;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
 
 namespace Tesserafin.Server.Implementations.Users;
 

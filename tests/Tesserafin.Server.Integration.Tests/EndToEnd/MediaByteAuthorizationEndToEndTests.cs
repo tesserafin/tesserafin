@@ -20,7 +20,7 @@ using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Net.PlaybackCredentials;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Trickplay;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;

@@ -14,15 +14,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Entities;
 using Tesserafin.Server.Core.Data;
 using Tesserafin.Server.Implementations.Item;
 using Tesserafin.Server.ServerSetupApp;
-using BaseItemEntity = Tesserafin.Database.Implementations.Entities.BaseItemEntity;
-using Chapter = Tesserafin.Database.Implementations.Entities.Chapter;
+using BaseItemEntity = Tesserafin.Data.Entities.BaseItemEntity;
+using Chapter = Tesserafin.Data.Entities.Chapter;
 
 namespace Tesserafin.Server.Migrations.Routines;
 
@@ -180,7 +180,7 @@ internal class MigrateLibraryDb : IDatabaseMigrationRoutine
             """;
 
             // EFCores local lookup sucks. We cannot use context.ItemValues.Local here because its just super slow.
-            var localItems = new Dictionary<(int Type, string Value), (Database.Implementations.Entities.ItemValue ItemValue, List<Guid> ItemIds)>();
+            var localItems = new Dictionary<(int Type, string Value), (global::Tesserafin.Data.Entities.ItemValue ItemValue, List<Guid> ItemIds)>();
             using (new TrackedMigrationStep("Loading ItemValues", _logger))
             {
                 foreach (SqliteDataReader dto in connection.Query(itemValueQuery))

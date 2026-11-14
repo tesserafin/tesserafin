@@ -1,7 +1,7 @@
 #pragma warning disable SA1313 // Parameter names should begin with lower-case letter
 
 using System.Collections.Generic;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 
 namespace Tesserafin.Database.Implementations.MatchCriteria;
 

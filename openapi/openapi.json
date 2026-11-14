@@ -6961,7 +6961,7 @@
         "type": "object"
       },
       "MediaSegmentType": {
-        "description": "Defines the types of content an individual Tesserafin.Database.Implementations.Entities.MediaSegment represents.",
+        "description": "Defines the types of content an individual Tesserafin.Data.Entities.MediaSegment represents.",
         "enum": [
           "Unknown",
           "Commercial",
@@ -10124,7 +10124,7 @@
         "type": "string"
       },
       "PlaybackDecisionSubtitlePlaybackMode": {
-        "description": "How a user wants subtitles auto-selected when no explicit stream index is requested. Mirrors\nthe legacy \u0060Tesserafin.Database.Implementations.Enums.SubtitlePlaybackMode\u0060 (same member names\nand numeric values) without depending on it: the domain assembly references nothing outside\nitself (RFC PR91 \u00A74/\u00A77), so this is a domain-local copy of the vocabulary, not a reuse of the\nlegacy type.",
+        "description": "How a user wants subtitles auto-selected when no explicit stream index is requested. Mirrors\nthe legacy \u0060Tesserafin.Data.Enums.SubtitlePlaybackMode\u0060 (same member names\nand numeric values) without depending on it: the domain assembly references nothing outside\nitself (RFC PR91 \u00A74/\u00A77), so this is a domain-local copy of the vocabulary, not a reuse of the\nlegacy type.",
         "enum": [
           "Default",
           "Always",

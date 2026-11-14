@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Tesserafin.Controller.Net;
 using Tesserafin.Data;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 
 namespace Tesserafin.Server.Core.HttpServer.Security
 {

@@ -13,13 +13,13 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.LiveTv;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Extensions;
 using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.LiveTv;
 using BaseItemDto = Tesserafin.Controller.Entities.BaseItem;
-using BaseItemEntity = Tesserafin.Database.Implementations.Entities.BaseItemEntity;
+using BaseItemEntity = Tesserafin.Data.Entities.BaseItemEntity;
 
 namespace Tesserafin.Server.Implementations.Item;
 

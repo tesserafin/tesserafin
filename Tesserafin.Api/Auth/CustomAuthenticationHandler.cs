@@ -9,7 +9,7 @@ using Tesserafin.Api.Constants;
 using Tesserafin.Controller.Authentication;
 using Tesserafin.Controller.Net;
 using Tesserafin.Data;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 
 namespace Tesserafin.Api.Auth
 {

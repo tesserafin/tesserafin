@@ -1,9 +1,9 @@
 using System;
 using System.ComponentModel;
 using System.Linq;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
-using Tesserafin.Database.Implementations.Interfaces;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Enums;
+using Tesserafin.Data.Interfaces;
 
 namespace Tesserafin.Data;
 

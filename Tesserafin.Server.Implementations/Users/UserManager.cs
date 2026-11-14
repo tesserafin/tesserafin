@@ -20,12 +20,11 @@ using Tesserafin.Controller.Events;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Net;
 using Tesserafin.Data;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Data.Events;
 using Tesserafin.Data.Events.Users;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
@@ -253,7 +252,7 @@ namespace Tesserafin.Server.Implementations.Users
                     }
                     else if (dbUser.ProfileImage is null)
                     {
-                        dbUser.ProfileImage = new Tesserafin.Database.Implementations.Entities.ImageInfo(user.ProfileImage.Path)
+                        dbUser.ProfileImage = new Tesserafin.Data.Entities.ImageInfo(user.ProfileImage.Path)
                         {
                             LastModified = user.ProfileImage.LastModified
                         };

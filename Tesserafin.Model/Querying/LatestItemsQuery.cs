@@ -2,8 +2,8 @@
 #pragma warning disable CS1591
 
 using System;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Model.Entities;
 
 namespace Tesserafin.Model.Querying

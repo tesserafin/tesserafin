@@ -9,11 +9,11 @@ using Tesserafin.Api.Constants;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Library;
 using Tesserafin.Data;
-using Tesserafin.Database.Implementations.Entities;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Entities;
+using Tesserafin.Data.Enums;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Server.Implementations.Users;
-using AccessSchedule = Tesserafin.Database.Implementations.Entities.AccessSchedule;
+using AccessSchedule = Tesserafin.Data.Entities.AccessSchedule;
 
 namespace Tesserafin.Api.Tests
 {

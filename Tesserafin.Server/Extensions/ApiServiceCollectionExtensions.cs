@@ -36,7 +36,6 @@ using Tesserafin.Common.Net;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Net.PlaybackCredentials;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Entities;
 using Tesserafin.Server.Api.RemoteAccess;

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 
 namespace Tesserafin.Data.Queries;
 

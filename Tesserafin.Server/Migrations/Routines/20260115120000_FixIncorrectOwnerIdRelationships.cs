@@ -309,8 +309,8 @@ public class FixIncorrectOwnerIdRelationships : IAsyncMigrationRoutine
         // Find all alternate version relationships where child's PrimaryVersionId is not set
         // ChildType 2 = LocalAlternateVersion, ChildType 3 = LinkedAlternateVersion
         var alternateVersionLinks = await context.LinkedChildren
-            .Where(lc => (lc.ChildType == Tesserafin.Database.Implementations.Entities.LinkedChildType.LocalAlternateVersion
-                       || lc.ChildType == Tesserafin.Database.Implementations.Entities.LinkedChildType.LinkedAlternateVersion))
+            .Where(lc => (lc.ChildType == Tesserafin.Data.Entities.LinkedChildType.LocalAlternateVersion
+                       || lc.ChildType == Tesserafin.Data.Entities.LinkedChildType.LinkedAlternateVersion))
             .Join(
                 context.BaseItems,
                 lc => lc.ChildId,

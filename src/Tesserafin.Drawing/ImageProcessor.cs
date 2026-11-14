@@ -15,7 +15,7 @@ using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Entities;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Drawing;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;

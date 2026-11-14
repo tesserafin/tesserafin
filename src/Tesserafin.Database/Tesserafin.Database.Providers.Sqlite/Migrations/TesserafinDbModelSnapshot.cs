@@ -17,7 +17,7 @@ namespace Tesserafin.Server.Implementations.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.AccessSchedule", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.AccessSchedule", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -44,7 +44,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ActivityLog", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ActivityLog", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -94,7 +94,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.AncestorId", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.AncestorId", b =>
                 {
                     b.Property<Guid>("ItemId")
                         .HasColumnType("TEXT");
@@ -111,7 +111,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.AttachmentStreamInfo", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.AttachmentStreamInfo", b =>
                 {
                     b.Property<Guid>("ItemId")
                         .HasColumnType("TEXT");
@@ -141,7 +141,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.BaseItemEntity", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.BaseItemEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -434,7 +434,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.BaseItemImageInfo", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.BaseItemImageInfo", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -471,7 +471,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.BaseItemMetadataField", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.BaseItemMetadataField", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("INTEGER");
@@ -488,7 +488,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.BaseItemProvider", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.BaseItemProvider", b =>
                 {
                     b.Property<Guid>("ItemId")
                         .HasColumnType("TEXT");
@@ -509,7 +509,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.BaseItemTrailerType", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.BaseItemTrailerType", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("INTEGER");
@@ -526,7 +526,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.Chapter", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.Chapter", b =>
                 {
                     b.Property<Guid>("ItemId")
                         .HasColumnType("TEXT");
@@ -553,7 +553,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ContentPack", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ContentPack", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -594,7 +594,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ContentPackMembership", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ContentPackMembership", b =>
                 {
                     b.Property<Guid>("PackId")
                         .HasColumnType("TEXT");
@@ -617,7 +617,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.CustomItemDisplayPreferences", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.CustomItemDisplayPreferences", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -651,7 +651,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.DisplayPreferences", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.DisplayPreferences", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -710,7 +710,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.HomeSection", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.HomeSection", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -734,7 +734,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ImageInfo", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ImageInfo", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -761,7 +761,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ItemDisplayPreferences", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ItemDisplayPreferences", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -808,7 +808,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ItemDisplayPreferencesArchive", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ItemDisplayPreferencesArchive", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("INTEGER");
@@ -860,7 +860,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ItemValue", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ItemValue", b =>
                 {
                     b.Property<Guid>("ItemValueId")
                         .ValueGeneratedOnAdd()
@@ -889,7 +889,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ItemValueMap", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ItemValueMap", b =>
                 {
                     b.Property<Guid>("ItemValueId")
                         .HasColumnType("TEXT");
@@ -906,7 +906,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.KeyframeData", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.KeyframeData", b =>
                 {
                     b.Property<Guid>("ItemId")
                         .HasColumnType("TEXT");
@@ -924,7 +924,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.LinkedChildEntity", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.LinkedChildEntity", b =>
                 {
                     b.Property<Guid>("ParentId")
                         .HasColumnType("TEXT");
@@ -951,7 +951,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.MediaSegment", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.MediaSegment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -980,7 +980,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.MediaStreamInfo", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.MediaStreamInfo", b =>
                 {
                     b.Property<Guid>("ItemId")
                         .HasColumnType("TEXT");
@@ -1133,7 +1133,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.People", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.People", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1155,7 +1155,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.PeopleBaseItemMap", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.PeopleBaseItemMap", b =>
                 {
                     b.Property<Guid>("ItemId")
                         .HasColumnType("TEXT");
@@ -1185,7 +1185,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.Permission", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.Permission", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1218,7 +1218,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.Preference", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.Preference", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1253,7 +1253,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.Security.ApiKey", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.Security.ApiKey", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1284,7 +1284,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.Security.Device", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.Security.Device", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1342,7 +1342,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.Security.DeviceOptions", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.Security.DeviceOptions", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1365,7 +1365,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.TrickplayInfo", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.TrickplayInfo", b =>
                 {
                     b.Property<Guid>("ItemId")
                         .HasColumnType("TEXT");
@@ -1398,7 +1398,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.User", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1526,7 +1526,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.UserData", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.UserData", b =>
                 {
                     b.Property<Guid>("ItemId")
                         .HasColumnType("TEXT");
@@ -1588,24 +1588,24 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.AccessSchedule", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.AccessSchedule", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.User", null)
+                    b.HasOne("Tesserafin.Data.Entities.User", null)
                         .WithMany("AccessSchedules")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.AncestorId", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.AncestorId", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany("Parents")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "ParentItem")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "ParentItem")
                         .WithMany("Children")
                         .HasForeignKey("ParentItemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1616,9 +1616,9 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("ParentItem");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.AttachmentStreamInfo", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.AttachmentStreamInfo", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany()
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1627,14 +1627,14 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("Item");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.BaseItemEntity", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.BaseItemEntity", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Owner")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Owner")
                         .WithMany("Extras")
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.NoAction);
 
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "DirectParent")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "DirectParent")
                         .WithMany("DirectChildren")
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.Cascade);
@@ -1644,9 +1644,9 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("Owner");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.BaseItemImageInfo", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.BaseItemImageInfo", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany("Images")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1655,9 +1655,9 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("Item");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.BaseItemMetadataField", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.BaseItemMetadataField", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany("LockedFields")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1666,9 +1666,9 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("Item");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.BaseItemProvider", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.BaseItemProvider", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany("Provider")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1677,9 +1677,9 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("Item");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.BaseItemTrailerType", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.BaseItemTrailerType", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany("TrailerTypes")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1688,9 +1688,9 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("Item");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.Chapter", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.Chapter", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany("Chapters")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1699,15 +1699,15 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("Item");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ContentPackMembership", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ContentPackMembership", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany()
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.ContentPack", "Pack")
+                    b.HasOne("Tesserafin.Data.Entities.ContentPack", "Pack")
                         .WithMany("Memberships")
                         .HasForeignKey("PackId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1718,50 +1718,50 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("Pack");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.DisplayPreferences", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.DisplayPreferences", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.User", null)
+                    b.HasOne("Tesserafin.Data.Entities.User", null)
                         .WithMany("DisplayPreferences")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.HomeSection", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.HomeSection", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.DisplayPreferences", null)
+                    b.HasOne("Tesserafin.Data.Entities.DisplayPreferences", null)
                         .WithMany("HomeSections")
                         .HasForeignKey("DisplayPreferencesId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ImageInfo", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ImageInfo", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.User", null)
+                    b.HasOne("Tesserafin.Data.Entities.User", null)
                         .WithOne("ProfileImage")
-                        .HasForeignKey("Tesserafin.Database.Implementations.Entities.ImageInfo", "UserId")
+                        .HasForeignKey("Tesserafin.Data.Entities.ImageInfo", "UserId")
                         .OnDelete(DeleteBehavior.Cascade);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ItemDisplayPreferences", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ItemDisplayPreferences", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.User", null)
+                    b.HasOne("Tesserafin.Data.Entities.User", null)
                         .WithMany("ItemDisplayPreferences")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ItemValueMap", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ItemValueMap", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany("ItemValues")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.ItemValue", "ItemValue")
+                    b.HasOne("Tesserafin.Data.Entities.ItemValue", "ItemValue")
                         .WithMany("BaseItemsMap")
                         .HasForeignKey("ItemValueId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1772,9 +1772,9 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("ItemValue");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.KeyframeData", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.KeyframeData", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany()
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1783,15 +1783,15 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("Item");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.LinkedChildEntity", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.LinkedChildEntity", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Child")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Child")
                         .WithMany("LinkedChildOfEntities")
                         .HasForeignKey("ChildId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Parent")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Parent")
                         .WithMany("LinkedChildEntities")
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -1802,9 +1802,9 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("Parent");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.MediaStreamInfo", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.MediaStreamInfo", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany("MediaStreams")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1813,15 +1813,15 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("Item");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.PeopleBaseItemMap", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.PeopleBaseItemMap", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany("Peoples")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.People", "People")
+                    b.HasOne("Tesserafin.Data.Entities.People", "People")
                         .WithMany("BaseItems")
                         .HasForeignKey("PeopleId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1832,25 +1832,25 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("People");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.Permission", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.Permission", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.User", null)
+                    b.HasOne("Tesserafin.Data.Entities.User", null)
                         .WithMany("Permissions")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.Preference", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.Preference", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.User", null)
+                    b.HasOne("Tesserafin.Data.Entities.User", null)
                         .WithMany("Preferences")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade);
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.Security.Device", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.Security.Device", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.User", "User")
+                    b.HasOne("Tesserafin.Data.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1859,15 +1859,15 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.UserData", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.UserData", b =>
                 {
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.BaseItemEntity", "Item")
+                    b.HasOne("Tesserafin.Data.Entities.BaseItemEntity", "Item")
                         .WithMany("UserData")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Tesserafin.Database.Implementations.Entities.User", "User")
+                    b.HasOne("Tesserafin.Data.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1878,7 +1878,7 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.BaseItemEntity", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.BaseItemEntity", b =>
                 {
                     b.Navigation("Chapters");
 
@@ -1911,27 +1911,27 @@ namespace Tesserafin.Server.Implementations.Migrations
                     b.Navigation("UserData");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ContentPack", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ContentPack", b =>
                 {
                     b.Navigation("Memberships");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.DisplayPreferences", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.DisplayPreferences", b =>
                 {
                     b.Navigation("HomeSections");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.ItemValue", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.ItemValue", b =>
                 {
                     b.Navigation("BaseItemsMap");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.People", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.People", b =>
                 {
                     b.Navigation("BaseItems");
                 });
 
-            modelBuilder.Entity("Tesserafin.Database.Implementations.Entities.User", b =>
+            modelBuilder.Entity("Tesserafin.Data.Entities.User", b =>
                 {
                     b.Navigation("AccessSchedules");
 

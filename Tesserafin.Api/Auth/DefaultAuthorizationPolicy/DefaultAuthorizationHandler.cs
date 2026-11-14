@@ -7,7 +7,7 @@ using Tesserafin.Common.Extensions;
 using Tesserafin.Common.Net;
 using Tesserafin.Controller.Library;
 using Tesserafin.Data;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
 
 namespace Tesserafin.Api.Auth.DefaultAuthorizationPolicy

@@ -8,8 +8,8 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Session;
 using Tesserafin.Data;
+using Tesserafin.Data.Enums;
 using Tesserafin.Data.Events;
-using Tesserafin.Database.Implementations.Enums;
 using Tesserafin.Model.Session;
 
 namespace Tesserafin.LiveTv.Recordings

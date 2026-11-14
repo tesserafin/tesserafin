@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
-using Tesserafin.Database.Implementations.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
 

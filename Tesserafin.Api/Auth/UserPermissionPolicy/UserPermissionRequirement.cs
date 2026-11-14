@@ -1,5 +1,5 @@
 using Tesserafin.Api.Auth.DefaultAuthorizationPolicy;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 
 namespace Tesserafin.Api.Auth.UserPermissionPolicy
 {

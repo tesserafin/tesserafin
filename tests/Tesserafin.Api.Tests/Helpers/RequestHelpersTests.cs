@@ -6,7 +6,6 @@ using Tesserafin.Api.Constants;
 using Tesserafin.Api.Helpers;
 using Tesserafin.Controller.Net;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Enums;
 using Xunit;
 
 namespace Tesserafin.Api.Tests.Helpers

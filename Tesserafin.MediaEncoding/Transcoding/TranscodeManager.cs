@@ -21,7 +21,7 @@ using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Session;
 using Tesserafin.Controller.Streaming;
 using Tesserafin.Data;
-using Tesserafin.Database.Implementations.Enums;
+using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dlna;

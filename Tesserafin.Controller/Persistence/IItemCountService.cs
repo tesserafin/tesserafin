@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Database.Implementations.Entities;
 using Tesserafin.Model.Dto;
 
 namespace Tesserafin.Controller.Persistence;
