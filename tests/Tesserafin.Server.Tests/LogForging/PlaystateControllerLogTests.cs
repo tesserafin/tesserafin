@@ -196,6 +196,7 @@ namespace Tesserafin.Server.Tests.LogForging
                     Mock.Of<IUserManager>(),
                     Mock.Of<IUserDataManager>(),
                     Mock.Of<IItemAccessService>(),
+                    Mock.Of<IItemPlayedStateService>(),
                     sessionManager.Object,
                     probe.Factory,
                     transcodeManager.Object,

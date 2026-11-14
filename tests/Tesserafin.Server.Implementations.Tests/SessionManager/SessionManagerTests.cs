@@ -41,7 +41,8 @@ public class SessionManagerTests
             Mock.Of<IHostApplicationLifetime>(),
             Mock.Of<IItemQueryService>(),
             Mock.Of<IItemSortService>(),
-            Mock.Of<IPlaybackCredentialService>());
+            Mock.Of<IPlaybackCredentialService>(),
+            Mock.Of<IItemPlayedStateService>());
 
         await Assert.ThrowsAsync(exceptionType, () => sessionManager.GetAuthorizationToken(
             new User("test", "default", "default"),
@@ -71,7 +72,8 @@ public class SessionManagerTests
             Mock.Of<IHostApplicationLifetime>(),
             Mock.Of<IItemQueryService>(),
             Mock.Of<IItemSortService>(),
-            Mock.Of<IPlaybackCredentialService>());
+            Mock.Of<IPlaybackCredentialService>(),
+            Mock.Of<IItemPlayedStateService>());
 
         await Assert.ThrowsAsync(exceptionType, () => sessionManager.AuthenticateNewSessionInternal(authenticationRequest, false));
     }

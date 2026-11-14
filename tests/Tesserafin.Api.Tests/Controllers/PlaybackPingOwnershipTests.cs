@@ -125,6 +125,7 @@ public sealed class PlaybackPingOwnershipTests
             Mock.Of<IUserManager>(),
             Mock.Of<IUserDataManager>(),
             Mock.Of<IItemAccessService>(),
+            Mock.Of<IItemPlayedStateService>(),
             Mock.Of<ISessionManager>(),
             NullLoggerFactory.Instance,
             manager,

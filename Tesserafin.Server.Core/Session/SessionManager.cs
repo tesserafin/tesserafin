@@ -65,6 +65,7 @@ namespace Tesserafin.Server.Core.Session
         private readonly IItemSortService _itemSortService;
         private readonly CancellationTokenRegistration _shutdownCallback;
         private readonly IPlaybackCredentialService _credentialService;
+        private readonly IItemPlayedStateService _playedStateService;
 
         private readonly ConcurrentDictionary<string, SessionInfo> _activeConnections
             = new(StringComparer.OrdinalIgnoreCase);
@@ -97,6 +98,7 @@ namespace Tesserafin.Server.Core.Session
         /// <param name="itemQueryService">Instance of <see cref="IItemQueryService"/> interface.</param>
         /// <param name="itemSortService">Instance of <see cref="IItemSortService"/> interface.</param>
         /// <param name="credentialService">Instance of the <see cref="IPlaybackCredentialService"/> interface.</param>
+        /// <param name="playedStateService">Marks the other versions of a video played to completion.</param>
         public SessionManager(
             ILogger<SessionManager> logger,
             IEventManager eventManager,
@@ -113,7 +115,8 @@ namespace Tesserafin.Server.Core.Session
             IHostApplicationLifetime hostApplicationLifetime,
             IItemQueryService itemQueryService,
             IItemSortService itemSortService,
-            IPlaybackCredentialService credentialService)
+            IPlaybackCredentialService credentialService,
+            IItemPlayedStateService playedStateService)
         {
             _logger = logger;
             _eventManager = eventManager;
@@ -131,6 +134,7 @@ namespace Tesserafin.Server.Core.Session
             _itemQueryService = itemQueryService;
             _itemSortService = itemSortService;
             _credentialService = credentialService;
+            _playedStateService = playedStateService;
 
             _deviceManager.DeviceOptionsUpdated += OnDeviceManagerDeviceOptionsUpdated;
         }
@@ -1030,7 +1034,7 @@ namespace Tesserafin.Server.Core.Session
                 // only persist while nothing has been completed yet.)
                 if (data.Played == true && item is Video playedVideo)
                 {
-                    playedVideo.PropagatePlayedState(user, true);
+                    _playedStateService.MarkOtherVersionsPlayed(user, playedVideo);
                 }
             }
 
@@ -1240,7 +1244,7 @@ namespace Tesserafin.Server.Core.Session
             // only persist while nothing has been completed yet.)
             if (data.Played == true && item is Video playedVideo)
             {
-                playedVideo.PropagatePlayedState(user, true);
+                _playedStateService.MarkOtherVersionsPlayed(user, playedVideo);
             }
 
             return playedToCompletion;

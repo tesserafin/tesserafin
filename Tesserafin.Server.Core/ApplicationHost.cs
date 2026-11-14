@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Prometheus.DotNetRuntime;
 using Tesserafin.Common;
@@ -625,6 +626,8 @@ namespace Tesserafin.Server.Core
 
             serviceCollection.AddSingleton<IUserViewManager, UserViewManager>();
             serviceCollection.AddSingleton<IItemQueryService, ItemQueryService>();
+            serviceCollection.TryAddSingleton(TimeProvider.System);
+            serviceCollection.AddSingleton<IItemPlayedStateService, ItemPlayedStateService>();
 
             serviceCollection.AddSingleton<IChapterManager, ChapterManager>();
 
