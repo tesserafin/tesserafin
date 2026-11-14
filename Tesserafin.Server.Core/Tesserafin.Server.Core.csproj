@@ -7,7 +7,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Tesserafin.Naming\Tesserafin.Naming.csproj" />
-    <ProjectReference Include="..\Tesserafin.Api\Tesserafin.Api.csproj" />
     <ProjectReference Include="..\Tesserafin.Server.Implementations\Tesserafin.Server.Implementations.csproj" />
     <ProjectReference Include="..\Tesserafin.Model\Tesserafin.Model.csproj" />
     <ProjectReference Include="..\Tesserafin.Common\Tesserafin.Common.csproj" />
@@ -18,6 +17,8 @@
     <ProjectReference Include="..\Tesserafin.Photos\Tesserafin.Photos.csproj" />
     <ProjectReference Include="..\src\Tesserafin.Drawing\Tesserafin.Drawing.csproj" />
     <ProjectReference Include="..\Tesserafin.MediaEncoding\Tesserafin.MediaEncoding.csproj" />
+    <ProjectReference Include="..\src\Tesserafin.MediaEncoding.Hls\Tesserafin.MediaEncoding.Hls.csproj" />
+    <ProjectReference Include="..\src\Tesserafin.Networking\Tesserafin.Networking.csproj" />
     <ProjectReference Include="..\src\Tesserafin.Database\Tesserafin.Database.Implementations\Tesserafin.Database.Implementations.csproj" />
     <!-- PR98 shadow mode DI: registers the v2 IPlaybackEngine used by ShadowPlaybackSessionPlanner. -->
     <ProjectReference Include="..\src\Tesserafin.Playback.Engine\Tesserafin.Playback.Engine.csproj" />

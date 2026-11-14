@@ -29,6 +29,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Test Data/HttpServer/*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- PR113b: so PlaybackCompatFixtureExporterTests can validate its output against the same
          schema the compatibility lab itself enforces (tests/Tesserafin.Playback.Engine.Tests uses the
          identical pattern for the lab's own fixtures). -->

@@ -337,9 +337,17 @@ client still speaks the legacy playback protocol today; migrating it is tracked 
 - **Composition:** `CoreAppHost` extends `ApplicationHost`
   (`Tesserafin.Server.Core`) and uses the generic .NET host
   (`Host.CreateDefaultBuilder(...).ConfigureWebHostDefaults(...).UseSerilog()`).
-  DI is registered in `ApplicationHost.Init → RegisterServices`, then
-  `CoreAppHost.RegisterServices` (image encoder, user/session/device managers,
-  auth providers), then plugin services.
+  `ApplicationHost.Init` dispatches to `CoreAppHost.RegisterServices`: the executable
+  composes the image encoder, user/device managers, authentication providers and HTTP services,
+  then calls the base registration for core services. Plugin registrations follow.
+  `Server.Core` has no project/assembly dependency on `Api`; only the executable references both.
+  The API owns `WebSockets.WebSocketManager`, `WebSockets.WebSocketConnection`,
+  `WebSockets.WebSocketSessionTransport` and `WebSocketListeners.SessionWebSocketListener`. HTTP delivery helpers, the session delivery guard
+  and HLS ownership authorizer are also registered by the executable, with their existing scoped
+  or singleton lifetimes. `HttpCompositionBoundaryTests` verifies this on a booted host.
+- **Shared classification:** `Tesserafin.Data.CollectionTypeMapping` supplies the item kinds for
+  library collection types. Both the Items API and collection-folder image selection use it;
+  core image generation no longer imports an API extension to classify a library.
 - **Plugins** are loaded **in-process** by `PluginManager` from the plugins path;
   some providers (TMDb, ListenBrainz) are compiled-in. (An out-of-process plugin
   SDK v2 is planned but not started.)

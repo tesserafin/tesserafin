@@ -5,13 +5,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Tesserafin.Api.Extensions;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Data;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
@@ -31,7 +31,7 @@ namespace Tesserafin.Server.Core.Images
         {
             var view = (CollectionFolder)item;
             var viewType = view.CollectionType;
-            var includeItemTypes = DtoExtensions.GetBaseItemKindsForCollectionType(viewType);
+            var includeItemTypes = CollectionTypeMapping.GetItemKinds(viewType);
             var recursive = viewType != CollectionType.playlists;
 
             return _itemQueryService.GetItemList(

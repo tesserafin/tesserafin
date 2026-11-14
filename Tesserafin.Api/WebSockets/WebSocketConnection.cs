@@ -15,7 +15,7 @@ using Tesserafin.Controller.Net.WebSocketMessages.Outbound;
 using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Session;
 
-namespace Tesserafin.Server.Core.HttpServer
+namespace Tesserafin.Api.WebSockets
 {
     /// <summary>
     /// Class WebSocketConnection.

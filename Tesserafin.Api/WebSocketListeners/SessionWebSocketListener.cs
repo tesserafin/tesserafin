@@ -8,12 +8,13 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Api.Extensions;
 using Tesserafin.Api.Helpers;
+using Tesserafin.Api.WebSockets;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Net;
 using Tesserafin.Controller.Net.WebSocketMessages.Outbound;
 using Tesserafin.Controller.Session;
 
-namespace Tesserafin.Server.Core.Session
+namespace Tesserafin.Api.WebSocketListeners
 {
     /// <summary>
     /// Class SessionWebSocketListener.
@@ -120,10 +121,12 @@ namespace Tesserafin.Server.Core.Session
 
         private void EnsureController(SessionInfo session, IWebSocketConnection connection)
         {
-            var controllerInfo = session.EnsureController<WebSocketController>(
-                s => new WebSocketController(_loggerFactory.CreateLogger<WebSocketController>(), s, _sessionManager));
+#pragma warning disable IDISP005 // SessionInfo owns the cached controller; the session manager disposes it.
+            var controllerInfo = session.EnsureController<WebSocketSessionTransport>(
+                s => new WebSocketSessionTransport(_loggerFactory.CreateLogger<WebSocketSessionTransport>(), s, _sessionManager));
+#pragma warning restore IDISP005
 
-            var controller = (WebSocketController)controllerInfo.Item1;
+            var controller = (WebSocketSessionTransport)controllerInfo.Item1;
             controller.AddWebSocket(connection);
 
             _sessionManager.OnSessionControllerConnected(session);
@@ -255,7 +258,9 @@ namespace Tesserafin.Server.Core.Session
                         // the session end normally.
                         try
                         {
+#pragma warning disable IDISP016 // Intentional watchdog abort; receive-loop cleanup may race and Dispose is idempotent.
                             webSocket.Dispose();
+#pragma warning restore IDISP016
                         }
                         catch (Exception exception)
                         {

@@ -19,8 +19,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Prometheus.DotNetRuntime;
-using Tesserafin.Api.Auth.HlsJobOwnership;
-using Tesserafin.Api.Helpers;
 using Tesserafin.Common;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Common.Events;
@@ -121,7 +119,6 @@ using Tesserafin.Server.Implementations.SystemBackupService;
 using Tesserafin.XbmcMetadata.Providers;
 using static Tesserafin.Controller.Extensions.ConfigurationExtensions;
 using IConfigurationManager = Tesserafin.Common.Configuration.IConfigurationManager;
-using WebSocketManager = Tesserafin.Server.Core.HttpServer.WebSocketManager;
 
 namespace Tesserafin.Server.Core
 {
@@ -601,8 +598,6 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<ISearchManager, SearchManager>();
             serviceCollection.AddSingleton<ISearchProvider, SqlSearchProvider>();
 
-            serviceCollection.AddSingleton<IWebSocketManager, WebSocketManager>();
-
             serviceCollection.AddSingleton<IImageProcessor, ImageProcessor>();
 
             serviceCollection.AddSingleton<ITVSeriesManager, TVSeriesManager>();
@@ -650,11 +645,6 @@ namespace Tesserafin.Server.Core
             // that could fall out of step with it.
             serviceCollection.AddSingleton<IHlsSegmentBindingRegistry>(
                 provider => (TranscodeManager)provider.GetRequiredService<ITranscodeManager>());
-
-            // #153-LTV-R3. The one authority every job-backed HLS resource is authorized through.
-            // Singleton, like the registry it reads: it holds no per-request state — the request
-            // is an argument, never a field.
-            serviceCollection.AddSingleton<IHlsJobOwnershipAuthorizer, HlsJobOwnershipAuthorizer>();
 
             // PR98 shadow mode: the concrete legacy planner and the v2 engine are both registered so
             // ShadowPlaybackSessionPlanner (the IPlaybackSessionPlanner actually resolved) can wrap
@@ -737,10 +727,6 @@ namespace Tesserafin.Server.Core
             // own instance from the same dependencies when not supplied, for pre-PR117 test/call site
             // compatibility) and by PlaybackSessionsController's new GET .../Stream endpoint.
             serviceCollection.AddSingleton<IPlaybackLiveStreamResolver, PlaybackLiveStreamResolver>();
-            serviceCollection.AddScoped<MediaInfoHelper>();
-            serviceCollection.AddScoped<AudioHelper>();
-            serviceCollection.AddScoped<DynamicHlsHelper>();
-            serviceCollection.AddSingleton<PlaybackSessionDeliveryGuard>();
             serviceCollection.AddScoped<IClientEventLogger, ClientEventLogger>();
             serviceCollection.AddSingleton<IDirectoryService, DirectoryService>();
 

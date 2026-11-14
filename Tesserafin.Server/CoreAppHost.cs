@@ -4,7 +4,10 @@ using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Tesserafin.Api.Auth.HlsJobOwnership;
+using Tesserafin.Api.Helpers;
 using Tesserafin.Api.WebSocketListeners;
+using Tesserafin.Api.WebSockets;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Authentication;
 using Tesserafin.Controller.BaseItemManager;
@@ -23,7 +26,6 @@ using Tesserafin.LiveTv;
 using Tesserafin.Model.Activity;
 using Tesserafin.Providers.Lyric;
 using Tesserafin.Server.Core;
-using Tesserafin.Server.Core.Session;
 using Tesserafin.Server.Implementations.Activity;
 using Tesserafin.Server.Implementations.Devices;
 using Tesserafin.Server.Implementations.Events;
@@ -87,6 +89,14 @@ namespace Tesserafin.Server
             serviceCollection.AddSingleton<IDisplayPreferencesManager, DisplayPreferencesManager>();
             serviceCollection.AddSingleton<IDeviceManager, DeviceManager>();
             serviceCollection.AddSingleton<ITrickplayManager, TrickplayManager>();
+
+            // HTTP delivery and WebSocket upgrades are composed by the executable, not the core.
+            serviceCollection.AddSingleton<IWebSocketManager, WebSocketManager>();
+            serviceCollection.AddSingleton<IHlsJobOwnershipAuthorizer, HlsJobOwnershipAuthorizer>();
+            serviceCollection.AddSingleton<PlaybackSessionDeliveryGuard>();
+            serviceCollection.AddScoped<MediaInfoHelper>();
+            serviceCollection.AddScoped<AudioHelper>();
+            serviceCollection.AddScoped<DynamicHlsHelper>();
 
             // TODO search the assemblies instead of adding them manually?
             serviceCollection.AddSingleton<IWebSocketListener, SessionWebSocketListener>();

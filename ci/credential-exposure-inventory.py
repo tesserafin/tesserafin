@@ -80,7 +80,7 @@ def routes(controller: str) -> list[dict]:
 
 
 AUTH_CONTEXT = "Tesserafin.Server.Implementations/Security/AuthorizationContext.cs"
-WS_MANAGER = "Tesserafin.Server.Core/HttpServer/WebSocketManager.cs"
+WS_MANAGER = "Tesserafin.Api/WebSockets/WebSocketManager.cs"
 SESSION_MANAGER = "Tesserafin.Server.Core/Session/SessionManager.cs"
 
 server: dict[str, dict] = {}

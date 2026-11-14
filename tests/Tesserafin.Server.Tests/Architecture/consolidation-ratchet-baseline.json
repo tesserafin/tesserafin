@@ -37,8 +37,7 @@
     "Video.RecordingsManager"
   ],
   "forbiddenDependencies": [
-    "Tesserafin.MediaEncoding -\u003E Tesserafin.Playback.Shadow",
-    "Tesserafin.Server.Core -\u003E Tesserafin.Api"
+    "Tesserafin.MediaEncoding -\u003E Tesserafin.Playback.Shadow"
   ],
   "streamBuilderFiles": [
     "Tesserafin.Api/Helpers/MediaInfoHelper.cs",

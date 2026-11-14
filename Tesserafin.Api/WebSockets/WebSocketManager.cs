@@ -19,7 +19,7 @@ using Tesserafin.Controller.Session;
 using Tesserafin.Data;
 using Tesserafin.Extensions;
 
-namespace Tesserafin.Server.Core.HttpServer
+namespace Tesserafin.Api.WebSockets
 {
     public class WebSocketManager : IWebSocketManager
     {

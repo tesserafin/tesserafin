@@ -332,7 +332,7 @@ public class ItemsController : BaseTesserafinApiController
         if (folder is IHasCollectionType hasCollectionType)
         {
             collectionType = hasCollectionType.CollectionType;
-            includeItemTypes = [.. includeItemTypes.Union(DtoExtensions.GetBaseItemKindsForCollectionType(collectionType))];
+            includeItemTypes = [.. includeItemTypes.Union(CollectionTypeMapping.GetItemKinds(collectionType))];
         }
 
         if (collectionType == CollectionType.playlists)

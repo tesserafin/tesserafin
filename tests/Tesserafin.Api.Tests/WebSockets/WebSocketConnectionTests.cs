@@ -1,15 +1,27 @@
 using System;
 using System.Buffers;
 using System.IO;
+using System.Net.WebSockets;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
-using Tesserafin.Server.Core.HttpServer;
+using Moq;
+using Tesserafin.Api.WebSockets;
 using Xunit;
 
-namespace Tesserafin.Server.Implementations.Tests.HttpServer
+namespace Tesserafin.Api.Tests.WebSockets
 {
     public class WebSocketConnectionTests
     {
+        [Fact]
+        public void RepeatedAbortDisposal_DisposesTheSocketOnce()
+        {
+            var socket = new Mock<WebSocket>();
+            using var connection = new WebSocketConnection(NullLogger<WebSocketConnection>.Instance, socket.Object, null!, null!);
+            connection.Dispose();
+            connection.Dispose();
+            socket.Verify(value => value.Dispose(), Times.Once);
+        }
+
         [Fact]
         public void DeserializeWebSocketMessage_SingleSegment_Success()
         {

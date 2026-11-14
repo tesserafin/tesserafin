@@ -62,6 +62,7 @@
   <ItemGroup>
     <ProjectReference Include="..\src\Tesserafin.Drawing\Tesserafin.Drawing.csproj" />
     <ProjectReference Include="..\Tesserafin.Server.Core\Tesserafin.Server.Core.csproj" />
+    <ProjectReference Include="..\Tesserafin.Api\Tesserafin.Api.csproj" />
     <ProjectReference Include="..\src\Tesserafin.Drawing.Skia\Tesserafin.Drawing.Skia.csproj" />
     <ProjectReference Include="..\src\Tesserafin.LiveTv\Tesserafin.LiveTv.csproj" />
     <ProjectReference Include="..\Tesserafin.Server.Implementations\Tesserafin.Server.Implementations.csproj" />

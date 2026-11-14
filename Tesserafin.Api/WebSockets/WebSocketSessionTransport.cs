@@ -12,11 +12,11 @@ using Tesserafin.Controller.Net.WebSocketMessages;
 using Tesserafin.Controller.Session;
 using Tesserafin.Model.Session;
 
-namespace Tesserafin.Server.Core.Session
+namespace Tesserafin.Api.WebSockets
 {
-    public sealed class WebSocketController : ISessionController, IAsyncDisposable, IDisposable
+    public sealed class WebSocketSessionTransport : ISessionController, IAsyncDisposable, IDisposable
     {
-        private readonly ILogger<WebSocketController> _logger;
+        private readonly ILogger<WebSocketSessionTransport> _logger;
         private readonly ISessionManager _sessionManager;
         private readonly SessionInfo _session;
 
@@ -24,8 +24,8 @@ namespace Tesserafin.Server.Core.Session
         private readonly ReaderWriterLockSlim _socketsLock;
         private bool _disposed = false;
 
-        public WebSocketController(
-            ILogger<WebSocketController> logger,
+        public WebSocketSessionTransport(
+            ILogger<WebSocketSessionTransport> logger,
             SessionInfo session,
             ISessionManager sessionManager)
         {

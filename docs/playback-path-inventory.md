@@ -281,5 +281,29 @@ references Data; Model and Controller no longer acquire EF through their shared 
 explicitly take a database context. The architecture baseline loses the three Model/Data
 exceptions; direct or transitive EF packages are forbidden for Data, Model and Controller.
 
-The two other project inversions, `Server.Core -> Api` and `MediaEncoding -> Playback.Shadow`,
-remain open. No playback path or delivery mode is added by this boundary change.
+The `Server.Core -> Api` inversion is addressed in §9; `MediaEncoding -> Playback.Shadow`
+remains open. No playback path or delivery mode is added by this boundary change.
+
+
+## 9. Core / HTTP boundary (consolidation step 4, candidate)
+
+`Server.Core` no longer references `Api`, directly or transitively. The executable server
+references both projects and owns their composition. The API owns WebSocket upgrade handling,
+the concrete connection, the session transport and the session WebSocket listener. Their authentication, ticket
+consumption, credential binding and keep-alive logic are moved unchanged; no forwarding types
+or replacement protocol are added. The former WebSocketController is named
+WebSocketSessionTransport in the API assembly so MVC cannot discover it as an HTTP controller;
+a negative controller-discovery assertion covers that boundary. Existing WebSocket boundary/identity and SyncPlay-loss tests
+exercise the relocated implementations.
+
+The HTTP delivery helpers, session delivery guard and HLS ownership authorizer are registered in
+`CoreAppHost.RegisterServices`, with the same scoped/singleton lifetimes. Core domain services
+stay in `ApplicationHost`. `CollectionTypeMapping` moved from the API's DTO extensions to Data,
+so collection-folder image generation and the Items API share one classification independent of
+HTTP. All former mappings, their ordering and their default are preserved.
+
+The architecture baseline loses its Core-to-API exception. A booted-host test verifies transport
+assembly ownership and DI lifetimes, and a compiled-reference test verifies the core assembly has
+no API reference. Credential inventory follows the new WebSocket manager path. The HTTP contract
+is unchanged; no SDK generation or pair-lock movement belongs to this slice. This candidate is
+stacked on #412 and retains that parent's pending SDK-pair merge requirement.

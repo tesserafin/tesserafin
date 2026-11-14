@@ -15,11 +15,11 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Api.Models.PlaybackCredentialDtos;
 using Tesserafin.Api.Models.StartupDtos;
+using Tesserafin.Api.WebSocketListeners;
 using Tesserafin.Controller.Net;
 using Tesserafin.Controller.Net.PlaybackCredentials;
 using Tesserafin.Controller.Session;
 using Tesserafin.Extensions.Json;
-using Tesserafin.Server.Core.Session;
 using Xunit;
 
 namespace Tesserafin.Server.Integration.Tests.PlaybackCredentials;
