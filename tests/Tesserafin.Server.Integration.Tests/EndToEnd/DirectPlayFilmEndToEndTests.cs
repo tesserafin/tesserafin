@@ -412,6 +412,11 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
     /// The e2e host with the legacy chain made unreachable for this journey: the planner the film
     /// planner wraps and the live-stream resolver both throw.
     /// </summary>
+    /// <remarks>
+    /// Shared by <see cref="RemuxFilmEndToEndTests"/>; xUnit builds an <c>IClassFixture</c> by
+    /// reflection and needs it public, so CA1034 is suppressed as in PlaybackSessionsControllerTests.
+    /// </remarks>
+#pragma warning disable CA1034 // Nested types should not be visible
     public sealed class LegacyFreeFactory : E2eApplicationFactory
     {
         /// <inheritdoc/>
@@ -448,4 +453,5 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
             bool alwaysBurnInSubtitleWhenTranscoding)
             => throw new InvalidOperationException("The live-stream resolver (ToStreamInfo) was reached.");
     }
+#pragma warning restore CA1034
 }
