@@ -131,7 +131,7 @@ jobs:
           ./ci/dependency-audit.sh --scan \
             --work artifacts/dependency-audit \
             --summary artifacts/dependency-audit/summary.md \
-            --expected-projects 53
+            --expected-projects 54
 
       # Always, including on a failing verdict — a report that only exists when
       # the gate is green is useless. There is no pull-request comment and
