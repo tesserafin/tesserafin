@@ -60,6 +60,6 @@ public static class UnplayedCountIndicator
             font.Size = 18;
         }
 
-        canvas.DrawText(text, x, y, font, paint);
+        canvas.DrawText(text, x, y, SKTextAlign.Left, font, paint);
     }
 }

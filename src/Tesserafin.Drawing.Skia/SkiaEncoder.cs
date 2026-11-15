@@ -446,20 +446,21 @@ public class SkiaEncoder : IImageEncoder
         }
 
         using var svg = SKSvg.CreateFromFile(path);
-        if (svg.Drawable is null)
+        var picture = svg.Picture;
+        if (picture is null)
         {
             return null;
         }
 
-        var width = (int)Math.Round(svg.Drawable.Bounds.Width);
-        var height = (int)Math.Round(svg.Drawable.Bounds.Height);
+        var width = (int)Math.Round(picture.CullRect.Width);
+        var height = (int)Math.Round(picture.CullRect.Height);
 
         SKBitmap? bitmap = null;
         try
         {
             bitmap = new SKBitmap(width, height);
             using var canvas = new SKCanvas(bitmap);
-            canvas.DrawPicture(svg.Picture);
+            canvas.DrawPicture(picture);
             canvas.Flush();
             canvas.Save();
 
@@ -811,7 +812,13 @@ public class SkiaEncoder : IImageEncoder
     {
         foreach (var typeface in _typefaces)
         {
-            if (typeface is not null && typeface.ContainsGlyphs(c))
+            if (typeface is null)
+            {
+                continue;
+            }
+
+            using var font = new SKFont(typeface);
+            if (font.ContainsGlyphs(c))
             {
                 return typeface;
             }

@@ -160,7 +160,7 @@ public class SplashscreenBuilder
             };
 
             canvas.SetMatrix(matrix);
-            canvas.DrawBitmap(input, 0, 0);
+            canvas.DrawBitmap(input, 0, 0, SKSamplingOptions.Default);
 
             return bitmap;
         }
