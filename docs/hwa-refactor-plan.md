@@ -73,6 +73,51 @@ Ces graphes caractérisent le rendu des commandes ; ils ne prouvent pas une exé
 NVENC, HDR ou Dolby Vision sur matériel NVIDIA. La validation des sessions avec FFmpeg logiciel
 reste distincte. Les autres backends et la sélection des encodeurs/décodeurs restent à extraire.
 
+## Extraction VAAPI — consolidation, 2026-11-14
+
+Cette tranche suit #418 et reste dans l'étape 5 de #129. `EncodingHelper` passe de 7 741 à
+7 096 lignes. Elle ne change ni le choix du codec/périphérique, ni le contrat Sessions.
+
+- `CaptureVaapiPipeline` sélectionne une seule variante immuable : logiciel/copy-back,
+  Intel iHD, AMD Vulkan/DRM ou VAAPI limité. Elle capture l'identité/capacité du périphérique,
+  les conditions de version/noyau, la géométrie après rotation, le tone mapping et les
+  chemins de sous-titres. Le renderer ne possède aucun accès à ces sources mutables.
+- `VaapiPipelineRenderer` compose les trois séquences main/subtitle/overlay, avec les
+  transferts mémoire/VAAPI/OpenCL/Vulkan/DRM. Intel sélectionne un seul tone mapping VPP ou
+  OpenCL ; AMD reçoit un import de surface déjà choisi ; le parcours limité garde ses
+  transferts mémoire et son interop i965. Ces choix de capacités ne sont pas une couche
+  de coexistence avec une ancienne API ou un ancien serveur.
+- Les variantes de sous-titres texte mémoire, texte sur source alpha et graphiques sont
+  exclusives. Les overlays Intel conservent leur préparation plafonnée à 1080 pixels et
+  leur taille de sortie distincte. Les graphes AMD gardent l'ordre du désentrelacement
+  après l'overlay lorsque la sortie est VAAPI.
+- Le logiciel/copy-back réutilise `SoftwarePipelineRenderer` ; le renderer VAAPI ajoute
+  l'upload après la composition effective, dans main ou overlay selon le cas. Les helpers
+  partagés de géométrie, de formatage tone mapping et libplacebo restent partagés. Aucun
+  générateur de graphe VAAPI ne reste dans `EncodingHelper`.
+- `GetVaapiVidFilterChain`, `GetIntelVaapiFullVidFiltersPrefered`,
+  `GetAmdVaapiFullVidFiltersPrefered` et `GetVaapiLimitedVidFiltersPrefered` sont supprimées.
+  Il n'y a ni forwarder public ni flag de coexistence. Le désentrelacement VAAPI partagé
+  reste utilisé par les chemins QSV ; cette extraction ne le duplique pas.
+
+328 graphes statiques ont été enregistrés sur #418 (`1ccb0bbae7`) avant extraction, puis
+comparés par le point d'entrée de production `GetVideoProcessingFilterParam`. La matrice
+couvre quatre profils de périphérique, décodage mémoire/VAAPI, sorties VAAPI/logiciel/MJPEG,
+SDR/HDR, SRT/ASS/PGS, rotation, FPS, VPP/OpenCL, modifiers DRM et capacités indisponibles.
+Les contrôles de capture vérifient l'indépendance aux mutations ultérieures du job, de la
+configuration et des capacités ; le garde-fou commun couvre les trois renderers.
+
+Les tests de graphes ne prouvent pas une exécution GPU, HDR, Dolby Vision ou 3D. La validation
+logicielle des sessions et les contrôles FFmpeg/ffprobe restent distincts. Les deux tests VAAPI
+existants sur matériel réel sont conservés et restent ignorés en l'absence de périphérique.
+Les chemins QSV, AMF, VideoToolbox et RKMPP restent à extraire ; l'étape 5 n'est pas close.
+
+Les deux hôtes d'intégration (standard et FFmpeg réel) vident les catalogues de plugins
+installés par migration avant `host.Start()`. La tâche de mise à jour conserve son exécution,
+avec zéro catalogue à interroger. Les tests qui visent un catalogue doivent fournir leur
+fixture explicitement. Les assertions de lecture, d'accès et de contrat restent actives.
+
+
 Les sections suivantes conservent le diagnostic et le séquencement historiques ; leurs noms
 `MediaBrowser.*` et numéros de ligne ne décrivent pas l'arbre après cette extraction.
 

@@ -15,6 +15,7 @@ using Serilog.Core;
 using Serilog.Extensions.Logging;
 using Tesserafin.Common;
 using Tesserafin.Common.Configuration;
+using Tesserafin.Controller.Configuration;
 using Tesserafin.Server.Core;
 using Tesserafin.Server.Extensions;
 using Tesserafin.Server.Helpers;
@@ -115,6 +116,10 @@ namespace Tesserafin.Server.Integration.Tests
             Program.ApplyCoreMigrationsAsync(appHost.ServiceProvider, Migrations.Stages.TesserafinMigrationStageTypes.CoreInitialisation).GetAwaiter().GetResult();
             appHost.InitializeServices(Mock.Of<IConfiguration>()).GetAwaiter().GetResult();
             Program.ApplyCoreMigrationsAsync(appHost.ServiceProvider, Migrations.Stages.TesserafinMigrationStageTypes.AppInitialisation).GetAwaiter().GetResult();
+            // Migrations seed an external catalog. These test hosts use no external plugins;
+            // keep startup's scheduled updater from contacting that catalog. Catalog tests
+            // must configure their own explicit repository fixtures after startup.
+            appHost.ServiceProvider.GetRequiredService<IServerConfigurationManager>().Configuration.PluginRepositories = [];
             host.Start();
 
             appHost.RunStartupTasksAsync().GetAwaiter().GetResult();

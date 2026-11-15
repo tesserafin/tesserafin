@@ -380,7 +380,7 @@ one rendering implementation, including hardware copy-back consumers.
 The former public `GetSwVidFilterChain`, `GetSwScaleFilter` and `GetSwDeinterlaceFilter` methods
 are removed. Frame-rate insertion, map/filter-graph assembly, codec/bitrate/quality selection and
 process execution remain outside this extraction. The diagnostic `TranscodePlan` is not made an
-execution authority by this change. The NVIDIA filter renderer is extracted in §13. Other hardware
+execution authority by this change. The NVIDIA filter renderer is extracted in §13. The VAAPI renderer is extracted in §14. Other hardware
 renderers, global playback switches and all remaining StreamInfo/StreamBuilder consumers above
 remain to be migrated.
 
@@ -407,3 +407,25 @@ values and the removed public entry points. No forbidden-dependency baseline is 
 These are supplemented by snapshot-isolation tests and software FFmpeg/session regression tests.
 There is no claim of real NVIDIA hardware acceptance, HDR/3D acceptance or completion of step 5.
 All remaining StreamInfo/StreamBuilder consumers in §6 are unchanged by this extraction.
+
+## 14. VAAPI filter renderer (consolidation step 5, candidate)
+
+The VAAPI production route captures one immutable `VaapiPipelinePlan` strategy before calling
+`VaapiPipelineRenderer`: software/copy-back, Intel iHD, AMD Vulkan/DRM or limited VAAPI. The
+renderer owns main/subtitle/overlay composition and surface transfers, without consulting job
+state, configuration, device probes, operating-system APIs or subtitle-path services.
+
+Software/copy-back filtering reuses the single software renderer. The VAAPI output upload is
+appended after main or overlay composition as required. Shared geometry, tone-map/libplacebo
+formatting and subtitle resolution stay at the capture boundary. Common FPS insertion, mapping,
+codec/device selection and final command assembly remain outside this renderer.
+
+The four public VAAPI filter-chain entries are removed, without forwarders or a coexistence
+flag. The shared VAAPI deinterlace formatter still serves QSV paths. No project/package/API/SDK
+change or ratchet-baseline expansion is introduced.
+
+328 pre-extraction production graph fixtures cover Intel/AMD/i965/generic profiles and optional
+capabilities. Snapshot-isolation and strategy-selection cases supplement them. Existing real
+VAAPI tests are retained; their hardware requirement is not waived by command characterization.
+Hardware acceptance remains outstanding. Remaining playback consumers in §6 are unchanged, and
+step 5 remains open.

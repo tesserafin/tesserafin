@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.MediaEncoding.Nvidia;
 using Tesserafin.Controller.MediaEncoding.Software;
+using Tesserafin.Controller.MediaEncoding.Vaapi;
 using Xunit;
 
 namespace Tesserafin.Controller.Tests.MediaEncoding;
@@ -17,6 +18,7 @@ public sealed partial class PipelineRendererArchitectureTests
     [Theory]
     [InlineData("Software")]
     [InlineData("Nvidia")]
+    [InlineData("Vaapi")]
     public void RendererSources_ReachOnlyImmutableValuesAndFormatting(string backend)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -49,6 +51,7 @@ public sealed partial class PipelineRendererArchitectureTests
     [Theory]
     [InlineData(typeof(SoftwarePipelinePlan))]
     [InlineData(typeof(NvidiaPipelinePlan))]
+    [InlineData(typeof(VaapiPipelinePlan))]
     public void CapturedPlans_ContainOnlyImmutableValues(Type planType)
     {
         var types = planType.Assembly.GetTypes()
@@ -59,7 +62,7 @@ public sealed partial class PipelineRendererArchitectureTests
             {
                 var valueType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
                 Assert.True(
-                    valueType.IsPrimitive || valueType.IsEnum || valueType == typeof(string) || valueType == typeof(Type) || valueType.Namespace == type.Namespace || valueType == typeof(SoftwareScalingPlan),
+                    valueType.IsPrimitive || valueType.IsEnum || valueType == typeof(string) || valueType == typeof(Type) || valueType.Namespace == type.Namespace || valueType == typeof(SoftwareScalingPlan) || valueType == typeof(SoftwarePipelinePlan),
                     $"{type.Name}.{property.Name} must not retain a mutable request/configuration object.");
                 if (property.SetMethod is { } setter)
                 {
@@ -75,6 +78,10 @@ public sealed partial class PipelineRendererArchitectureTests
     [InlineData("GetSwDeinterlaceFilter")]
     [InlineData("GetNvidiaVidFilterChain")]
     [InlineData("GetNvidiaVidFiltersPrefered")]
+    [InlineData("GetVaapiVidFilterChain")]
+    [InlineData("GetIntelVaapiFullVidFiltersPrefered")]
+    [InlineData("GetAmdVaapiFullVidFiltersPrefered")]
+    [InlineData("GetVaapiLimitedVidFiltersPrefered")]
     public void EncodingHelper_HasNoFormerRendererImplementationEntryPoints(string method)
         => Assert.Null(typeof(EncodingHelper).GetMethod(method));
 
