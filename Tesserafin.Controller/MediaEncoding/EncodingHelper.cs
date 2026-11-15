@@ -22,6 +22,7 @@ using Tesserafin.Controller.MediaEncoding.Nvidia;
 using Tesserafin.Controller.MediaEncoding.Qsv;
 using Tesserafin.Controller.MediaEncoding.Software;
 using Tesserafin.Controller.MediaEncoding.Vaapi;
+using Tesserafin.Controller.MediaEncoding.VideoToolbox;
 using Tesserafin.Controller.Streaming;
 using Tesserafin.Data;
 using Tesserafin.Data.Enums;
@@ -4188,194 +4189,68 @@ namespace Tesserafin.Controller.MediaEncoding
             return new VaapiPipelinePlan.Limited(input, _mediaEncoder.IsVaapiDeviceInteli965, opencl ? GetHwTonemapFilter(options, "opencl", "nv12", mjpeg) : null);
         }
 
-        /// <summary>
-        /// Gets the parameter of Apple VideoToolBox filter chain.
-        /// </summary>
-        /// <param name="state">Encoding state.</param>
-        /// <param name="options">Encoding options.</param>
-        /// <param name="vidEncoder">Video encoder to use.</param>
-        /// <returns>The tuple contains three lists: main, sub and overlay filters.</returns>
-        public (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) GetAppleVidFilterChain(
-            EncodingJobInfo state,
-            EncodingOptions options,
-            string vidEncoder)
+        private (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) RenderVideoToolboxFilterChain(EncodingJobInfo state, EncodingOptions options, string videoEncoder)
         {
-            if (options.HardwareAccelerationType != HardwareAccelerationType.videotoolbox)
-            {
-                return (null, null, null);
-            }
-
-            // ReSharper disable once InconsistentNaming
-            var isMacOS = OperatingSystem.IsMacOS();
-            var vidDecoder = GetHardwareVideoDecoder(state, options) ?? string.Empty;
-            var isVtDecoder = vidDecoder.Contains("videotoolbox", StringComparison.OrdinalIgnoreCase);
-            var isVtEncoder = vidEncoder.Contains("videotoolbox", StringComparison.OrdinalIgnoreCase);
-            var isVtFullSupported = isMacOS && IsVideoToolboxFullSupported();
-
-            // legacy videotoolbox pipeline (disable hw filters)
-            if (!(isVtEncoder || isVtDecoder)
-                || !isVtFullSupported
-                || !_mediaEncoder.SupportsFilter("alphasrc"))
-            {
-                return RenderSoftwareFilterChain(state, options, vidEncoder);
-            }
-
-            // preferred videotoolbox + metal filters pipeline
-            return GetAppleVidFiltersPreferred(state, options, vidDecoder, vidEncoder);
+            var graph = VideoToolboxPipelineRenderer.Render(CaptureVideoToolboxPipeline(state, options, videoEncoder));
+            return (graph.MainFilters.ToList(), graph.SubFilters.ToList(), graph.OverlayFilters.ToList());
         }
 
-        public (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) GetAppleVidFiltersPreferred(
-            EncodingJobInfo state,
-            EncodingOptions options,
-            string vidDecoder,
-            string vidEncoder)
+        internal VideoToolboxPipelinePlan CaptureVideoToolboxPipeline(EncodingJobInfo state, EncodingOptions options, string videoEncoder)
         {
-            var isVtEncoder = vidEncoder.Contains("videotoolbox", StringComparison.OrdinalIgnoreCase);
-            var isVtDecoder = vidDecoder.Contains("videotoolbox", StringComparison.OrdinalIgnoreCase);
-            var isMjpegEncoder = vidEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase);
+            var decoder = GetHardwareVideoDecoder(state, options) ?? string.Empty;
+            var hardwareOutput = videoEncoder.Contains("videotoolbox", StringComparison.OrdinalIgnoreCase);
+            if (!OperatingSystem.IsMacOS() || !IsVideoToolboxFullSupported() || !_mediaEncoder.SupportsFilter("alphasrc")
+                || !(hardwareOutput || decoder.Contains("videotoolbox", StringComparison.OrdinalIgnoreCase)))
+            {
+                return new VideoToolboxPipelinePlan.Software(CaptureSoftwarePipeline(state, options, videoEncoder));
+            }
 
-            var inW = state.VideoStream?.Width;
-            var inH = state.VideoStream?.Height;
-            var reqW = state.BaseRequest.Width;
-            var reqH = state.BaseRequest.Height;
-            var reqMaxW = state.BaseRequest.MaxWidth;
-            var reqMaxH = state.BaseRequest.MaxHeight;
-            var threeDFormat = state.MediaSource.Video3DFormat;
+            return CaptureVideoToolboxHardwarePipeline(state, options, decoder, videoEncoder);
+        }
 
-            var doDeintH2645 = IsDeinterlaceAvailable(state);
-            var doVtTonemap = IsVideoToolboxTonemapAvailable(state, options);
-            var doMetalTonemap = !doVtTonemap && IsHwTonemapAvailable(state, options);
-            var usingHwSurface = isVtDecoder && (_mediaEncoder.EncoderVersion >= _minFFmpegWorkingVtHwSurface);
-
-            var rotation = state.VideoStream?.Rotation ?? 0;
-            var transposeDir = rotation == 0 ? string.Empty : GetVideoTransposeDirection(state);
-            var doVtTranspose = !string.IsNullOrEmpty(transposeDir) && _mediaEncoder.SupportsFilter("transpose_vt");
-            var swapWAndH = Math.Abs(rotation) == 90 && doVtTranspose;
-            var swpInW = swapWAndH ? inH : inW;
-            var swpInH = swapWAndH ? inW : inH;
-
-            var scaleFormat = string.Empty;
-            // Use P010 for Metal tone mapping, otherwise force an 8bit output.
+        internal VideoToolboxPipelinePlan CaptureVideoToolboxHardwarePipeline(EncodingJobInfo state, EncodingOptions options, string decoder, string videoEncoder)
+        {
+            var nativeTone = IsVideoToolboxTonemapAvailable(state, options);
+            var metalTone = !nativeTone && IsHwTonemapAvailable(state, options);
+            var rotation = GetVideoTransposeDirection(state);
+            var transpose = rotation.Length > 0 && _mediaEncoder.SupportsFilter("transpose_vt");
+            var swap = Math.Abs(state.VideoStream?.Rotation ?? 0) == 90 && transpose;
+            var width = swap ? state.VideoStream?.Height : state.VideoStream?.Width;
+            var height = swap ? state.VideoStream?.Width : state.VideoStream?.Height;
+            var request = state.BaseRequest;
+            var format = string.Empty;
             if (!string.Equals(state.VideoStream.PixelFormat, "yuv420p", StringComparison.OrdinalIgnoreCase))
             {
-                if (doMetalTonemap)
+                format = metalTone ? (string.Equals(state.VideoStream.PixelFormat, "yuv420p10le", StringComparison.OrdinalIgnoreCase) ? string.Empty : "p010le") : "nv12";
+            }
+
+            VideoToolboxPipelinePlan.Subtitle subtitles = null;
+            if (state.SubtitleStream is { } subtitle && ShouldEncodeSubtitle(state))
+            {
+                if (subtitle.IsTextSubtitleStream)
                 {
-                    if (!string.Equals(state.VideoStream.PixelFormat, "yuv420p10le", StringComparison.OrdinalIgnoreCase))
-                    {
-                        scaleFormat = "p010le";
-                    }
+                    var ass = string.Equals(subtitle.Codec, "ass", StringComparison.OrdinalIgnoreCase) || string.Equals(subtitle.Codec, "ssa", StringComparison.OrdinalIgnoreCase);
+                    var fps = ass ? Math.Min(state.VideoStream?.RealFrameRate ?? 25, 60) : 10;
+                    subtitles = new VideoToolboxPipelinePlan.Subtitle.Text(
+                        GetAlphaSrcFilter(state, width, height, request.Width, request.Height, request.MaxWidth, request.MaxHeight, fps),
+                        GetTextSubtitlesFilter(state, true, true));
                 }
                 else
                 {
-                    scaleFormat = "nv12";
+                    subtitles = new VideoToolboxPipelinePlan.Subtitle.Graphical(GetGraphicalSubPreProcessFilters(width, height, subtitle.Width, subtitle.Height, request.Width, request.Height, request.MaxWidth, request.MaxHeight));
                 }
             }
 
-            var hwScaleFilter = GetHwScaleFilter("scale", "vt", scaleFormat, false, swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH);
-
-            var hasSubs = state.SubtitleStream is not null && ShouldEncodeSubtitle(state);
-            var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
-            var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
-            var hasAssSubs = hasSubs
-                && (string.Equals(state.SubtitleStream.Codec, "ass", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(state.SubtitleStream.Codec, "ssa", StringComparison.OrdinalIgnoreCase));
-
-            /* Make main filters for video stream */
-            var mainFilters = new List<string>();
-
-            // hw deint
-            if (doDeintH2645)
-            {
-                var deintFilter = GetHwDeinterlaceFilter(state, options, "videotoolbox");
-                mainFilters.Add(deintFilter);
-            }
-
-            // hw transpose
-            if (doVtTranspose)
-            {
-                mainFilters.Add($"transpose_vt=dir={transposeDir}");
-            }
-
-            if (doVtTonemap)
-            {
-                const string VtTonemapArgs = "color_matrix=bt709:color_primaries=bt709:color_transfer=bt709";
-
-                // scale_vt can handle scaling & tonemapping in one shot, just like vpp_qsv.
-                hwScaleFilter = string.IsNullOrEmpty(hwScaleFilter)
-                    ? "scale_vt=" + VtTonemapArgs
-                    : hwScaleFilter + ":" + VtTonemapArgs;
-            }
-
-            // hw scale & vt tonemap
-            mainFilters.Add(hwScaleFilter);
-
-            // Metal tonemap
-            if (doMetalTonemap)
-            {
-                var tonemapFilter = GetHwTonemapFilter(options, "videotoolbox", "nv12", isMjpegEncoder);
-                mainFilters.Add(tonemapFilter);
-            }
-
-            /* Make sub and overlay filters for subtitle stream */
-            var subFilters = new List<string>();
-            var overlayFilters = new List<string>();
-
-            if (hasSubs)
-            {
-                if (hasGraphicalSubs)
-                {
-                    var subW = state.SubtitleStream?.Width;
-                    var subH = state.SubtitleStream?.Height;
-                    var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, reqMaxH);
-                    subFilters.Add(subPreProcFilters);
-                    subFilters.Add("format=bgra");
-                }
-                else if (hasTextSubs)
-                {
-                    var framerate = state.VideoStream?.RealFrameRate;
-                    var subFramerate = hasAssSubs ? Math.Min(framerate ?? 25, 60) : 10;
-
-                    var alphaSrcFilter = GetAlphaSrcFilter(state, swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH, subFramerate);
-                    var subTextSubtitlesFilter = GetTextSubtitlesFilter(state, true, true);
-                    subFilters.Add(alphaSrcFilter);
-                    subFilters.Add("format=bgra");
-                    subFilters.Add(subTextSubtitlesFilter);
-                }
-
-                subFilters.Add("hwupload");
-                overlayFilters.Add("overlay_videotoolbox=eof_action=pass:repeatlast=0");
-            }
-
-            if (usingHwSurface)
-            {
-                if (!isVtEncoder)
-                {
-                    mainFilters.Add("hwdownload");
-                    mainFilters.Add("format=nv12");
-                }
-
-                return (mainFilters, subFilters, overlayFilters);
-            }
-
-            // For old jellyfin-ffmpeg that has broken hwsurface, add a hwupload
-            var needFiltering = mainFilters.Any(f => !string.IsNullOrEmpty(f)) ||
-                                subFilters.Any(f => !string.IsNullOrEmpty(f)) ||
-                                overlayFilters.Any(f => !string.IsNullOrEmpty(f));
-            if (needFiltering)
-            {
-                // INPUT videotoolbox/memory surface(vram/uma)
-                // this will pass-through automatically if in/out format matches.
-                mainFilters.Insert(0, "hwupload");
-                mainFilters.Insert(0, "format=nv12|p010le|videotoolbox_vld");
-
-                if (!isVtEncoder)
-                {
-                    mainFilters.Add("hwdownload");
-                    mainFilters.Add("format=nv12");
-                }
-            }
-
-            return (mainFilters, subFilters, overlayFilters);
+            VideoToolboxPipelinePlan.ToneMapping tone = nativeTone ? new VideoToolboxPipelinePlan.ToneMapping.Native()
+                : metalTone ? new VideoToolboxPipelinePlan.ToneMapping.Metal(GetHwTonemapFilter(options, "videotoolbox", "nv12", videoEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase))) : null;
+            return new VideoToolboxPipelinePlan.Hardware(
+                videoEncoder.Contains("videotoolbox", StringComparison.OrdinalIgnoreCase),
+                decoder.Contains("videotoolbox", StringComparison.OrdinalIgnoreCase) && _mediaEncoder.EncoderVersion >= _minFFmpegWorkingVtHwSurface,
+                IsDeinterlaceAvailable(state) ? GetHwDeinterlaceFilter(state, options, "videotoolbox") : null,
+                transpose ? rotation : null,
+                GetHwScaleFilter("scale", "vt", format, false, width, height, request.Width, request.Height, request.MaxWidth, request.MaxHeight),
+                tone,
+                subtitles);
         }
 
         /// <summary>
@@ -4695,7 +4570,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 HardwareAccelerationType.amf => RenderAmfFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.qsv => RenderQsvFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.nvenc => RenderNvidiaFilterChain(state, options, outputVideoCodec),
-                HardwareAccelerationType.videotoolbox => GetAppleVidFilterChain(state, options, outputVideoCodec),
+                HardwareAccelerationType.videotoolbox => RenderVideoToolboxFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.rkmpp => GetRkmppVidFilterChain(state, options, outputVideoCodec),
                 _ => RenderSoftwareFilterChain(state, options, outputVideoCodec),
             };

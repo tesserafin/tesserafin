@@ -11,6 +11,7 @@ using Tesserafin.Controller.MediaEncoding.Nvidia;
 using Tesserafin.Controller.MediaEncoding.Qsv;
 using Tesserafin.Controller.MediaEncoding.Software;
 using Tesserafin.Controller.MediaEncoding.Vaapi;
+using Tesserafin.Controller.MediaEncoding.VideoToolbox;
 using Xunit;
 
 namespace Tesserafin.Controller.Tests.MediaEncoding;
@@ -19,6 +20,7 @@ public sealed partial class PipelineRendererArchitectureTests
 {
     [Theory]
     [InlineData("Amf")]
+    [InlineData("VideoToolbox")]
     [InlineData("Software")]
     [InlineData("Nvidia")]
     [InlineData("Vaapi")]
@@ -54,6 +56,7 @@ public sealed partial class PipelineRendererArchitectureTests
 
     [Theory]
     [InlineData(typeof(AmfPipelinePlan))]
+    [InlineData(typeof(VideoToolboxPipelinePlan))]
     [InlineData(typeof(SoftwarePipelinePlan))]
     [InlineData(typeof(NvidiaPipelinePlan))]
     [InlineData(typeof(VaapiPipelinePlan))]
@@ -81,6 +84,8 @@ public sealed partial class PipelineRendererArchitectureTests
     [Theory]
     [InlineData("GetAmdDx11VidFiltersPrefered")]
     [InlineData("GetAmdVidFilterChain")]
+    [InlineData("GetAppleVidFiltersPreferred")]
+    [InlineData("GetAppleVidFilterChain")]
     [InlineData("GetSwVidFilterChain")]
     [InlineData("GetSwScaleFilter")]
     [InlineData("GetSwDeinterlaceFilter")]

@@ -6,6 +6,7 @@ using System.Text.Json;
 using Moq;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.MediaEncoding.Amf;
+using Tesserafin.Controller.MediaEncoding.VideoToolbox;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Xunit;
@@ -53,7 +54,7 @@ public sealed class RemainingPipelineCharacterizationTests
 
             case "VideoToolbox":
             {
-                var graph = helper.GetAppleVidFiltersPreferred(state, options, Decoder(scenario), scenario.Encoder);
+                var graph = VideoToolboxPipelineRenderer.Render(helper.CaptureVideoToolboxHardwarePipeline(state, options, Decoder(scenario), scenario.Encoder));
                 return Snapshot(graph.MainFilters, graph.SubFilters, graph.OverlayFilters);
             }
 
