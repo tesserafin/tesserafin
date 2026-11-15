@@ -241,8 +241,14 @@ This is the headline rewrite and has its own section below (§5).
   their permits or disposing. Images/trickplay use the runner's bounded image profile, retaining
   captured child-environment overrides and optional priority. Trickplay renews its inactivity
   deadline only when a new nonempty JPEG appears; single-image extraction has a total timeout.
-  General media-info probing (including its live input pump) still has its existing process
-  wrapper and remains separate work.
+  General media-info probing uses `MediaProbeService` and the same runner: complete stdout JSON,
+  final 65,536 stderr characters, a two-minute total deadline, and a successful native exit required
+  before normalization. A lazy input factory opens a distinct progressive Live TV reader only
+  after native launch; the runner owns that reader and its stdin pump. Native exit, producer
+  failure, timeout and cancellation all join the pump and child before returning. `MediaEncoder`
+  has no native-process wrapper or registry. Image/probe services share `FfmpegOperationScope`:
+  admission closes before cancellation, and encoder disposal starts both shutdowns before waiting
+  for every operation's cleanup. Cancellation requires cooperative stream reads.
   Argument serialization remains a quoted string, not a tokenized argv vector.
 
 **Hardware acceleration** was rewritten into a decision-first design

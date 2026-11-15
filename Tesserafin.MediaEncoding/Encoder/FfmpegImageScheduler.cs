@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -22,12 +23,9 @@ internal sealed class FfmpegImageScheduler : IDisposable
     private readonly IFfmpegProcessRunner _runner;
     private readonly IFileSystem _fileSystem;
     private readonly ILogger _logger;
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Permit ownership is transferred to _operations; its joined shutdown disposes them exactly once after all attempts finish.")]
     private readonly AsyncNonKeyedLocker _permits;
-    private readonly CancellationTokenSource _shutdown = new();
-    private readonly object _gate = new();
-    private readonly HashSet<Task> _attempts = [];
-    private readonly TaskCompletionSource _disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private bool _stopping;
+    private readonly FfmpegOperationScope _operations;
 
     public FfmpegImageScheduler(IFfmpegProcessRunner runner, IFileSystem fileSystem, ILogger logger, int concurrency)
     {
@@ -35,79 +33,54 @@ internal sealed class FfmpegImageScheduler : IDisposable
         _fileSystem = fileSystem;
         _logger = logger;
         _permits = new(concurrency);
+        _operations = new FfmpegOperationScope(_permits.Dispose);
     }
 
     public Task<string> ExtractImageAsync(FfmpegCommand command, string output, TimeSpan timeout, CancellationToken cancellationToken)
-        => Register(command, output, timeout, interval: false, ProcessPriorityClass.BelowNormal, cancellationToken);
+        => _operations.RunAsync(token => ExecuteAsync(command, output, timeout, interval: false, ProcessPriorityClass.BelowNormal, token), cancellationToken);
 
     public Task<string> ExtractIntervalAsync(FfmpegCommand command, string outputDirectory, TimeSpan inactivityTimeout, ProcessPriorityClass? priority, CancellationToken cancellationToken)
-        => Register(command, outputDirectory, inactivityTimeout, interval: true, priority ?? ProcessPriorityClass.BelowNormal, cancellationToken);
+        => _operations.RunAsync(token => ExecuteAsync(command, outputDirectory, inactivityTimeout, interval: true, priority ?? ProcessPriorityClass.BelowNormal, token), cancellationToken);
 
-    private Task<string> Register(FfmpegCommand command, string output, TimeSpan timeout, bool interval, ProcessPriorityClass priority, CancellationToken cancellationToken)
+    private async Task<string> ExecuteAsync(FfmpegCommand command, string output, TimeSpan timeout, bool interval, ProcessPriorityClass priority, CancellationToken cancellationToken)
     {
-        var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        CancellationTokenSource cancellation;
-        lock (_gate)
+        using (await _permits.LockAsync(cancellationToken).ConfigureAwait(false))
         {
-            ObjectDisposedException.ThrowIf(_stopping, this);
-            cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdown.Token);
-            _attempts.Add(completed.Task);
-        }
-
-        return ExecuteAsync(command, output, timeout, interval, priority, cancellation, completed);
-    }
-
-    private async Task<string> ExecuteAsync(FfmpegCommand command, string output, TimeSpan timeout, bool interval, ProcessPriorityClass priority, CancellationTokenSource cancellation, TaskCompletionSource completed)
-    {
-        try
-        {
-            using (await _permits.LockAsync(cancellation.Token).ConfigureAwait(false))
+            cancellationToken.ThrowIfCancellationRequested();
+            Directory.CreateDirectory(interval ? output : Path.GetDirectoryName(output)!);
+            var previousCount = 0;
+            bool HasProgress()
             {
-                cancellation.Token.ThrowIfCancellationRequested();
-                Directory.CreateDirectory(interval ? output : Path.GetDirectoryName(output)!);
-                var previousCount = 0;
-                bool HasProgress()
-                {
-                    var count = Images(output).Count();
-                    var advanced = count > previousCount;
-                    previousCount = count;
-                    return advanced;
-                }
-
-                _logger.LogDebug("Image extraction: {Executable} {Arguments}", command.Executable, command.ArgumentLine);
-                try
-                {
-                    var result = await _runner.RunImageAsync(command, timeout, interval ? HasProgress : null, priority, cancellation.Token).ConfigureAwait(false);
-                    cancellation.Token.ThrowIfCancellationRequested();
-                    if (result.TimedOut || result.ExitCode != 0)
-                    {
-                        _logger.LogError("Image extraction failed: timeout={TimedOut}, exit={ExitCode}, stderr={StandardError}", result.TimedOut, result.ExitCode, result.StandardError);
-                        throw new FfmpegException(result.TimedOut ? "FFmpeg image extraction timed out." : $"FFmpeg image extraction exited with code {result.ExitCode}.");
-                    }
-
-                    if (interval ? !Images(output).Any() : !Nonempty(output))
-                    {
-                        throw new FfmpegException($"FFmpeg image extraction produced no images at {output}.");
-                    }
-
-                    return output;
-                }
-                catch
-                {
-                    // The runner has already killed/waited/drained. Keep the permit until cleanup
-                    // finishes: the next image must never overlap a child that is still stopping.
-                    Cleanup(output, interval);
-                    throw;
-                }
+                var count = Images(output).Count();
+                var advanced = count > previousCount;
+                previousCount = count;
+                return advanced;
             }
-        }
-        finally
-        {
-            cancellation.Dispose();
-            lock (_gate)
+
+            _logger.LogDebug("Image extraction: {Executable} {Arguments}", command.Executable, command.ArgumentLine);
+            try
             {
-                _attempts.Remove(completed.Task);
-                completed.SetResult();
+                var result = await _runner.RunImageAsync(command, timeout, interval ? HasProgress : null, priority, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (result.TimedOut || result.ExitCode != 0)
+                {
+                    _logger.LogError("Image extraction failed: timeout={TimedOut}, exit={ExitCode}, stderr={StandardError}", result.TimedOut, result.ExitCode, result.StandardError);
+                    throw new FfmpegException(result.TimedOut ? "FFmpeg image extraction timed out." : $"FFmpeg image extraction exited with code {result.ExitCode}.");
+                }
+
+                if (interval ? !Images(output).Any() : !Nonempty(output))
+                {
+                    throw new FfmpegException($"FFmpeg image extraction produced no images at {output}.");
+                }
+
+                return output;
+            }
+            catch
+            {
+                // The runner has already killed/waited/drained. Keep the permit until cleanup
+                // finishes: the next image must never overlap a child that is still stopping.
+                Cleanup(output, interval);
+                throw;
             }
         }
     }
@@ -140,40 +113,7 @@ internal sealed class FfmpegImageScheduler : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        Task[]? attempts = null;
-        lock (_gate)
-        {
-            if (!_stopping)
-            {
-                _stopping = true;
-                attempts = _attempts.ToArray();
-            }
-        }
+    public Task StopAsync() => _operations.StopAsync();
 
-        if (attempts is null)
-        {
-            _disposed.Task.GetAwaiter().GetResult();
-            return;
-        }
-
-        try
-        {
-            try
-            {
-                _shutdown.Cancel();
-            }
-            finally
-            {
-                Task.WhenAll(attempts).GetAwaiter().GetResult();
-                _permits.Dispose();
-                _shutdown.Dispose();
-            }
-        }
-        finally
-        {
-            _disposed.SetResult();
-        }
-    }
+    public void Dispose() => _operations.Dispose();
 }

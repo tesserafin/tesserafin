@@ -41,12 +41,16 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
     public Task<FfmpegProcessResult> RunImageAsync(FfmpegCommand command, TimeSpan timeout, Func<bool>? hasProgress, ProcessPriorityClass priority, CancellationToken cancellationToken)
         => RunAsync(command, timeout, standardInput: string.Empty, outputCaptureLimit: 64 * 1024, cancellationToken, hasProgress, priority);
 
-    private async Task<FfmpegProcessResult> RunAsync(FfmpegCommand command, TimeSpan timeout, string? standardInput, int? outputCaptureLimit, CancellationToken cancellationToken, Func<bool>? hasProgress = null, ProcessPriorityClass? priority = null)
+    /// <inheritdoc />
+    public Task<FfmpegProcessResult> RunMediaProbeAsync(FfmpegCommand command, TimeSpan timeout, Func<Stream>? openInput, CancellationToken cancellationToken)
+        => RunAsync(command, timeout, standardInput: openInput is null ? string.Empty : null, outputCaptureLimit: null, cancellationToken, priority: ProcessPriorityClass.BelowNormal, openInput: openInput, errorCaptureLimit: 64 * 1024);
+
+    private async Task<FfmpegProcessResult> RunAsync(FfmpegCommand command, TimeSpan timeout, string? standardInput, int? outputCaptureLimit, CancellationToken cancellationToken, Func<bool>? hasProgress = null, ProcessPriorityClass? priority = null, Func<Stream>? openInput = null, int? errorCaptureLimit = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var timeoutCts = new CancellationTokenSource(timeout);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-        using var process = CreateProcess(command, redirectOutput: true, redirectInput: standardInput is not null, raiseEvents: false);
+        using var process = CreateProcess(command, redirectOutput: true, redirectInput: standardInput is not null || openInput is not null, raiseEvents: false);
         process.Start();
 
         // Both streams must be drained concurrently: reading one to completion before starting
@@ -55,9 +59,10 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
         // pipes, which is what ends these reads (with whatever was captured so far), rather than
         // having them throw and lose that partial output.
         var stdOutTask = ReadOutputAsync(process.StandardOutput, outputCaptureLimit);
-        var stdErrTask = ReadOutputAsync(process.StandardError, outputCaptureLimit);
+        var stdErrTask = ReadOutputAsync(process.StandardError, errorCaptureLimit ?? outputCaptureLimit);
 
         bool timedOut = false;
+        DirectStreamPump? pump = null;
         try
         {
             if (priority is { } requestedPriority)
@@ -72,6 +77,20 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
                 }
             }
 
+            if (openInput is not null)
+            {
+                var source = openInput() ?? throw new IOException("The media probe input factory returned null.");
+                try
+                {
+                    pump = DirectStreamPump.Start(source, process.StandardInput.BaseStream, _logger, linkedCts.Token);
+                }
+                catch
+                {
+                    await source.DisposeAsync().ConfigureAwait(false);
+                    throw;
+                }
+            }
+
             if (standardInput is not null)
             {
                 using var writer = process.StandardInput;
@@ -80,11 +99,31 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
 
             if (hasProgress is null)
             {
-                await process.WaitForExitAsync(linkedCts.Token).ConfigureAwait(false);
+                var exit = process.WaitForExitAsync(linkedCts.Token);
+                if (pump is not null)
+                {
+                    var first = await Task.WhenAny(exit, pump.Completion).ConfigureAwait(false);
+                    if (ReferenceEquals(first, pump.Completion) && pump.Fault is not null)
+                    {
+                        // Wake the exit wait on producer failure, including a consumer ignoring EOF.
+                        await linkedCts.CancelAsync().ConfigureAwait(false);
+                    }
+                }
+
+                await exit.ConfigureAwait(false);
             }
             else
             {
                 await WaitForObservedExitAsync(process, timeout, hasProgress, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (pump is not null)
+            {
+                await pump.StopAsync().ConfigureAwait(false);
+                if (pump.Fault is { } fault)
+                {
+                    throw new IOException("The media probe input failed.", fault);
+                }
             }
         }
         catch (OperationCanceledException)
@@ -97,6 +136,11 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
                 throw;
             }
 
+            if (pump?.Fault is { } fault)
+            {
+                throw new IOException("The media probe input failed.", fault);
+            }
+
             timedOut = true;
         }
         catch
@@ -105,6 +149,13 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
             await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
             await Task.WhenAll(stdOutTask, stdErrTask).ConfigureAwait(false);
             throw;
+        }
+        finally
+        {
+            if (pump is not null)
+            {
+                await pump.DisposeAsync().ConfigureAwait(false);
+            }
         }
 
         var stdOut = await stdOutTask.ConfigureAwait(false);

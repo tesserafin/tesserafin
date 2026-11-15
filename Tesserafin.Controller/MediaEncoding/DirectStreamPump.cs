@@ -70,7 +70,7 @@ public sealed class DirectStreamPump : IAsyncDisposable
     public Task Completion { get; }
 
     /// <summary>
-    /// Gets the producer-side failure that ended the pump, if any. Null when the pump ended because
+    /// Gets the producer, transport or unexpected disposal failure that ended the pump, if any. Null when the pump ended because
     /// the producer reached EOF, the consumer closed its stdin, or the pump was cancelled.
     /// </summary>
     public Exception? Fault { get; private set; }
@@ -222,6 +222,12 @@ public sealed class DirectStreamPump : IAsyncDisposable
         catch (Exception ex) when (ex is IOException or ObjectDisposedException)
         {
             _logger.LogDebug(ex, "Ignoring stream disposal error while stopping the direct stream pump");
+        }
+        catch (Exception ex)
+        {
+            // Completion must still settle and the other owned stream must also be disposed.
+            Fault ??= ex;
+            _logger.LogError(ex, "Direct stream disposal failed");
         }
     }
 }

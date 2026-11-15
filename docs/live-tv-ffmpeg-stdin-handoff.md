@@ -99,3 +99,19 @@ instead.
 `SharedHttpStream.Open` → `MediaSource.Path` → `StreamingHelpers.GetStreamingState` →
 `DirectStreamProvider` → `EncodingHelper` → `TranscodeManager.StartFfMpeg` →
 `LiveTvController.GetLiveStreamFile`. It fails if any category becomes empty.
+
+
+## General media-info probing
+
+`MediaEncoder.GetMediaInfo` captures `pipe:0` when a direct reader is present and delegates
+interpretation/lifetime to `MediaProbeService`. `IFfmpegProcessRunner.RunMediaProbeAsync`
+opens the progressive reader once after launching ffprobe and owns the reader, stdin pump,
+concurrent stdout/stderr drains and native shutdown. There is no native probe wrapper left
+in the encoder and no HTTP retry if input fails. Existing HTTP/RTSP flags are omitted on pipes.
+
+A normal child exit stops an unfinished progressive read immediately. Producer failure stops
+a child that ignores EOF and preserves the source exception. Timeout (two-minute native limit),
+caller cancellation and encoder shutdown kill/wait/drain and join the pump before returning.
+A result is interpreted only after successful native exit; valid JSON from a nonzero exit is
+rejected. Probes and image work share operation registration, and encoder disposal begins
+cancelling both before awaiting their cleanup. Reads must cooperate with cancellation.

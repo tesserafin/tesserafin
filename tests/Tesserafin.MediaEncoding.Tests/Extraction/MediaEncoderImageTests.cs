@@ -99,7 +99,7 @@ public sealed class MediaEncoderImageTests
         Assert.DoesNotContain(logger.Invocations, invocation => invocation.Method.Name == "Log" && invocation.Arguments[0] is LogLevel.Warning);
     }
 
-    private static MediaEncoder Encoder(ExtractionTestContext context, IFfmpegProcessRunner runner, ILogger<MediaEncoder>? logger = null)
+    internal static MediaEncoder Encoder(ExtractionTestContext context, IFfmpegProcessRunner runner, ILogger<MediaEncoder>? logger = null)
     {
         var configuration = new Mock<IServerConfigurationManager>();
         configuration.Setup(c => c.Configuration).Returns(new ServerConfiguration { ParallelImageEncodingLimit = 1, ImageExtractionTimeoutMs = 5_000 });
@@ -109,6 +109,7 @@ public sealed class MediaEncoderImageTests
         // Startup probing is outside these tests: supply the already-selected binary/version.
         typeof(MediaEncoder).GetField("_ffmpegPath", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(encoder, "ffmpeg");
         typeof(MediaEncoder).GetField("_ffmpegVersion", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(encoder, new Version(7, 1));
+        typeof(MediaEncoder).GetField("_ffprobePath", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(encoder, "ffprobe");
         return encoder;
     }
 

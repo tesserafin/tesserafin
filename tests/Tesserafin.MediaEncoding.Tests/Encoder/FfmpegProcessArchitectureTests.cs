@@ -35,14 +35,15 @@ public sealed partial class FfmpegProcessArchitectureTests
     public void ImageScheduler_HasNoNativeProcessLaunch()
         => Assert.DoesNotMatch(NativeProcessCreationOrLaunch(), Source("Tesserafin.MediaEncoding", "Encoder", "FfmpegImageScheduler.cs"));
 
-    [Fact]
-    public void MediaEncoderImagePaths_HaveNoNativeProcessLaunch()
+    [Theory]
+    [InlineData("MediaEncoder.cs")]
+    [InlineData("MediaProbeService.cs")]
+    public void MediaAnalysis_DelegatesNativeProcessLifecycle(string file)
     {
-        var source = Source("Tesserafin.MediaEncoding", "Encoder", "MediaEncoder.cs");
-        var start = source.IndexOf("private async Task<string> ExtractImageInternal(", StringComparison.Ordinal);
-        var end = source.IndexOf("public string GetTimeParameter(long ticks)", start, StringComparison.Ordinal);
-        Assert.True(start >= 0 && end > start);
-        Assert.DoesNotMatch(NativeProcessCreationOrLaunch(), source[start..end]);
+        var source = Source("Tesserafin.MediaEncoding", "Encoder", file);
+        Assert.DoesNotMatch(NativeProcessCreationOrLaunch(), source);
+        Assert.DoesNotContain("ProcessWrapper", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("DirectStreamPump", source, StringComparison.Ordinal);
     }
 
     [Fact]

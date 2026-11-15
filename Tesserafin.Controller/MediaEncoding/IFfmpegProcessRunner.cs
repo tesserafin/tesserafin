@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -55,4 +56,12 @@ public interface IFfmpegProcessRunner
     /// <param name="standardInput">Text to write to the process's standard input and close, or null to leave stdin unredirected.</param>
     /// <returns>The process outcome.</returns>
     Task<FfmpegProcessResult> RunProbeAsync(FfmpegCommand command, TimeSpan timeout, CancellationToken cancellationToken, string? standardInput = null);
+
+    /// <summary>Runs a media-info probe with an optional owned binary input stream.</summary>
+    /// <param name="command">The immutable invocation.</param>
+    /// <param name="timeout">Maximum native execution time.</param>
+    /// <param name="openInput">Opened once after launch; the runner owns and disposes the returned stream.</param>
+    /// <param name="cancellationToken">Cancellation stops and waits for child, pump and output drains.</param>
+    /// <returns>Complete stdout and a bounded stderr tail, after all native resources have ended.</returns>
+    Task<FfmpegProcessResult> RunMediaProbeAsync(FfmpegCommand command, TimeSpan timeout, Func<Stream>? openInput, CancellationToken cancellationToken);
 }

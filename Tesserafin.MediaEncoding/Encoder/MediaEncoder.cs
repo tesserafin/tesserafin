@@ -7,7 +7,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,9 +22,6 @@ using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Streaming;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
-using Tesserafin.Extensions.Json;
-using Tesserafin.Extensions.Json.Converters;
-using Tesserafin.MediaEncoding.Probing;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Drawing;
@@ -55,7 +51,6 @@ namespace Tesserafin.MediaEncoding.Encoder
         private readonly ILogger<MediaEncoder> _logger;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly IFileSystem _fileSystem;
-        private readonly ILocalizationManager _localization;
         private readonly IBlurayExaminer _blurayExaminer;
         private readonly IConfiguration _config;
         private readonly IServerConfigurationManager _serverConfig;
@@ -63,11 +58,8 @@ namespace Tesserafin.MediaEncoding.Encoder
 
         private readonly FfmpegImageScheduler _images;
 
-        private readonly Lock _runningProcessesLock = new();
-        private readonly List<ProcessWrapper> _runningProcesses = new List<ProcessWrapper>();
+        private readonly MediaProbeService _probes;
 
-        // MediaEncoder is registered as a Singleton
-        private readonly JsonSerializerOptions _jsonSerializerOptions;
         private readonly IFfmpegProcessRunner _processRunner;
 
         private HardwareCapabilitySnapshot _capabilities = HardwareCapabilitySnapshot.Empty;
@@ -80,8 +72,6 @@ namespace Tesserafin.MediaEncoding.Encoder
         private bool _isPkeyPauseSupported = false;
         private bool _isLowPriorityHwDecodeSupported = false;
         private bool _proberSupportsFirstVideoFrame = false;
-
-        private bool _canSetProcessPriority = true;
 
         private bool _isVideoToolboxAv1DecodeAvailable = false;
 
@@ -117,14 +107,12 @@ namespace Tesserafin.MediaEncoding.Encoder
             _configurationManager = configurationManager;
             _fileSystem = fileSystem;
             _blurayExaminer = blurayExaminer;
-            _localization = localization;
             _config = config;
             _serverConfig = serverConfig;
             _processRunner = processRunner;
             _startupOptionFFmpegPath = config.GetValue<string>(Tesserafin.Controller.Extensions.ConfigurationExtensions.FfmpegPathKey) ?? string.Empty;
 
-            _jsonSerializerOptions = new JsonSerializerOptions(JsonDefaults.Options);
-            _jsonSerializerOptions.Converters.Add(new JsonBoolStringConverter());
+            _probes = new MediaProbeService(processRunner, logger, localization);
 
             // Although the type is not nullable, this might still be null during unit tests
             var semaphoreCount = serverConfig.Configuration?.ParallelImageEncodingLimit ?? 0;
@@ -512,42 +500,25 @@ namespace Tesserafin.MediaEncoding.Encoder
         /// <inheritdoc />
         public Task<MediaInfo> GetMediaInfo(MediaInfoRequest request, CancellationToken cancellationToken)
         {
-            var extractChapters = request.ExtractChapters;
-            var extraArgs = GetExtraArguments(request);
-
-            // #153-LTV-R1. A request that carries a reader over the media is probed from that
-            // reader, over stdin. The alternative is what LTV-R0 measured on two rig runs: ffprobe
-            // opening MediaSourceInfo.Path, which for a live tuner source is the server's own
-            // [Authorize]d /LiveTv/LiveStreamFiles/** route, with no credential — one GET, one 401,
-            // and a media source published with Codec null / Index -1 on every stream.
-            //
-            // Same ownership and cancellation model as the transcode handoff (#153-LTV-S0): the
-            // pump is started before the output is consumed, is stopped when the process exits or
-            // the token is cancelled, and its fault is observed rather than left unhandled.
             var reader = request.DirectStreamReader;
-            if (reader is not null)
+            var input = reader is null ? GetInputArgument(request.MediaSource.Path, request.MediaSource) : "pipe:0";
+            var args = request.ExtractChapters
+                ? "{0} -i {1} -threads {2} -v warning -print_format json -show_streams -show_chapters -show_format"
+                : "{0} -i {1} -threads {2} -v warning -print_format json -show_streams -show_format";
+            var audio = request.MediaType == DlnaProfileType.Audio;
+            if (request.MediaSource.Protocol == MediaProtocol.File && !audio && _proberSupportsFirstVideoFrame)
             {
-                return GetMediaInfoInternal(
-                    "pipe:0",
-                    request.MediaSource.Path,
-                    request.MediaSource.Protocol,
-                    extractChapters,
-                    extraArgs,
-                    request.MediaType == DlnaProfileType.Audio,
-                    request.MediaSource.VideoType,
-                    reader,
-                    cancellationToken);
+                args += " -show_frames -only_first_vframe";
             }
 
-            return GetMediaInfoInternal(
-                GetInputArgument(request.MediaSource.Path, request.MediaSource),
+            args = string.Format(CultureInfo.InvariantCulture, args, GetExtraArguments(request), input, _threads).Trim();
+            return _probes.ProbeAsync(
+                FfmpegCommand.FromArgumentLine(_ffprobePath, args),
                 request.MediaSource.Path,
                 request.MediaSource.Protocol,
-                extractChapters,
-                extraArgs,
-                request.MediaType == DlnaProfileType.Audio,
+                audio,
                 request.MediaSource.VideoType,
-                null,
+                reader is null ? null : () => new ProgressiveFileStream(reader.GetStream()),
                 cancellationToken);
         }
 
@@ -622,149 +593,6 @@ namespace Tesserafin.MediaEncoding.Encoder
             const string Prefix = "file";
 
             return EncodingUtils.GetInputArgument(Prefix, new[] { inputFile }, MediaProtocol.File);
-        }
-
-        /// <summary>
-        /// Gets the media info internal.
-        /// </summary>
-        /// <returns>Task{MediaInfoResult}.</returns>
-        private async Task<MediaInfo> GetMediaInfoInternal(
-            string inputPath,
-            string primaryPath,
-            MediaProtocol protocol,
-            bool extractChapters,
-            string probeSizeArgument,
-            bool isAudio,
-            VideoType? videoType,
-            IDirectStreamProvider directStreamReader,
-            CancellationToken cancellationToken)
-        {
-            var args = extractChapters
-                ? "{0} -i {1} -threads {2} -v warning -print_format json -show_streams -show_chapters -show_format"
-                : "{0} -i {1} -threads {2} -v warning -print_format json -show_streams -show_format";
-
-            if (protocol == MediaProtocol.File && !isAudio && _proberSupportsFirstVideoFrame)
-            {
-                args += " -show_frames -only_first_vframe";
-            }
-
-            args = string.Format(CultureInfo.InvariantCulture, args, probeSizeArgument, inputPath, _threads).Trim();
-
-            var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-
-                    // Must consume both or ffmpeg may hang due to deadlocks.
-                    RedirectStandardOutput = true,
-
-                    // #153-LTV-R1. Only for a piped probe. Redirecting stdin unconditionally would
-                    // change every other probe's process shape for nothing.
-                    RedirectStandardInput = directStreamReader is not null,
-
-                    FileName = _ffprobePath,
-                    Arguments = args,
-
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    ErrorDialog = false,
-                },
-                EnableRaisingEvents = true
-            };
-
-            _logger.LogDebug("Starting {ProcessFileName} with args {ProcessArgs}", _ffprobePath, args);
-
-            var memoryStream = new MemoryStream();
-            await using (memoryStream.ConfigureAwait(false))
-            using (var processWrapper = new ProcessWrapper(process, this))
-            {
-                StartProcess(processWrapper);
-
-                // #153-LTV-R1. A reader of its OWN: LiveStream.GetStream() constructs a new
-                // FileStream over the tuner's temp file on every call, so the probe never shares a
-                // Stream with the transcode and opening it does not open the tuner a second time.
-                // The pump is bounded by `probeCancellation`, which is cancelled in the finally
-                // below whatever happens, so ffprobe exiting on its own -- which it does, having
-                // read `-analyzeduration` worth of bytes -- never leaves the pump running.
-                DirectStreamPump pump = null;
-                CancellationTokenSource probeCancellation = null;
-                if (directStreamReader is not null)
-                {
-                    probeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    pump = DirectStreamPump.Start(
-                        new ProgressiveFileStream(directStreamReader.GetStream()),
-                        process.StandardInput.BaseStream,
-                        _logger,
-                        probeCancellation.Token);
-                }
-
-                try
-                {
-                    using var reader = process.StandardOutput;
-                    await reader.BaseStream.CopyToAsync(memoryStream, cancellationToken).ConfigureAwait(false);
-                }
-                finally
-                {
-                    if (pump is not null)
-                    {
-                        // Bounded, and in this order: cancel first so a blocked read on a live
-                        // tuner file cannot hold the wait open, then observe the pump's completion
-                        // and its fault so neither is left unobserved, and only then dispose.
-                        await probeCancellation.CancelAsync().ConfigureAwait(false);
-                        await pump.StopAsync().ConfigureAwait(false);
-
-                        var fault = pump.Fault;
-                        if (fault is not null)
-                        {
-                            _logger.LogDebug(fault, "The live stream feeding ffprobe ended early");
-                        }
-
-                        await pump.DisposeAsync().ConfigureAwait(false);
-                        probeCancellation.Dispose();
-                    }
-                }
-
-                memoryStream.Seek(0, SeekOrigin.Begin);
-                InternalMediaInfoResult result;
-                try
-                {
-                    result = await JsonSerializer.DeserializeAsync<InternalMediaInfoResult>(
-                                        memoryStream,
-                                        _jsonSerializerOptions,
-                                        cancellationToken).ConfigureAwait(false);
-                }
-                catch
-                {
-                    StopProcess(processWrapper, 100);
-
-                    throw;
-                }
-
-                if (result is null || (result.Streams is null && result.Format is null))
-                {
-                    throw new FfmpegException("ffprobe failed - streams and format are both null.");
-                }
-
-                if (result.Streams is not null)
-                {
-                    // Normalize aspect ratio if invalid
-                    foreach (var stream in result.Streams)
-                    {
-                        if (string.Equals(stream.DisplayAspectRatio, "0:1", StringComparison.OrdinalIgnoreCase))
-                        {
-                            stream.DisplayAspectRatio = string.Empty;
-                        }
-
-                        if (string.Equals(stream.SampleAspectRatio, "0:1", StringComparison.OrdinalIgnoreCase))
-                        {
-                            stream.SampleAspectRatio = string.Empty;
-                        }
-                    }
-                }
-
-                return new ProbeResultNormalizer(_logger, _localization).GetMediaInfo(result, videoType, isAudio, primaryPath, protocol);
-            }
         }
 
         /// <inheritdoc />
@@ -1180,71 +1008,6 @@ namespace Tesserafin.MediaEncoding.Encoder
             return time.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture);
         }
 
-        private void StartProcess(ProcessWrapper process)
-        {
-            process.Process.Start();
-
-            if (_canSetProcessPriority)
-            {
-                try
-                {
-                    process.Process.PriorityClass = ProcessPriorityClass.BelowNormal;
-                }
-                catch (Exception ex)
-                {
-                    _canSetProcessPriority = false;
-                    _logger.LogWarning(ex, "Unable to set process priority to BelowNormal for {ProcessFileName}. Further attempts will be skipped.", process.Process.StartInfo.FileName);
-                }
-            }
-
-            lock (_runningProcessesLock)
-            {
-                _runningProcesses.Add(process);
-            }
-        }
-
-        private void StopProcess(ProcessWrapper process, int waitTimeMs)
-        {
-            try
-            {
-                if (process.Process.WaitForExit(waitTimeMs))
-                {
-                    return;
-                }
-
-                _logger.LogInformation("Killing ffmpeg process");
-
-                process.Process.Kill();
-            }
-            catch (InvalidOperationException)
-            {
-                // The process has already exited or
-                // there is no process associated with this Process object.
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error killing process");
-            }
-        }
-
-        private void StopProcesses()
-        {
-            List<ProcessWrapper> processes;
-            lock (_runningProcessesLock)
-            {
-                processes = _runningProcesses.ToList();
-                _runningProcesses.Clear();
-            }
-
-            foreach (var process in processes)
-            {
-                if (!process.HasExited)
-                {
-                    StopProcess(process, 500);
-                }
-            }
-        }
-
         public string EscapeSubtitleFilterPath(string path)
         {
             // https://ffmpeg.org/ffmpeg-filters.html#Notes-on-filtergraph-escaping
@@ -1272,14 +1035,9 @@ namespace Tesserafin.MediaEncoding.Encoder
         {
             if (dispose)
             {
-                try
-                {
-                    _images.Dispose();
-                }
-                finally
-                {
-                    StopProcesses();
-                }
+                Task.WhenAll(_images.StopAsync(), _probes.StopAsync()).GetAwaiter().GetResult();
+                _images.Dispose();
+                _probes.Dispose();
             }
         }
 
@@ -1403,67 +1161,6 @@ namespace Tesserafin.MediaEncoding.Encoder
         public bool CanExtractSubtitles(string codec)
         {
             return _configurationManager.GetEncodingOptions().EnableSubtitleExtraction;
-        }
-
-        private sealed class ProcessWrapper : IDisposable
-        {
-            private readonly MediaEncoder _mediaEncoder;
-
-            private bool _disposed = false;
-
-            public ProcessWrapper(Process process, MediaEncoder mediaEncoder)
-            {
-                Process = process;
-                _mediaEncoder = mediaEncoder;
-                Process.Exited += OnProcessExited;
-            }
-
-            public Process Process { get; }
-
-            public bool HasExited { get; private set; }
-
-            public int? ExitCode { get; private set; }
-
-            private void OnProcessExited(object sender, EventArgs e)
-            {
-                var process = (Process)sender;
-
-                HasExited = true;
-
-                try
-                {
-                    ExitCode = process.ExitCode;
-                }
-                catch
-                {
-                }
-
-                DisposeProcess(process);
-            }
-
-            private void DisposeProcess(Process process)
-            {
-                lock (_mediaEncoder._runningProcessesLock)
-                {
-                    _mediaEncoder._runningProcesses.Remove(this);
-                }
-
-                process.Dispose();
-            }
-
-            public void Dispose()
-            {
-                if (!_disposed)
-                {
-                    if (Process is not null)
-                    {
-                        Process.Exited -= OnProcessExited;
-                        DisposeProcess(Process);
-                    }
-                }
-
-                _disposed = true;
-            }
         }
     }
 }

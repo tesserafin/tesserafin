@@ -651,3 +651,52 @@ consolidation ratchet; real software FFmpeg film/OpenAPI/HLS/progressive integra
 Publishing before preparation fails all three postprocessing controls. Publishing metadata
 before data fails the disappeared-data control. A copy/delete fallback fails the cross-device
 case and architecture guard. Restoring source passes the full MediaEncoding suite.
+
+## 21. General media probing and Live TV input ownership (consolidation step 5, candidate)
+
+`MediaEncoder.GetMediaInfo` now only captures the selected executable and probe arguments,
+source metadata and a lazy reader factory. `MediaProbeService` owns operation registration,
+JSON interpretation and the existing `ProbeResultNormalizer`. It rejects timeouts and nonzero
+native exits before interpreting output, including syntactically valid partial results. Invalid
+`0:1` ratios retain their previous normalization. Chapters, first-frame options, audio/video
+selection and HTTP/RTSP option suppression for pipe inputs remain at command construction.
+
+`IFfmpegProcessRunner.RunMediaProbeAsync` owns native launch, concurrent complete stdout capture,
+a bounded 65,536-character stderr tail, the binary input pump and all teardown. A two-minute
+native execution deadline now bounds probes even without caller cancellation. Each provider
+reader is opened exactly once, only after launch, through `ProgressiveFileStream`; probe and
+transcode consumers never share readers. Native exit cancels an unfinished producer. Producer
+failure interrupts even a consumer ignoring EOF, kills/waits/drains the child, and preserves the
+producer exception. Caller cancellation remains cancellation rather than a timeout or metadata
+success. Unexpected stream-disposal errors cannot abandon disposal of the other owned stream.
+
+The old `GetMediaInfoInternal`, `ProcessWrapper`, native-process registry and start/stop helpers
+are deleted. `MediaEncoder` has no native launch or pump ownership left. `FfmpegOperationScope`
+is shared by probes and the image scheduler: register before launch, close admission before
+cancelling, join every operation's cleanup, then release owned resources. Encoder disposal
+starts both shutdowns before awaiting either, so an image cleanup cannot delay cancelling a
+live probe. Concurrent stops await the same completion. This supersedes the remaining-probe
+wrapper and sequential disposal described in §§17–20; other cache families and tokenized argv
+remain separate work. No API/OpenAPI, SDK, project/package or ratchet-baseline change.
+
+The new cases exercise binary input byte integrity across concurrent output floods, diagnostic
+bounds, closed unused stdin, child exit with a blocked source, producer failure, timeout and
+caller cancellation with PID reaping, failed/native-pre-cancelled launch without opening input,
+invalid/failed probe results, ratio normalization, isolated cancellation, shutdown joining and
+public encoder command capture. Real software FFmpeg generates an MPEG-TS fixture: the public
+file probe and two independent progressive Live TV probes return the same useful audio/video
+streams, without fetching the protected LiveStreamFiles URL, and close all their readers.
+Architecture guards now cover the whole encoder and probe interpreter, not only image paths.
+These are regular non-Smoke tests under the existing FFmpeg-equipped hosted job.
+
+The Live TV fixture models the internal tuner-file handoff; it is not a physical tuner rig.
+Stream reads must observe cancellation. Native Windows/macOS and hardware execution remain
+unproven by Linux software tests. Step 5 and remaining playback consumers in §6 stay open.
+
+Local validation for §21: Controller 1,674 passed / 2 hardware skips; MediaEncoding 405 passed /
+2 platform/hardware skips; API 650 passed; Server 528 passed, including the unchanged
+consolidation ratchet; film/OpenAPI/HLS/progressive integration 94 passed with software FFmpeg.
+Injecting native construction into the encoder fails the expanded architecture guard. Accepting
+metadata despite failed/timed-out native execution fails both process-result cases. After source
+restoration, the full MediaEncoding suite and analyzer-enabled builds pass. No hosted CI result
+or physical tuner/GPU acceptance is claimed.

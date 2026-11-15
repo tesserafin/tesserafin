@@ -170,6 +170,19 @@ public class DirectStreamPumpTests
         Assert.True(pump.Completion.IsCompletedSuccessfully);
     }
 
+    [Fact]
+    public async Task UnexpectedDisposalFailure_StillClosesBothStreamsAndReportsFault()
+    {
+        var source = new NonClosingMemoryStream();
+        var destination = new MockDisposeFailureStream();
+        await using var pump = DirectStreamPump.Start(source, destination, NullLogger.Instance, TestContext.Current.CancellationToken);
+        await WithTimeout(pump.Completion);
+        Assert.True(source.IsDisposed);
+        Assert.True(destination.IsDisposed);
+        Assert.Same(destination.Failure, pump.Fault);
+        Assert.True(pump.Completion.IsCompletedSuccessfully);
+    }
+
     private static byte[] RandomBytes(int count)
     {
         var buffer = new byte[count];
@@ -191,6 +204,20 @@ public class DirectStreamPumpTests
         {
             Assert.True(DateTime.UtcNow < deadline, $"Condition was still false after {_timeout}.");
             await Task.Delay(25);
+        }
+    }
+
+    private sealed class MockDisposeFailureStream : MemoryStream
+    {
+        public Exception Failure { get; } = new InvalidOperationException("unexpected disposal failure");
+
+        public bool IsDisposed { get; private set; }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await base.DisposeAsync();
+            IsDisposed = true;
+            throw Failure;
         }
     }
 
