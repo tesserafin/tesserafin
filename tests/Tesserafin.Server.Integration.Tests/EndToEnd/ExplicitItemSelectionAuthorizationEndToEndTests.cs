@@ -154,8 +154,8 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
 
         // Both libraries before either folder: adding a library validates the root's children,
         // and a folder no scan resolved would not survive it.
-        var openDir = await AddLibraryAsync("smr3-open-" + _suffix);
-        var withheldDir = await AddLibraryAsync("smr3-withheld-" + _suffix);
+        var openDir = await AddLibraryAsync("smr3-open-" + _suffix, TestContext.Current.CancellationToken);
+        var withheldDir = await AddLibraryAsync("smr3-withheld-" + _suffix, TestContext.Current.CancellationToken);
 
         // So does the first collection a server is asked for: it creates the collections library, which also
         // queues a library scan nothing awaits. A scan running during the seeding below removes what it did
@@ -174,10 +174,10 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
 
         if (createdTheCollectionsLibrary)
         {
-            await WaitForLibraryScanAsync(beforeFirst);
+            await WaitForLibraryScanAsync(beforeFirst, TestContext.Current.CancellationToken);
         }
 
-        var libraries = await LibrariesAsync();
+        var libraries = await LibrariesAsync(TestContext.Current.CancellationToken);
         _openLibrary = libraries["smr3-open-" + _suffix];
         _withheldLibrary = libraries["smr3-withheld-" + _suffix];
         _openFolder = AddFolder(openDir, _openLibrary);
@@ -225,7 +225,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
         Assert.Equal([_openLibrary], library.GetCollectionFolders(library.GetItemById(_visible)!).Select(f => f.Id));
         Assert.Equal([_withheldLibrary], library.GetCollectionFolders(library.GetItemById(_hidden)!).Select(f => f.Id));
 
-        (_restricted, _restrictedId) = await SignInAsync("smr3-restricted-" + _suffix, [_openLibrary]);
+        (_restricted, _restrictedId) = await SignInAsync("smr3-restricted-" + _suffix, [_openLibrary], TestContext.Current.CancellationToken);
     }
 
     public async ValueTask DisposeAsync()
@@ -255,18 +255,18 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     [Fact(Timeout = 120_000)]
     public async Task Harness_TheRestrictedUserSeesOneLibraryAndNotTheOther()
     {
-        Assert.Equal(HttpStatusCode.OK, (await SendAsync(_restricted, "GET", "Items/" + _visible)).Status);
-        Assert.Equal(HttpStatusCode.NotFound, (await SendAsync(_restricted, "GET", "Items/" + _hidden)).Status);
-        Assert.Equal(HttpStatusCode.OK, (await SendAsync(_admin, "GET", "Items/" + _hidden)).Status);
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(_restricted, "GET", "Items/" + _visible, TestContext.Current.CancellationToken)).Status);
+        Assert.Equal(HttpStatusCode.NotFound, (await SendAsync(_restricted, "GET", "Items/" + _hidden, TestContext.Current.CancellationToken)).Status);
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(_admin, "GET", "Items/" + _hidden, TestContext.Current.CancellationToken)).Status);
 
         // What the by-name routes are searched for is there to be found, by who may see it.
         // (Genres, Studios and the other by-name routes list items only a scan creates: on this
         // harness they answer with nothing for anyone, and their rows below cannot fail.)
         foreach (var mark in new[] { "-genre", "-tag" })
         {
-            var all = await SendAsync(_admin, "GET", FormattableString.Invariant($"Items/Filters?userId={_adminId}&parentId={_withheldFolder}"));
+            var all = await SendAsync(_admin, "GET", FormattableString.Invariant($"Items/Filters?userId={_adminId}&parentId={_withheldFolder}"), TestContext.Current.CancellationToken);
             Assert.Contains("withheld-" + _suffix + mark, all.Body, StringComparison.Ordinal);
-            var mine = await SendAsync(_restricted, "GET", FormattableString.Invariant($"Items/Filters?userId={_restrictedId}&parentId={_openFolder}"));
+            var mine = await SendAsync(_restricted, "GET", FormattableString.Invariant($"Items/Filters?userId={_restrictedId}&parentId={_openFolder}"), TestContext.Current.CancellationToken);
             Assert.Contains("open-" + _suffix + mark, mine.Body, StringComparison.Ordinal);
         }
 
@@ -276,7 +276,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
         {
             foreach (var route in new[] { "Items/Latest?", "Items?recursive=true&", "Items?recursive=true&includeItemTypes=Movie&" })
             {
-                var under = await SendAsync(_restricted, "GET", FormattableString.Invariant($"{route}userId={_restrictedId}&parentId={parent}"));
+                var under = await SendAsync(_restricted, "GET", FormattableString.Invariant($"{route}userId={_restrictedId}&parentId={parent}"), TestContext.Current.CancellationToken);
                 Assert.True(under.Body.Contains(_visibleName, StringComparison.Ordinal), FormattableString.Invariant($"{route}parentId={(parent.Equals(_openLibrary) ? "library" : "folder")}: {(int)under.Status} {under.Body}"));
             }
         }
@@ -284,13 +284,13 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
         // The people and the next episode the rows below look for are there, for who may see them.
         foreach (var route in new[] { "Persons?parentId=" + _withheldLibrary, "Persons?appearsInItemId=" + _hidden })
         {
-            Assert.Contains("withheld-" + _suffix + " actor", (await SendAsync(_admin, "GET", route + "&userId=" + _adminId)).Body, StringComparison.Ordinal);
+            Assert.Contains("withheld-" + _suffix + " actor", (await SendAsync(_admin, "GET", route + "&userId=" + _adminId, TestContext.Current.CancellationToken)).Body, StringComparison.Ordinal);
         }
 
-        Assert.Contains("open-" + _suffix + " actor", (await SendAsync(_restricted, "GET", "Persons?appearsInItemId=" + _visible + "&userId=" + _restrictedId)).Body, StringComparison.Ordinal);
-        Assert.Contains("withheld-" + _suffix + " episode", (await SendAsync(_admin, "GET", "Shows/NextUp?seriesId=" + _hiddenSeries + "&userId=" + _adminId)).Body, StringComparison.Ordinal);
+        Assert.Contains("open-" + _suffix + " actor", (await SendAsync(_restricted, "GET", "Persons?appearsInItemId=" + _visible + "&userId=" + _restrictedId, TestContext.Current.CancellationToken)).Body, StringComparison.Ordinal);
+        Assert.Contains("withheld-" + _suffix + " episode", (await SendAsync(_admin, "GET", "Shows/NextUp?seriesId=" + _hiddenSeries + "&userId=" + _adminId, TestContext.Current.CancellationToken)).Body, StringComparison.Ordinal);
 
-        var listing = await SendAsync(_restricted, "GET", "Items?recursive=true&includeItemTypes=Movie&" + Everything);
+        var listing = await SendAsync(_restricted, "GET", "Items?recursive=true&includeItemTypes=Movie&" + Everything, TestContext.Current.CancellationToken);
         Assert.Contains(_visibleName, listing.Body, StringComparison.Ordinal);
         AssertNothingOfTheWithheldItem("unrestricted listing", listing.Body);
     }
@@ -305,8 +305,8 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     [MemberData(nameof(Selections))]
     public async Task WithheldItemNamedById_IsAnsweredAsAnIdThatNamesNothing(string template)
     {
-        var refused = await SendAsync(_restricted, "GET", Fill(template, _hidden) + "&" + Everything);
-        var unknown = await SendAsync(_restricted, "GET", Fill(template, Guid.NewGuid()) + "&" + Everything);
+        var refused = await SendAsync(_restricted, "GET", Fill(template, _hidden) + "&" + Everything, TestContext.Current.CancellationToken);
+        var unknown = await SendAsync(_restricted, "GET", Fill(template, Guid.NewGuid()) + "&" + Everything, TestContext.Current.CancellationToken);
 
         AssertNothingOfTheWithheldItem(template, refused.Body);
         Assert.Equal(unknown.Status, refused.Status);
@@ -331,7 +331,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
 
         foreach (var ids in new[] { new[] { _visible, _hidden }, [_hidden, _visible], [_hidden, _visible, Guid.NewGuid(), _hidden] })
         {
-            var mixed = await SendAsync(_restricted, "GET", Fill(template, ids) + "&" + Everything);
+            var mixed = await SendAsync(_restricted, "GET", Fill(template, ids) + "&" + Everything, TestContext.Current.CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, mixed.Status);
             AssertNothingOfTheWithheldItem(template, mixed.Body);
@@ -356,19 +356,19 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     {
         const string Page = "Items?ids={ids}&userId={user}&sortBy=SortName&sortOrder=Descending&limit=1&startIndex=";
 
-        var (allowed, allowedId) = await SignInAsync("smr3-pager-" + _suffix, [_openLibrary, _withheldLibrary]);
+        var (allowed, allowedId) = await SignInAsync("smr3-pager-" + _suffix, [_openLibrary, _withheldLibrary], TestContext.Current.CancellationToken);
         using (allowed)
         {
             foreach (var (start, expected) in new[] { (0, _hidden), (1, _visible) })
             {
-                var page = await SendAsync(allowed, "GET", FillAs(Page + start, allowedId, _visible, _hidden));
+                var page = await SendAsync(allowed, "GET", FillAs(Page + start, allowedId, _visible, _hidden), TestContext.Current.CancellationToken);
                 using var document = JsonDocument.Parse(page.Body);
                 Assert.Equal(expected, Guid.Parse(Assert.Single(document.RootElement.GetProperty("Items").EnumerateArray()).GetProperty("Id").GetString()!));
                 Assert.Equal(2, document.RootElement.GetProperty("TotalRecordCount").GetInt32());
             }
         }
 
-        var first = await SendAsync(_restricted, "GET", Fill(Page + "0", [_visible, _hidden]) + "&" + Everything);
+        var first = await SendAsync(_restricted, "GET", Fill(Page + "0", [_visible, _hidden]) + "&" + Everything, TestContext.Current.CancellationToken);
         AssertNothingOfTheWithheldItem("first page", first.Body);
         using (var document = JsonDocument.Parse(first.Body))
         {
@@ -376,7 +376,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
             Assert.Equal(1, document.RootElement.GetProperty("TotalRecordCount").GetInt32());
         }
 
-        var second = await SendAsync(_restricted, "GET", Fill(Page + "1", [_visible, _hidden]) + "&" + Everything);
+        var second = await SendAsync(_restricted, "GET", Fill(Page + "1", [_visible, _hidden]) + "&" + Everything, TestContext.Current.CancellationToken);
         AssertNothingOfTheWithheldItem("second page", second.Body);
         using (var document = JsonDocument.Parse(second.Body))
         {
@@ -392,13 +392,13 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     [Fact(Timeout = 120_000)]
     public async Task UserWithNoLibrary_IsAnsweredWithNothing()
     {
-        var (nobody, nobodyId) = await SignInAsync("smr3-nobody-" + _suffix, []);
+        var (nobody, nobodyId) = await SignInAsync("smr3-nobody-" + _suffix, [], TestContext.Current.CancellationToken);
         using (nobody)
         {
             foreach (var template in Selections.Select(row => row.Data))
             {
-                var answer = await SendAsync(nobody, "GET", FillAs(template, nobodyId, _visible, _hidden) + "&" + Everything);
-                var unknown = await SendAsync(nobody, "GET", FillAs(template, nobodyId, Guid.NewGuid()) + "&" + Everything);
+                var answer = await SendAsync(nobody, "GET", FillAs(template, nobodyId, _visible, _hidden) + "&" + Everything, TestContext.Current.CancellationToken);
+                var unknown = await SendAsync(nobody, "GET", FillAs(template, nobodyId, Guid.NewGuid()) + "&" + Everything, TestContext.Current.CancellationToken);
 
                 AssertNothingOfTheWithheldItem(template, answer.Body);
                 Assert.DoesNotContain(_visibleName, answer.Body, StringComparison.Ordinal);
@@ -416,18 +416,18 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     [Fact(Timeout = 120_000)]
     public async Task LibraryWithdrawnBetweenTwoRequests_TheSecondNoLongerCarriesItsItems()
     {
-        var (second, secondId) = await SignInAsync("smr3-second-" + _suffix, [_openLibrary, _withheldLibrary]);
+        var (second, secondId) = await SignInAsync("smr3-second-" + _suffix, [_openLibrary, _withheldLibrary], TestContext.Current.CancellationToken);
         using (second)
         {
             var url = FillAs("Items?ids={ids}&userId={user}", secondId, _visible, _hidden) + "&" + Everything;
 
-            var before = await SendAsync(second, "GET", url);
+            var before = await SendAsync(second, "GET", url, TestContext.Current.CancellationToken);
             Assert.Contains(_hiddenName, before.Body, StringComparison.Ordinal);
             Assert.Contains(_visibleName, before.Body, StringComparison.Ordinal);
 
-            await RestrictAsync(secondId, [_openLibrary]);
+            await RestrictAsync(secondId, [_openLibrary], TestContext.Current.CancellationToken);
 
-            var after = await SendAsync(second, "GET", url);
+            var after = await SendAsync(second, "GET", url, TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.OK, after.Status);
             AssertNothingOfTheWithheldItem("after the library was withdrawn", after.Body);
             Assert.Contains(_visibleName, after.Body, StringComparison.Ordinal);
@@ -456,7 +456,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
 
         // The merge is real: who may see both is told of two sources, on the primary.
         var primary = withheldIsPrimary ? withheld : open;
-        var both = await SendAsync(_admin, "GET", FormattableString.Invariant($"Items/{primary}?userId={_adminId}&{Everything}"));
+        var both = await SendAsync(_admin, "GET", FormattableString.Invariant($"Items/{primary}?userId={_adminId}&{Everything}"), TestContext.Current.CancellationToken);
         using (var document = JsonDocument.Parse(both.Body))
         {
             Assert.Equal(2, document.RootElement.GetProperty("MediaSources").GetArrayLength());
@@ -478,7 +478,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
         foreach (var template in templates)
         {
             var separator = template.Contains('?', StringComparison.Ordinal) ? '&' : '?';
-            var answer = await SendAsync(_restricted, "GET", Fill(template, open) + separator + Everything);
+            var answer = await SendAsync(_restricted, "GET", Fill(template, open) + separator + Everything, TestContext.Current.CancellationToken);
 
             Assert.True(answer.Status == HttpStatusCode.OK, FormattableString.Invariant($"{template} answered {(int)answer.Status}: {answer.Body}"));
             foreach (var mark in marks)
@@ -488,7 +488,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
         }
 
         // Its own version is still its own, with its own file.
-        var own = await SendAsync(_restricted, "GET", FormattableString.Invariant($"Items/{open}?userId={_restrictedId}&{Everything}"));
+        var own = await SendAsync(_restricted, "GET", FormattableString.Invariant($"Items/{open}?userId={_restrictedId}&{Everything}"), TestContext.Current.CancellationToken);
         using (var document = JsonDocument.Parse(own.Body))
         {
             var source = Assert.Single(document.RootElement.GetProperty("MediaSources").EnumerateArray());
@@ -496,8 +496,8 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
             Assert.EndsWith("open-version-" + _suffix + ".mp4", source.GetProperty("Path").GetString(), StringComparison.Ordinal);
         }
 
-        var named = await SendAsync(_restricted, "GET", Fill("Items?ids={ids}&userId={user}", withheld) + "&" + Everything);
-        var unknown = await SendAsync(_restricted, "GET", Fill("Items?ids={ids}&userId={user}", Guid.NewGuid()) + "&" + Everything);
+        var named = await SendAsync(_restricted, "GET", Fill("Items?ids={ids}&userId={user}", withheld) + "&" + Everything, TestContext.Current.CancellationToken);
+        var unknown = await SendAsync(_restricted, "GET", Fill("Items?ids={ids}&userId={user}", Guid.NewGuid()) + "&" + Everything, TestContext.Current.CancellationToken);
         Assert.Equal(unknown.Body, named.Body);
     }
 
@@ -509,12 +509,12 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     [Fact(Timeout = 120_000)]
     public async Task WhoMaySeeAnItem_IsStillAnsweredWithIt()
     {
-        var (allowed, allowedId) = await SignInAsync("smr3-allowed-" + _suffix, [_openLibrary, _withheldLibrary]);
+        var (allowed, allowedId) = await SignInAsync("smr3-allowed-" + _suffix, [_openLibrary, _withheldLibrary], TestContext.Current.CancellationToken);
         using (allowed)
         {
             foreach (var template in new[] { "Items?ids={ids}&userId={user}", "Items?ids={ids}", "Users/{user}/Items?ids={ids}", "Items?ids={ids}&recursive=true&includeItemTypes=Movie" })
             {
-                var answer = await SendAsync(allowed, "GET", FillAs(template, allowedId, _hidden, _visible) + "&" + Everything);
+                var answer = await SendAsync(allowed, "GET", FillAs(template, allowedId, _hidden, _visible) + "&" + Everything, TestContext.Current.CancellationToken);
 
                 Assert.Equal(HttpStatusCode.OK, answer.Status);
                 using var document = JsonDocument.Parse(answer.Body);
@@ -524,12 +524,12 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
             }
         }
 
-        var byAdmin = await SendAsync(_admin, "GET", FillAs("Items?ids={ids}&userId={user}", _adminId, _hidden, _visible) + "&" + Everything);
+        var byAdmin = await SendAsync(_admin, "GET", FillAs("Items?ids={ids}&userId={user}", _adminId, _hidden, _visible) + "&" + Everything, TestContext.Current.CancellationToken);
         Assert.Contains(_hiddenName, byAdmin.Body, StringComparison.Ordinal);
         Assert.Contains(_visibleName, byAdmin.Body, StringComparison.Ordinal);
 
         // The restricted user's own item, by id, as before.
-        var mine = await SendAsync(_restricted, "GET", Fill("Items?ids={ids}&userId={user}", _visible) + "&" + Everything);
+        var mine = await SendAsync(_restricted, "GET", Fill("Items?ids={ids}&userId={user}", _visible) + "&" + Everything, TestContext.Current.CancellationToken);
         Assert.Contains(_visibleName, mine.Body, StringComparison.Ordinal);
         Assert.Contains("open-" + _suffix + ".mp4", mine.Body, StringComparison.Ordinal);
 
@@ -542,13 +542,13 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
         using var keys = JsonDocument.Parse(await _admin.GetStringAsync("Auth/Keys", TestContext.Current.CancellationToken));
         var key = keys.RootElement.GetProperty("Items").EnumerateArray().Single(k => k.GetProperty("AppName").GetString() == app).GetProperty("AccessToken").GetString();
         using var anonymous = _factory.CreateClient();
-        var byKey = await SendAsync(anonymous, "GET", FormattableString.Invariant($"Items?ids={_hidden},{_visible}&ApiKey={key}&{Everything}"));
+        var byKey = await SendAsync(anonymous, "GET", FormattableString.Invariant($"Items?ids={_hidden},{_visible}&ApiKey={key}&{Everything}"), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, byKey.Status);
         Assert.Contains(_hiddenName, byKey.Body, StringComparison.Ordinal);
         Assert.Contains(_visibleName, byKey.Body, StringComparison.Ordinal);
 
         // A key that asks as a user is answered as that user.
-        var byKeyAsUser = await SendAsync(anonymous, "GET", FormattableString.Invariant($"Items?ids={_hidden},{_visible}&userId={_restrictedId}&ApiKey={key}&{Everything}"));
+        var byKeyAsUser = await SendAsync(anonymous, "GET", FormattableString.Invariant($"Items?ids={_hidden},{_visible}&userId={_restrictedId}&ApiKey={key}&{Everything}"), TestContext.Current.CancellationToken);
         AssertNothingOfTheWithheldItem("an API key asking as the restricted user", byKeyAsUser.Body);
         Assert.Contains(_visibleName, byKeyAsUser.Body, StringComparison.Ordinal);
 
@@ -569,7 +569,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     public async Task RouteNamingTheWithheldItem_AnswersWithNothingOfIt(string method, string template)
     {
         var separator = template.Contains('?', StringComparison.Ordinal) ? '&' : '?';
-        var answer = await SendAsync(_restricted, method, Fill(template, _hidden) + separator + "userId=" + _restrictedId + "&" + Everything);
+        var answer = await SendAsync(_restricted, method, Fill(template, _hidden) + separator + "userId=" + _restrictedId + "&" + Everything, TestContext.Current.CancellationToken);
 
         Assert.True((int)answer.Status < 500, FormattableString.Invariant($"{method} {template} answered {(int)answer.Status}"));
         AssertNothingOfTheWithheldItem(method + " " + template, answer.Body, idToo: false);
@@ -604,7 +604,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
 
         // What the playlist holds, told to who may see everything: both items when the
         // administrator filled it, the visible one alone when the restricted user did.
-        var held = await SendAsync(_admin, "GET", FormattableString.Invariant($"Playlists/{playlist}/Items?userId={_adminId}"));
+        var held = await SendAsync(_admin, "GET", FormattableString.Invariant($"Playlists/{playlist}/Items?userId={_adminId}"), TestContext.Current.CancellationToken);
         Assert.Contains(_visibleName, held.Body, StringComparison.Ordinal);
         Assert.Equal(!ownedByTheRestrictedUser, held.Body.Contains(_hiddenName, StringComparison.Ordinal));
 
@@ -618,16 +618,16 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
             FormattableString.Invariant($"Playlists/{playlist}/InstantMix?userId={_restrictedId}&{Everything}"),
         })
         {
-            var read = await SendAsync(_restricted, "GET", url);
+            var read = await SendAsync(_restricted, "GET", url, TestContext.Current.CancellationToken);
             Assert.True(read.Status == HttpStatusCode.OK, FormattableString.Invariant($"{url} answered {(int)read.Status}"));
             AssertNothingOfTheWithheldItem(url, read.Body, container: url.StartsWith("Items/", StringComparison.Ordinal));
         }
 
-        var mine = await SendAsync(_restricted, "GET", FormattableString.Invariant($"Playlists/{playlist}/Items?userId={_restrictedId}&{Everything}"));
+        var mine = await SendAsync(_restricted, "GET", FormattableString.Invariant($"Playlists/{playlist}/Items?userId={_restrictedId}&{Everything}"), TestContext.Current.CancellationToken);
         Assert.Contains(_visibleName, mine.Body, StringComparison.Ordinal);
 
         // Nor by asking as the user who may see it.
-        var asAnother = await SendAsync(_restricted, "GET", FormattableString.Invariant($"Playlists/{playlist}/Items?userId={_adminId}&{Everything}"));
+        var asAnother = await SendAsync(_restricted, "GET", FormattableString.Invariant($"Playlists/{playlist}/Items?userId={_adminId}&{Everything}"), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, asAnother.Status);
         AssertNothingOfTheWithheldItem("the playlist, asked as the administrator", asAnother.Body);
     }
@@ -656,10 +656,10 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
             var hosting = Guid.Parse(folders.RootElement.EnumerateArray()
                 .Single(f => f.TryGetProperty("CollectionType", out var type) && type.GetString() == "boxsets")
                 .GetProperty("ItemId").GetString()!);
-            await RestrictAsync(_restrictedId, [_openLibrary, hosting]);
+            await RestrictAsync(_restrictedId, [_openLibrary, hosting], TestContext.Current.CancellationToken);
         }
 
-        var held = await SendAsync(_admin, "GET", FormattableString.Invariant($"Items?parentId={collection}&userId={_adminId}"));
+        var held = await SendAsync(_admin, "GET", FormattableString.Invariant($"Items?parentId={collection}&userId={_adminId}"), TestContext.Current.CancellationToken);
         Assert.Contains(_visibleName, held.Body, StringComparison.Ordinal);
         Assert.Contains(_hiddenName, held.Body, StringComparison.Ordinal);
 
@@ -673,12 +673,12 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
             FormattableString.Invariant($"Items?includeItemTypes=BoxSet&recursive=true&userId={_restrictedId}&{Everything}"),
         })
         {
-            var read = await SendAsync(_restricted, "GET", url);
+            var read = await SendAsync(_restricted, "GET", url, TestContext.Current.CancellationToken);
             Assert.True(read.Status == HttpStatusCode.OK, FormattableString.Invariant($"{url} answered {(int)read.Status}"));
             AssertNothingOfTheWithheldItem(url, read.Body, container: !url.Contains("parentId", StringComparison.Ordinal));
         }
 
-        var mine = await SendAsync(_restricted, "GET", FormattableString.Invariant($"Items?parentId={collection}&recursive=true&userId={_restrictedId}&{Everything}"));
+        var mine = await SendAsync(_restricted, "GET", FormattableString.Invariant($"Items?parentId={collection}&recursive=true&userId={_restrictedId}&{Everything}"), TestContext.Current.CancellationToken);
         Assert.Contains(_visibleName, mine.Body, StringComparison.Ordinal);
     }
 
@@ -696,7 +696,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
             Assert.Equal(HttpStatusCode.NoContent, playing.StatusCode);
         }
 
-        Assert.Contains(_visibleName, (await SendAsync(_restricted, "GET", "Sessions")).Body, StringComparison.Ordinal);
+        Assert.Contains(_visibleName, (await SendAsync(_restricted, "GET", "Sessions", TestContext.Current.CancellationToken)).Body, StringComparison.Ordinal);
         using (var viewing = await _restricted.PostAsync("Sessions/Viewing?itemId=" + _visible, null, TestContext.Current.CancellationToken))
         {
             Assert.Equal(HttpStatusCode.NoContent, viewing.StatusCode);
@@ -708,21 +708,21 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
             Assert.True((int)playing.StatusCode < 500);
         }
 
-        AssertNothingOfTheWithheldItem("GET Sessions, after Sessions/Playing", (await SendAsync(_restricted, "GET", "Sessions")).Body, idToo: false);
+        AssertNothingOfTheWithheldItem("GET Sessions, after Sessions/Playing", (await SendAsync(_restricted, "GET", "Sessions", TestContext.Current.CancellationToken)).Body, idToo: false);
 
         using (var progress = await _restricted.PostAsJsonAsync("Sessions/Playing/Progress", new { ItemId = _hidden, MediaSourceId = _hidden.ToString("N", CultureInfo.InvariantCulture), PlaySessionId = "smr3-" + _suffix, PositionTicks = 10_000_000 }, JsonDefaults.Options, TestContext.Current.CancellationToken))
         {
             Assert.True((int)progress.StatusCode < 500);
         }
 
-        AssertNothingOfTheWithheldItem("GET Sessions, after Sessions/Playing/Progress", (await SendAsync(_restricted, "GET", "Sessions")).Body, idToo: false);
+        AssertNothingOfTheWithheldItem("GET Sessions, after Sessions/Playing/Progress", (await SendAsync(_restricted, "GET", "Sessions", TestContext.Current.CancellationToken)).Body, idToo: false);
 
         using (var viewing = await _restricted.PostAsync("Sessions/Viewing?itemId=" + _hidden, null, TestContext.Current.CancellationToken))
         {
             Assert.True((int)viewing.StatusCode < 500);
         }
 
-        AssertNothingOfTheWithheldItem("GET Sessions, after Sessions/Viewing", (await SendAsync(_restricted, "GET", "Sessions")).Body, idToo: false);
+        AssertNothingOfTheWithheldItem("GET Sessions, after Sessions/Viewing", (await SendAsync(_restricted, "GET", "Sessions", TestContext.Current.CancellationToken)).Body, idToo: false);
 
         using (var stopped = await _restricted.PostAsJsonAsync("Sessions/Playing/Stopped", new { ItemId = _hidden, MediaSourceId = _hidden.ToString("N", CultureInfo.InvariantCulture), PlaySessionId = "smr3-" + _suffix, PositionTicks = 10_000_000 }, JsonDefaults.Options, TestContext.Current.CancellationToken))
         {
@@ -731,15 +731,15 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
 
         foreach (var url in new[] { "Sessions", "UserItems/Resume?userId=" + _restrictedId + "&" + Everything, "Items?filters=IsResumable&recursive=true&userId=" + _restrictedId + "&" + Everything, "Items/Latest?userId=" + _restrictedId + "&" + Everything })
         {
-            AssertNothingOfTheWithheldItem(url + ", after a reported playback", (await SendAsync(_restricted, "GET", url)).Body, idToo: false);
+            AssertNothingOfTheWithheldItem(url + ", after a reported playback", (await SendAsync(_restricted, "GET", url, TestContext.Current.CancellationToken)).Body, idToo: false);
         }
     }
 
-    private static async Task<(HttpStatusCode Status, string Body)> SendAsync(HttpClient client, string method, string url)
+    private static async Task<(HttpStatusCode Status, string Body)> SendAsync(HttpClient client, string method, string url, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(new HttpMethod(method), url);
-        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
-        return (response.StatusCode, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        using var response = await client.SendAsync(request, cancellationToken);
+        return (response.StatusCode, await response.Content.ReadAsStringAsync(cancellationToken));
     }
 
     private string Fill(string template, params Guid[] ids) => FillAs(template, _restrictedId, ids);
@@ -794,7 +794,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
             });
     }
 
-    private async Task WaitForLibraryScanAsync(DateTime since)
+    private async Task WaitForLibraryScanAsync(DateTime since, CancellationToken cancellationToken)
     {
         var scan = _factory.Services.GetRequiredService<ITaskManager>().ScheduledTasks.Single(w => w.ScheduledTask.Key == "RefreshLibrary");
         for (var i = 0; i < 600; i++)
@@ -804,16 +804,16 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
                 return;
             }
 
-            await Task.Delay(100, TestContext.Current.CancellationToken);
+            await Task.Delay(100, cancellationToken);
         }
 
         Assert.Fail("the library scan queued by the collections library did not finish");
     }
 
-    private async Task<string> AddLibraryAsync(string name)
+    private async Task<string> AddLibraryAsync(string name, CancellationToken cancellationToken)
     {
         var directory = Directory.CreateDirectory(Path.Combine(_workDir, name)).FullName;
-        using var added = await _admin.PostAsJsonAsync("Library/VirtualFolders?collectionType=movies&refreshLibrary=false&name=" + name + "&paths=" + Uri.EscapeDataString(directory), new { }, JsonDefaults.Options, TestContext.Current.CancellationToken);
+        using var added = await _admin.PostAsJsonAsync("Library/VirtualFolders?collectionType=movies&refreshLibrary=false&name=" + name + "&paths=" + Uri.EscapeDataString(directory), new { }, JsonDefaults.Options, cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, added.StatusCode);
         return directory;
     }
@@ -833,40 +833,40 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
         return folder.Id;
     }
 
-    private async Task<Dictionary<string, Guid>> LibrariesAsync()
+    private async Task<Dictionary<string, Guid>> LibrariesAsync(CancellationToken cancellationToken)
     {
-        using var document = JsonDocument.Parse(await _admin.GetStringAsync("Library/VirtualFolders", TestContext.Current.CancellationToken));
+        using var document = JsonDocument.Parse(await _admin.GetStringAsync("Library/VirtualFolders", cancellationToken));
         return document.RootElement.EnumerateArray().ToDictionary(f => f.GetProperty("Name").GetString()!, f => Guid.Parse(f.GetProperty("ItemId").GetString()!));
     }
 
-    private async Task RestrictAsync(Guid userId, Guid[] libraries)
+    private async Task RestrictAsync(Guid userId, Guid[] libraries, CancellationToken cancellationToken)
     {
-        var user = (await _admin.GetFromJsonAsync<UserDto>(FormattableString.Invariant($"Users/{userId}"), JsonDefaults.Options, TestContext.Current.CancellationToken))!;
+        var user = (await _admin.GetFromJsonAsync<UserDto>(FormattableString.Invariant($"Users/{userId}"), JsonDefaults.Options, cancellationToken))!;
         user.Policy!.EnableAllFolders = false;
         user.Policy.EnabledFolders = libraries;
-        using var applied = await _admin.PostAsJsonAsync(FormattableString.Invariant($"Users/{userId}/Policy"), user.Policy, JsonDefaults.Options, TestContext.Current.CancellationToken);
+        using var applied = await _admin.PostAsJsonAsync(FormattableString.Invariant($"Users/{userId}/Policy"), user.Policy, JsonDefaults.Options, cancellationToken);
         applied.EnsureSuccessStatusCode();
     }
 
-    private async Task<(HttpClient Client, Guid UserId)> SignInAsync(string name, Guid[] libraries)
+    private async Task<(HttpClient Client, Guid UserId)> SignInAsync(string name, Guid[] libraries, CancellationToken cancellationToken)
     {
         const string Password = "smr3-password";
         UserDto created;
-        using (var response = await _admin.PostAsJsonAsync("/Users/New", new { Name = name, Password }, JsonDefaults.Options, TestContext.Current.CancellationToken))
+        using (var response = await _admin.PostAsJsonAsync("/Users/New", new { Name = name, Password }, JsonDefaults.Options, cancellationToken))
         {
             response.EnsureSuccessStatusCode();
-            created = (await response.Content.ReadFromJsonAsync<UserDto>(JsonDefaults.Options, TestContext.Current.CancellationToken))!;
+            created = (await response.Content.ReadFromJsonAsync<UserDto>(JsonDefaults.Options, cancellationToken))!;
         }
 
-        await RestrictAsync(created.Id, libraries);
+        await RestrictAsync(created.Id, libraries, cancellationToken);
 
         using var anonymous = _factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/Users/AuthenticateByName");
         request.Headers.TryAddWithoutValidation(AuthHelper.AuthHeaderName, MediaBoundaryFixture.AuthorizationHeader(name + "-device", null));
         request.Content = JsonContent.Create(new { Username = name, Pw = Password }, options: JsonDefaults.Options);
-        using var authenticated = await anonymous.SendAsync(request, TestContext.Current.CancellationToken);
+        using var authenticated = await anonymous.SendAsync(request, cancellationToken);
         authenticated.EnsureSuccessStatusCode();
-        using var document = JsonDocument.Parse(await authenticated.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        using var document = JsonDocument.Parse(await authenticated.Content.ReadAsStringAsync(cancellationToken));
 
         var client = _factory.CreateClient();
         client.Timeout = TimeSpan.FromSeconds(90);

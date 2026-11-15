@@ -241,7 +241,7 @@ docker run --rm \
         # keeps the build honest even if a stage between the purge and here writes into obj/.
         dotnet build '${SOLUTION}' --no-restore --no-incremental -clp:ErrorsOnly
         echo '-- dotnet test (full suite, excluding the optional PR115d smoke stage) --'
-        dotnet test '${SOLUTION}' --no-build --nologo --filter 'Category!=Smoke'
+        dotnet test --solution '${SOLUTION}' --no-build --filter 'Category!=Smoke' --no-progress
     "
 STATUS=$?
 set -e

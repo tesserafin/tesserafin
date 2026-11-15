@@ -75,7 +75,7 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
         Seeded seeded;
         using (var first = new Boot(_dataRoot))
         {
-            seeded = await SeedAsync(first);
+            seeded = await SeedAsync(first, TestContext.Current.CancellationToken);
         }
 
         using (var server = new Boot(_dataRoot))
@@ -90,7 +90,7 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
             {
                 foreach (var item in seeded.Items)
                 {
-                    capabilities[(name, item)] = await MintAsync(client, userId, item);
+                    capabilities[(name, item)] = await MintAsync(client, userId, item, TestContext.Current.CancellationToken);
                 }
             }
 
@@ -102,13 +102,13 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
 
             await AssertAsync("before any tag", beaAllowed: true);
 
-            await TagAsync(admin, seeded.AdminId, seeded.Vault, VaultTag);
+            await TagAsync(admin, seeded.AdminId, seeded.Vault, TestContext.Current.CancellationToken, VaultTag);
             await AssertAsync("after tagging Vault", beaAllowed: false);
 
-            await TagAsync(admin, seeded.AdminId, seeded.Vault);
+            await TagAsync(admin, seeded.AdminId, seeded.Vault, TestContext.Current.CancellationToken);
             await AssertAsync("after untagging Vault", beaAllowed: true);
 
-            await TagAsync(admin, seeded.AdminId, seeded.Vault, VaultTag);
+            await TagAsync(admin, seeded.AdminId, seeded.Vault, TestContext.Current.CancellationToken, VaultTag);
             await AssertAsync("after tagging Vault again", beaAllowed: false);
         }
 
@@ -123,7 +123,7 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
             await AssertDecisionsAsync("after a restart, bea", bea, anonymous, seeded.BeaId, seeded, none, "bea", allowed: false);
             await AssertDecisionsAsync("after a restart, cleo", cleo, anonymous, seeded.CleoId, seeded, none, "cleo", allowed: true);
 
-            await TagAsync(admin, seeded.AdminId, seeded.Vault);
+            await TagAsync(admin, seeded.AdminId, seeded.Vault, TestContext.Current.CancellationToken);
             await AssertDecisionsAsync("after untagging the tag a restart loaded, bea", bea, anonymous, seeded.BeaId, seeded, none, "bea", allowed: true);
         }
 
@@ -144,17 +144,17 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
         foreach (var item in seeded.Items)
         {
             var at = FormattableString.Invariant($"{what}, item {(item.Equals(seeded.InBoth) ? "in both libraries" : "in Vault only")}");
-            Expect(at + ": by id", expected, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{item}?userId={userId}")));
-            Expect(at + ": PlaybackInfo", expected, await StatusAsync(client, HttpMethod.Post, FormattableString.Invariant($"Items/{item}/PlaybackInfo?userId={userId}"), new { }));
-            Expect(at + ": bytes with the user's token", expected, await StatusAsync(client, HttpMethod.Get, Bytes(item)));
+            Expect(at + ": by id", expected, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{item}?userId={userId}"), cancellationToken: TestContext.Current.CancellationToken));
+            Expect(at + ": PlaybackInfo", expected, await StatusAsync(client, HttpMethod.Post, FormattableString.Invariant($"Items/{item}/PlaybackInfo?userId={userId}"), new { }, cancellationToken: TestContext.Current.CancellationToken));
+            Expect(at + ": bytes with the user's token", expected, await StatusAsync(client, HttpMethod.Get, Bytes(item), cancellationToken: TestContext.Current.CancellationToken));
             if (capabilities.TryGetValue((name, item), out var capability))
             {
-                Expect(at + ": bytes with a capability minted before the change", expected, await StatusAsync(anonymous, HttpMethod.Get, Bytes(item) + "&playbackCapability=" + Uri.EscapeDataString(capability)));
+                Expect(at + ": bytes with a capability minted before the change", expected, await StatusAsync(anonymous, HttpMethod.Get, Bytes(item) + "&playbackCapability=" + Uri.EscapeDataString(capability), cancellationToken: TestContext.Current.CancellationToken));
             }
         }
 
-        Expect(what + ": the Vault library by id", expected, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{seeded.Vault}?userId={userId}")));
-        Expect(what + ": the Films library by id", HttpStatusCode.OK, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{seeded.Films}?userId={userId}")));
+        Expect(what + ": the Vault library by id", expected, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{seeded.Vault}?userId={userId}"), cancellationToken: TestContext.Current.CancellationToken));
+        Expect(what + ": the Films library by id", HttpStatusCode.OK, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{seeded.Films}?userId={userId}"), cancellationToken: TestContext.Current.CancellationToken));
 
         using var listing = JsonDocument.Parse(await client.GetStringAsync(FormattableString.Invariant($"Items?recursive=true&includeItemTypes=Movie&userId={userId}"), TestContext.Current.CancellationToken));
         var listed = listing.RootElement.GetProperty("Items").EnumerateArray().Select(i => Guid.Parse(i.GetProperty("Id").GetString()!)).ToHashSet();
@@ -174,7 +174,7 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
 
     private static string Bytes(Guid item) => FormattableString.Invariant($"Videos/{item}/stream?static=true&mediaSourceId={item:N}");
 
-    private static async Task<HttpStatusCode> StatusAsync(HttpClient client, HttpMethod method, string url, object? body = null)
+    private static async Task<HttpStatusCode> StatusAsync(HttpClient client, HttpMethod method, string url, object? body = null, CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(method, url);
         if (body is not null)
@@ -182,15 +182,15 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
             request.Content = JsonContent.Create(body, options: JsonDefaults.Options);
         }
 
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         return response.StatusCode;
     }
 
-    private static async Task<string> MintAsync(HttpClient client, Guid userId, Guid item)
+    private static async Task<string> MintAsync(HttpClient client, Guid userId, Guid item, CancellationToken cancellationToken)
     {
-        using var info = await client.PostAsJsonAsync(FormattableString.Invariant($"Items/{item}/PlaybackInfo?userId={userId}"), new { }, JsonDefaults.Options, TestContext.Current.CancellationToken);
+        using var info = await client.PostAsJsonAsync(FormattableString.Invariant($"Items/{item}/PlaybackInfo?userId={userId}"), new { }, JsonDefaults.Options, cancellationToken);
         info.EnsureSuccessStatusCode();
-        using var infoDocument = JsonDocument.Parse(await info.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        using var infoDocument = JsonDocument.Parse(await info.Content.ReadAsStringAsync(cancellationToken));
         var (status, body) = await MintingFixture.MintAsync(client, [PlaybackCapabilityScope.Media], item, item.ToString("N"), infoDocument.RootElement.GetProperty("PlaySessionId").GetString()!);
         Assert.Equal(HttpStatusCode.OK, status);
         using var document = JsonDocument.Parse(body);
@@ -200,16 +200,16 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
     /// <summary>
     /// What the item editor does: reads the item, changes its tags, posts it back.
     /// </summary>
-    private static async Task TagAsync(HttpClient admin, Guid adminId, Guid item, params string[] tags)
+    private static async Task TagAsync(HttpClient admin, Guid adminId, Guid item, CancellationToken cancellationToken, params string[] tags)
     {
-        var dto = JsonNode.Parse(await admin.GetStringAsync(FormattableString.Invariant($"Items/{item}?userId={adminId}"), TestContext.Current.CancellationToken))!;
+        var dto = JsonNode.Parse(await admin.GetStringAsync(FormattableString.Invariant($"Items/{item}?userId={adminId}"), cancellationToken))!;
         dto["Tags"] = new JsonArray(tags.Select(t => (JsonNode)t).ToArray());
         using var content = new StringContent(dto.ToJsonString(), System.Text.Encoding.UTF8, "application/json");
-        using var saved = await admin.PostAsync(FormattableString.Invariant($"Items/{item}"), content, TestContext.Current.CancellationToken);
+        using var saved = await admin.PostAsync(FormattableString.Invariant($"Items/{item}"), content, cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, saved.StatusCode);
     }
 
-    private async Task<Seeded> SeedAsync(Boot server)
+    private async Task<Seeded> SeedAsync(Boot server, CancellationToken cancellationToken)
     {
         var (adminToken, adminId) = await server.EnsureAuthenticatedAsync();
         using var admin = server.AdminClient(adminToken);
@@ -219,10 +219,10 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
 
         // Both libraries before either folder: adding a library validates the root's children,
         // and a folder no scan resolved would not survive it.
-        await AddLibraryAsync(admin, "r2-films", films);
-        await AddLibraryAsync(admin, "r2-vault", vault, films);
+        await AddLibraryAsync(admin, "r2-films", cancellationToken, films);
+        await AddLibraryAsync(admin, "r2-vault", cancellationToken, vault, films);
 
-        using var libraries = JsonDocument.Parse(await admin.GetStringAsync("Library/VirtualFolders", TestContext.Current.CancellationToken));
+        using var libraries = JsonDocument.Parse(await admin.GetStringAsync("Library/VirtualFolders", cancellationToken));
         var ids = libraries.RootElement.EnumerateArray().ToDictionary(f => f.GetProperty("Name").GetString()!, f => Guid.Parse(f.GetProperty("ItemId").GetString()!));
 
         var library = server.Services.GetRequiredService<ILibraryManager>();
@@ -240,16 +240,16 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
         var inBoth = Seed(server, Path.Combine(films, "r2-film.mp4"), filmsFolder);
         var vaultOnly = Seed(server, Path.Combine(vault, "r2-vault.mp4"), vaultFolder);
 
-        var (beaToken, beaId) = await SignInAsync(server, admin, "r2-bea", "r2 vault only");
-        var (cleoToken, cleoId) = await SignInAsync(server, admin, "r2-cleo", "r2 unrelated");
+        var (beaToken, beaId) = await SignInAsync(server, admin, "r2-bea", "r2 vault only", cancellationToken);
+        var (cleoToken, cleoId) = await SignInAsync(server, admin, "r2-cleo", "r2 unrelated", cancellationToken);
 
         return new Seeded(adminToken, adminId, beaToken, beaId, cleoToken, cleoId, ids["r2-films"], ids["r2-vault"], inBoth, [inBoth, vaultOnly]);
     }
 
-    private static async Task AddLibraryAsync(HttpClient admin, string name, params string[] paths)
+    private static async Task AddLibraryAsync(HttpClient admin, string name, CancellationToken cancellationToken, params string[] paths)
     {
         var query = string.Concat(paths.Select(p => "&paths=" + Uri.EscapeDataString(p)));
-        using var added = await admin.PostAsJsonAsync("Library/VirtualFolders?collectionType=movies&refreshLibrary=false&name=" + name + query, new { }, JsonDefaults.Options, TestContext.Current.CancellationToken);
+        using var added = await admin.PostAsJsonAsync("Library/VirtualFolders?collectionType=movies&refreshLibrary=false&name=" + name + query, new { }, JsonDefaults.Options, cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, added.StatusCode);
     }
 
@@ -276,18 +276,18 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
             parentId: folder);
     }
 
-    private static async Task<(string Token, Guid Id)> SignInAsync(Boot server, HttpClient admin, string name, string blockedTag)
+    private static async Task<(string Token, Guid Id)> SignInAsync(Boot server, HttpClient admin, string name, string blockedTag, CancellationToken cancellationToken)
     {
         UserDto created;
-        using (var response = await admin.PostAsJsonAsync("/Users/New", new { Name = name, Password }, JsonDefaults.Options, TestContext.Current.CancellationToken))
+        using (var response = await admin.PostAsJsonAsync("/Users/New", new { Name = name, Password }, JsonDefaults.Options, cancellationToken))
         {
             response.EnsureSuccessStatusCode();
-            created = (await response.Content.ReadFromJsonAsync<UserDto>(JsonDefaults.Options, TestContext.Current.CancellationToken))!;
+            created = (await response.Content.ReadFromJsonAsync<UserDto>(JsonDefaults.Options, cancellationToken))!;
         }
 
         var policy = created.Policy!;
         policy.BlockedTags = [blockedTag];
-        using (var applied = await admin.PostAsJsonAsync(FormattableString.Invariant($"/Users/{created.Id}/Policy"), policy, JsonDefaults.Options, TestContext.Current.CancellationToken))
+        using (var applied = await admin.PostAsJsonAsync(FormattableString.Invariant($"/Users/{created.Id}/Policy"), policy, JsonDefaults.Options, cancellationToken))
         {
             applied.EnsureSuccessStatusCode();
         }
@@ -296,9 +296,9 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
         using var request = new HttpRequestMessage(HttpMethod.Post, "/Users/AuthenticateByName");
         request.Headers.TryAddWithoutValidation(AuthHelper.AuthHeaderName, MediaBoundaryFixture.AuthorizationHeader(name, null));
         request.Content = JsonContent.Create(new { Username = name, Pw = Password }, options: JsonDefaults.Options);
-        using var authenticated = await anonymous.SendAsync(request, TestContext.Current.CancellationToken);
+        using var authenticated = await anonymous.SendAsync(request, cancellationToken);
         authenticated.EnsureSuccessStatusCode();
-        using var document = JsonDocument.Parse(await authenticated.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        using var document = JsonDocument.Parse(await authenticated.Content.ReadAsStringAsync(cancellationToken));
         return (document.RootElement.GetProperty("AccessToken").GetString()!, created.Id);
     }
 

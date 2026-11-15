@@ -53,8 +53,12 @@ dotnet build Tesserafin.sln       # warnings are errors; analyzers armed in Debu
 ## Test
 
 ```bash
-dotnet test Tesserafin.sln --filter 'Category!=Smoke'
+dotnet test --solution Tesserafin.sln --filter 'Category!=Smoke'
 ```
+
+Tests run on Microsoft.Testing.Platform (`global.json` sets `test.runner`), so
+`dotnet test` takes `--solution`/`--project`, `--report-trx` and `--coverlet`
+instead of the VSTest `--logger`/`--collect` switches.
 
 `Category=Smoke` is the optional, heavier ffmpeg/HLS stage; it is deliberately
 excluded from the core gate and run on its own with `./ci/smoke.sh`. The core

@@ -347,7 +347,7 @@ C'est le seul point d'entrée. Il :
    premier problème :
    - `dotnet restore Tesserafin.sln`
    - `dotnet build Tesserafin.sln` (0 erreur exigée)
-   - `dotnet test Tesserafin.sln` (suite complète)
+   - `dotnet test --solution Tesserafin.sln` (suite complète, Microsoft.Testing.Platform)
 4. affiche un résumé PASS/FAIL avec le temps total en fin d'exécution.
 
 Le dépôt est monté en bind-mount (pas copié) dans le conteneur : le script

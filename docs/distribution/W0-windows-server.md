@@ -94,7 +94,7 @@ sound: `Set up job`, `checkout`, `setup-dotnet` and the NuGet cache all
 succeeded before the cancellation, which retires "no native Windows x64 runner
 can execute" as a blocker. Second, the Windows test verdict cannot come from
 that workflow while the macOS leg fails first, so the W0 probe workflow runs the
-**identical** command (`dotnet test Tesserafin.sln --configuration Release
+**identical** command (`dotnet test --solution Tesserafin.sln --configuration Release
 --filter 'Category!=Smoke'`) in its own `windows-tests` job and reports it as W0
 evidence.
 

@@ -65,7 +65,8 @@ FROZEN_PINS = {
     "ci/windows/w2/two-runner-controls.py": "303b2ebf7cdf6c82b24eb4077eb26696c6b0c7c7e8dc0016656a28efe7f19491",
     "ci/windows/w2/web-payload-controls.py": "6ccc80158e1194a5ede42b6925f7305c31b6c1a0ddc00e3e3a47d2d819fd2f17",
     "ci/windows/w2/zip-controls.py": "36f3496c3011a199fe3ac8b1e3b6c9aee7a9f0bba2c500ed5bcd0420a5e8f277",
-    ".github/workflows/w0-windows-probe.yml": "e092e3c3a6af555e2b3c2f0675c19adb81b563cf4d763d1d2d441041768136e3",
+    # Re-pinned for #357: its `dotnet test` call moved to Microsoft.Testing.Platform syntax.
+    ".github/workflows/w0-windows-probe.yml": "176be938da325f264db7addb8a14f6978fa9c04011d4bb04235980f0f1d438f2",
     ".github/workflows/w1-windows-build-inputs-consume.yml": "61c1434b722c34068609b98f61f6065039b2e641bd826185b69f1e28c9d67125",
     ".github/workflows/w1-windows-build-inputs.yml": "c2e4785b9e0183fe00c72abf5331e5d3a62e918298c0d1e8d46514374f3bd527",
     # Re-pinned: one step added before the source fetch, ensure-tls-trust.sh
@@ -79,7 +80,8 @@ FROZEN_PINS = {
     ".github/workflows/w2-windows-server-zip.yml": "337921cc0e473701a29d0ea193e70884ec93c68de1ba1d57bf1d84ec63dc4ac1",
     ".github/workflows/w2-windows-web-payload.yml": "4347e06bfd33ed0ad0c431959ac4301f2e8c19bd8d438327e14e2b3ce6ed98ef",
     ".github/workflows/w2-windows-zip-two-runner.yml": "fbfcbf19931cb5396e391443714b62da77bff43b7998b06c6999cb7c726c368b",
-    ".github/workflows/w3-windows-service-host.yml": "60678f742861628d92680cf846452675bd3f3d1b8403f1e6d732c85b7cf716e2",
+    # Re-pinned for #357: its `dotnet test` call moved to Microsoft.Testing.Platform syntax.
+    ".github/workflows/w3-windows-service-host.yml": "31907297eba8ea83a6632fd024fdf1a6d79d42a0f5175c006b4b091b0f166a48",
     ".github/workflows/w4-windows-msi.yml": "deffcba556b413f5823ec8605f3ad6560a703f0b95660763968c124fd7b001c0",
     "ci/windows/runtime-retention/consume.ps1": "80e3ca9aaa9323192537afafb01302869d2a58a869d1faf613048fc60dde3053",
     "ci/windows/runtime-retention/accepted-runtime.json": "b599c3c1a2e6130549759b2beb5701fef6a196357a8244d4f0ecd751e4d11adb",

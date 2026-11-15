@@ -181,7 +181,7 @@ jobs:
       - name: The exit contract as unit evidence
         shell: pwsh
         run: |
-          dotnet test tests/Tesserafin.Server.Tests/Tesserafin.Server.Tests.csproj `
+          dotnet test --project tests/Tesserafin.Server.Tests/Tesserafin.Server.Tests.csproj `
             -c Debug --filter 'FullyQualifiedName~FatalStartupExitCodeTests'
           if ($LASTEXITCODE -ne 0) { throw 'the W3 exit-contract tests failed' }
 

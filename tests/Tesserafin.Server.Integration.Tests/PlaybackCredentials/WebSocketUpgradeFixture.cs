@@ -68,24 +68,25 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         Factory = new WebSocketUpgradeApplicationFactory();
+        var cancellationToken = TestContext.Current.CancellationToken;
 
         using (var setup = Factory.CreateClient())
         {
             var startupUser = await setup
-                .GetFromJsonAsync<StartupUserDto>("/Startup/User", JsonDefaults.Options)
+                .GetFromJsonAsync<StartupUserDto>("/Startup/User", JsonDefaults.Options, cancellationToken)
                 .ConfigureAwait(false);
 
             _userName = startupUser!.Name ?? string.Empty;
             _password = startupUser.Password ?? string.Empty;
 
-            using var complete = await setup.PostAsync("/Startup/Complete", new ByteArrayContent([])).ConfigureAwait(false);
+            using var complete = await setup.PostAsync("/Startup/Complete", new ByteArrayContent([]), cancellationToken).ConfigureAwait(false);
             Assert.Equal(HttpStatusCode.NoContent, complete.StatusCode);
         }
 
-        DurableToken = await AuthenticateAsync(PrimaryDeviceId).ConfigureAwait(false);
+        DurableToken = await AuthenticateAsync(PrimaryDeviceId, cancellationToken).ConfigureAwait(false);
 
         using var me = ClientFor(PrimaryDeviceId, DurableToken);
-        using var document = JsonDocument.Parse(await me.GetStringAsync("/Users/Me").ConfigureAwait(false));
+        using var document = JsonDocument.Parse(await me.GetStringAsync("/Users/Me", cancellationToken).ConfigureAwait(false));
         UserId = Guid.Parse(document.RootElement.GetProperty("Id").GetString()!);
     }
 
@@ -100,18 +101,19 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
     /// Authenticates the fixture's user on one device.
     /// </summary>
     /// <param name="deviceId">The device to authenticate as.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>That session's durable token.</returns>
-    public async Task<string> AuthenticateAsync(string deviceId)
+    public async Task<string> AuthenticateAsync(string deviceId, CancellationToken cancellationToken)
     {
         using var client = Factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/Users/AuthenticateByName");
         request.Headers.TryAddWithoutValidation(AuthHelper.AuthHeaderName, MediaBoundaryFixture.AuthorizationHeader(deviceId, null));
         request.Content = JsonContent.Create(new { Username = _userName, Pw = _password }, options: JsonDefaults.Options);
 
-        using var response = await client.SendAsync(request).ConfigureAwait(false);
+        using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
         return document.RootElement.GetProperty("AccessToken").GetString()!;
     }
 
@@ -135,15 +137,16 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
     /// </summary>
     /// <param name="deviceId">The device to mint for.</param>
     /// <param name="token">That device's durable token.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The minted ticket.</returns>
-    public async Task<WebSocketTicketDto> MintTicketAsync(string deviceId, string token)
+    public async Task<WebSocketTicketDto> MintTicketAsync(string deviceId, string token, CancellationToken cancellationToken)
     {
         using var client = ClientFor(deviceId, token);
-        using var response = await client.PostAsync("/WebSocket/Tickets", content: null).ConfigureAwait(false);
+        using var response = await client.PostAsync("/WebSocket/Tickets", content: null, cancellationToken).ConfigureAwait(false);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var dto = await response.Content
-            .ReadFromJsonAsync<WebSocketTicketDto>(JsonDefaults.Options)
+            .ReadFromJsonAsync<WebSocketTicketDto>(JsonDefaults.Options, cancellationToken)
             .ConfigureAwait(false);
 
         Assert.NotNull(dto);
@@ -154,36 +157,40 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
     /// <summary>
     /// Mints a ticket for the fixture's primary device.
     /// </summary>
+    /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The minted ticket.</returns>
-    public Task<WebSocketTicketDto> MintTicketAsync() => MintTicketAsync(PrimaryDeviceId, DurableToken);
+    public Task<WebSocketTicketDto> MintTicketAsync(CancellationToken cancellationToken) => MintTicketAsync(PrimaryDeviceId, DurableToken, cancellationToken);
 
     /// <summary>
     /// Opens the real socket presenting ONLY a ticket in the query string — no header, no token.
     /// </summary>
     /// <param name="ticket">The ticket value.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <param name="durableToken">An optional durable token to also present, for no-fallback cases.</param>
     /// <param name="deviceId">The device the optional header claims.</param>
     /// <returns>The connected socket.</returns>
-    public Task<WebSocket> ConnectWithTicketAsync(string ticket, string? durableToken = null, string deviceId = PrimaryDeviceId)
-        => ConnectAsync($"webSocketTicket={Uri.EscapeDataString(ticket)}", durableToken, deviceId);
+    public Task<WebSocket> ConnectWithTicketAsync(string ticket, CancellationToken cancellationToken, string? durableToken = null, string deviceId = PrimaryDeviceId)
+        => ConnectAsync($"webSocketTicket={Uri.EscapeDataString(ticket)}", cancellationToken, durableToken, deviceId);
 
     /// <summary>
     /// Opens the real socket the legacy way, durable token in the header.
     /// </summary>
     /// <param name="durableToken">The durable token.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <param name="deviceId">The device the header claims.</param>
     /// <returns>The connected socket.</returns>
-    public Task<WebSocket> ConnectWithDurableTokenAsync(string durableToken, string deviceId = PrimaryDeviceId)
-        => ConnectAsync(query: null, durableToken, deviceId);
+    public Task<WebSocket> ConnectWithDurableTokenAsync(string durableToken, CancellationToken cancellationToken, string deviceId = PrimaryDeviceId)
+        => ConnectAsync(query: null, cancellationToken, durableToken, deviceId);
 
     /// <summary>
     /// Opens the real socket with an arbitrary query string.
     /// </summary>
     /// <param name="query">The query string, without the leading '?'.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <param name="durableToken">An optional durable token for the header.</param>
     /// <param name="deviceId">The device the optional header claims.</param>
     /// <returns>The connected socket.</returns>
-    public async Task<WebSocket> ConnectAsync(string? query, string? durableToken = null, string deviceId = PrimaryDeviceId)
+    public async Task<WebSocket> ConnectAsync(string? query, CancellationToken cancellationToken, string? durableToken = null, string deviceId = PrimaryDeviceId)
     {
         var client = Factory.Server.CreateWebSocketClient();
         if (durableToken is not null)
@@ -199,7 +206,7 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
             Query = query ?? string.Empty
         }.Uri;
 
-        return await client.ConnectAsync(uri, TestContext.Current.CancellationToken).ConfigureAwait(false);
+        return await client.ConnectAsync(uri, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -208,8 +215,9 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
     /// </summary>
     /// <param name="query">The query string, without the leading '?'.</param>
     /// <param name="authorizationHeader">The complete header value, or null for none.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns>The connected socket.</returns>
-    public async Task<WebSocket> ConnectWithHeaderAsync(string? query, string? authorizationHeader)
+    public async Task<WebSocket> ConnectWithHeaderAsync(string? query, string? authorizationHeader, CancellationToken cancellationToken)
     {
         var client = Factory.Server.CreateWebSocketClient();
         if (authorizationHeader is not null)
@@ -224,7 +232,7 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
             Query = query ?? string.Empty
         }.Uri;
 
-        return await client.ConnectAsync(uri, TestContext.Current.CancellationToken).ConfigureAwait(false);
+        return await client.ConnectAsync(uri, cancellationToken).ConfigureAwait(false);
     }
 
     // -------------------------------------------------------------------------------------
@@ -333,8 +341,9 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
     /// be torn about without disturbing the fixture's own.
     /// </summary>
     /// <param name="deviceId">The device to sign the new user in on.</param>
+    /// <param name="cancellationToken">Cancels the requests.</param>
     /// <returns>The new user's id and that session's durable token.</returns>
-    public async Task<(Guid UserId, string Token)> CreateUserSessionAsync(string deviceId)
+    public async Task<(Guid UserId, string Token)> CreateUserSessionAsync(string deviceId, CancellationToken cancellationToken)
     {
         var password = "r3-" + Guid.NewGuid().ToString("N");
         var name = "r3-user-" + Guid.NewGuid().ToString("N")[..8];
@@ -344,12 +353,12 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
             "/Users/New",
             new { Name = name, Password = password },
             JsonDefaults.Options,
-            TestContext.Current.CancellationToken).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(false);
 
         Assert.Equal(HttpStatusCode.OK, created.StatusCode);
 
         using var document = JsonDocument.Parse(
-            await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(false));
+            await created.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
         var userId = Guid.Parse(document.RootElement.GetProperty("Id").GetString()!);
 
         using var client = Factory.CreateClient();
@@ -359,11 +368,11 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
             MediaBoundaryFixture.AuthorizationHeader(deviceId, null));
         request.Content = JsonContent.Create(new { Username = name, Pw = password }, options: JsonDefaults.Options);
 
-        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken).ConfigureAwait(false);
+        using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         using var authenticated = JsonDocument.Parse(
-            await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(false));
+            await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
 
         return (userId, authenticated.RootElement.GetProperty("AccessToken").GetString()!);
     }
@@ -404,8 +413,9 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
     /// </summary>
     /// <param name="expected">The size to wait for.</param>
     /// <param name="timeout">How long to wait.</param>
+    /// <param name="cancellationToken">Stops waiting.</param>
     /// <returns>The final snapshot.</returns>
-    public async Task<IReadOnlyList<IWebSocketConnection>> WaitForWatchlistAsync(int expected, TimeSpan timeout)
+    public async Task<IReadOnlyList<IWebSocketConnection>> WaitForWatchlistAsync(int expected, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (true)
@@ -416,7 +426,7 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
                 return snapshot;
             }
 
-            await Task.Delay(50, TestContext.Current.CancellationToken).ConfigureAwait(false);
+            await Task.Delay(50, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -425,8 +435,9 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
     /// known watchlist.
     /// </summary>
     /// <param name="socket">The socket to close.</param>
+    /// <param name="cancellationToken">Stops waiting for the listener; the close itself always runs.</param>
     /// <returns>A task.</returns>
-    public async Task CloseAndDrainAsync(WebSocket socket)
+    public async Task CloseAndDrainAsync(WebSocket socket, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(socket);
 
@@ -447,7 +458,7 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (Watchlist().Count > 0 && DateTime.UtcNow < deadline)
         {
-            await Task.Delay(50, TestContext.Current.CancellationToken).ConfigureAwait(false);
+            await Task.Delay(50, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -457,15 +468,17 @@ public sealed class WebSocketUpgradeFixture : IAsyncLifetime
     /// </summary>
     /// <param name="socket">The accepted socket.</param>
     /// <param name="messageType">The message type to send.</param>
+    /// <param name="cancellationToken">Cancels the exchange, in addition to its own 20-second bound.</param>
     /// <returns>The first message received, as text.</returns>
-    public static async Task<string> ExchangeAsync(WebSocket socket, string messageType)
+    public static async Task<string> ExchangeAsync(WebSocket socket, string messageType, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(socket);
 
         var payload = Encoding.UTF8.GetBytes(
             string.Create(CultureInfo.InvariantCulture, $"{{\"MessageType\":\"{messageType}\"}}"));
 
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(20));
         await socket.SendAsync(payload, WebSocketMessageType.Text, true, timeout.Token).ConfigureAwait(false);
 
         var buffer = new byte[8192];

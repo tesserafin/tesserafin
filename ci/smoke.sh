@@ -84,7 +84,7 @@ docker run --rm \
         echo '-- dotnet build (fail fast on errors) --'
         dotnet build '${SOLUTION}' --no-restore -clp:ErrorsOnly
         echo '-- dotnet test (PR115d smoke scope: HlsSmokeTests + live-wiring decision + diagnostics endpoint) --'
-        dotnet test '${SOLUTION}' --no-build --nologo --filter '${SMOKE_FILTER}'
+        dotnet test --solution '${SOLUTION}' --no-build --filter '${SMOKE_FILTER}' --ignore-exit-code 8 --no-progress
     "
 STATUS=$?
 set -e

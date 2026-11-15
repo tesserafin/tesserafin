@@ -88,7 +88,7 @@ public sealed class WebSocketUpgradeIdentityTests
             WebSocketUpgradeFixture.PrimaryDeviceId);
 
         await AssertRefusedBeforeAcceptanceAsync(
-            () => _fixture.ConnectWithTicketAsync(ticket),
+            () => _fixture.ConnectWithTicketAsync(ticket, TestContext.Current.CancellationToken),
             "a ticket naming a session that is not live");
     }
 
@@ -116,7 +116,7 @@ public sealed class WebSocketUpgradeIdentityTests
     public async Task A_ticket_whose_user_no_longer_resolves_is_refused_before_acceptance()
     {
         var deviceId = "r3-vanishing-user-" + Guid.NewGuid().ToString("N");
-        var (userId, _) = await _fixture.CreateUserSessionAsync(deviceId);
+        var (userId, _) = await _fixture.CreateUserSessionAsync(deviceId, TestContext.Current.CancellationToken);
 
         var session = _fixture.SessionForDevice(deviceId);
         Assert.NotNull(session);
@@ -134,7 +134,7 @@ public sealed class WebSocketUpgradeIdentityTests
             "deleting the user also ended its session, so this case can no longer isolate the missing-user guard");
 
         await AssertRefusedBeforeAcceptanceAsync(
-            () => _fixture.ConnectWithTicketAsync(ticket, deviceId: deviceId),
+            () => _fixture.ConnectWithTicketAsync(ticket, TestContext.Current.CancellationToken, deviceId: deviceId),
             "a ticket whose user no longer resolves");
     }
 
@@ -158,12 +158,12 @@ public sealed class WebSocketUpgradeIdentityTests
         var ownDevice = "r3-mismatch-own-" + Guid.NewGuid().ToString("N");
         var otherDevice = "r3-mismatch-other-" + Guid.NewGuid().ToString("N");
 
-        var ownToken = await _fixture.AuthenticateAsync(ownDevice);
+        var ownToken = await _fixture.AuthenticateAsync(ownDevice, TestContext.Current.CancellationToken);
         Assert.NotEmpty(ownToken);
         var ownSession = _fixture.SessionForDevice(ownDevice);
         Assert.NotNull(ownSession);
 
-        var (otherUserId, _) = await _fixture.CreateUserSessionAsync(otherDevice);
+        var (otherUserId, _) = await _fixture.CreateUserSessionAsync(otherDevice, TestContext.Current.CancellationToken);
         var otherSession = _fixture.SessionForDevice(otherDevice);
         Assert.NotNull(otherSession);
 
@@ -180,7 +180,7 @@ public sealed class WebSocketUpgradeIdentityTests
         };
 
         await AssertRefusedBeforeAcceptanceAsync(
-            () => _fixture.ConnectWithTicketAsync(ticket, deviceId: ownDevice),
+            () => _fixture.ConnectWithTicketAsync(ticket, TestContext.Current.CancellationToken, deviceId: ownDevice),
             $"a ticket whose {kind} binding disagrees with its live session");
     }
 
@@ -197,16 +197,16 @@ public sealed class WebSocketUpgradeIdentityTests
     public async Task A_valid_ticket_attaches_to_the_exact_pre_existing_session()
     {
         var deviceId = "r3-exact-" + Guid.NewGuid().ToString("N");
-        var token = await _fixture.AuthenticateAsync(deviceId);
+        var token = await _fixture.AuthenticateAsync(deviceId, TestContext.Current.CancellationToken);
         var before = _fixture.SessionForDevice(deviceId);
         Assert.NotNull(before);
 
-        var ticket = await _fixture.MintTicketAsync(deviceId, token);
+        var ticket = await _fixture.MintTicketAsync(deviceId, token, TestContext.Current.CancellationToken);
 
         var countBefore = _fixture.Sessions().Count;
         _fixture.Recorder().Clear();
 
-        var socket = await _fixture.ConnectWithTicketAsync(ticket.Value, deviceId: deviceId);
+        var socket = await _fixture.ConnectWithTicketAsync(ticket.Value, TestContext.Current.CancellationToken, deviceId: deviceId);
         try
         {
             var accepted = await WaitForAcceptedAsync(1);
@@ -233,7 +233,7 @@ public sealed class WebSocketUpgradeIdentityTests
             // The session listener resolves through LogSessionActivity, which CREATES a session
             // when the key it is handed does not match one. Attaching to the wrong identity is
             // therefore visible as an extra session, not as an error.
-            var watched = await _fixture.WaitForWatchlistAsync(1, _settle);
+            var watched = await _fixture.WaitForWatchlistAsync(1, _settle, TestContext.Current.CancellationToken);
             Assert.Single(watched);
 
             var after = _fixture.SessionForDevice(deviceId);
@@ -243,7 +243,7 @@ public sealed class WebSocketUpgradeIdentityTests
         }
         finally
         {
-            await _fixture.CloseAndDrainAsync(socket);
+            await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
         }
     }
 
@@ -261,11 +261,11 @@ public sealed class WebSocketUpgradeIdentityTests
     public async Task Request_supplied_device_client_and_version_cannot_override_the_tickets_session()
     {
         var deviceId = "r3-bound-" + Guid.NewGuid().ToString("N");
-        var token = await _fixture.AuthenticateAsync(deviceId);
+        var token = await _fixture.AuthenticateAsync(deviceId, TestContext.Current.CancellationToken);
         var bound = _fixture.SessionForDevice(deviceId);
         Assert.NotNull(bound);
 
-        var ticket = await _fixture.MintTicketAsync(deviceId, token);
+        var ticket = await _fixture.MintTicketAsync(deviceId, token, TestContext.Current.CancellationToken);
 
         var lyingDevice = "r3-lying-" + Guid.NewGuid().ToString("N");
         var header = WebSocketUpgradeFixture.AuthorizationHeader(
@@ -286,7 +286,8 @@ public sealed class WebSocketUpgradeIdentityTests
 
         var socket = await _fixture.ConnectWithHeaderAsync(
             $"webSocketTicket={Uri.EscapeDataString(ticket.Value)}",
-            header);
+            header,
+            TestContext.Current.CancellationToken);
 
         try
         {
@@ -301,7 +302,7 @@ public sealed class WebSocketUpgradeIdentityTests
                 bound.UserId.ToString("N", CultureInfo.InvariantCulture),
                 ValueOf(upgrade, InternalClaimTypes.UserId));
 
-            await _fixture.WaitForWatchlistAsync(1, _settle);
+            await _fixture.WaitForWatchlistAsync(1, _settle, TestContext.Current.CancellationToken);
             var after = _fixture.SessionForDevice(deviceId);
             Assert.NotNull(after);
             Assert.Equal(bound.Id, after!.Id);
@@ -310,7 +311,7 @@ public sealed class WebSocketUpgradeIdentityTests
         }
         finally
         {
-            await _fixture.CloseAndDrainAsync(socket);
+            await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
         }
     }
 
@@ -342,7 +343,7 @@ public sealed class WebSocketUpgradeIdentityTests
     public async Task A_post_consumption_failure_never_falls_back_and_leaves_the_ticket_consumed(string kind)
     {
         var deviceId = "r3-nofallback-" + Guid.NewGuid().ToString("N");
-        var token = await _fixture.AuthenticateAsync(deviceId);
+        var token = await _fixture.AuthenticateAsync(deviceId, TestContext.Current.CancellationToken);
         Assert.NotEmpty(token);
         var session = _fixture.SessionForDevice(deviceId);
         Assert.NotNull(session);
@@ -352,7 +353,7 @@ public sealed class WebSocketUpgradeIdentityTests
             : _fixture.MintTicketDirectly(_fixture.UserId, session!.Id, "r3-not-this-device-" + Guid.NewGuid().ToString("N"));
 
         await AssertRefusedBeforeAcceptanceAsync(
-            () => _fixture.ConnectWithTicketAsync(ticket, durableToken: _fixture.DurableToken),
+            () => _fixture.ConnectWithTicketAsync(ticket, TestContext.Current.CancellationToken, durableToken: _fixture.DurableToken),
             $"a {kind} ticket presented alongside a valid durable token");
 
         var second = _fixture.Service<IPlaybackCredentialService>().ConsumeWebSocketTicket(ticket);
@@ -379,10 +380,10 @@ public sealed class WebSocketUpgradeIdentityTests
     public async Task The_ticket_and_durable_token_principals_agree_on_every_claim_but_the_declared_exceptions()
     {
         var deviceId = "r3-parity-" + Guid.NewGuid().ToString("N");
-        var token = await _fixture.AuthenticateAsync(deviceId);
+        var token = await _fixture.AuthenticateAsync(deviceId, TestContext.Current.CancellationToken);
 
         _fixture.Recorder().Clear();
-        var durableSocket = await _fixture.ConnectWithDurableTokenAsync(token, deviceId);
+        var durableSocket = await _fixture.ConnectWithDurableTokenAsync(token, TestContext.Current.CancellationToken, deviceId);
         AcceptedUpgrade durable;
         try
         {
@@ -390,16 +391,16 @@ public sealed class WebSocketUpgradeIdentityTests
         }
         finally
         {
-            await _fixture.CloseAndDrainAsync(durableSocket);
+            await _fixture.CloseAndDrainAsync(durableSocket, TestContext.Current.CancellationToken);
         }
 
         // The same session, reached the other way. Authenticating again would make a second
         // session and the comparison would be between two different identities.
-        var reused = await _fixture.AuthenticateAsync(deviceId);
-        var ticket = await _fixture.MintTicketAsync(deviceId, reused);
+        var reused = await _fixture.AuthenticateAsync(deviceId, TestContext.Current.CancellationToken);
+        var ticket = await _fixture.MintTicketAsync(deviceId, reused, TestContext.Current.CancellationToken);
 
         _fixture.Recorder().Clear();
-        var ticketSocket = await _fixture.ConnectWithTicketAsync(ticket.Value, deviceId: deviceId);
+        var ticketSocket = await _fixture.ConnectWithTicketAsync(ticket.Value, TestContext.Current.CancellationToken, deviceId: deviceId);
         AcceptedUpgrade viaTicket;
         try
         {
@@ -407,7 +408,7 @@ public sealed class WebSocketUpgradeIdentityTests
         }
         finally
         {
-            await _fixture.CloseAndDrainAsync(ticketSocket);
+            await _fixture.CloseAndDrainAsync(ticketSocket, TestContext.Current.CancellationToken);
         }
 
         AssertExactClaimShape(durable, "the durable-token principal");
@@ -520,7 +521,7 @@ public sealed class WebSocketUpgradeIdentityTests
                 // exception would replace the assertion above and hide which guard is missing.
                 try
                 {
-                    await _fixture.CloseAndDrainAsync(socket);
+                    await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
                 }
                 catch (Exception)
                 {

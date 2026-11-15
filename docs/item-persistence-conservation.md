@@ -171,6 +171,6 @@ also exercises an earlier primary-item update and association removal.
 Run the regression and existing content-pack deletion guard with:
 
 ```sh
-dotnet test tests/Tesserafin.Server.Implementations.Tests/Tesserafin.Server.Implementations.Tests.csproj \
+dotnet test --project tests/Tesserafin.Server.Implementations.Tests/Tesserafin.Server.Implementations.Tests.csproj \
   --filter 'FullyQualifiedName~ItemPersistenceConservationTests|FullyQualifiedName~ContentPackItemDeletionTests'
 ```

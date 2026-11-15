@@ -113,6 +113,18 @@ concurrency:
 
 env:
   SDK_VERSION: "10.0.x"
+  # Code coverage through coverlet.MTP (Microsoft.Testing.Platform). These are the
+  # settings the former VSTest runsettings file carried: Cobertura,
+  # generated/obsolete code excluded, auto-properties skipped. Its Moq and
+  # coverlet-self exclusions are dropped: coverlet.MTP only instruments
+  # assemblies with sources (Moq never appeared), and a whole-solution run
+  # passing --coverlet-exclude crashes the test modules before they report.
+  COVERAGE_ARGS: >-
+    --coverlet --coverlet-output-format cobertura
+    --coverlet-exclude-by-attribute Obsolete
+    --coverlet-exclude-by-attribute GeneratedCodeAttribute
+    --coverlet-exclude-by-attribute CompilerGeneratedAttribute
+    --coverlet-skip-auto-props
 
 jobs:
   run-tests:
@@ -223,14 +235,21 @@ jobs:
         # below run on master pushes only. On a pull request the question is
         # "does it build and pass", and coverage roughly doubles the test
         # stage for an answer nobody reads on the pull request itself.
+        # The tests run on Microsoft.Testing.Platform (global.json "test.runner").
+        # The integration project matches no test under this filter and exits 8
+        # ("zero tests"); that code is ignored here, and the result check below
+        # is what rejects a run that executed nothing. --hangdump writes a dump of
+        # a test process that stops making progress, uploaded on failure.
         run: >
-          dotnet test Tesserafin.sln
+          dotnet test --solution Tesserafin.sln
           --configuration Release
           --filter 'Category!=Smoke&FullyQualifiedName!~Tesserafin.Server.Integration.Tests.'
-          ${{ github.event_name == 'push' && '--collect:"XPlat Code Coverage" --settings tests/coverletArgs.runsettings' || '' }}
-          --logger trx
+          --ignore-exit-code 8
+          ${{ github.event_name == 'push' && env.COVERAGE_ARGS || '' }}
+          --report-trx
           --results-directory artifacts/test-results/unit
-          --verbosity minimal
+          --hangdump --hangdump-timeout 20m
+          --no-progress
 
       # `dotnet test` exits 0 when the filter matches nothing, so without this a
       # broken filter or target would report a green check that ran no test.
@@ -239,11 +258,20 @@ jobs:
         shell: bash
         run: '"$(command -v python3 || command -v python)" ci/summarize-test-results.py artifacts/test-results/unit'
 
+      - name: Retain hang dumps
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hang-dumps-unit-${{ matrix.os }}-${{ github.run_id }}
+          path: artifacts/test-results/unit/**/*.dmp
+          if-no-files-found: ignore
+          retention-days: 3
+
       - name: Merge code coverage results
         if: ${{ github.event_name == 'push' }}
         uses: danielpalme/ReportGenerator-GitHub-Action@049f7ec958c672fd31d5cc1cb01622dc8d2e23ab # v5.5.10
         with:
-          reports: "**/coverage.cobertura.xml"
+          reports: "artifacts/test-results/**/coverage.cobertura*.xml"
           targetdir: "merged/"
           reporttypes: "Cobertura"
 
@@ -303,13 +331,14 @@ jobs:
         id: tests
         # Same Category filter and coverage switch as run-tests.
         run: >
-          dotnet test tests/Tesserafin.Server.Integration.Tests/Tesserafin.Server.Integration.Tests.csproj
+          dotnet test --project tests/Tesserafin.Server.Integration.Tests/Tesserafin.Server.Integration.Tests.csproj
           --configuration Release
           --filter 'Category!=Smoke'
-          ${{ github.event_name == 'push' && '--collect:"XPlat Code Coverage" --settings tests/coverletArgs.runsettings' || '' }}
-          --logger trx
+          ${{ github.event_name == 'push' && env.COVERAGE_ARGS || '' }}
+          --report-trx
           --results-directory artifacts/test-results/integration
-          --verbosity minimal
+          --hangdump --hangdump-timeout 20m
+          --no-progress
 
       # Besides rejecting a run that executed nothing, require the two OpenAPI
       # contract tests this job exists to run on a second machine: renaming,
@@ -356,6 +385,15 @@ jobs:
       # reproduce it on. The test writes the pair only on mismatch, so on a green run there
       # is nothing to upload and this step no-ops. Contents are the two canonical contracts
       # and their hashes — no secrets, no environment, no absolute paths.
+      - name: Retain hang dumps
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hang-dumps-integration-${{ matrix.os }}-${{ github.run_id }}
+          path: artifacts/test-results/integration/**/*.dmp
+          if-no-files-found: ignore
+          retention-days: 3
+
       - name: Retain OpenAPI drift evidence
         if: ${{ failure() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -369,6 +407,6 @@ jobs:
         if: ${{ github.event_name == 'push' }}
         uses: danielpalme/ReportGenerator-GitHub-Action@049f7ec958c672fd31d5cc1cb01622dc8d2e23ab # v5.5.10
         with:
-          reports: "**/coverage.cobertura.xml"
+          reports: "artifacts/test-results/**/coverage.cobertura*.xml"
           targetdir: "merged/"
           reporttypes: "Cobertura"

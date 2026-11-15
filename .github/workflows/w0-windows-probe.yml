@@ -458,12 +458,12 @@ jobs:
         run: |
           $results = Join-Path $env:RUNNER_TEMP 'w0-trx'
           New-Item -ItemType Directory -Force -Path $results | Out-Null
-          dotnet test Tesserafin.sln `
+          dotnet test --solution Tesserafin.sln `
             --configuration Release `
             --filter 'Category!=Smoke' `
-            --verbosity minimal `
-            --logger "trx" `
-            --results-directory $results
+            --report-trx `
+            --results-directory $results `
+            --no-progress
           $code = $LASTEXITCODE
           Write-Host "dotnet test exit code: $code"
           "exitCode=$code" | Add-Content -LiteralPath $env:GITHUB_OUTPUT

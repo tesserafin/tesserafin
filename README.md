@@ -128,7 +128,7 @@ Supported on all major operating systems except FreeBSD.
 git clone https://github.com/tesserafin/tesserafin.git
 cd tesserafin
 dotnet build Tesserafin.sln
-dotnet test Tesserafin.sln
+dotnet test --solution Tesserafin.sln
 ```
 
 `./ci/run.sh` is the authoritative local merge gate — it runs the full suite with

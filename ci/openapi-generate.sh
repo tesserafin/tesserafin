@@ -56,7 +56,7 @@ docker run --rm \
     "$IMAGE_TAG" \
     bash -c "
         set -euo pipefail
-        dotnet test '${TEST_PROJECT}' --nologo \
+        dotnet test --project '${TEST_PROJECT}' --no-progress \
             --filter 'FullyQualifiedName~OpenApiContractTests.CommittedContract_MatchesRunningServer'
     "
 STATUS=$?

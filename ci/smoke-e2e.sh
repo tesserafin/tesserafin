@@ -84,7 +84,7 @@ docker run --rm \
         # loop forever; see PlaybackUrlContractEndToEndTests' remarks on that scenario). This ceiling
         # stays as a last-resort process-level kill for any other stuck request the two finer-grained
         # bounds above don't catch, not because it is still needed to survive that specific bug.
-        timeout 600 dotnet test '${SOLUTION}' --no-build --nologo --filter '${E2E_FILTER}'
+        timeout 600 dotnet test --solution '${SOLUTION}' --no-build --filter '${E2E_FILTER}' --ignore-exit-code 8 --no-progress
     "
 STATUS=$?
 set -e

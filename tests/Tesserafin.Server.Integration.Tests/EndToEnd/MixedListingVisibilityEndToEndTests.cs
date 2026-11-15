@@ -76,30 +76,38 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
     public async Task MixedAndUntypedListings_HoldOnlyWhatAccessByIdAdmits()
     {
         using var server = new Boot(_dataRoot);
-        var s = await SeedAsync(server);
+        var s = await SeedAsync(server, TestContext.Current.CancellationToken);
         using var admin = server.AdminClient(s.AdminToken);
         using var bea = server.ClientFor("mix-bea", s.BeaToken);
 
-        await UpdatePolicyAsync(admin, s.BeaId, p =>
-        {
-            p["EnableAllFolders"] = false;
-            p["EnabledFolders"] = Ids(s.Films, s.Sets);
-        });
-        await AssertListingsAsync("Films and the box-set library", bea, s.BeaId, s);
+        await UpdatePolicyAsync(
+            admin,
+            s.BeaId,
+            p =>
+            {
+                p["EnableAllFolders"] = false;
+                p["EnabledFolders"] = Ids(s.Films, s.Sets);
+            },
+            TestContext.Current.CancellationToken);
+        await AssertListingsAsync("Films and the box-set library", bea, s.BeaId, s, TestContext.Current.CancellationToken);
 
-        await UpdatePolicyAsync(admin, s.BeaId, p => p["EnabledFolders"] = Ids(s.Films, s.Kids, s.Sets));
-        await AssertListingsAsync("Films, Kids and the box-set library", bea, s.BeaId, s);
+        await UpdatePolicyAsync(admin, s.BeaId, p => p["EnabledFolders"] = Ids(s.Films, s.Kids, s.Sets), TestContext.Current.CancellationToken);
+        await AssertListingsAsync("Films, Kids and the box-set library", bea, s.BeaId, s, TestContext.Current.CancellationToken);
 
-        await UpdatePolicyAsync(admin, s.BeaId, p =>
-        {
-            p["EnableAllFolders"] = true;
-            p["EnabledFolders"] = Ids();
-            p["BlockedMediaFolders"] = Ids(s.Kids);
-        });
-        await AssertListingsAsync("all libraries, Kids blocked", bea, s.BeaId, s);
+        await UpdatePolicyAsync(
+            admin,
+            s.BeaId,
+            p =>
+            {
+                p["EnableAllFolders"] = true;
+                p["EnabledFolders"] = Ids();
+                p["BlockedMediaFolders"] = Ids(s.Kids);
+            },
+            TestContext.Current.CancellationToken);
+        await AssertListingsAsync("all libraries, Kids blocked", bea, s.BeaId, s, TestContext.Current.CancellationToken);
 
-        await UpdatePolicyAsync(admin, s.BeaId, p => p["BlockedMediaFolders"] = Ids(s.Sets));
-        await AssertListingsAsync("all libraries, the box-set library blocked", bea, s.BeaId, s);
+        await UpdatePolicyAsync(admin, s.BeaId, p => p["BlockedMediaFolders"] = Ids(s.Sets), TestContext.Current.CancellationToken);
+        await AssertListingsAsync("all libraries, the box-set library blocked", bea, s.BeaId, s, TestContext.Current.CancellationToken);
 
         Assert.True(_wrong.Count == 0, string.Join(Environment.NewLine, _wrong));
     }
@@ -114,29 +122,37 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
     public async Task ParentScopedMixedListings_HoldOnlyWhatAccessByIdAdmits()
     {
         using var server = new Boot(_dataRoot);
-        var s = await SeedAsync(server);
+        var s = await SeedAsync(server, TestContext.Current.CancellationToken);
         using var admin = server.AdminClient(s.AdminToken);
         using var bea = server.ClientFor("mix-bea", s.BeaToken);
         var library = server.Services.GetRequiredService<ILibraryManager>();
         var parents = new[] { s.Films, s.Kids, s.Sets, library.GetItemById(s.SharedList)!.ParentId };
 
-        await UpdatePolicyAsync(admin, s.BeaId, p =>
-        {
-            p["EnableAllFolders"] = false;
-            p["EnabledFolders"] = Ids(s.Films, s.Sets);
-        });
-        await AssertParentScopedListingsAsync("Films and the box-set library", bea, s.BeaId, s, parents);
+        await UpdatePolicyAsync(
+            admin,
+            s.BeaId,
+            p =>
+            {
+                p["EnableAllFolders"] = false;
+                p["EnabledFolders"] = Ids(s.Films, s.Sets);
+            },
+            TestContext.Current.CancellationToken);
+        await AssertParentScopedListingsAsync("Films and the box-set library", bea, s.BeaId, s, parents, TestContext.Current.CancellationToken);
 
-        await UpdatePolicyAsync(admin, s.BeaId, p => p["EnabledFolders"] = Ids(s.Films, s.Kids, s.Sets));
-        await AssertParentScopedListingsAsync("Films, Kids and the box-set library", bea, s.BeaId, s, parents);
+        await UpdatePolicyAsync(admin, s.BeaId, p => p["EnabledFolders"] = Ids(s.Films, s.Kids, s.Sets), TestContext.Current.CancellationToken);
+        await AssertParentScopedListingsAsync("Films, Kids and the box-set library", bea, s.BeaId, s, parents, TestContext.Current.CancellationToken);
 
-        await UpdatePolicyAsync(admin, s.BeaId, p =>
-        {
-            p["EnableAllFolders"] = true;
-            p["EnabledFolders"] = Ids();
-            p["BlockedMediaFolders"] = Ids(s.Kids);
-        });
-        await AssertParentScopedListingsAsync("all libraries, Kids blocked", bea, s.BeaId, s, parents);
+        await UpdatePolicyAsync(
+            admin,
+            s.BeaId,
+            p =>
+            {
+                p["EnableAllFolders"] = true;
+                p["EnabledFolders"] = Ids();
+                p["BlockedMediaFolders"] = Ids(s.Kids);
+            },
+            TestContext.Current.CancellationToken);
+        await AssertParentScopedListingsAsync("all libraries, Kids blocked", bea, s.BeaId, s, parents, TestContext.Current.CancellationToken);
 
         Assert.True(_wrong.Count == 0, string.Join(Environment.NewLine, _wrong));
     }
@@ -150,7 +166,7 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
     public async Task Aggregates_CountAndDescribeOnlyWhatAccessByIdAdmits()
     {
         using var server = new Boot(_dataRoot);
-        var s = await SeedAsync(server);
+        var s = await SeedAsync(server, TestContext.Current.CancellationToken);
         using var admin = server.AdminClient(s.AdminToken);
         using var bea = server.ClientFor("mix-bea", s.BeaToken);
 
@@ -181,22 +197,30 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
         // Scoped to a parent too: each library and the playlists folder that hold the marked items.
         var parents = new[] { Guid.Empty, s.Films, s.Sets, library.GetItemById(s.SharedList)!.ParentId };
 
-        await UpdatePolicyAsync(admin, s.BeaId, p =>
-        {
-            p["EnableAllFolders"] = false;
-            p["EnabledFolders"] = Ids(s.Films, s.Sets);
-        });
+        await UpdatePolicyAsync(
+            admin,
+            s.BeaId,
+            p =>
+            {
+                p["EnableAllFolders"] = false;
+                p["EnabledFolders"] = Ids(s.Films, s.Sets);
+            },
+            TestContext.Current.CancellationToken);
         await AssertAggregatesAsync("Films and the box-set library", bea, s.BeaId, marked, parents);
 
-        await UpdatePolicyAsync(admin, s.BeaId, p => p["EnabledFolders"] = Ids(s.Films, s.Kids, s.Sets));
+        await UpdatePolicyAsync(admin, s.BeaId, p => p["EnabledFolders"] = Ids(s.Films, s.Kids, s.Sets), TestContext.Current.CancellationToken);
         await AssertAggregatesAsync("Films, Kids and the box-set library", bea, s.BeaId, marked, parents);
 
-        await UpdatePolicyAsync(admin, s.BeaId, p =>
-        {
-            p["EnableAllFolders"] = true;
-            p["EnabledFolders"] = Ids();
-            p["BlockedMediaFolders"] = Ids(s.Kids);
-        });
+        await UpdatePolicyAsync(
+            admin,
+            s.BeaId,
+            p =>
+            {
+                p["EnableAllFolders"] = true;
+                p["EnabledFolders"] = Ids();
+                p["BlockedMediaFolders"] = Ids(s.Kids);
+            },
+            TestContext.Current.CancellationToken);
         await AssertAggregatesAsync("all libraries, Kids blocked", bea, s.BeaId, marked, parents);
 
         Assert.True(_wrong.Count == 0, string.Join(Environment.NewLine, _wrong));
@@ -267,16 +291,16 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
 
     private static JsonArray Ids(params Guid[] ids) => new(ids.Select(i => (JsonNode)i.ToString()).ToArray());
 
-    private static async Task UpdatePolicyAsync(HttpClient admin, Guid userId, Action<JsonObject> change)
+    private static async Task UpdatePolicyAsync(HttpClient admin, Guid userId, Action<JsonObject> change, CancellationToken cancellationToken)
     {
-        var policy = JsonNode.Parse(await admin.GetStringAsync(FormattableString.Invariant($"Users/{userId}"), TestContext.Current.CancellationToken))!["Policy"]!.AsObject();
+        var policy = JsonNode.Parse(await admin.GetStringAsync(FormattableString.Invariant($"Users/{userId}"), cancellationToken))!["Policy"]!.AsObject();
         change(policy);
         using var content = new StringContent(policy.ToJsonString(), System.Text.Encoding.UTF8, "application/json");
-        using var saved = await admin.PostAsync(FormattableString.Invariant($"Users/{userId}/Policy"), content, TestContext.Current.CancellationToken);
+        using var saved = await admin.PostAsync(FormattableString.Invariant($"Users/{userId}/Policy"), content, cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, saved.StatusCode);
     }
 
-    private async Task AssertParentScopedListingsAsync(string state, HttpClient client, Guid userId, Seeded s, Guid[] parents)
+    private async Task AssertParentScopedListingsAsync(string state, HttpClient client, Guid userId, Seeded s, Guid[] parents, CancellationToken cancellationToken)
     {
         var guarded = new (Guid Id, string Name)[]
         {
@@ -287,7 +311,7 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
         var unseen = new HashSet<Guid>();
         foreach (var item in guarded)
         {
-            using var response = await client.GetAsync(FormattableString.Invariant($"Items/{item.Id}?userId={userId}"), TestContext.Current.CancellationToken);
+            using var response = await client.GetAsync(FormattableString.Invariant($"Items/{item.Id}?userId={userId}"), cancellationToken);
             if (response.StatusCode != HttpStatusCode.OK)
             {
                 refused.Add(item);
@@ -312,14 +336,14 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
                 foreach (var filter in Queries)
                 {
                     var url = FormattableString.Invariant($"Items?recursive={recursive}&parentId={parent}&fields=Overview,Path,Tags,ParentId&userId={userId}") + (filter.Length == 0 ? string.Empty : "&" + filter);
-                    using var response = await client.GetAsync(url, TestContext.Current.CancellationToken);
+                    using var response = await client.GetAsync(url, cancellationToken);
                     if (response.StatusCode != HttpStatusCode.OK)
                     {
                         continue;
                     }
 
                     answered++;
-                    var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+                    var body = await response.Content.ReadAsStringAsync(cancellationToken);
                     using var document = JsonDocument.Parse(body);
                     var ids = document.RootElement.GetProperty("Items").EnumerateArray().Select(i => Guid.Parse(i.GetProperty("Id").GetString()!)).ToList();
                     unseen.ExceptWith(ids);
@@ -347,7 +371,7 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
         }
     }
 
-    private async Task AssertListingsAsync(string state, HttpClient client, Guid userId, Seeded s)
+    private async Task AssertListingsAsync(string state, HttpClient client, Guid userId, Seeded s, CancellationToken cancellationToken)
     {
         // The oracle is access by id, asked now: what it refuses must appear nowhere below.
         var guarded = new (Guid Id, string Name)[]
@@ -359,7 +383,7 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
         var admitted = new List<Guid>();
         foreach (var item in guarded)
         {
-            using var response = await client.GetAsync(FormattableString.Invariant($"Items/{item.Id}?userId={userId}"), TestContext.Current.CancellationToken);
+            using var response = await client.GetAsync(FormattableString.Invariant($"Items/{item.Id}?userId={userId}"), cancellationToken);
             (response.StatusCode == HttpStatusCode.OK ? admitted : null)?.Add(item.Id);
             if (response.StatusCode != HttpStatusCode.OK)
             {
@@ -374,7 +398,7 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
             var url = "Items?recursive=true&fields=Overview,Path,Tags,ParentId&userId=" + userId + (filter.Length == 0 ? string.Empty : "&" + filter);
             var at = state + ", " + (filter.Length == 0 ? "no type filter" : filter);
 
-            using var whole = JsonDocument.Parse(await client.GetStringAsync(url, TestContext.Current.CancellationToken));
+            using var whole = JsonDocument.Parse(await client.GetStringAsync(url, cancellationToken));
             var body = whole.RootElement.GetRawText();
             var ids = whole.RootElement.GetProperty("Items").EnumerateArray().Select(i => Guid.Parse(i.GetProperty("Id").GetString()!)).ToList();
             var total = whole.RootElement.GetProperty("TotalRecordCount").GetInt32();
@@ -407,7 +431,7 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
             {
                 foreach (var (movie, set) in new[] { (s.FilmsMovie, s.FilmsSet), (s.KidsMovie, s.KidsSet) })
                 {
-                    using var byId = await client.GetAsync(FormattableString.Invariant($"Items/{movie}?userId={userId}"), TestContext.Current.CancellationToken);
+                    using var byId = await client.GetAsync(FormattableString.Invariant($"Items/{movie}?userId={userId}"), cancellationToken);
                     if (byId.StatusCode == HttpStatusCode.OK && !ids.Contains(movie) && !(admitted.Contains(set) && ids.Contains(set)))
                     {
                         _wrong.Add(FormattableString.Invariant($"{at}: movie {movie} admitted by id, neither listed nor grouped into an admitted box set"));
@@ -419,7 +443,7 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
             var paged = new List<Guid>();
             for (var start = 0; start < ids.Count + 2; start++)
             {
-                using var page = JsonDocument.Parse(await client.GetStringAsync(url + "&sortBy=SortName,Id&limit=1&startIndex=" + start, TestContext.Current.CancellationToken));
+                using var page = JsonDocument.Parse(await client.GetStringAsync(url + "&sortBy=SortName,Id&limit=1&startIndex=" + start, cancellationToken));
                 if (page.RootElement.GetProperty("TotalRecordCount").GetInt32() != ids.Count)
                 {
                     _wrong.Add(FormattableString.Invariant($"{at}: page {start} total {page.RootElement.GetProperty("TotalRecordCount").GetInt32()}, expected {ids.Count}"));
@@ -466,25 +490,25 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
         return types.Contains(isSet ? "BoxSet" : "Playlist");
     }
 
-    private async Task<Seeded> SeedAsync(Boot server)
+    private async Task<Seeded> SeedAsync(Boot server, CancellationToken cancellationToken)
     {
         var (adminToken, _) = await server.EnsureAuthenticatedAsync();
         using var admin = server.AdminClient(adminToken);
 
         var films = Directory.CreateDirectory(Path.Combine(_mediaRoot, "films")).FullName;
         var kids = Directory.CreateDirectory(Path.Combine(_mediaRoot, "kids")).FullName;
-        await AddLibraryAsync(admin, "mix-films", films);
-        await AddLibraryAsync(admin, "mix-kids", kids);
+        await AddLibraryAsync(admin, "mix-films", cancellationToken, films);
+        await AddLibraryAsync(admin, "mix-kids", cancellationToken, kids);
 
         // The first box set creates the box-set library and queues a scan: both before any unscanned folder.
         var before = DateTime.UtcNow;
-        var emptySet = await CreateBoxSetAsync(admin, "mix Empty Set");
-        await WaitForLibraryScanAsync(server, before);
+        var emptySet = await CreateBoxSetAsync(admin, "mix Empty Set", cancellationToken);
+        await WaitForLibraryScanAsync(server, before, cancellationToken);
 
         var library = server.Services.GetRequiredService<ILibraryManager>();
         var filmsFolder = AddFolder(library, films);
         var kidsFolder = AddFolder(library, kids);
-        var ids = await LibrariesAsync(admin);
+        var ids = await LibrariesAsync(admin, cancellationToken);
         foreach (var (libraryId, folder) in new[] { (ids["mix-films"], filmsFolder), (ids["mix-kids"], kidsFolder) })
         {
             var collectionFolder = Assert.IsType<CollectionFolder>(library.GetItemById(libraryId));
@@ -494,43 +518,43 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
 
         var filmsMovie = Seed(server, Path.Combine(films, "mix-film.mp4"), filmsFolder);
         var kidsMovie = Seed(server, Path.Combine(kids, "mix-toon.mp4"), kidsFolder);
-        var filmsSet = await CreateBoxSetAsync(admin, "mix Films Set", filmsMovie);
-        var kidsSet = await CreateBoxSetAsync(admin, "mix Kids Set", kidsMovie);
+        var filmsSet = await CreateBoxSetAsync(admin, "mix Films Set", cancellationToken, filmsMovie);
+        var kidsSet = await CreateBoxSetAsync(admin, "mix Kids Set", cancellationToken, kidsMovie);
 
-        using var virtualFolders = JsonDocument.Parse(await admin.GetStringAsync("Library/VirtualFolders", TestContext.Current.CancellationToken));
+        using var virtualFolders = JsonDocument.Parse(await admin.GetStringAsync("Library/VirtualFolders", cancellationToken));
         var sets = Guid.Parse(virtualFolders.RootElement.EnumerateArray()
             .Single(f => f.TryGetProperty("CollectionType", out var type) && type.GetString() == "boxsets")
             .GetProperty("ItemId").GetString()!);
 
-        var (beaToken, beaId) = await SignInAsync(server, admin, "mix-bea");
-        var (cleoToken, cleoId) = await SignInAsync(server, admin, "mix-cleo");
+        var (beaToken, beaId) = await SignInAsync(server, admin, "mix-bea", cancellationToken);
+        var (cleoToken, cleoId) = await SignInAsync(server, admin, "mix-cleo", cancellationToken);
         using var cleo = server.ClientFor("mix-cleo", cleoToken);
-        var privateList = await CreatePlaylistAsync(cleo, cleoId, "mix private list", filmsMovie, isPublic: false);
-        var sharedList = await CreatePlaylistAsync(cleo, cleoId, "mix shared list", filmsMovie, isPublic: false, beaId);
-        var publicList = await CreatePlaylistAsync(cleo, cleoId, "mix public list", filmsMovie, isPublic: true);
+        var privateList = await CreatePlaylistAsync(cleo, cleoId, "mix private list", filmsMovie, isPublic: false, sharedWith: [], cancellationToken: cancellationToken);
+        var sharedList = await CreatePlaylistAsync(cleo, cleoId, "mix shared list", filmsMovie, isPublic: false, sharedWith: [beaId], cancellationToken: cancellationToken);
+        var publicList = await CreatePlaylistAsync(cleo, cleoId, "mix public list", filmsMovie, isPublic: true, sharedWith: [], cancellationToken: cancellationToken);
 
         // The scenario holds only if the preparation did: each box set has its child, each playlist its item.
         // The playlists are asked as their owner: a private one is no one else's, administrator included.
         foreach (var (asker, container, child) in new[] { (admin, filmsSet, filmsMovie), (admin, kidsSet, kidsMovie), (cleo, privateList, filmsMovie), (cleo, sharedList, filmsMovie), (cleo, publicList, filmsMovie) })
         {
-            using var children = JsonDocument.Parse(await asker.GetStringAsync(FormattableString.Invariant($"Items?parentId={container}"), TestContext.Current.CancellationToken));
+            using var children = JsonDocument.Parse(await asker.GetStringAsync(FormattableString.Invariant($"Items?parentId={container}"), cancellationToken));
             Assert.Contains(child.ToString("N"), children.RootElement.GetRawText().Replace("-", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
         }
 
         return new Seeded(adminToken, beaToken, beaId, ids["mix-films"], ids["mix-kids"], sets, filmsSet, kidsSet, emptySet, privateList, sharedList, publicList, filmsMovie, kidsMovie);
     }
 
-    private static async Task<Guid> CreatePlaylistAsync(HttpClient owner, Guid ownerId, string name, Guid item, bool isPublic, params Guid[] sharedWith)
+    private static async Task<Guid> CreatePlaylistAsync(HttpClient owner, Guid ownerId, string name, Guid item, bool isPublic, Guid[] sharedWith, CancellationToken cancellationToken)
     {
         var body = new { Name = name, Ids = new[] { item }, UserId = ownerId, IsPublic = isPublic, Users = sharedWith.Select(u => new { UserId = u, CanEdit = false }).ToArray() };
-        using var created = await owner.PostAsJsonAsync("Playlists", body, JsonDefaults.Options, TestContext.Current.CancellationToken);
-        var text = await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using var created = await owner.PostAsJsonAsync("Playlists", body, JsonDefaults.Options, cancellationToken);
+        var text = await created.Content.ReadAsStringAsync(cancellationToken);
         Assert.True(created.IsSuccessStatusCode, name + ": " + created.StatusCode + " " + text);
         using var document = JsonDocument.Parse(text);
         return Guid.Parse(document.RootElement.GetProperty("Id").GetString()!);
     }
 
-    private static async Task WaitForLibraryScanAsync(Boot server, DateTime since)
+    private static async Task WaitForLibraryScanAsync(Boot server, DateTime since, CancellationToken cancellationToken)
     {
         var scan = server.Services.GetRequiredService<ITaskManager>().ScheduledTasks.Single(w => w.ScheduledTask.Key == "RefreshLibrary");
         for (var i = 0; i < 600; i++)
@@ -540,32 +564,32 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
                 return;
             }
 
-            await Task.Delay(100, TestContext.Current.CancellationToken);
+            await Task.Delay(100, cancellationToken);
         }
 
         Assert.Fail("the library scan queued by the box-set library did not finish");
     }
 
-    private static async Task<Dictionary<string, Guid>> LibrariesAsync(HttpClient admin)
+    private static async Task<Dictionary<string, Guid>> LibrariesAsync(HttpClient admin, CancellationToken cancellationToken)
     {
-        using var libraries = JsonDocument.Parse(await admin.GetStringAsync("Library/VirtualFolders", TestContext.Current.CancellationToken));
+        using var libraries = JsonDocument.Parse(await admin.GetStringAsync("Library/VirtualFolders", cancellationToken));
         return libraries.RootElement.EnumerateArray().ToDictionary(f => f.GetProperty("Name").GetString()!, f => Guid.Parse(f.GetProperty("ItemId").GetString()!));
     }
 
-    private static async Task<Guid> CreateBoxSetAsync(HttpClient admin, string name, params Guid[] children)
+    private static async Task<Guid> CreateBoxSetAsync(HttpClient admin, string name, CancellationToken cancellationToken, params Guid[] children)
     {
         var ids = children.Length == 0 ? string.Empty : "&ids=" + string.Join(',', children);
-        using var created = await admin.PostAsync("Collections?name=" + Uri.EscapeDataString(name) + ids, null, TestContext.Current.CancellationToken);
-        var body = await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using var created = await admin.PostAsync("Collections?name=" + Uri.EscapeDataString(name) + ids, null, cancellationToken);
+        var body = await created.Content.ReadAsStringAsync(cancellationToken);
         Assert.True(created.StatusCode == HttpStatusCode.OK, name + ": " + created.StatusCode + " " + body);
         using var document = JsonDocument.Parse(body);
         return Guid.Parse(document.RootElement.GetProperty("Id").GetString()!);
     }
 
-    private static async Task AddLibraryAsync(HttpClient admin, string name, params string[] paths)
+    private static async Task AddLibraryAsync(HttpClient admin, string name, CancellationToken cancellationToken, params string[] paths)
     {
         var query = string.Concat(paths.Select(p => "&paths=" + Uri.EscapeDataString(p)));
-        using var added = await admin.PostAsJsonAsync("Library/VirtualFolders?collectionType=movies&refreshLibrary=false&name=" + name + query, new { }, JsonDefaults.Options, TestContext.Current.CancellationToken);
+        using var added = await admin.PostAsJsonAsync("Library/VirtualFolders?collectionType=movies&refreshLibrary=false&name=" + name + query, new { }, JsonDefaults.Options, cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, added.StatusCode);
     }
 
@@ -592,22 +616,22 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
             parentId: folder);
     }
 
-    private static async Task<(string Token, Guid Id)> SignInAsync(Boot server, HttpClient admin, string name)
+    private static async Task<(string Token, Guid Id)> SignInAsync(Boot server, HttpClient admin, string name, CancellationToken cancellationToken)
     {
         UserDto created;
-        using (var response = await admin.PostAsJsonAsync("/Users/New", new { Name = name, Password }, JsonDefaults.Options, TestContext.Current.CancellationToken))
+        using (var response = await admin.PostAsJsonAsync("/Users/New", new { Name = name, Password }, JsonDefaults.Options, cancellationToken))
         {
             response.EnsureSuccessStatusCode();
-            created = (await response.Content.ReadFromJsonAsync<UserDto>(JsonDefaults.Options, TestContext.Current.CancellationToken))!;
+            created = (await response.Content.ReadFromJsonAsync<UserDto>(JsonDefaults.Options, cancellationToken))!;
         }
 
         using var anonymous = server.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/Users/AuthenticateByName");
         request.Headers.TryAddWithoutValidation(AuthHelper.AuthHeaderName, MediaBoundaryFixture.AuthorizationHeader(name, null));
         request.Content = JsonContent.Create(new { Username = name, Pw = Password }, options: JsonDefaults.Options);
-        using var authenticated = await anonymous.SendAsync(request, TestContext.Current.CancellationToken);
+        using var authenticated = await anonymous.SendAsync(request, cancellationToken);
         authenticated.EnsureSuccessStatusCode();
-        using var document = JsonDocument.Parse(await authenticated.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        using var document = JsonDocument.Parse(await authenticated.Content.ReadAsStringAsync(cancellationToken));
         return (document.RootElement.GetProperty("AccessToken").GetString()!, created.Id);
     }
 

@@ -146,10 +146,10 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         var itemId = SeedItem();
         var (capabilities, constraints) = EndToEndCapabilityPresets.DirectPlay();
 
-        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-direct-play");
+        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-direct-play", cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackMethod.DirectPlay, session.Method);
 
-        var descriptor = await GetStreamDescriptorAsync(session.Id);
+        var descriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
         Assert.Equal(StreamingProtocol.Http, descriptor.Protocol);
 
         await AssertUrlServes200Async(descriptor.Url, "DirectPlay");
@@ -163,10 +163,10 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         var itemId = SeedItem();
         var (capabilities, constraints) = EndToEndCapabilityPresets.Remux();
 
-        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-remux");
+        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-remux", cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackMethod.Remux, session.Method);
 
-        var descriptor = await GetStreamDescriptorAsync(session.Id);
+        var descriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
 
         await AssertUrlServes200Async(descriptor.Url, "Remux/DirectStream");
     }
@@ -207,10 +207,10 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         var itemId = LibraryItemSeeder.SeedVideo(_libraryManager, _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 non-film transcode fixture {Guid.NewGuid()}", film: false);
         var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHls();
 
-        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-transcode-hls");
+        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-transcode-hls", cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackMethod.Transcode, session.Method);
 
-        var descriptor = await GetStreamDescriptorAsync(session.Id);
+        var descriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
         Assert.Equal(StreamingProtocol.Hls, descriptor.Protocol);
 
         var masterManifest = await GetTextAsync(descriptor.Url, "HLS master playlist");
@@ -219,7 +219,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         var variantUrl = FirstUriLine(masterManifest, descriptor.Url)
             ?? throw new InvalidOperationException($"HLS master playlist named no variant. Content:\n{masterManifest}");
 
-        var mediaPlaylist = await GetTextWithRetryAsync(variantUrl, "HLS media playlist", TimeSpan.FromSeconds(60));
+        var mediaPlaylist = await GetTextWithRetryAsync(variantUrl, "HLS media playlist", TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
         Assert.Contains("#EXTINF", mediaPlaylist, StringComparison.Ordinal);
 
         var segmentUrl = FirstUriLine(mediaPlaylist, variantUrl)
@@ -252,9 +252,9 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
 
         // A specific subtitle stream request requires naming the media source explicitly
         // (PlaybackSessionRequestValidator) - the item's single MediaSource id, itself the item id.
-        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-external-subtitle", mediaSourceId: itemId.ToString("N"));
+        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-external-subtitle", mediaSourceId: itemId.ToString("N"), cancellationToken: TestContext.Current.CancellationToken);
 
-        var descriptor = await GetStreamDescriptorAsync(session.Id);
+        var descriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
         Assert.True(!string.IsNullOrEmpty(descriptor.SubtitleUrl), $"Descriptor named no SubtitleUrl for an external-subtitle session (FallbackReason={descriptor.FallbackReason}).");
 
         await AssertUrlServes200Async(descriptor.Url, "DirectPlay (subtitle scenario)");
@@ -286,9 +286,9 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         // "after" transition below is a genuine transition and not just re-observing the default.
         _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.V2;
 
-        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-kill-switch");
+        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-kill-switch", cancellationToken: TestContext.Current.CancellationToken);
 
-        var beforeDescriptor = await GetStreamDescriptorAsync(session.Id);
+        var beforeDescriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
         await AssertUrlServes200Async(beforeDescriptor.Url, "Before kill switch");
         Assert.True(
             beforeDescriptor.FallbackReason is null && beforeDescriptor.ServedBy != PlaybackSessionResponse.LegacyDecisionVersion,
@@ -300,7 +300,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         // restart, no session recreation.
         _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
 
-        var afterDescriptor = await GetStreamDescriptorAsync(session.Id);
+        var afterDescriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackLiveFallbackReason.KillSwitch, afterDescriptor.FallbackReason);
         Assert.Equal(PlaybackSessionResponse.LegacyDecisionVersion, afterDescriptor.ServedBy);
 
@@ -348,10 +348,10 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         // cohort-hash dependency; InitializeAsync resets this to Legacy before every test.
         _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.V2;
 
-        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-remux-mkv-to-mp4");
+        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-remux-mkv-to-mp4", cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackMethod.Remux, session.Method);
 
-        var descriptor = await GetStreamDescriptorAsync(session.Id);
+        var descriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
 
         // Guard the premise: a legacy fallback here would silently turn this into a test of a
         // different engine than the one issue #57 was reported against.
@@ -403,10 +403,10 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         var itemId = LibraryItemSeeder.SeedVideo(_libraryManager, _mediaStreamRepository, mkvPath, "mkv", _baseStreams, $"Issue 374 fixture {Guid.NewGuid()}", film: false);
 
         var (capabilities, constraints) = EndToEndCapabilityPresets.Remux();
-        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-374-remux");
+        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-374-remux", cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackMethod.Remux, session.Method);
 
-        var descriptor = await GetStreamDescriptorAsync(session.Id);
+        var descriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackLiveFallbackReason.KillSwitch, descriptor.FallbackReason);
         Assert.Equal(StreamingProtocol.Hls, descriptor.Protocol);
         Assert.Equal("ts", descriptor.Container);
@@ -415,7 +415,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         var master = await GetTextAsync(descriptor.Url, "#374 master");
         var variantUrl = FirstUriLine(master, descriptor.Url);
         Assert.NotNull(variantUrl);
-        var variant = await GetTextWithRetryAsync(variantUrl, "#374 variant", TimeSpan.FromSeconds(60));
+        var variant = await GetTextWithRetryAsync(variantUrl, "#374 variant", TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
         var segmentUrl = FirstUriLine(variant, variantUrl);
         Assert.NotNull(segmentUrl);
 
@@ -444,17 +444,17 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         shadow.CanaryPercentage = 100;
 
         var (mp4Declared, constraints) = EndToEndCapabilityPresets.RemuxMatroskaToMp4();
-        var withOutput = await CreateSessionAsync(itemId, mp4Declared, constraints, $"e2e-374-fallback-{mode}-ok");
+        var withOutput = await CreateSessionAsync(itemId, mp4Declared, constraints, $"e2e-374-fallback-{mode}-ok", cancellationToken: TestContext.Current.CancellationToken);
         var noOutput = mp4Declared with
         {
             Decode = mp4Declared.Decode with { DirectPlayProfiles = [new DecodeProfile(MediaKind.Video, ["webm"], [EndToEndCapabilityPresets.FixtureVideoCodec], [EndToEndCapabilityPresets.FixtureAudioCodec])] },
         };
-        var withoutOutput = await CreateSessionAsync(itemId, noOutput, constraints, $"e2e-374-fallback-{mode}-none");
+        var withoutOutput = await CreateSessionAsync(itemId, noOutput, constraints, $"e2e-374-fallback-{mode}-none", cancellationToken: TestContext.Current.CancellationToken);
 
         // The kill switch is the operator's real, live path back to legacy.
         shadow.Mode = PlaybackEngineMode.Legacy;
 
-        var descriptor = await GetStreamDescriptorAsync(withOutput.Id);
+        var descriptor = await GetStreamDescriptorAsync(withOutput.Id, TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackLiveFallbackReason.KillSwitch, descriptor.FallbackReason);
         Assert.Equal("mp4", descriptor.Container);
         Assert.DoesNotContain("Static=true", descriptor.Url, StringComparison.OrdinalIgnoreCase);
@@ -516,10 +516,10 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
 
         _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.V2;
 
-        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-59-remux-allowed");
+        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-59-remux-allowed", cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackMethod.Remux, session.Method);
 
-        var descriptor = await GetStreamDescriptorAsync(session.Id);
+        var descriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
         Assert.Equal("mp4", descriptor.Container);
         Assert.DoesNotContain("Static=true", descriptor.Url, StringComparison.OrdinalIgnoreCase);
 
@@ -553,7 +553,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
 
         _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.V2;
 
-        var status = await CreateSessionExpectingFailureAsync(itemId, capabilities, constraints, "e2e-59-no-plan");
+        var status = await CreateSessionExpectingFailureAsync(itemId, capabilities, constraints, "e2e-59-no-plan", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, status);
     }
@@ -573,7 +573,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         // The legacy engine, not v2: this is the branch issue #59 was reported against.
         _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
 
-        var status = await CreateSessionExpectingFailureAsync(itemId, capabilities, constraints, "e2e-59-no-plan-legacy");
+        var status = await CreateSessionExpectingFailureAsync(itemId, capabilities, constraints, "e2e-59-no-plan-legacy", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, status);
     }
@@ -590,7 +590,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         var itemId = SeedItem();
         var (capabilities, constraints) = EndToEndCapabilityPresets.AllMethodsForbidden();
 
-        var status = await CreateSessionExpectingFailureAsync(itemId, capabilities, constraints, "e2e-59-all-forbidden");
+        var status = await CreateSessionExpectingFailureAsync(itemId, capabilities, constraints, "e2e-59-all-forbidden", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, status);
     }
@@ -610,7 +610,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         // A genuinely viable session first, so the refusal below is caused by the re-plan and not by
         // the session having been unservable all along.
         var (directPlayCapabilities, directPlayConstraints) = EndToEndCapabilityPresets.DirectPlay();
-        var session = await CreateSessionAsync(itemId, directPlayCapabilities, directPlayConstraints, "e2e-59-replan-seed");
+        var session = await CreateSessionAsync(itemId, directPlayCapabilities, directPlayConstraints, "e2e-59-replan-seed", cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackMethod.DirectPlay, session.Method);
 
         var (capabilities, constraints) = EndToEndCapabilityPresets.IncompatibleCodecsTranscodingForbidden();
@@ -634,14 +634,11 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     /// asserts success: a refusal is the assertion subject here, not an error to surface.
     /// </summary>
     private async Task<HttpStatusCode> CreateSessionExpectingFailureAsync(
-        Guid itemId,
-        ClientCapabilities capabilities,
-        PlaybackConstraints constraints,
-        string playSessionId)
+        Guid itemId, ClientCapabilities capabilities, PlaybackConstraints constraints, string playSessionId, CancellationToken cancellationToken)
     {
         var request = new CreatePlaybackSessionRequest(itemId, _userId, capabilities, constraints, MediaSourceId: null, PlaySessionId: playSessionId);
-        using var response = await _client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, TestContext.Current.CancellationToken);
-        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using var response = await _client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
         Assert.False(
             response.IsSuccessStatusCode,
@@ -665,21 +662,21 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     private Guid SeedItem() =>
         LibraryItemSeeder.SeedVideo(_libraryManager, _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 fixture {Guid.NewGuid()}");
 
-    private async Task<PlaybackSessionResponse> CreateSessionAsync(Guid itemId, ClientCapabilities capabilities, PlaybackConstraints constraints, string playSessionId, string? mediaSourceId = null)
+    private async Task<PlaybackSessionResponse> CreateSessionAsync(Guid itemId, ClientCapabilities capabilities, PlaybackConstraints constraints, string playSessionId, string? mediaSourceId = null, CancellationToken cancellationToken = default)
     {
         var request = new CreatePlaybackSessionRequest(itemId, _userId, capabilities, constraints, MediaSourceId: mediaSourceId, PlaySessionId: playSessionId);
-        using var response = await _client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, TestContext.Current.CancellationToken);
-        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using var response = await _client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
         Assert.True(response.IsSuccessStatusCode, $"POST Playback/Sessions failed for PlaySessionId='{playSessionId}': {(int)response.StatusCode} {Truncate(body)}");
 
         return JsonSerializer.Deserialize<PlaybackSessionResponse>(body, JsonDefaults.Options)
             ?? throw new InvalidOperationException("POST Playback/Sessions returned an empty body.");
     }
 
-    private async Task<PlaybackSessionStreamDescriptor> GetStreamDescriptorAsync(Guid sessionId)
+    private async Task<PlaybackSessionStreamDescriptor> GetStreamDescriptorAsync(Guid sessionId, CancellationToken cancellationToken)
     {
-        using var response = await _client.GetAsync($"Playback/Sessions/{sessionId}/Stream", TestContext.Current.CancellationToken);
-        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using var response = await _client.GetAsync($"Playback/Sessions/{sessionId}/Stream", cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
         Assert.True(response.IsSuccessStatusCode, $"GET Playback/Sessions/{sessionId}/Stream failed: {(int)response.StatusCode} {Truncate(body)}");
 
         return JsonSerializer.Deserialize<PlaybackSessionStreamDescriptor>(body, JsonDefaults.Options)
@@ -743,7 +740,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     /// guaranteed ready the instant the master playlist returns. Polls with a clear diagnostic on
     /// timeout, mirroring <c>ci/smoke.sh</c>'s own "attente readiness" discipline.
     /// </summary>
-    private async Task<string> GetTextWithRetryAsync(string relativeUrl, string diagnosticContext, TimeSpan timeout)
+    private async Task<string> GetTextWithRetryAsync(string relativeUrl, string diagnosticContext, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var deadline = DateTime.UtcNow + timeout;
         Exception? lastFailure = null;
@@ -756,7 +753,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
             catch (Xunit.Sdk.XunitException ex)
             {
                 lastFailure = ex;
-                await Task.Delay(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
             }
         }
 

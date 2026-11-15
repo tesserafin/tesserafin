@@ -55,9 +55,9 @@ public sealed class WebSocketUpgradeBoundaryTests
     [Fact(Timeout = TestTimeoutMs)]
     public async Task A_ticket_alone_opens_a_socket_the_server_associates_with_the_ticket_owner()
     {
-        var ticket = await _fixture.MintTicketAsync();
+        var ticket = await _fixture.MintTicketAsync(TestContext.Current.CancellationToken);
 
-        var socket = await _fixture.ConnectWithTicketAsync(ticket.Value);
+        var socket = await _fixture.ConnectWithTicketAsync(ticket.Value, TestContext.Current.CancellationToken);
         try
         {
             Assert.Equal(WebSocketState.Open, socket.State);
@@ -65,7 +65,7 @@ public sealed class WebSocketUpgradeBoundaryTests
             // Accepting the handshake is not the claim. The claim is that the connection reaches
             // the session listener with the right identity — which is where a ticket-authenticated
             // socket that cannot resolve its session dies instead.
-            var watched = await _fixture.WaitForWatchlistAsync(1, _settle);
+            var watched = await _fixture.WaitForWatchlistAsync(1, _settle, TestContext.Current.CancellationToken);
             var connection = Assert.Single(watched);
 
             Assert.Equal(_fixture.UserId, connection.AuthorizationInfo.User?.Id);
@@ -74,7 +74,7 @@ public sealed class WebSocketUpgradeBoundaryTests
         }
         finally
         {
-            await _fixture.CloseAndDrainAsync(socket);
+            await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
         }
     }
 
@@ -87,19 +87,19 @@ public sealed class WebSocketUpgradeBoundaryTests
     [Fact(Timeout = TestTimeoutMs)]
     public async Task An_accepted_ticket_socket_exchanges_a_real_message()
     {
-        var ticket = await _fixture.MintTicketAsync();
+        var ticket = await _fixture.MintTicketAsync(TestContext.Current.CancellationToken);
 
-        var socket = await _fixture.ConnectWithTicketAsync(ticket.Value);
+        var socket = await _fixture.ConnectWithTicketAsync(ticket.Value, TestContext.Current.CancellationToken);
         try
         {
-            var reply = await WebSocketUpgradeFixture.ExchangeAsync(socket, "KeepAlive");
+            var reply = await WebSocketUpgradeFixture.ExchangeAsync(socket, "KeepAlive", TestContext.Current.CancellationToken);
 
             Assert.False(string.IsNullOrWhiteSpace(reply), "the server closed the socket instead of answering");
             Assert.Contains("MessageType", reply, StringComparison.Ordinal);
         }
         finally
         {
-            await _fixture.CloseAndDrainAsync(socket);
+            await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
         }
     }
 
@@ -111,18 +111,18 @@ public sealed class WebSocketUpgradeBoundaryTests
     [Fact(Timeout = TestTimeoutMs)]
     public async Task A_durable_token_upgrade_still_works()
     {
-        var socket = await _fixture.ConnectWithDurableTokenAsync(_fixture.DurableToken);
+        var socket = await _fixture.ConnectWithDurableTokenAsync(_fixture.DurableToken, TestContext.Current.CancellationToken);
         try
         {
             Assert.Equal(WebSocketState.Open, socket.State);
 
-            var watched = await _fixture.WaitForWatchlistAsync(1, _settle);
+            var watched = await _fixture.WaitForWatchlistAsync(1, _settle, TestContext.Current.CancellationToken);
             var connection = Assert.Single(watched);
             Assert.Equal(_fixture.UserId, connection.AuthorizationInfo.User?.Id);
         }
         finally
         {
-            await _fixture.CloseAndDrainAsync(socket);
+            await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
         }
     }
 
@@ -132,12 +132,12 @@ public sealed class WebSocketUpgradeBoundaryTests
 
     [Fact(Timeout = TestTimeoutMs)]
     public async Task No_credential_is_refused_before_the_socket_is_accepted()
-        => await AssertRefusedAsync(() => _fixture.ConnectAsync(query: null), "a request presenting no credential at all");
+        => await AssertRefusedAsync(() => _fixture.ConnectAsync(query: null, cancellationToken: TestContext.Current.CancellationToken), "a request presenting no credential at all");
 
     [Fact(Timeout = TestTimeoutMs)]
     public async Task An_unknown_ticket_is_refused_before_the_socket_is_accepted()
         => await AssertRefusedAsync(
-            () => _fixture.ConnectWithTicketAsync("not-a-ticket"),
+            () => _fixture.ConnectWithTicketAsync("not-a-ticket", TestContext.Current.CancellationToken),
             "a ticket that was never minted");
 
     /// <summary>
@@ -147,23 +147,23 @@ public sealed class WebSocketUpgradeBoundaryTests
     [Fact(Timeout = TestTimeoutMs)]
     public async Task An_expired_ticket_is_refused()
     {
-        var ticket = await _fixture.MintTicketAsync();
+        var ticket = await _fixture.MintTicketAsync(TestContext.Current.CancellationToken);
 
         _fixture.Factory.Clock.Advance(PlaybackCredentialService.WebSocketTicketLifetime + TimeSpan.FromSeconds(1));
 
-        await AssertRefusedAsync(() => _fixture.ConnectWithTicketAsync(ticket.Value), "an expired ticket");
+        await AssertRefusedAsync(() => _fixture.ConnectWithTicketAsync(ticket.Value, TestContext.Current.CancellationToken), "an expired ticket");
 
         // The negative direction, so the assertion above is not satisfied by a validator that
         // refuses everything: a ticket minted after the clock moved is still accepted.
-        var fresh = await _fixture.MintTicketAsync();
-        var socket = await _fixture.ConnectWithTicketAsync(fresh.Value);
+        var fresh = await _fixture.MintTicketAsync(TestContext.Current.CancellationToken);
+        var socket = await _fixture.ConnectWithTicketAsync(fresh.Value, TestContext.Current.CancellationToken);
         try
         {
             Assert.Equal(WebSocketState.Open, socket.State);
         }
         finally
         {
-            await _fixture.CloseAndDrainAsync(socket);
+            await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
         }
     }
 
@@ -176,8 +176,8 @@ public sealed class WebSocketUpgradeBoundaryTests
     public async Task A_ticket_whose_owning_session_was_logged_out_is_refused()
     {
         var deviceId = "r2-revoked-" + Guid.NewGuid().ToString("N");
-        var token = await _fixture.AuthenticateAsync(deviceId);
-        var ticket = await _fixture.MintTicketAsync(deviceId, token);
+        var token = await _fixture.AuthenticateAsync(deviceId, TestContext.Current.CancellationToken);
+        var ticket = await _fixture.MintTicketAsync(deviceId, token, TestContext.Current.CancellationToken);
 
         using (var owner = _fixture.ClientFor(deviceId, token))
         using (var logout = await owner.PostAsync("/Sessions/Logout", content: null, TestContext.Current.CancellationToken))
@@ -186,7 +186,7 @@ public sealed class WebSocketUpgradeBoundaryTests
         }
 
         await AssertRefusedAsync(
-            () => _fixture.ConnectWithTicketAsync(ticket.Value, deviceId: deviceId),
+            () => _fixture.ConnectWithTicketAsync(ticket.Value, TestContext.Current.CancellationToken, deviceId: deviceId),
             "a ticket whose owning session was logged out");
     }
 
@@ -198,8 +198,8 @@ public sealed class WebSocketUpgradeBoundaryTests
     public async Task A_ticket_whose_device_was_deleted_is_refused()
     {
         var deviceId = "r2-deleted-" + Guid.NewGuid().ToString("N");
-        var token = await _fixture.AuthenticateAsync(deviceId);
-        var ticket = await _fixture.MintTicketAsync(deviceId, token);
+        var token = await _fixture.AuthenticateAsync(deviceId, TestContext.Current.CancellationToken);
+        var ticket = await _fixture.MintTicketAsync(deviceId, token, TestContext.Current.CancellationToken);
 
         using (var admin = _fixture.ClientFor(WebSocketUpgradeFixture.PrimaryDeviceId, _fixture.DurableToken))
         using (var deleted = await admin.DeleteAsync(
@@ -210,7 +210,7 @@ public sealed class WebSocketUpgradeBoundaryTests
         }
 
         await AssertRefusedAsync(
-            () => _fixture.ConnectWithTicketAsync(ticket.Value, deviceId: deviceId),
+            () => _fixture.ConnectWithTicketAsync(ticket.Value, TestContext.Current.CancellationToken, deviceId: deviceId),
             "a ticket whose device was deleted");
     }
 
@@ -230,21 +230,21 @@ public sealed class WebSocketUpgradeBoundaryTests
     [Fact(Timeout = TestTimeoutMs)]
     public async Task A_ticket_is_accepted_once_and_refused_on_replay()
     {
-        var ticket = await _fixture.MintTicketAsync();
+        var ticket = await _fixture.MintTicketAsync(TestContext.Current.CancellationToken);
 
-        var socket = await _fixture.ConnectWithTicketAsync(ticket.Value);
+        var socket = await _fixture.ConnectWithTicketAsync(ticket.Value, TestContext.Current.CancellationToken);
         try
         {
             Assert.Equal(WebSocketState.Open, socket.State);
 
             await AssertRefusedAsync(
-                () => _fixture.ConnectWithTicketAsync(ticket.Value),
+                () => _fixture.ConnectWithTicketAsync(ticket.Value, TestContext.Current.CancellationToken),
                 "a replayed ticket, while its first socket is still open",
                 expectedWatchlist: 1);
         }
         finally
         {
-            await _fixture.CloseAndDrainAsync(socket);
+            await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
         }
     }
 
@@ -261,7 +261,7 @@ public sealed class WebSocketUpgradeBoundaryTests
     [Fact(Timeout = TestTimeoutMs)]
     public async Task Two_simultaneous_upgrades_with_one_ticket_yield_exactly_one_socket()
     {
-        var ticket = await _fixture.MintTicketAsync();
+        var ticket = await _fixture.MintTicketAsync(TestContext.Current.CancellationToken);
 
         var first = Attempt(ticket.Value);
         var second = Attempt(ticket.Value);
@@ -278,7 +278,7 @@ public sealed class WebSocketUpgradeBoundaryTests
         {
             foreach (var socket in accepted)
             {
-                await _fixture.CloseAndDrainAsync(socket!);
+                await _fixture.CloseAndDrainAsync(socket!, TestContext.Current.CancellationToken);
             }
         }
 
@@ -286,7 +286,7 @@ public sealed class WebSocketUpgradeBoundaryTests
         {
             try
             {
-                return await _fixture.ConnectWithTicketAsync(value);
+                return await _fixture.ConnectWithTicketAsync(value, TestContext.Current.CancellationToken);
             }
             catch (Exception)
             {
@@ -303,17 +303,18 @@ public sealed class WebSocketUpgradeBoundaryTests
     [Fact(Timeout = TestTimeoutMs)]
     public async Task A_ticket_binds_its_own_device_even_when_the_request_claims_another()
     {
-        var otherToken = await _fixture.AuthenticateAsync(WebSocketUpgradeFixture.OtherDeviceId);
-        var ticket = await _fixture.MintTicketAsync(WebSocketUpgradeFixture.OtherDeviceId, otherToken);
+        var otherToken = await _fixture.AuthenticateAsync(WebSocketUpgradeFixture.OtherDeviceId, TestContext.Current.CancellationToken);
+        var ticket = await _fixture.MintTicketAsync(WebSocketUpgradeFixture.OtherDeviceId, otherToken, TestContext.Current.CancellationToken);
 
         var socket = await _fixture.ConnectWithTicketAsync(
             ticket.Value,
+            TestContext.Current.CancellationToken,
             durableToken: _fixture.DurableToken,
             deviceId: WebSocketUpgradeFixture.PrimaryDeviceId);
 
         try
         {
-            var watched = await _fixture.WaitForWatchlistAsync(1, _settle);
+            var watched = await _fixture.WaitForWatchlistAsync(1, _settle, TestContext.Current.CancellationToken);
             var connection = Assert.Single(watched);
 
             Assert.Equal(
@@ -322,7 +323,7 @@ public sealed class WebSocketUpgradeBoundaryTests
         }
         finally
         {
-            await _fixture.CloseAndDrainAsync(socket);
+            await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
         }
     }
 
@@ -346,7 +347,7 @@ public sealed class WebSocketUpgradeBoundaryTests
         };
 
         await AssertRefusedAsync(
-            () => _fixture.ConnectWithTicketAsync(value, durableToken: _fixture.DurableToken),
+            () => _fixture.ConnectWithTicketAsync(value, TestContext.Current.CancellationToken, durableToken: _fixture.DurableToken),
             $"a {kind} ticket presented alongside a valid durable token");
     }
 
@@ -368,7 +369,7 @@ public sealed class WebSocketUpgradeBoundaryTests
     [InlineData("/FallbackFont/Fonts", "playbackCapability")]
     public async Task A_ticket_is_never_an_http_credential(string path, string key)
     {
-        var ticket = await _fixture.MintTicketAsync();
+        var ticket = await _fixture.MintTicketAsync(TestContext.Current.CancellationToken);
 
         using var anonymous = _fixture.Factory.CreateClient();
         using var response = await anonymous.GetAsync(
@@ -390,13 +391,13 @@ public sealed class WebSocketUpgradeBoundaryTests
     {
         _fixture.Factory.Logs.Clear();
 
-        var accepted = await _fixture.MintTicketAsync();
-        var socket = await _fixture.ConnectWithTicketAsync(accepted.Value);
-        await _fixture.CloseAndDrainAsync(socket);
+        var accepted = await _fixture.MintTicketAsync(TestContext.Current.CancellationToken);
+        var socket = await _fixture.ConnectWithTicketAsync(accepted.Value, TestContext.Current.CancellationToken);
+        await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
 
-        var refused = await _fixture.MintTicketAsync();
+        var refused = await _fixture.MintTicketAsync(TestContext.Current.CancellationToken);
         await AssertRefusedAsync(
-            () => _fixture.ConnectWithTicketAsync(refused.Value + "-tampered"),
+            () => _fixture.ConnectWithTicketAsync(refused.Value + "-tampered", TestContext.Current.CancellationToken),
             "a tampered ticket, purely to exercise the refusal log path");
 
         var ours = _fixture.Factory.Logs.Captured
@@ -433,9 +434,9 @@ public sealed class WebSocketUpgradeBoundaryTests
     {
         _fixture.Factory.Logs.Clear();
 
-        var ticket = await _fixture.MintTicketAsync();
-        var socket = await _fixture.ConnectWithTicketAsync(ticket.Value);
-        await _fixture.CloseAndDrainAsync(socket);
+        var ticket = await _fixture.MintTicketAsync(TestContext.Current.CancellationToken);
+        var socket = await _fixture.ConnectWithTicketAsync(ticket.Value, TestContext.Current.CancellationToken);
+        await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
 
         // The fact, stated. If this ever stops being true the mitigation below is no longer needed
         // and this test should be revisited rather than deleted.
@@ -468,20 +469,20 @@ public sealed class WebSocketUpgradeBoundaryTests
 
     private async Task<string> ExpiredTicketAsync()
     {
-        var ticket = await _fixture.MintTicketAsync();
+        var ticket = await _fixture.MintTicketAsync(TestContext.Current.CancellationToken);
         _fixture.Factory.Clock.Advance(PlaybackCredentialService.WebSocketTicketLifetime + TimeSpan.FromSeconds(1));
         return ticket.Value;
     }
 
     private async Task<string> ReplayedTicketAsync()
     {
-        var ticket = await _fixture.MintTicketAsync();
+        var ticket = await _fixture.MintTicketAsync(TestContext.Current.CancellationToken);
 
         // Consumed and then released, so the value is spent. The caller asserts the refusal while
         // presenting a valid durable token, and that assertion is about fallback rather than about
         // why the ticket is dead, so closing here is fine.
-        var socket = await _fixture.ConnectWithTicketAsync(ticket.Value);
-        await _fixture.CloseAndDrainAsync(socket);
+        var socket = await _fixture.ConnectWithTicketAsync(ticket.Value, TestContext.Current.CancellationToken);
+        await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
         return ticket.Value;
     }
 
@@ -513,7 +514,7 @@ public sealed class WebSocketUpgradeBoundaryTests
         {
             if (socket is not null)
             {
-                await _fixture.CloseAndDrainAsync(socket);
+                await _fixture.CloseAndDrainAsync(socket, TestContext.Current.CancellationToken);
             }
         }
     }

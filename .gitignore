@@ -296,6 +296,7 @@ artifacts/openapi-drift/
 # their Markdown summary (ci/dependency-audit.sh). The hosted job uploads these
 # as a short-retention artifact; they are never committed.
 artifacts/dependency-audit/
+artifacts/test-results/
 
 # Local environment overrides for `docker compose`. `.env` is local-only even
 # though it currently holds nothing secret — the value of the rule is that it is

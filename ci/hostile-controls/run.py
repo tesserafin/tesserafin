@@ -426,9 +426,9 @@ def gate_dotnet_test(worktree, gate, timeout):
     results_dir = tempfile.mkdtemp(prefix="ltv-trx-")
     try:
         code, log = run(
-            ["dotnet", "test", gate["project"], "--no-build", "--nologo",
+            ["dotnet", "test", "--project", gate["project"], "--no-build", "--no-progress",
              "--filter", gate["filter"],
-             "--logger", "trx;LogFileName=control.trx",
+             "--report-trx", "--report-trx-filename", "control.trx",
              "--results-directory", results_dir],
             worktree, timeout)
         if code == "TIMEOUT":

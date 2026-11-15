@@ -80,7 +80,7 @@ public sealed class BlockedLibraryPolicyEndToEndTests : IDisposable
         Seeded seeded;
         using (var first = new Boot(_dataRoot))
         {
-            seeded = await SeedAsync(first);
+            seeded = await SeedAsync(first, TestContext.Current.CancellationToken);
         }
 
         using (var server = new Boot(_dataRoot))
@@ -95,7 +95,7 @@ public sealed class BlockedLibraryPolicyEndToEndTests : IDisposable
             {
                 foreach (var item in new[] { seeded.InBoth, seeded.VaultOnly })
                 {
-                    capabilities[(name, item)] = await MintAsync(client, userId, item);
+                    capabilities[(name, item)] = await MintAsync(client, userId, item, TestContext.Current.CancellationToken);
                 }
             }
 
@@ -107,54 +107,74 @@ public sealed class BlockedLibraryPolicyEndToEndTests : IDisposable
 
             await AssertAsync("before any block", vaultAllowed: true);
 
-            await UpdatePolicyAsync(admin, seeded.BeaId, p =>
-            {
-                p["BlockedMediaFolders"] = Ids(seeded.Vault);
-                p["BlockedChannels"] = Ids(BlockedChannel);
-            });
-            await AssertBlockedAsync(admin, "after blocking Vault", seeded.BeaId, seeded.Vault);
-            await AssertBlockedAsync(admin, "after blocking a channel", seeded.BeaId, "BlockedChannels", BlockedChannel);
+            await UpdatePolicyAsync(
+                admin,
+                seeded.BeaId,
+                p =>
+                {
+                    p["BlockedMediaFolders"] = Ids(seeded.Vault);
+                    p["BlockedChannels"] = Ids(BlockedChannel);
+                },
+                TestContext.Current.CancellationToken);
+            await AssertBlockedAsync(admin, "after blocking Vault", seeded.BeaId, TestContext.Current.CancellationToken, seeded.Vault);
+            await AssertBlockedAsync(admin, "after blocking a channel", seeded.BeaId, "BlockedChannels", TestContext.Current.CancellationToken, BlockedChannel);
             await AssertAsync("after blocking Vault", vaultAllowed: false);
 
             // What the web library-access page saves (Access.tsx): all libraries, the block list null.
             // The libraries it shows are the whole of the user's access, so null clears the block.
-            await UpdatePolicyAsync(admin, seeded.BeaId, p =>
-            {
-                p["EnableAllFolders"] = true;
-                p["EnabledFolders"] = Ids();
-                p["BlockedMediaFolders"] = null;
-                p["BlockedChannels"] = null;
-            });
-            await AssertBlockedAsync(admin, "after the library-access page saved", seeded.BeaId);
-            await AssertBlockedAsync(admin, "after the library-access page saved", seeded.BeaId, "BlockedChannels");
+            await UpdatePolicyAsync(
+                admin,
+                seeded.BeaId,
+                p =>
+                {
+                    p["EnableAllFolders"] = true;
+                    p["EnabledFolders"] = Ids();
+                    p["BlockedMediaFolders"] = null;
+                    p["BlockedChannels"] = null;
+                },
+                TestContext.Current.CancellationToken);
+            await AssertBlockedAsync(admin, "after the library-access page saved", seeded.BeaId, TestContext.Current.CancellationToken);
+            await AssertBlockedAsync(admin, "after the library-access page saved", seeded.BeaId, "BlockedChannels", TestContext.Current.CancellationToken);
             await AssertAsync("after the library-access page saved", vaultAllowed: true);
 
-            await UpdatePolicyAsync(admin, seeded.BeaId, p => p["BlockedMediaFolders"] = Ids(seeded.Vault));
+            await UpdatePolicyAsync(admin, seeded.BeaId, p => p["BlockedMediaFolders"] = Ids(seeded.Vault), TestContext.Current.CancellationToken);
             await AssertAsync("after blocking Vault again", vaultAllowed: false);
 
             // The block list wins over an enabled-folders list that names the blocked library.
-            await UpdatePolicyAsync(admin, seeded.BeaId, p =>
-            {
-                p["EnableAllFolders"] = false;
-                p["EnabledFolders"] = Ids(seeded.Vault);
-            });
-            await AssertBlockedAsync(admin, "with Vault both blocked and enabled", seeded.BeaId, seeded.Vault);
+            await UpdatePolicyAsync(
+                admin,
+                seeded.BeaId,
+                p =>
+                {
+                    p["EnableAllFolders"] = false;
+                    p["EnabledFolders"] = Ids(seeded.Vault);
+                },
+                TestContext.Current.CancellationToken);
+            await AssertBlockedAsync(admin, "with Vault both blocked and enabled", seeded.BeaId, TestContext.Current.CancellationToken, seeded.Vault);
             await AssertAsync("with Vault both blocked and enabled", vaultAllowed: false);
 
-            await UpdatePolicyAsync(admin, seeded.BeaId, p =>
-            {
-                p["EnableAllFolders"] = true;
-                p["EnabledFolders"] = Ids();
-                p["BlockedMediaFolders"] = Ids();
-            });
-            await AssertBlockedAsync(admin, "after clearing the block", seeded.BeaId);
+            await UpdatePolicyAsync(
+                admin,
+                seeded.BeaId,
+                p =>
+                {
+                    p["EnableAllFolders"] = true;
+                    p["EnabledFolders"] = Ids();
+                    p["BlockedMediaFolders"] = Ids();
+                },
+                TestContext.Current.CancellationToken);
+            await AssertBlockedAsync(admin, "after clearing the block", seeded.BeaId, TestContext.Current.CancellationToken);
             await AssertAsync("after clearing the block", vaultAllowed: true);
 
-            await UpdatePolicyAsync(admin, seeded.BeaId, p =>
-            {
-                p["BlockedMediaFolders"] = Ids(seeded.Vault);
-                p["BlockedChannels"] = Ids(BlockedChannel);
-            });
+            await UpdatePolicyAsync(
+                admin,
+                seeded.BeaId,
+                p =>
+                {
+                    p["BlockedMediaFolders"] = Ids(seeded.Vault);
+                    p["BlockedChannels"] = Ids(BlockedChannel);
+                },
+                TestContext.Current.CancellationToken);
             await AssertAsync("after blocking Vault once more", vaultAllowed: false);
         }
 
@@ -166,12 +186,12 @@ public sealed class BlockedLibraryPolicyEndToEndTests : IDisposable
             using var anonymous = restarted.CreateClient();
             var none = new Dictionary<(string User, Guid Item), string>();
 
-            await AssertBlockedAsync(admin, "after a restart", seeded.BeaId, seeded.Vault);
-            await AssertBlockedAsync(admin, "after a restart", seeded.BeaId, "BlockedChannels", BlockedChannel);
+            await AssertBlockedAsync(admin, "after a restart", seeded.BeaId, TestContext.Current.CancellationToken, seeded.Vault);
+            await AssertBlockedAsync(admin, "after a restart", seeded.BeaId, "BlockedChannels", TestContext.Current.CancellationToken, BlockedChannel);
             await AssertDecisionsAsync("after a restart, bea", bea, anonymous, seeded.BeaId, seeded, none, "bea", vaultAllowed: false);
             await AssertDecisionsAsync("after a restart, cleo", cleo, anonymous, seeded.CleoId, seeded, none, "cleo", vaultAllowed: true);
 
-            await UpdatePolicyAsync(admin, seeded.BeaId, p => p["BlockedMediaFolders"] = Ids());
+            await UpdatePolicyAsync(admin, seeded.BeaId, p => p["BlockedMediaFolders"] = Ids(), TestContext.Current.CancellationToken);
             await AssertDecisionsAsync("after clearing the block a restart loaded, bea", bea, anonymous, seeded.BeaId, seeded, none, "bea", vaultAllowed: true);
         }
 
@@ -183,21 +203,21 @@ public sealed class BlockedLibraryPolicyEndToEndTests : IDisposable
     /// <summary>
     /// What the user editor does: reads the user's policy, changes it, posts it back.
     /// </summary>
-    private static async Task UpdatePolicyAsync(HttpClient admin, Guid userId, Action<JsonObject> change)
+    private static async Task UpdatePolicyAsync(HttpClient admin, Guid userId, Action<JsonObject> change, CancellationToken cancellationToken)
     {
-        var policy = JsonNode.Parse(await admin.GetStringAsync(FormattableString.Invariant($"Users/{userId}"), TestContext.Current.CancellationToken))!["Policy"]!.AsObject();
+        var policy = JsonNode.Parse(await admin.GetStringAsync(FormattableString.Invariant($"Users/{userId}"), cancellationToken))!["Policy"]!.AsObject();
         change(policy);
         using var content = new StringContent(policy.ToJsonString(), System.Text.Encoding.UTF8, "application/json");
-        using var saved = await admin.PostAsync(FormattableString.Invariant($"Users/{userId}/Policy"), content, TestContext.Current.CancellationToken);
+        using var saved = await admin.PostAsync(FormattableString.Invariant($"Users/{userId}/Policy"), content, cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, saved.StatusCode);
     }
 
-    private Task AssertBlockedAsync(HttpClient admin, string what, Guid userId, params Guid[] expected) =>
-        AssertBlockedAsync(admin, what, userId, "BlockedMediaFolders", expected);
+    private Task AssertBlockedAsync(HttpClient admin, string what, Guid userId, CancellationToken cancellationToken, params Guid[] expected) =>
+        AssertBlockedAsync(admin, what, userId, "BlockedMediaFolders", cancellationToken, expected);
 
-    private async Task AssertBlockedAsync(HttpClient admin, string what, Guid userId, string field, params Guid[] expected)
+    private async Task AssertBlockedAsync(HttpClient admin, string what, Guid userId, string field, CancellationToken cancellationToken, params Guid[] expected)
     {
-        var user = (await admin.GetFromJsonAsync<UserDto>(FormattableString.Invariant($"Users/{userId}"), JsonDefaults.Options, TestContext.Current.CancellationToken))!;
+        var user = (await admin.GetFromJsonAsync<UserDto>(FormattableString.Invariant($"Users/{userId}"), JsonDefaults.Options, cancellationToken))!;
         var actual = (field == "BlockedChannels" ? user.Policy!.BlockedChannels : user.Policy!.BlockedMediaFolders) ?? [];
         if (!actual.Order().SequenceEqual(expected.Order()))
         {
@@ -219,34 +239,34 @@ public sealed class BlockedLibraryPolicyEndToEndTests : IDisposable
         {
             var expected = allowed ? HttpStatusCode.OK : HttpStatusCode.NotFound;
             var at = what + ", item " + label;
-            Expect(at + ": by id", expected, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{item}?userId={userId}")));
-            Expect(at + ": PlaybackInfo", expected, await StatusAsync(client, HttpMethod.Post, FormattableString.Invariant($"Items/{item}/PlaybackInfo?userId={userId}"), new { }));
-            Expect(at + ": bytes with the user's token", expected, await StatusAsync(client, HttpMethod.Get, Bytes(item)));
+            Expect(at + ": by id", expected, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{item}?userId={userId}"), cancellationToken: TestContext.Current.CancellationToken));
+            Expect(at + ": PlaybackInfo", expected, await StatusAsync(client, HttpMethod.Post, FormattableString.Invariant($"Items/{item}/PlaybackInfo?userId={userId}"), new { }, cancellationToken: TestContext.Current.CancellationToken));
+            Expect(at + ": bytes with the user's token", expected, await StatusAsync(client, HttpMethod.Get, Bytes(item), cancellationToken: TestContext.Current.CancellationToken));
             if (capabilities.TryGetValue((name, item), out var capability))
             {
-                Expect(at + ": bytes with a capability minted before the change", expected, await StatusAsync(anonymous, HttpMethod.Get, Bytes(item) + "&playbackCapability=" + Uri.EscapeDataString(capability)));
+                Expect(at + ": bytes with a capability minted before the change", expected, await StatusAsync(anonymous, HttpMethod.Get, Bytes(item) + "&playbackCapability=" + Uri.EscapeDataString(capability), cancellationToken: TestContext.Current.CancellationToken));
             }
         }
 
-        Expect(what + ": the Vault library by id", vaultAllowed ? HttpStatusCode.OK : HttpStatusCode.NotFound, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{seeded.Vault}?userId={userId}")));
-        Expect(what + ": the Films library by id", HttpStatusCode.OK, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{seeded.Films}?userId={userId}")));
+        Expect(what + ": the Vault library by id", vaultAllowed ? HttpStatusCode.OK : HttpStatusCode.NotFound, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{seeded.Vault}?userId={userId}"), cancellationToken: TestContext.Current.CancellationToken));
+        Expect(what + ": the Films library by id", HttpStatusCode.OK, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{seeded.Films}?userId={userId}"), cancellationToken: TestContext.Current.CancellationToken));
 
-        var views = await IdsAsync(client, FormattableString.Invariant($"UserViews?userId={userId}"));
+        var views = await IdsAsync(client, FormattableString.Invariant($"UserViews?userId={userId}"), TestContext.Current.CancellationToken);
         if (views.Contains(seeded.Vault) != vaultAllowed || !views.Contains(seeded.Films))
         {
             _wrong.Add(FormattableString.Invariant($"{what}: views [{string.Join(", ", views)}]"));
         }
 
-        var listed = await IdsAsync(client, FormattableString.Invariant($"Items?recursive=true&includeItemTypes=Movie&userId={userId}"));
+        var listed = await IdsAsync(client, FormattableString.Invariant($"Items?recursive=true&includeItemTypes=Movie&userId={userId}"), TestContext.Current.CancellationToken);
         if (!listed.Contains(seeded.InBoth) || listed.Contains(seeded.VaultOnly) != vaultAllowed)
         {
             _wrong.Add(what + ": listing");
         }
     }
 
-    private static async Task<HashSet<Guid>> IdsAsync(HttpClient client, string url)
+    private static async Task<HashSet<Guid>> IdsAsync(HttpClient client, string url, CancellationToken cancellationToken)
     {
-        using var document = JsonDocument.Parse(await client.GetStringAsync(url, TestContext.Current.CancellationToken));
+        using var document = JsonDocument.Parse(await client.GetStringAsync(url, cancellationToken));
         return document.RootElement.GetProperty("Items").EnumerateArray().Select(i => Guid.Parse(i.GetProperty("Id").GetString()!)).ToHashSet();
     }
 
@@ -260,7 +280,7 @@ public sealed class BlockedLibraryPolicyEndToEndTests : IDisposable
 
     private static string Bytes(Guid item) => FormattableString.Invariant($"Videos/{item}/stream?static=true&mediaSourceId={item:N}");
 
-    private static async Task<HttpStatusCode> StatusAsync(HttpClient client, HttpMethod method, string url, object? body = null)
+    private static async Task<HttpStatusCode> StatusAsync(HttpClient client, HttpMethod method, string url, object? body = null, CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(method, url);
         if (body is not null)
@@ -268,22 +288,22 @@ public sealed class BlockedLibraryPolicyEndToEndTests : IDisposable
             request.Content = JsonContent.Create(body, options: JsonDefaults.Options);
         }
 
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         return response.StatusCode;
     }
 
-    private static async Task<string> MintAsync(HttpClient client, Guid userId, Guid item)
+    private static async Task<string> MintAsync(HttpClient client, Guid userId, Guid item, CancellationToken cancellationToken)
     {
-        using var info = await client.PostAsJsonAsync(FormattableString.Invariant($"Items/{item}/PlaybackInfo?userId={userId}"), new { }, JsonDefaults.Options, TestContext.Current.CancellationToken);
+        using var info = await client.PostAsJsonAsync(FormattableString.Invariant($"Items/{item}/PlaybackInfo?userId={userId}"), new { }, JsonDefaults.Options, cancellationToken);
         info.EnsureSuccessStatusCode();
-        using var infoDocument = JsonDocument.Parse(await info.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        using var infoDocument = JsonDocument.Parse(await info.Content.ReadAsStringAsync(cancellationToken));
         var (status, body) = await MintingFixture.MintAsync(client, [PlaybackCapabilityScope.Media], item, item.ToString("N"), infoDocument.RootElement.GetProperty("PlaySessionId").GetString()!);
         Assert.Equal(HttpStatusCode.OK, status);
         using var document = JsonDocument.Parse(body);
         return document.RootElement.GetProperty("Value").GetString()!;
     }
 
-    private async Task<Seeded> SeedAsync(Boot server)
+    private async Task<Seeded> SeedAsync(Boot server, CancellationToken cancellationToken)
     {
         var (adminToken, adminId) = await server.EnsureAuthenticatedAsync();
         using var admin = server.AdminClient(adminToken);
@@ -293,10 +313,10 @@ public sealed class BlockedLibraryPolicyEndToEndTests : IDisposable
 
         // Both libraries before either folder: adding a library validates the root's children,
         // and a folder no scan resolved would not survive it.
-        await AddLibraryAsync(admin, "blk-films", films);
-        await AddLibraryAsync(admin, "blk-vault", vault, films);
+        await AddLibraryAsync(admin, "blk-films", cancellationToken, films);
+        await AddLibraryAsync(admin, "blk-vault", cancellationToken, vault, films);
 
-        using var libraries = JsonDocument.Parse(await admin.GetStringAsync("Library/VirtualFolders", TestContext.Current.CancellationToken));
+        using var libraries = JsonDocument.Parse(await admin.GetStringAsync("Library/VirtualFolders", cancellationToken));
         var ids = libraries.RootElement.EnumerateArray().ToDictionary(f => f.GetProperty("Name").GetString()!, f => Guid.Parse(f.GetProperty("ItemId").GetString()!));
 
         var library = server.Services.GetRequiredService<ILibraryManager>();
@@ -314,16 +334,16 @@ public sealed class BlockedLibraryPolicyEndToEndTests : IDisposable
         var inBoth = Seed(server, Path.Combine(films, "blk-film.mp4"), filmsFolder);
         var vaultOnly = Seed(server, Path.Combine(vault, "blk-vault.mp4"), vaultFolder);
 
-        var (beaToken, beaId) = await SignInAsync(server, admin, "blk-bea");
-        var (cleoToken, cleoId) = await SignInAsync(server, admin, "blk-cleo");
+        var (beaToken, beaId) = await SignInAsync(server, admin, "blk-bea", cancellationToken);
+        var (cleoToken, cleoId) = await SignInAsync(server, admin, "blk-cleo", cancellationToken);
 
         return new Seeded(adminToken, beaToken, beaId, cleoToken, cleoId, ids["blk-films"], ids["blk-vault"], inBoth, vaultOnly);
     }
 
-    private static async Task AddLibraryAsync(HttpClient admin, string name, params string[] paths)
+    private static async Task AddLibraryAsync(HttpClient admin, string name, CancellationToken cancellationToken, params string[] paths)
     {
         var query = string.Concat(paths.Select(p => "&paths=" + Uri.EscapeDataString(p)));
-        using var added = await admin.PostAsJsonAsync("Library/VirtualFolders?collectionType=movies&refreshLibrary=false&name=" + name + query, new { }, JsonDefaults.Options, TestContext.Current.CancellationToken);
+        using var added = await admin.PostAsJsonAsync("Library/VirtualFolders?collectionType=movies&refreshLibrary=false&name=" + name + query, new { }, JsonDefaults.Options, cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, added.StatusCode);
     }
 
@@ -350,22 +370,22 @@ public sealed class BlockedLibraryPolicyEndToEndTests : IDisposable
             parentId: folder);
     }
 
-    private static async Task<(string Token, Guid Id)> SignInAsync(Boot server, HttpClient admin, string name)
+    private static async Task<(string Token, Guid Id)> SignInAsync(Boot server, HttpClient admin, string name, CancellationToken cancellationToken)
     {
         UserDto created;
-        using (var response = await admin.PostAsJsonAsync("/Users/New", new { Name = name, Password }, JsonDefaults.Options, TestContext.Current.CancellationToken))
+        using (var response = await admin.PostAsJsonAsync("/Users/New", new { Name = name, Password }, JsonDefaults.Options, cancellationToken))
         {
             response.EnsureSuccessStatusCode();
-            created = (await response.Content.ReadFromJsonAsync<UserDto>(JsonDefaults.Options, TestContext.Current.CancellationToken))!;
+            created = (await response.Content.ReadFromJsonAsync<UserDto>(JsonDefaults.Options, cancellationToken))!;
         }
 
         using var anonymous = server.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/Users/AuthenticateByName");
         request.Headers.TryAddWithoutValidation(AuthHelper.AuthHeaderName, MediaBoundaryFixture.AuthorizationHeader(name, null));
         request.Content = JsonContent.Create(new { Username = name, Pw = Password }, options: JsonDefaults.Options);
-        using var authenticated = await anonymous.SendAsync(request, TestContext.Current.CancellationToken);
+        using var authenticated = await anonymous.SendAsync(request, cancellationToken);
         authenticated.EnsureSuccessStatusCode();
-        using var document = JsonDocument.Parse(await authenticated.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        using var document = JsonDocument.Parse(await authenticated.Content.ReadAsStringAsync(cancellationToken));
         return (document.RootElement.GetProperty("AccessToken").GetString()!, created.Id);
     }
 
