@@ -8,11 +8,10 @@ using System.Threading.Tasks;
 using Tesserafin.Api.Models.StartupDtos;
 using Tesserafin.Extensions.Json;
 using Xunit;
-using Xunit.v3.Priority;
 
 namespace Tesserafin.Server.Integration.Tests.Controllers
 {
-    [TestCaseOrderer(typeof(PriorityOrderer))]
+    [TestMethodOrderer(typeof(PriorityOrderer))]
     public sealed class StartupControllerTests : IClassFixture<TesserafinApplicationFactory>
     {
         private readonly TesserafinApplicationFactory _factory;

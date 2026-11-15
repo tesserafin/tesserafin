@@ -9,11 +9,10 @@ using Tesserafin.Api.Models.UserDtos;
 using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Dto;
 using Xunit;
-using Xunit.v3.Priority;
 
 namespace Tesserafin.Server.Integration.Tests.Controllers
 {
-    [TestCaseOrderer(typeof(PriorityOrderer))]
+    [TestMethodOrderer(typeof(PriorityOrderer))]
     public sealed class UserControllerTests : IClassFixture<TesserafinApplicationFactory>
     {
         private const string TestUsername = "testUser01";

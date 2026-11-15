@@ -9,11 +9,10 @@ using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Xunit;
-using Xunit.v3.Priority;
 
 namespace Tesserafin.Server.Integration.Tests.Controllers;
 
-[TestCaseOrderer(typeof(PriorityOrderer))]
+[TestMethodOrderer(typeof(PriorityOrderer))]
 public sealed class LibraryStructureControllerTests : IClassFixture<TesserafinApplicationFactory>
 {
     private readonly TesserafinApplicationFactory _factory;

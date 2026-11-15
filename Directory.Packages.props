@@ -86,7 +86,6 @@
     <PackageVersion Include="TMDbLib" Version="3.0.0" />
     <PackageVersion Include="UTF.Unknown" Version="2.8.0" />
     <PackageVersion Include="xunit.v3" Version="4.0.3" />
-    <PackageVersion Include="Xunit.v3.Priority" Version="1.1.18" />
   </ItemGroup>
   <!--
     Security pins. Packages listed here are NOT dependencies this project wants;
