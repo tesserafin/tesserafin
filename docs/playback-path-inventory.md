@@ -429,3 +429,25 @@ capabilities. Snapshot-isolation and strategy-selection cases supplement them. E
 VAAPI tests are retained; their hardware requirement is not waived by command characterization.
 Hardware acceptance remains outstanding. Remaining playback consumers in §6 are unchanged, and
 step 5 remains open.
+
+## 15. QSV filter renderer (consolidation step 5, candidate)
+
+QSV production routing captures one immutable `QsvPipelinePlan`: software/copy-back, Linux
+VAAPI or Windows D3D11. `QsvPipelineRenderer` composes main/subtitle/overlay sequences and
+surface transfers without reading a job, options, platform APIs or hardware services. OpenCL,
+VAAPI VPP and Windows VPP tone mapping are exclusive; Windows procamp/two-pass requirements
+are frozen before rendering. Shared software scaling has one implementation.
+
+The public entries `GetIntelVidFilterChain`, `GetIntelQsvDx11VidFiltersPrefered` and
+`GetIntelQsvVaapiVidFiltersPrefered` are removed without compatibility forwarders or flags.
+The renderer retains QSV overlay pools, the 1080 preparation ceiling, native surface relays
+and Linux-specific reverse mapping pools. Shared geometry/filter helpers and subtitle paths
+remain resolved at capture. Common FPS insertion, final command assembly and codec/device
+selection stay outside this slice. The retained Sessions execution plan remains authoritative.
+
+The static baseline contains 234 pre-extraction backend graphs and 117 complete production
+Linux responses. D3D11 graph characterization executes explicit parameters on Linux; native
+Windows startup and Intel GPU execution remain unproven. Architecture checks cover all four
+renderer namespaces and removed entry points without expanding the consolidation baseline.
+No OpenAPI, SDK, project or package changes. AMF, VideoToolbox and RKMPP remain to be extracted;
+step 5 and all remaining playback consumers in §6 stay open.

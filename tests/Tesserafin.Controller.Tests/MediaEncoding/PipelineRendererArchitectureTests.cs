@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.MediaEncoding.Nvidia;
+using Tesserafin.Controller.MediaEncoding.Qsv;
 using Tesserafin.Controller.MediaEncoding.Software;
 using Tesserafin.Controller.MediaEncoding.Vaapi;
 using Xunit;
@@ -19,6 +20,7 @@ public sealed partial class PipelineRendererArchitectureTests
     [InlineData("Software")]
     [InlineData("Nvidia")]
     [InlineData("Vaapi")]
+    [InlineData("Qsv")]
     public void RendererSources_ReachOnlyImmutableValuesAndFormatting(string backend)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -52,6 +54,7 @@ public sealed partial class PipelineRendererArchitectureTests
     [InlineData(typeof(SoftwarePipelinePlan))]
     [InlineData(typeof(NvidiaPipelinePlan))]
     [InlineData(typeof(VaapiPipelinePlan))]
+    [InlineData(typeof(QsvPipelinePlan))]
     public void CapturedPlans_ContainOnlyImmutableValues(Type planType)
     {
         var types = planType.Assembly.GetTypes()
@@ -82,6 +85,9 @@ public sealed partial class PipelineRendererArchitectureTests
     [InlineData("GetIntelVaapiFullVidFiltersPrefered")]
     [InlineData("GetAmdVaapiFullVidFiltersPrefered")]
     [InlineData("GetVaapiLimitedVidFiltersPrefered")]
+    [InlineData("GetIntelVidFilterChain")]
+    [InlineData("GetIntelQsvDx11VidFiltersPrefered")]
+    [InlineData("GetIntelQsvVaapiVidFiltersPrefered")]
     public void EncodingHelper_HasNoFormerRendererImplementationEntryPoints(string method)
         => Assert.Null(typeof(EncodingHelper).GetMethod(method));
 

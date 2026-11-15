@@ -18,6 +18,7 @@ using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Extensions;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.MediaEncoding.Nvidia;
+using Tesserafin.Controller.MediaEncoding.Qsv;
 using Tesserafin.Controller.MediaEncoding.Software;
 using Tesserafin.Controller.MediaEncoding.Vaapi;
 using Tesserafin.Controller.Streaming;
@@ -4150,612 +4151,111 @@ namespace Tesserafin.Controller.MediaEncoding
             return (mainFilters, subFilters, overlayFilters);
         }
 
-        /// <summary>
-        /// Gets the parameter of Intel QSV filter chain.
-        /// </summary>
-        /// <param name="state">Encoding state.</param>
-        /// <param name="options">Encoding options.</param>
-        /// <param name="vidEncoder">Video encoder to use.</param>
-        /// <returns>The tuple contains three lists: main, sub and overlay filters.</returns>
-        public (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) GetIntelVidFilterChain(
+        private (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) RenderQsvFilterChain(
             EncodingJobInfo state,
             EncodingOptions options,
-            string vidEncoder)
+            string videoEncoder)
         {
-            if (options.HardwareAccelerationType != HardwareAccelerationType.qsv)
-            {
-                return (null, null, null);
-            }
-
-            var isWindows = OperatingSystem.IsWindows();
-            var isLinux = OperatingSystem.IsLinux();
-            var vidDecoder = GetHardwareVideoDecoder(state, options) ?? string.Empty;
-            var isSwDecoder = string.IsNullOrEmpty(vidDecoder);
-            var isSwEncoder = !vidEncoder.Contains("qsv", StringComparison.OrdinalIgnoreCase);
-            var isQsvOclSupported = _mediaEncoder.SupportsHwaccel("qsv") && IsOpenclFullSupported();
-            var isIntelDx11OclSupported = isWindows
-                && _mediaEncoder.SupportsHwaccel("d3d11va")
-                && isQsvOclSupported;
-            var isIntelVaapiOclSupported = isLinux
-                && IsVaapiSupported(state)
-                && isQsvOclSupported;
-
-            // legacy qsv pipeline(copy-back)
-            if ((isSwDecoder && isSwEncoder)
-                || (!isIntelVaapiOclSupported && !isIntelDx11OclSupported)
-                || !_mediaEncoder.SupportsFilter("alphasrc"))
-            {
-                return RenderSoftwareFilterChain(state, options, vidEncoder);
-            }
-
-            // preferred qsv(vaapi) + opencl filters pipeline
-            if (isIntelVaapiOclSupported)
-            {
-                return GetIntelQsvVaapiVidFiltersPrefered(state, options, vidDecoder, vidEncoder);
-            }
-
-            // preferred qsv(d3d11) + opencl filters pipeline
-            if (isIntelDx11OclSupported)
-            {
-                return GetIntelQsvDx11VidFiltersPrefered(state, options, vidDecoder, vidEncoder);
-            }
-
-            return (null, null, null);
+            var filters = QsvPipelineRenderer.Render(CaptureQsvPipeline(state, options, videoEncoder));
+            return (filters.MainFilters.ToList(), filters.SubFilters.ToList(), filters.OverlayFilters.ToList());
         }
 
-        public (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) GetIntelQsvDx11VidFiltersPrefered(
-            EncodingJobInfo state,
-            EncodingOptions options,
-            string vidDecoder,
-            string vidEncoder)
+        // Resolve the native route once. This is a capability decision, not a client/server
+        // compatibility branch; all graph composition is delegated to the pure renderer.
+        internal QsvPipelinePlan CaptureQsvPipeline(EncodingJobInfo state, EncodingOptions options, string videoEncoder)
         {
-            var inW = state.VideoStream?.Width;
-            var inH = state.VideoStream?.Height;
-            var reqW = state.BaseRequest.Width;
-            var reqH = state.BaseRequest.Height;
-            var reqMaxW = state.BaseRequest.MaxWidth;
-            var reqMaxH = state.BaseRequest.MaxHeight;
-            var threeDFormat = state.MediaSource.Video3DFormat;
-
-            var isD3d11vaDecoder = vidDecoder.Contains("d3d11va", StringComparison.OrdinalIgnoreCase);
-            var isQsvDecoder = vidDecoder.Contains("qsv", StringComparison.OrdinalIgnoreCase);
-            var isQsvEncoder = vidEncoder.Contains("qsv", StringComparison.OrdinalIgnoreCase);
-            var isHwDecoder = isD3d11vaDecoder || isQsvDecoder;
-            var isSwDecoder = string.IsNullOrEmpty(vidDecoder);
-            var isSwEncoder = !isQsvEncoder;
-            var isMjpegEncoder = vidEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase);
-            var isQsvInQsvOut = isHwDecoder && isQsvEncoder;
-
-            var doDeintH2645 = IsDeinterlaceAvailable(state);
-            var doVppTonemap = IsIntelVppTonemapAvailable(state, options);
-            var doOclTonemap = !doVppTonemap && IsHwTonemapAvailable(state, options);
-            var doTonemap = doVppTonemap || doOclTonemap;
-
-            var hasSubs = state.SubtitleStream is not null && ShouldEncodeSubtitle(state);
-            var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
-            var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
-            var hasAssSubs = hasSubs
-                && (string.Equals(state.SubtitleStream.Codec, "ass", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(state.SubtitleStream.Codec, "ssa", StringComparison.OrdinalIgnoreCase));
-            var subW = state.SubtitleStream?.Width;
-            var subH = state.SubtitleStream?.Height;
-
-            var rotation = state.VideoStream?.Rotation ?? 0;
-            var transposeDir = rotation == 0 ? string.Empty : GetVideoTransposeDirection(state);
-            var doVppTranspose = !string.IsNullOrEmpty(transposeDir);
-            var swapWAndH = Math.Abs(rotation) == 90 && (isSwDecoder || ((isD3d11vaDecoder || isQsvDecoder) && doVppTranspose));
-            var swpInW = swapWAndH ? inH : inW;
-            var swpInH = swapWAndH ? inW : inH;
-
-            /* Make main filters for video stream */
-            var mainFilters = new List<string>();
-
-            mainFilters.Add(GetOverwriteColorPropertiesParam(state, doTonemap));
-
-            if (isSwDecoder)
+            var decoder = GetHardwareVideoDecoder(state, options) ?? string.Empty;
+            var supported = _mediaEncoder.SupportsHwaccel("qsv") && IsOpenclFullSupported();
+            var vaapi = OperatingSystem.IsLinux() && IsVaapiSupported(state) && supported;
+            var d3d11 = OperatingSystem.IsWindows() && _mediaEncoder.SupportsHwaccel("d3d11va") && supported;
+            if ((decoder.Length == 0 && !videoEncoder.Contains("qsv", StringComparison.OrdinalIgnoreCase))
+                || (!vaapi && !d3d11) || !_mediaEncoder.SupportsFilter("alphasrc"))
             {
-                // INPUT sw surface(memory)
-                // sw deint
-                if (doDeintH2645)
-                {
-                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
-                    mainFilters.Add(swDeintFilter);
-                }
-
-                var outFormat = doOclTonemap ? "yuv420p10le" : (hasGraphicalSubs ? "yuv420p" : "nv12");
-                var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
-                if (isMjpegEncoder && !doOclTonemap)
-                {
-                    // sw decoder + hw mjpeg encoder
-                    swScaleFilter = string.IsNullOrEmpty(swScaleFilter) ? "scale=out_range=pc" : $"{swScaleFilter}:out_range=pc";
-                }
-
-                // sw scale
-                mainFilters.Add(swScaleFilter);
-                mainFilters.Add($"format={outFormat}");
-
-                // keep video at memory except ocl tonemap,
-                // since the overhead caused by hwupload >>> using sw filter.
-                // sw => hw
-                if (doOclTonemap)
-                {
-                    mainFilters.Add("hwupload=derive_device=opencl");
-                }
-            }
-            else if (isD3d11vaDecoder || isQsvDecoder)
-            {
-                var isRext = IsVideoStreamHevcRext(state);
-                var twoPassVppTonemap = false;
-                var doVppFullRangeOut = isMjpegEncoder
-                    && _mediaEncoder.EncoderVersion >= _minFFmpegQsvVppOutRangeOption;
-                var doVppScaleModeHq = isMjpegEncoder
-                    && _mediaEncoder.EncoderVersion >= _minFFmpegQsvVppScaleModeOption;
-                var doVppProcamp = false;
-                var procampParams = string.Empty;
-                var procampParamsString = string.Empty;
-                if (doVppTonemap)
-                {
-                    if (isRext)
-                    {
-                        // VPP tonemap requires p010 input
-                        twoPassVppTonemap = true;
-                    }
-
-                    if (options.VppTonemappingBrightness != 0
-                        && options.VppTonemappingBrightness >= -100
-                        && options.VppTonemappingBrightness <= 100)
-                    {
-                        procampParamsString += ":brightness={0}";
-                        twoPassVppTonemap = doVppProcamp = true;
-                    }
-
-                    if (options.VppTonemappingContrast > 1
-                        && options.VppTonemappingContrast <= 10)
-                    {
-                        procampParamsString += ":contrast={1}";
-                        twoPassVppTonemap = doVppProcamp = true;
-                    }
-
-                    if (doVppProcamp)
-                    {
-                        procampParamsString += ":procamp=1:async_depth=2";
-                        procampParams = string.Format(
-                            CultureInfo.InvariantCulture,
-                            procampParamsString,
-                            options.VppTonemappingBrightness,
-                            options.VppTonemappingContrast);
-                    }
-                }
-
-                var outFormat = doOclTonemap ? ((doVppTranspose || isRext) ? "p010" : string.Empty) : "nv12";
-                outFormat = twoPassVppTonemap ? "p010" : outFormat;
-
-                var swapOutputWandH = doVppTranspose && swapWAndH;
-                var hwScaleFilter = GetHwScaleFilter("vpp", "qsv", outFormat, swapOutputWandH, swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH);
-
-                // d3d11va doesn't support dynamic pool size, use vpp filter ctx to relay
-                // to prevent encoder async and bframes from exhausting the decoder pool.
-                if (!string.IsNullOrEmpty(hwScaleFilter) && isD3d11vaDecoder)
-                {
-                    hwScaleFilter += ":passthrough=0";
-                }
-
-                if (!string.IsNullOrEmpty(hwScaleFilter) && doVppTranspose)
-                {
-                    hwScaleFilter += $":transpose={transposeDir}";
-                }
-
-                if (!string.IsNullOrEmpty(hwScaleFilter) && isMjpegEncoder)
-                {
-                    hwScaleFilter += (doVppFullRangeOut && !doOclTonemap) ? ":out_range=pc" : string.Empty;
-                    hwScaleFilter += doVppScaleModeHq ? ":scale_mode=hq" : string.Empty;
-                }
-
-                if (!string.IsNullOrEmpty(hwScaleFilter) && doVppTonemap)
-                {
-                    hwScaleFilter += doVppProcamp ? procampParams : (twoPassVppTonemap ? string.Empty : ":tonemap=1");
-                }
-
-                if (isD3d11vaDecoder)
-                {
-                    if (!string.IsNullOrEmpty(hwScaleFilter) || doDeintH2645)
-                    {
-                        // INPUT d3d11 surface(vram)
-                        // map from d3d11va to qsv.
-                        mainFilters.Add("hwmap=derive_device=qsv");
-                    }
-                }
-
-                // hw deint
-                if (doDeintH2645)
-                {
-                    var deintFilter = GetHwDeinterlaceFilter(state, options, "qsv");
-                    mainFilters.Add(deintFilter);
-                }
-
-                // hw transpose & scale & tonemap(w/o procamp)
-                mainFilters.Add(hwScaleFilter);
-
-                // hw tonemap(w/ procamp)
-                if (doVppTonemap && twoPassVppTonemap)
-                {
-                    mainFilters.Add("vpp_qsv=tonemap=1:format=nv12:async_depth=2");
-                }
-
-                // force bt709 just in case vpp tonemap is not triggered or using MSDK instead of VPL.
-                if (doVppTonemap)
-                {
-                    mainFilters.Add(GetOverwriteColorPropertiesParam(state, false));
-                }
+                return new QsvPipelinePlan.Software(CaptureSoftwarePipeline(state, options, videoEncoder));
             }
 
-            if (doOclTonemap && isHwDecoder)
-            {
-                // map from qsv to opencl via qsv(d3d11)-opencl interop.
-                mainFilters.Add("hwmap=derive_device=opencl:mode=read");
-            }
-
-            // hw tonemap
-            if (doOclTonemap)
-            {
-                var tonemapFilter = GetHwTonemapFilter(options, "opencl", "nv12", isMjpegEncoder);
-                mainFilters.Add(tonemapFilter);
-            }
-
-            var memoryOutput = false;
-            var isUploadForOclTonemap = isSwDecoder && doOclTonemap;
-            var isHwmapUsable = isSwEncoder && doOclTonemap;
-            if ((isHwDecoder && isSwEncoder) || isUploadForOclTonemap)
-            {
-                memoryOutput = true;
-
-                // OUTPUT nv12 surface(memory)
-                // prefer hwmap to hwdownload on opencl.
-                // qsv hwmap is not fully implemented for the time being.
-                mainFilters.Add(isHwmapUsable ? "hwmap=mode=read" : "hwdownload");
-                mainFilters.Add("format=nv12");
-            }
-
-            // OUTPUT nv12 surface(memory)
-            if (isSwDecoder && isQsvEncoder)
-            {
-                memoryOutput = true;
-            }
-
-            if (memoryOutput)
-            {
-                // text subtitles
-                if (hasTextSubs)
-                {
-                    var textSubtitlesFilter = GetTextSubtitlesFilter(state, false, false);
-                    mainFilters.Add(textSubtitlesFilter);
-                }
-            }
-
-            if (isQsvInQsvOut && doOclTonemap)
-            {
-                // OUTPUT qsv(nv12) surface(vram)
-                // reverse-mapping via qsv(d3d11)-opencl interop.
-                mainFilters.Add("hwmap=derive_device=qsv:mode=write:reverse=1");
-                mainFilters.Add("format=qsv");
-            }
-
-            /* Make sub and overlay filters for subtitle stream */
-            var subFilters = new List<string>();
-            var overlayFilters = new List<string>();
-            if (isQsvInQsvOut)
-            {
-                if (hasSubs)
-                {
-                    if (hasGraphicalSubs)
-                    {
-                        // overlay_qsv can handle overlay scaling, setup a smaller height to reduce transfer overhead
-                        var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, 1080);
-                        subFilters.Add(subPreProcFilters);
-                        subFilters.Add("format=bgra");
-                    }
-                    else if (hasTextSubs)
-                    {
-                        var framerate = state.VideoStream?.RealFrameRate;
-                        var subFramerate = hasAssSubs ? Math.Min(framerate ?? 25, 60) : 10;
-
-                        // alphasrc=s=1280x720:r=10:start=0,format=bgra,subtitles,hwupload
-                        var alphaSrcFilter = GetAlphaSrcFilter(state, swpInW, swpInH, reqW, reqH, reqMaxW, 1080, subFramerate);
-                        var subTextSubtitlesFilter = GetTextSubtitlesFilter(state, true, true);
-                        subFilters.Add(alphaSrcFilter);
-                        subFilters.Add("format=bgra");
-                        subFilters.Add(subTextSubtitlesFilter);
-                    }
-
-                    // qsv requires a fixed pool size.
-                    // default to 64 otherwise it will fail on certain iGPU.
-                    subFilters.Add("hwupload=derive_device=qsv:extra_hw_frames=64");
-
-                    var (overlayW, overlayH) = GetFixedOutputSize(swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH);
-                    var overlaySize = (overlayW.HasValue && overlayH.HasValue)
-                        ? $":w={overlayW.Value}:h={overlayH.Value}"
-                        : string.Empty;
-                    var overlayQsvFilter = string.Format(
-                        CultureInfo.InvariantCulture,
-                        "overlay_qsv=eof_action=pass:repeatlast=0{0}",
-                        overlaySize);
-                    overlayFilters.Add(overlayQsvFilter);
-                }
-            }
-            else if (memoryOutput)
-            {
-                if (hasGraphicalSubs)
-                {
-                    var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, reqMaxH);
-                    subFilters.Add(subPreProcFilters);
-                    overlayFilters.Add("overlay=eof_action=pass:repeatlast=0");
-                }
-            }
-
-            return (mainFilters, subFilters, overlayFilters);
+            return CaptureQsvHardwarePipeline(state, options, decoder, videoEncoder, vaapi);
         }
 
-        public (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) GetIntelQsvVaapiVidFiltersPrefered(
-            EncodingJobInfo state,
-            EncodingOptions options,
-            string vidDecoder,
-            string vidEncoder)
+        // The native route supplies its selected backend and decoder. Keeping capture separate
+        // also allows both backend renderers to be characterized without impersonating an OS.
+        internal QsvPipelinePlan CaptureQsvHardwarePipeline(EncodingJobInfo state, EncodingOptions options, string decoder, string videoEncoder, bool vaapi)
         {
-            var inW = state.VideoStream?.Width;
-            var inH = state.VideoStream?.Height;
-            var reqW = state.BaseRequest.Width;
-            var reqH = state.BaseRequest.Height;
-            var reqMaxW = state.BaseRequest.MaxWidth;
-            var reqMaxH = state.BaseRequest.MaxHeight;
-            var threeDFormat = state.MediaSource.Video3DFormat;
-
-            var isVaapiDecoder = vidDecoder.Contains("vaapi", StringComparison.OrdinalIgnoreCase);
-            var isQsvDecoder = vidDecoder.Contains("qsv", StringComparison.OrdinalIgnoreCase);
-            var isQsvEncoder = vidEncoder.Contains("qsv", StringComparison.OrdinalIgnoreCase);
-            var isHwDecoder = isVaapiDecoder || isQsvDecoder;
-            var isSwDecoder = string.IsNullOrEmpty(vidDecoder);
-            var isSwEncoder = !isQsvEncoder;
-            var isMjpegEncoder = vidEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase);
-            var isQsvInQsvOut = isHwDecoder && isQsvEncoder;
-
-            var doVaVppTonemap = IsIntelVppTonemapAvailable(state, options);
-            var doOclTonemap = !doVaVppTonemap && IsHwTonemapAvailable(state, options);
-            var doTonemap = doVaVppTonemap || doOclTonemap;
-            var doDeintH2645 = IsDeinterlaceAvailable(state);
-
-            var hasSubs = state.SubtitleStream is not null && ShouldEncodeSubtitle(state);
-            var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
-            var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
-            var hasAssSubs = hasSubs
-                && (string.Equals(state.SubtitleStream.Codec, "ass", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(state.SubtitleStream.Codec, "ssa", StringComparison.OrdinalIgnoreCase));
-            var subW = state.SubtitleStream?.Width;
-            var subH = state.SubtitleStream?.Height;
-
-            var rotation = state.VideoStream?.Rotation ?? 0;
-            var transposeDir = rotation == 0 ? string.Empty : GetVideoTransposeDirection(state);
-            var doVppTranspose = !string.IsNullOrEmpty(transposeDir);
-            var swapWAndH = Math.Abs(rotation) == 90 && (isSwDecoder || ((isVaapiDecoder || isQsvDecoder) && doVppTranspose));
-            var swpInW = swapWAndH ? inH : inW;
-            var swpInH = swapWAndH ? inW : inH;
-
-            /* Make main filters for video stream */
-            var mainFilters = new List<string>();
-
-            mainFilters.Add(GetOverwriteColorPropertiesParam(state, doTonemap));
-
-            if (isSwDecoder)
+            var surface = decoder.Contains("qsv", StringComparison.OrdinalIgnoreCase) ? QsvPipelinePlan.Surface.Qsv
+                : decoder.Contains("vaapi", StringComparison.OrdinalIgnoreCase) ? QsvPipelinePlan.Surface.Vaapi
+                : decoder.Contains("d3d11va", StringComparison.OrdinalIgnoreCase) ? QsvPipelinePlan.Surface.D3d11 : QsvPipelinePlan.Surface.Memory;
+            var hardwareInput = surface != QsvPipelinePlan.Surface.Memory;
+            var qsvOutput = videoEncoder.Contains("qsv", StringComparison.OrdinalIgnoreCase);
+            var mjpeg = videoEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase);
+            var vpp = IsIntelVppTonemapAvailable(state, options);
+            var opencl = !vpp && IsHwTonemapAvailable(state, options);
+            var rotation = GetVideoTransposeDirection(state);
+            var transpose = rotation.Length > 0;
+            var swap = Math.Abs(state.VideoStream?.Rotation ?? 0) == 90;
+            var width = swap ? state.VideoStream?.Height : state.VideoStream?.Width;
+            var height = swap ? state.VideoStream?.Width : state.VideoStream?.Height;
+            var request = state.BaseRequest;
+            var hardwareOverlay = hardwareInput && qsvOutput;
+            var overlayMaxHeight = hardwareOverlay ? 1080 : request.MaxHeight;
+            QsvPipelinePlan.Subtitle subtitles = null;
+            if (state.SubtitleStream is { } subtitle && ShouldEncodeSubtitle(state))
             {
-                // INPUT sw surface(memory)
-                // sw deint
-                if (doDeintH2645)
+                if (subtitle.IsTextSubtitleStream)
                 {
-                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
-                    mainFilters.Add(swDeintFilter);
+                    var ass = string.Equals(subtitle.Codec, "ass", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(subtitle.Codec, "ssa", StringComparison.OrdinalIgnoreCase);
+                    var frameRate = ass ? Math.Min(state.VideoStream?.RealFrameRate ?? 25, 60) : 10;
+                    subtitles = hardwareOverlay
+                        ? new QsvPipelinePlan.Subtitle.OverlayText(
+                            GetAlphaSrcFilter(state, width, height, request.Width, request.Height, request.MaxWidth, overlayMaxHeight, frameRate),
+                            GetTextSubtitlesFilter(state, true, true))
+                        : new QsvPipelinePlan.Subtitle.Text(GetTextSubtitlesFilter(state, false, false));
                 }
-
-                var outFormat = doOclTonemap ? "yuv420p10le" : (hasGraphicalSubs ? "yuv420p" : "nv12");
-                var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
-                if (isMjpegEncoder && !doOclTonemap)
+                else
                 {
-                    // sw decoder + hw mjpeg encoder
-                    swScaleFilter = string.IsNullOrEmpty(swScaleFilter) ? "scale=out_range=pc" : $"{swScaleFilter}:out_range=pc";
-                }
-
-                // sw scale
-                mainFilters.Add(swScaleFilter);
-                mainFilters.Add($"format={outFormat}");
-
-                // keep video at memory except ocl tonemap,
-                // since the overhead caused by hwupload >>> using sw filter.
-                // sw => hw
-                if (doOclTonemap)
-                {
-                    mainFilters.Add("hwupload=derive_device=opencl");
-                }
-            }
-            else if (isVaapiDecoder || isQsvDecoder)
-            {
-                var hwFilterSuffix = isVaapiDecoder ? "vaapi" : "qsv";
-                var isRext = IsVideoStreamHevcRext(state);
-                var doVppFullRangeOut = isMjpegEncoder
-                    && _mediaEncoder.EncoderVersion >= _minFFmpegQsvVppOutRangeOption;
-                var doVppScaleModeHq = isMjpegEncoder
-                    && _mediaEncoder.EncoderVersion >= _minFFmpegQsvVppScaleModeOption;
-
-                // INPUT vaapi/qsv surface(vram)
-                // hw deint
-                if (doDeintH2645)
-                {
-                    var deintFilter = GetHwDeinterlaceFilter(state, options, hwFilterSuffix);
-                    mainFilters.Add(deintFilter);
-                }
-
-                // hw transpose(vaapi vpp)
-                if (isVaapiDecoder && doVppTranspose)
-                {
-                    mainFilters.Add($"transpose_vaapi=dir={transposeDir}");
-                }
-
-                var outFormat = doTonemap ? (((isQsvDecoder && doVppTranspose) || isRext) ? "p010" : string.Empty) : "nv12";
-                var swapOutputWandH = isQsvDecoder && doVppTranspose && swapWAndH;
-                var hwScalePrefix = isQsvDecoder ? "vpp" : "scale";
-                var hwScaleFilter = GetHwScaleFilter(hwScalePrefix, hwFilterSuffix, outFormat, swapOutputWandH, swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH);
-
-                if (!string.IsNullOrEmpty(hwScaleFilter) && isQsvDecoder && doVppTranspose)
-                {
-                    hwScaleFilter += $":transpose={transposeDir}";
-                }
-
-                if (!string.IsNullOrEmpty(hwScaleFilter) && isMjpegEncoder)
-                {
-                    hwScaleFilter += ((isQsvDecoder && !doVppFullRangeOut) || doOclTonemap) ? string.Empty : ":out_range=pc";
-                    hwScaleFilter += isQsvDecoder ? (doVppScaleModeHq ? ":scale_mode=hq" : string.Empty) : ":mode=hq";
-                }
-
-                // allocate extra pool sizes for vaapi vpp scale
-                if (!string.IsNullOrEmpty(hwScaleFilter) && isVaapiDecoder)
-                {
-                    hwScaleFilter += ":extra_hw_frames=24";
-                }
-
-                // hw transpose(qsv vpp) & scale
-                mainFilters.Add(hwScaleFilter);
-            }
-
-            // vaapi vpp tonemap
-            if (doVaVppTonemap && isHwDecoder)
-            {
-                if (isQsvDecoder)
-                {
-                    // map from qsv to vaapi.
-                    mainFilters.Add("hwmap=derive_device=vaapi");
-                    mainFilters.Add("format=vaapi");
-                }
-
-                var tonemapFilter = GetHwTonemapFilter(options, "vaapi", "nv12", isMjpegEncoder);
-                mainFilters.Add(tonemapFilter);
-
-                if (isQsvDecoder)
-                {
-                    // map from vaapi to qsv.
-                    mainFilters.Add("hwmap=derive_device=qsv");
-                    mainFilters.Add("format=qsv");
+                    subtitles = new QsvPipelinePlan.Subtitle.Graphical(GetGraphicalSubPreProcessFilters(
+                        width, height, subtitle.Width, subtitle.Height, request.Width, request.Height, request.MaxWidth, overlayMaxHeight));
                 }
             }
 
-            if (doOclTonemap && isHwDecoder)
+            var rext = IsVideoStreamHevcRext(state);
+            double? brightness = options.VppTonemappingBrightness != 0 && options.VppTonemappingBrightness >= -100 && options.VppTonemappingBrightness <= 100 ? options.VppTonemappingBrightness : null;
+            double? contrast = options.VppTonemappingContrast > 1 && options.VppTonemappingContrast <= 10 ? options.VppTonemappingContrast : null;
+            var secondPass = !vaapi && vpp && (rext || brightness.HasValue || contrast.HasValue);
+            var format = vaapi
+                ? (vpp || opencl ? (((surface == QsvPipelinePlan.Surface.Qsv && transpose) || rext) ? "p010" : string.Empty) : "nv12")
+                : (secondPass ? "p010" : opencl ? (transpose || rext ? "p010" : string.Empty) : "nv12");
+            var nativeVaapi = vaapi && surface == QsvPipelinePlan.Surface.Vaapi;
+            var suffix = nativeVaapi ? "vaapi" : "qsv";
+            var scaling = hardwareInput ? GetHwScaleFilter(nativeVaapi ? "scale" : "vpp", suffix, format, !nativeVaapi && transpose && swap, width, height, request.Width, request.Height, request.MaxWidth, request.MaxHeight) : string.Empty;
+            var (overlayWidth, overlayHeight) = GetFixedOutputSize(width, height, request.Width, request.Height, request.MaxWidth, request.MaxHeight);
+            var input = new QsvPipelinePlan.Inputs(
+                surface,
+                qsvOutput,
+                mjpeg,
+                GetOverwriteColorPropertiesParam(state, vpp || opencl),
+                IsDeinterlaceAvailable(state) ? (hardwareInput ? GetHwDeinterlaceFilter(state, options, suffix) : CaptureSoftwareDeinterlacing(state, options)) : null,
+                transpose ? rotation : null,
+                new SoftwareScalingPlan(videoEncoder, state.MediaSource.Video3DFormat, request.Width, request.Height, request.MaxWidth, request.MaxHeight),
+                scaling,
+                _mediaEncoder.EncoderVersion >= _minFFmpegQsvVppOutRangeOption,
+                _mediaEncoder.EncoderVersion >= _minFFmpegQsvVppScaleModeOption,
+                subtitles,
+                overlayWidth,
+                overlayHeight);
+            QsvPipelinePlan.ToneMapping tone = null;
+            if (opencl)
             {
-                // map from qsv to opencl via qsv(vaapi)-opencl interop.
-                mainFilters.Add("hwmap=derive_device=opencl:mode=read");
+                tone = new QsvPipelinePlan.ToneMapping.OpenCl(GetHwTonemapFilter(options, "opencl", "nv12", mjpeg));
+            }
+            else if (vpp)
+            {
+                tone = vaapi
+                    ? new QsvPipelinePlan.ToneMapping.VaapiVpp(GetHwTonemapFilter(options, "vaapi", "nv12", mjpeg))
+                    : new QsvPipelinePlan.ToneMapping.WindowsVpp(secondPass, brightness, contrast, GetOverwriteColorPropertiesParam(state, false));
             }
 
-            // ocl tonemap
-            if (doOclTonemap)
-            {
-                var tonemapFilter = GetHwTonemapFilter(options, "opencl", "nv12", isMjpegEncoder);
-                mainFilters.Add(tonemapFilter);
-            }
-
-            var memoryOutput = false;
-            var isUploadForOclTonemap = isSwDecoder && doOclTonemap;
-            var isHwmapUsable = isSwEncoder && (doOclTonemap || isVaapiDecoder);
-            if ((isHwDecoder && isSwEncoder) || isUploadForOclTonemap)
-            {
-                memoryOutput = true;
-
-                // OUTPUT nv12 surface(memory)
-                // prefer hwmap to hwdownload on opencl/vaapi.
-                // qsv hwmap is not fully implemented for the time being.
-                mainFilters.Add(isHwmapUsable ? "hwmap=mode=read" : "hwdownload");
-                mainFilters.Add("format=nv12");
-            }
-
-            // OUTPUT nv12 surface(memory)
-            if (isSwDecoder && isQsvEncoder)
-            {
-                memoryOutput = true;
-            }
-
-            if (memoryOutput)
-            {
-                // text subtitles
-                if (hasTextSubs)
-                {
-                    var textSubtitlesFilter = GetTextSubtitlesFilter(state, false, false);
-                    mainFilters.Add(textSubtitlesFilter);
-                }
-            }
-
-            if (isQsvInQsvOut)
-            {
-                if (doOclTonemap)
-                {
-                    // OUTPUT qsv(nv12) surface(vram)
-                    // reverse-mapping via qsv(vaapi)-opencl interop.
-                    // add extra pool size to avoid the 'cannot allocate memory' error on hevc_qsv.
-                    mainFilters.Add("hwmap=derive_device=qsv:mode=write:reverse=1:extra_hw_frames=16");
-                    mainFilters.Add("format=qsv");
-                }
-                else if (isVaapiDecoder)
-                {
-                    mainFilters.Add("hwmap=derive_device=qsv");
-                    mainFilters.Add("format=qsv");
-                }
-            }
-
-            /* Make sub and overlay filters for subtitle stream */
-            var subFilters = new List<string>();
-            var overlayFilters = new List<string>();
-            if (isQsvInQsvOut)
-            {
-                if (hasSubs)
-                {
-                    if (hasGraphicalSubs)
-                    {
-                        // overlay_qsv can handle overlay scaling, setup a smaller height to reduce transfer overhead
-                        var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, 1080);
-                        subFilters.Add(subPreProcFilters);
-                        subFilters.Add("format=bgra");
-                    }
-                    else if (hasTextSubs)
-                    {
-                        var framerate = state.VideoStream?.RealFrameRate;
-                        var subFramerate = hasAssSubs ? Math.Min(framerate ?? 25, 60) : 10;
-
-                        var alphaSrcFilter = GetAlphaSrcFilter(state, swpInW, swpInH, reqW, reqH, reqMaxW, 1080, subFramerate);
-                        var subTextSubtitlesFilter = GetTextSubtitlesFilter(state, true, true);
-                        subFilters.Add(alphaSrcFilter);
-                        subFilters.Add("format=bgra");
-                        subFilters.Add(subTextSubtitlesFilter);
-                    }
-
-                    // qsv requires a fixed pool size.
-                    // default to 64 otherwise it will fail on certain iGPU.
-                    subFilters.Add("hwupload=derive_device=qsv:extra_hw_frames=64");
-
-                    var (overlayW, overlayH) = GetFixedOutputSize(swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH);
-                    var overlaySize = (overlayW.HasValue && overlayH.HasValue)
-                        ? $":w={overlayW.Value}:h={overlayH.Value}"
-                        : string.Empty;
-                    var overlayQsvFilter = string.Format(
-                        CultureInfo.InvariantCulture,
-                        "overlay_qsv=eof_action=pass:repeatlast=0{0}",
-                        overlaySize);
-                    overlayFilters.Add(overlayQsvFilter);
-                }
-            }
-            else if (memoryOutput)
-            {
-                if (hasGraphicalSubs)
-                {
-                    var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, reqMaxH);
-                    subFilters.Add(subPreProcFilters);
-                    overlayFilters.Add("overlay=eof_action=pass:repeatlast=0");
-                }
-            }
-
-            return (mainFilters, subFilters, overlayFilters);
+            return vaapi ? new QsvPipelinePlan.Vaapi(input, tone) : new QsvPipelinePlan.D3d11(input, tone);
         }
 
         private (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) RenderVaapiFilterChain(
@@ -5356,7 +4856,7 @@ namespace Tesserafin.Controller.MediaEncoding
             {
                 HardwareAccelerationType.vaapi => RenderVaapiFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.amf => GetAmdVidFilterChain(state, options, outputVideoCodec),
-                HardwareAccelerationType.qsv => GetIntelVidFilterChain(state, options, outputVideoCodec),
+                HardwareAccelerationType.qsv => RenderQsvFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.nvenc => RenderNvidiaFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.videotoolbox => GetAppleVidFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.rkmpp => GetRkmppVidFilterChain(state, options, outputVideoCodec),

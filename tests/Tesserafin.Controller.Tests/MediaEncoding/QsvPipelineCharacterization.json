@@ -1,0 +1,3118 @@
+{
+  "vaapi-memory-h264_qsv-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=nv12\""
+  },
+  "vaapi-memory-h264_qsv-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=nv12,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-memory-h264_qsv-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=nv12,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-memory-h264_qsv-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=yuv420p"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=yuv420p[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-memory-h264_qsv-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2,format=nv12\""
+  },
+  "vaapi-memory-h264_qsv-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2,format=nv12,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-memory-h264_qsv-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2,format=nv12,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-memory-h264_qsv-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=yuv420p"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2,format=yuv420p[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-memory-libx264-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=yuv420p\""
+  },
+  "vaapi-memory-libx264-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=yuv420p,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-memory-libx264-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=yuv420p,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-memory-libx264-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=yuv420p"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=yuv420p[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-memory-libx264-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2,tonemapx=tonemap=bt2390:desat=0.5:peak=100.5:t=bt709:m=bt709:p=bt709:format=yuv420p:param=0.25:range=tv\""
+  },
+  "vaapi-memory-libx264-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2,tonemapx=tonemap=bt2390:desat=0.5:peak=100.5:t=bt709:m=bt709:p=bt709:format=yuv420p:param=0.25:range=tv,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-memory-libx264-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2,tonemapx=tonemap=bt2390:desat=0.5:peak=100.5:t=bt709:m=bt709:p=bt709:format=yuv420p:param=0.25:range=tv,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-memory-libx264-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=yuv420p"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2,tonemapx=tonemap=bt2390:desat=0.5:peak=100.5:t=bt709:m=bt709:p=bt709:format=yuv420p:param=0.25:range=tv[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-memory-mjpeg-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=yuv420p\""
+  },
+  "vaapi-memory-mjpeg-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=yuv420p,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-memory-mjpeg-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=yuv420p,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-memory-mjpeg-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=yuv420p"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=yuv420p[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-memory-mjpeg-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2,tonemapx=tonemap=bt2390:desat=0.5:peak=100.5:t=bt709:m=bt709:p=bt709:format=yuv420p:param=0.25:range=tv\""
+  },
+  "vaapi-memory-mjpeg-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2,tonemapx=tonemap=bt2390:desat=0.5:peak=100.5:t=bt709:m=bt709:p=bt709:format=yuv420p:param=0.25:range=tv,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-memory-mjpeg-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2,tonemapx=tonemap=bt2390:desat=0.5:peak=100.5:t=bt709:m=bt709:p=bt709:format=yuv420p:param=0.25:range=tv,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-memory-mjpeg-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=yuv420p"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2,tonemapx=tonemap=bt2390:desat=0.5:peak=100.5:t=bt709:m=bt709:p=bt709:format=yuv420p:param=0.25:range=tv[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-memory-mjpeg_qsv-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc,format=nv12\""
+  },
+  "vaapi-memory-mjpeg_qsv-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc,format=nv12,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-memory-mjpeg_qsv-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc,format=nv12,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-memory-mjpeg_qsv-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=yuv420p"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc,format=yuv420p[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-memory-mjpeg_qsv-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc,format=nv12\""
+  },
+  "vaapi-memory-mjpeg_qsv-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc,format=nv12,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-memory-mjpeg_qsv-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc,format=nv12,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-memory-mjpeg_qsv-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=yuv420p"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc,format=yuv420p[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-native-h264_qsv-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-native-h264_qsv-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-native-h264_qsv-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-native-h264_qsv-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear,format=bgra,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-native-h264_qsv-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-native-h264_qsv-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-native-h264_qsv-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-native-h264_qsv-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear,format=bgra,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-native-libx264-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=mode=read",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=mode=read,format=nv12\""
+  },
+  "vaapi-native-libx264-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=mode=read",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=mode=read,format=nv12,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-native-libx264-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=mode=read",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=mode=read,format=nv12,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-native-libx264-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=mode=read",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=mode=read,format=nv12[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-native-libx264-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=mode=read",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=mode=read,format=nv12\""
+  },
+  "vaapi-native-libx264-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=mode=read",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=mode=read,format=nv12,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-native-libx264-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=mode=read",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=mode=read,format=nv12,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-native-libx264-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=mode=read",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=mode=read,format=nv12[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-native-mjpeg-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24",
+      "hwmap=mode=read",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24,hwmap=mode=read,format=nv12\""
+  },
+  "vaapi-native-mjpeg-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24",
+      "hwmap=mode=read",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24,hwmap=mode=read,format=nv12,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-native-mjpeg-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24",
+      "hwmap=mode=read",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24,hwmap=mode=read,format=nv12,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-native-mjpeg-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24",
+      "hwmap=mode=read",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24,hwmap=mode=read,format=nv12[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-native-mjpeg-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=mode=read",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=mode=read,format=nv12\""
+  },
+  "vaapi-native-mjpeg-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=mode=read",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=mode=read,format=nv12,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-native-mjpeg-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=mode=read",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=mode=read,format=nv12,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-native-mjpeg-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=mode=read",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=mode=read,format=nv12[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-native-mjpeg_qsv-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-native-mjpeg_qsv-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-native-mjpeg_qsv-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-native-mjpeg_qsv-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear,format=bgra,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-native-mjpeg_qsv-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-native-mjpeg_qsv-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-native-mjpeg_qsv-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-native-mjpeg_qsv-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear,format=bgra,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:out_range=pc:mode=hq:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-qsv-h264_qsv-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12\""
+  },
+  "vaapi-qsv-h264_qsv-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-qsv-h264_qsv-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-qsv-h264_qsv-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear,format=bgra,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-qsv-h264_qsv-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-qsv-h264_qsv-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-qsv-h264_qsv-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-qsv-h264_qsv-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear,format=bgra,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-qsv-libx264-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12,hwdownload,format=nv12\""
+  },
+  "vaapi-qsv-libx264-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12,hwdownload,format=nv12,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-qsv-libx264-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12,hwdownload,format=nv12,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-qsv-libx264-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12,hwdownload,format=nv12[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-qsv-libx264-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv,hwdownload,format=nv12\""
+  },
+  "vaapi-qsv-libx264-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv,hwdownload,format=nv12,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-qsv-libx264-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv,hwdownload,format=nv12,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-qsv-libx264-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv,hwdownload,format=nv12[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-qsv-mjpeg-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq,hwdownload,format=nv12\""
+  },
+  "vaapi-qsv-mjpeg-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq,hwdownload,format=nv12,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-qsv-mjpeg-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq,hwdownload,format=nv12,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-qsv-mjpeg-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq,hwdownload,format=nv12[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-qsv-mjpeg-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv,hwdownload,format=nv12\""
+  },
+  "vaapi-qsv-mjpeg-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv,hwdownload,format=nv12,subtitles=f='/media/subtitle.srt'\""
+  },
+  "vaapi-qsv-mjpeg-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv,hwdownload,format=nv12,subtitles=f='/media/subtitle.ass'\""
+  },
+  "vaapi-qsv-mjpeg-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv,hwdownload,format=nv12[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-qsv-mjpeg_qsv-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq\""
+  },
+  "vaapi-qsv-mjpeg_qsv-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-qsv-mjpeg_qsv-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-qsv-mjpeg_qsv-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear,format=bgra,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-qsv-mjpeg_qsv-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-qsv-mjpeg_qsv-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-qsv-mjpeg_qsv-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-qsv-mjpeg_qsv-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq",
+      "hwmap=derive_device=vaapi",
+      "format=vaapi",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear,format=bgra,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,vpp_qsv=w=160:h=90:out_range=pc:scale_mode=hq,hwmap=derive_device=vaapi,format=vaapi,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-rotation90": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "transpose_vaapi=dir=cclock",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,transpose_vaapi=dir=cclock,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-qsv-rotationMinus90": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=90:h=160:format=nv12:transpose=clock"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,vpp_qsv=w=90:h=160:format=nv12:transpose=clock\""
+  },
+  "vaapi-rotation180-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "transpose_vaapi=dir=reversal",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,transpose_vaapi=dir=reversal,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "vaapi-deinterlace": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "deinterlace_vaapi=rate=field",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,deinterlace_vaapi=rate=field,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-deinterlace-60fps": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "deinterlace_vaapi=rate=frame",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,deinterlace_vaapi=rate=frame,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-hdr-opencl": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "hwmap=derive_device=opencl:mode=read",
+      "tonemap_opencl=format=nv12:p=bt709:t=bt709:m=bt709:tonemap=bt2390:peak=100.5:desat=0.5:param=0.25:range=tv",
+      "hwmap=derive_device=qsv:mode=write:reverse=1:extra_hw_frames=16",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,hwmap=derive_device=opencl:mode=read,tonemap_opencl=format=nv12:p=bt709:t=bt709:m=bt709:tonemap=bt2390:peak=100.5:desat=0.5:param=0.25:range=tv,hwmap=derive_device=qsv:mode=write:reverse=1:extra_hw_frames=16,format=qsv\""
+  },
+  "vaapi-hdr-rext": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:format=p010:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:format=p010:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-procamp-brightness": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "procamp_vaapi=b=10.5,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,procamp_vaapi=b=10.5,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-procamp-contrast": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "procamp_vaapi=c=2.5,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,procamp_vaapi=c=2.5,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-procamp-both": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "procamp_vaapi=b=-10.5:c=2.5,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,procamp_vaapi=b=-10.5:c=2.5,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-procamp-outside-range": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale_vaapi=w=160:h=90:extra_hw_frames=24",
+      "tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,scale_vaapi=w=160:h=90:extra_hw_frames=24,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-old-range-scale-options": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:out_range=pc:mode=hq:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-fps": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "deinterlace_vaapi=rate=field",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,deinterlace_vaapi=rate=field,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv,fps=15\""
+  },
+  "vaapi-large-text-overlay": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=2560:h=1440:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=1920x1080:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=2560:h=1440"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=1920x1080:r=24:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=2560:h=1440:format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=2560:h=1440\""
+  },
+  "vaapi-large-graphical-overlay": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=2560:h=1440:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "scale,scale=1920:1080:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=2560:h=1440"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=1920:1080:fast_bilinear,format=bgra,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=2560:h=1440:format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=2560:h=1440\""
+  },
+  "vaapi-copyback-no-alpha": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"[1:0]scale,scale=160:90:fast_bilinear[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=nv12[main];[main][sub]overlay=eof_action=pass:repeatlast=0\""
+  },
+  "vaapi-copyback-no-opencl": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=trunc(160/2)*2:trunc(90/2)*2,format=nv12\""
+  },
+  "vaapi-no-resize": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-no-resize-opencl": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "",
+      "hwmap=derive_device=opencl:mode=read",
+      "tonemap_opencl=format=nv12:p=bt709:t=bt709:m=bt709:tonemap=bt2390:peak=100.5:desat=0.5:param=0.25:range=tv",
+      "hwmap=derive_device=qsv:mode=write:reverse=1:extra_hw_frames=16",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,hwmap=derive_device=opencl:mode=read,tonemap_opencl=format=nv12:p=bt709:t=bt709:m=bt709:tonemap=bt2390:peak=100.5:desat=0.5:param=0.25:range=tv,hwmap=derive_device=qsv:mode=write:reverse=1:extra_hw_frames=16,format=qsv\""
+  },
+  "vaapi-no-resize-procamp": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "",
+      "procamp_vaapi=b=10.5,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": " -vf \"setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,procamp_vaapi=b=10.5,tonemap_vaapi=format=nv12:p=bt709:t=bt709:m=bt709:extra_hw_frames=32,hwmap=derive_device=qsv,format=qsv\""
+  },
+  "vaapi-ass-high-framerate": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24",
+      "hwmap=derive_device=qsv",
+      "format=qsv"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=60:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": " -filter_complex \"alphasrc=s=160x90:r=60:start='00\\:00\\:03\\.500',format=bgra,subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1,hwupload=derive_device=qsv:extra_hw_frames=64[sub];[0:0]setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale_vaapi=w=160:h=90:format=nv12:extra_hw_frames=24,hwmap=derive_device=qsv,format=qsv[main];[main][sub]overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90\""
+  },
+  "d3d11-memory-h264_qsv-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-h264_qsv-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-h264_qsv-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-h264_qsv-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=yuv420p"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-h264_qsv-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-h264_qsv-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-h264_qsv-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-h264_qsv-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=yuv420p"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-libx264-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-libx264-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-libx264-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-libx264-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=yuv420p"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-libx264-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-libx264-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-libx264-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-libx264-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2",
+      "format=yuv420p"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=yuv420p"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=yuv420p"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg_qsv-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg_qsv-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg_qsv-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg_qsv-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=yuv420p"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg_qsv-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg_qsv-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg_qsv-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-memory-mjpeg_qsv-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "scale=trunc(160/2)*2:trunc(90/2)*2:out_range=pc",
+      "format=yuv420p"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-h264_qsv-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-h264_qsv-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-h264_qsv-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-h264_qsv-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-h264_qsv-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-h264_qsv-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-h264_qsv-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-h264_qsv-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-libx264-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-libx264-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-libx264-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-libx264-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-libx264-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-libx264-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-libx264-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-libx264-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg_qsv-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg_qsv-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg_qsv-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg_qsv-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg_qsv-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg_qsv-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg_qsv-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-native-mjpeg_qsv-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-h264_qsv-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-h264_qsv-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-h264_qsv-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-h264_qsv-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-h264_qsv-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-h264_qsv-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-h264_qsv-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-h264_qsv-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-libx264-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-libx264-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-libx264-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-libx264-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-libx264-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-libx264-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-libx264-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-libx264-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.srt'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12",
+      "subtitles=f='/media/subtitle.ass'"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwdownload",
+      "format=nv12"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear"
+    ],
+    "Overlay": [
+      "overlay=eof_action=pass:repeatlast=0"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg_qsv-sdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg_qsv-sdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg_qsv-sdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg_qsv-sdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg_qsv-hdr-none": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg_qsv-hdr-srt": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=10:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.srt':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg_qsv-hdr-ass": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-mjpeg_qsv-hdr-pgs": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "vpp_qsv=w=160:h=90:format=nv12:out_range=pc:scale_mode=hq:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-rotation90": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=90:h=160:format=nv12:passthrough=0:transpose=cclock"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-qsv-rotationMinus90": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "vpp_qsv=w=90:h=160:format=nv12:transpose=clock"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-rotation180-ass": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:transpose=reversal"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-deinterlace": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "deinterlace_qsv=mode=2",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-deinterlace-60fps": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "deinterlace_qsv=mode=2",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-hdr-opencl": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:passthrough=0",
+      "hwmap=derive_device=opencl:mode=read",
+      "tonemap_opencl=format=nv12:p=bt709:t=bt709:m=bt709:tonemap=bt2390:peak=100.5:desat=0.5:param=0.25:range=tv",
+      "hwmap=derive_device=qsv:mode=write:reverse=1",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-hdr-rext": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=p010:passthrough=0",
+      "vpp_qsv=tonemap=1:format=nv12:async_depth=2",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-procamp-brightness": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=p010:passthrough=0:brightness=10.5:procamp=1:async_depth=2",
+      "vpp_qsv=tonemap=1:format=nv12:async_depth=2",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-procamp-contrast": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=p010:passthrough=0:contrast=2.5:procamp=1:async_depth=2",
+      "vpp_qsv=tonemap=1:format=nv12:async_depth=2",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-procamp-both": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=p010:passthrough=0:brightness=-10.5:contrast=2.5:procamp=1:async_depth=2",
+      "vpp_qsv=tonemap=1:format=nv12:async_depth=2",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-procamp-outside-range": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0:tonemap=1",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-old-range-scale-options": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-fps": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "deinterlace_qsv=mode=2",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-large-text-overlay": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=2560:h=1440:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [
+      "alphasrc=s=1920x1080:r=24:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=2560:h=1440"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-large-graphical-overlay": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=2560:h=1440:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [
+      "scale,scale=1920:1080:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=2560:h=1440"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-copyback-no-alpha": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [
+      "scale,scale=160:90:fast_bilinear",
+      "format=bgra",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  },
+  "d3d11-copyback-no-opencl": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-no-resize": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=format=nv12:passthrough=0"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-no-resize-opencl": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "",
+      "hwmap=derive_device=opencl:mode=read",
+      "tonemap_opencl=format=nv12:p=bt709:t=bt709:m=bt709:tonemap=bt2390:peak=100.5:desat=0.5:param=0.25:range=tv",
+      "hwmap=derive_device=qsv:mode=write:reverse=1",
+      "format=qsv"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-no-resize-procamp": {
+    "Main": [
+      "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=format=p010:passthrough=0:brightness=10.5:procamp=1:async_depth=2",
+      "vpp_qsv=tonemap=1:format=nv12:async_depth=2",
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+    ],
+    "Subtitles": [],
+    "Overlay": [],
+    "LinuxProduction": null
+  },
+  "d3d11-ass-high-framerate": {
+    "Main": [
+      "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+      "hwmap=derive_device=qsv",
+      "vpp_qsv=w=160:h=90:format=nv12:passthrough=0"
+    ],
+    "Subtitles": [
+      "alphasrc=s=160x90:r=60:start='00\\:00\\:03\\.500'",
+      "format=bgra",
+      "subtitles=f='/media/subtitle.ass':alpha=1:sub2video=1",
+      "hwupload=derive_device=qsv:extra_hw_frames=64"
+    ],
+    "Overlay": [
+      "overlay_qsv=eof_action=pass:repeatlast=0:w=160:h=90"
+    ],
+    "LinuxProduction": null
+  }
+}

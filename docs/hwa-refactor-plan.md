@@ -110,13 +110,51 @@ configuration et des capacités ; le garde-fou commun couvre les trois renderers
 Les tests de graphes ne prouvent pas une exécution GPU, HDR, Dolby Vision ou 3D. La validation
 logicielle des sessions et les contrôles FFmpeg/ffprobe restent distincts. Les deux tests VAAPI
 existants sur matériel réel sont conservés et restent ignorés en l'absence de périphérique.
-Les chemins QSV, AMF, VideoToolbox et RKMPP restent à extraire ; l'étape 5 n'est pas close.
+QSV est extrait dans la tranche suivante ; AMF, VideoToolbox et RKMPP restent à extraire.
+L'étape 5 n'est pas close.
 
 Les deux hôtes d'intégration (standard et FFmpeg réel) vident les catalogues de plugins
 installés par migration avant `host.Start()`. La tâche de mise à jour conserve son exécution,
 avec zéro catalogue à interroger. Les tests qui visent un catalogue doivent fournir leur
 fixture explicitement. Les assertions de lecture, d'accès et de contrat restent actives.
 
+
+## Extraction QSV — consolidation, 2026-11-15
+
+Cette tranche suit #419 et reste dans l'étape 5 de #129. `EncodingHelper` passe de 7 096 à
+6 596 lignes. Les choix de lecture, de codec/périphérique et l'assemblage final restent aux
+étages existants.
+
+- `CaptureQsvPipeline` sélectionne le parcours natif VAAPI/Linux ou D3D11/Windows, ou le
+  renderer logiciel partagé si les capacités requises manquent. Aucun ancien client/API
+  n'est détecté. `CaptureQsvHardwarePipeline` fige les surfaces mémoire/QSV/VAAPI/D3D11,
+  la géométrie, les capacités VPP et les sous-titres du parcours sélectionné.
+- `QsvPipelinePlan` représente les variantes logiciel, VAAPI et D3D11, avec un tone mapping
+  exclusif OpenCL, VPP VAAPI ou VPP Windows. Les valeurs procamp valides et le besoin d'une
+  seconde passe Windows sont capturés ; leur formatage invariant et l'ordre des filtres
+  sont rendus sans service, configuration ou API de plateforme.
+- `QsvPipelineRenderer` partage la composition commune, mais garde les opérations VAAPI
+  et D3D11 explicites : relais VPP `passthrough=0`, désentrelacement, rotation, transferts
+  OpenCL, pools fixes de sous-titres QSV et mapping inverse avec le pool Linux supplémentaire.
+  Les sous-titres texte mémoire, texte sur source alpha et graphiques sont des variantes
+  exclusives. Le plafond de préparation des overlays reste distinct de la taille de sortie.
+- Les entrées publiques `GetIntelVidFilterChain`, `GetIntelQsvDx11VidFiltersPrefered` et
+  `GetIntelQsvVaapiVidFiltersPrefered` sont supprimées. Aucun forwarder, flag de coexistence
+  ou second générateur n'est conservé. Le logiciel utilise `SoftwarePipelineRenderer` ;
+  géométrie, formatage des filtres partagés et résolution des chemins restent à la capture.
+
+La référence statique a été capturée sur #419 (`285809ebb6`) avant extraction : 234 graphes
+VAAPI/D3D11, dont 117 réponses complètes du point d'entrée de production Linux. Elle couvre
+les décodeurs mémoire/natif/QSV, sorties QSV/logiciel/MJPEG, SDR/HDR, SRT/ASS/PGS, rotation,
+désentrelacement/FPS, VPP/OpenCL, procamp valide/hors limites, scaling vide et overlays 4K.
+Les tests ne régénèrent jamais cette référence. Les tests de capture vérifient l'indépendance
+aux mutations du job, des options et des capacités, y compris en culture `fr-BE`.
+
+Les graphes D3D11 sont caractérisés depuis la méthode d'origine appelée avec des paramètres
+explicites sur Linux : ils ne constituent pas une preuve de démarrage natif Windows. Cette
+preuve et l'exécution sur GPU Intel réel restent ouvertes, comme l'acceptation HDR/Dolby Vision/3D.
+Les tests logiciels FFmpeg/session sont distincts. Les autres renderers extraits gardent leurs
+régressions ; AMF, VideoToolbox et RKMPP restent à extraire. L'étape 5 n'est pas close.
 
 Les sections suivantes conservent le diagnostic et le séquencement historiques ; leurs noms
 `MediaBrowser.*` et numéros de ligne ne décrivent pas l'arbre après cette extraction.
