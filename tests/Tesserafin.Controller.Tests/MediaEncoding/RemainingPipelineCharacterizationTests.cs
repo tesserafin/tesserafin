@@ -6,6 +6,7 @@ using System.Text.Json;
 using Moq;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.MediaEncoding.Amf;
+using Tesserafin.Controller.MediaEncoding.Rkmpp;
 using Tesserafin.Controller.MediaEncoding.VideoToolbox;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
@@ -60,7 +61,7 @@ public sealed class RemainingPipelineCharacterizationTests
 
             default:
             {
-                var graph = helper.GetRkmppVidFiltersPrefered(state, options, Decoder(scenario), scenario.Encoder);
+                var graph = RkmppPipelineRenderer.Render(helper.CaptureRkmppHardwarePipeline(state, options, Decoder(scenario), scenario.Encoder));
                 return Snapshot(graph.MainFilters, graph.SubFilters, graph.OverlayFilters);
             }
         }

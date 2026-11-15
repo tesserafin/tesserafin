@@ -20,6 +20,7 @@ using Tesserafin.Controller.IO;
 using Tesserafin.Controller.MediaEncoding.Amf;
 using Tesserafin.Controller.MediaEncoding.Nvidia;
 using Tesserafin.Controller.MediaEncoding.Qsv;
+using Tesserafin.Controller.MediaEncoding.Rkmpp;
 using Tesserafin.Controller.MediaEncoding.Software;
 using Tesserafin.Controller.MediaEncoding.Vaapi;
 using Tesserafin.Controller.MediaEncoding.VideoToolbox;
@@ -4253,289 +4254,77 @@ namespace Tesserafin.Controller.MediaEncoding
                 subtitles);
         }
 
-        /// <summary>
-        /// Gets the parameter of Rockchip RKMPP/RKRGA filter chain.
-        /// </summary>
-        /// <param name="state">Encoding state.</param>
-        /// <param name="options">Encoding options.</param>
-        /// <param name="vidEncoder">Video encoder to use.</param>
-        /// <returns>The tuple contains three lists: main, sub and overlay filters.</returns>
-        public (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) GetRkmppVidFilterChain(
-            EncodingJobInfo state,
-            EncodingOptions options,
-            string vidEncoder)
+        private (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) RenderRkmppFilterChain(EncodingJobInfo state, EncodingOptions options, string videoEncoder)
         {
-            if (options.HardwareAccelerationType != HardwareAccelerationType.rkmpp)
-            {
-                return (null, null, null);
-            }
-
-            var isLinux = OperatingSystem.IsLinux();
-            var vidDecoder = GetHardwareVideoDecoder(state, options) ?? string.Empty;
-            var isSwDecoder = string.IsNullOrEmpty(vidDecoder);
-            var isSwEncoder = !vidEncoder.Contains("rkmpp", StringComparison.OrdinalIgnoreCase);
-            var isRkmppOclSupported = isLinux && IsRkmppFullSupported() && IsOpenclFullSupported();
-
-            if ((isSwDecoder && isSwEncoder)
-                || !isRkmppOclSupported
-                || !_mediaEncoder.SupportsFilter("alphasrc"))
-            {
-                return RenderSoftwareFilterChain(state, options, vidEncoder);
-            }
-
-            // preferred rkmpp + rkrga + opencl filters pipeline
-            if (isRkmppOclSupported)
-            {
-                return GetRkmppVidFiltersPrefered(state, options, vidDecoder, vidEncoder);
-            }
-
-            return (null, null, null);
+            var graph = RkmppPipelineRenderer.Render(CaptureRkmppPipeline(state, options, videoEncoder));
+            return (graph.MainFilters.ToList(), graph.SubFilters.ToList(), graph.OverlayFilters.ToList());
         }
 
-        public (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) GetRkmppVidFiltersPrefered(
-            EncodingJobInfo state,
-            EncodingOptions options,
-            string vidDecoder,
-            string vidEncoder)
+        internal RkmppPipelinePlan CaptureRkmppPipeline(EncodingJobInfo state, EncodingOptions options, string videoEncoder)
         {
-            var inW = state.VideoStream?.Width;
-            var inH = state.VideoStream?.Height;
-            var reqW = state.BaseRequest.Width;
-            var reqH = state.BaseRequest.Height;
-            var reqMaxW = state.BaseRequest.MaxWidth;
-            var reqMaxH = state.BaseRequest.MaxHeight;
-            var threeDFormat = state.MediaSource.Video3DFormat;
-
-            var isRkmppDecoder = vidDecoder.Contains("rkmpp", StringComparison.OrdinalIgnoreCase);
-            var isRkmppEncoder = vidEncoder.Contains("rkmpp", StringComparison.OrdinalIgnoreCase);
-            var isSwDecoder = !isRkmppDecoder;
-            var isSwEncoder = !isRkmppEncoder;
-            var isMjpegEncoder = vidEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase);
-            var isDrmInDrmOut = isRkmppDecoder && isRkmppEncoder;
-            var isEncoderSupportAfbc = isRkmppEncoder
-                && (vidEncoder.Contains("h264", StringComparison.OrdinalIgnoreCase)
-                    || vidEncoder.Contains("hevc", StringComparison.OrdinalIgnoreCase));
-
-            var doDeintH2645 = IsDeinterlaceAvailable(state);
-            var doOclTonemap = IsHwTonemapAvailable(state, options);
-
-            var hasSubs = state.SubtitleStream is not null && ShouldEncodeSubtitle(state);
-            var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
-            var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
-            var hasAssSubs = hasSubs
-                && (string.Equals(state.SubtitleStream.Codec, "ass", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(state.SubtitleStream.Codec, "ssa", StringComparison.OrdinalIgnoreCase));
-            var subW = state.SubtitleStream?.Width;
-            var subH = state.SubtitleStream?.Height;
-
-            var rotation = state.VideoStream?.Rotation ?? 0;
-            var transposeDir = rotation == 0 ? string.Empty : GetVideoTransposeDirection(state);
-            var doRkVppTranspose = !string.IsNullOrEmpty(transposeDir);
-            var swapWAndH = Math.Abs(rotation) == 90 && (isSwDecoder || (isRkmppDecoder && doRkVppTranspose));
-            var swpInW = swapWAndH ? inH : inW;
-            var swpInH = swapWAndH ? inW : inH;
-
-            /* Make main filters for video stream */
-            var mainFilters = new List<string>();
-
-            mainFilters.Add(GetOverwriteColorPropertiesParam(state, doOclTonemap));
-
-            if (isSwDecoder)
+            var decoder = GetHardwareVideoDecoder(state, options) ?? string.Empty;
+            if (!OperatingSystem.IsLinux() || !IsRkmppFullSupported() || !IsOpenclFullSupported() || !_mediaEncoder.SupportsFilter("alphasrc")
+                || (decoder.Length == 0 && !videoEncoder.Contains("rkmpp", StringComparison.OrdinalIgnoreCase)))
             {
-                // INPUT sw surface(memory)
-                // sw deint
-                if (doDeintH2645)
-                {
-                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
-                    mainFilters.Add(swDeintFilter);
-                }
-
-                var outFormat = doOclTonemap ? "yuv420p10le" : (hasGraphicalSubs ? "yuv420p" : "nv12");
-                var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
-                if (isMjpegEncoder && !doOclTonemap)
-                {
-                    // sw decoder + hw mjpeg encoder
-                    swScaleFilter = string.IsNullOrEmpty(swScaleFilter) ? "scale=out_range=pc" : $"{swScaleFilter}:out_range=pc";
-                }
-
-                if (!string.IsNullOrEmpty(swScaleFilter))
-                {
-                    swScaleFilter += ":flags=fast_bilinear";
-                }
-
-                // sw scale
-                mainFilters.Add(swScaleFilter);
-                mainFilters.Add($"format={outFormat}");
-
-                // keep video at memory except ocl tonemap,
-                // since the overhead caused by hwupload >>> using sw filter.
-                // sw => hw
-                if (doOclTonemap)
-                {
-                    mainFilters.Add("hwupload=derive_device=opencl");
-                }
+                return new RkmppPipelinePlan.Software(CaptureSoftwarePipeline(state, options, videoEncoder));
             }
-            else if (isRkmppDecoder)
+
+            return CaptureRkmppHardwarePipeline(state, options, decoder, videoEncoder);
+        }
+
+        internal RkmppPipelinePlan CaptureRkmppHardwarePipeline(EncodingJobInfo state, EncodingOptions options, string decoder, string videoEncoder)
+        {
+            var hardwareInput = decoder.Contains("rkmpp", StringComparison.OrdinalIgnoreCase);
+            var hardwareOutput = videoEncoder.Contains("rkmpp", StringComparison.OrdinalIgnoreCase);
+            var tonemap = IsHwTonemapAvailable(state, options);
+            var rotation = GetVideoTransposeDirection(state);
+            var transpose = rotation.Length > 0;
+            var swap = Math.Abs(state.VideoStream?.Rotation ?? 0) == 90;
+            var width = swap ? state.VideoStream?.Height : state.VideoStream?.Width;
+            var height = swap ? state.VideoStream?.Width : state.VideoStream?.Height;
+            var request = state.BaseRequest;
+            var hardwareOverlay = hardwareInput && hardwareOutput;
+            var overlayMaxHeight = hardwareOverlay ? 1080 : request.MaxHeight;
+            RkmppPipelinePlan.Subtitle subtitles = null;
+            if (state.SubtitleStream is { } subtitle && ShouldEncodeSubtitle(state))
             {
-                // INPUT rkmpp/drm surface(gem/dma-heap)
-
-                var isFullAfbcPipeline = isEncoderSupportAfbc && isDrmInDrmOut && !doOclTonemap;
-                var swapOutputWandH = doRkVppTranspose && swapWAndH;
-                var outFormat = doOclTonemap ? "p010" : "nv12";
-                var hwScaleFilter = GetHwScaleFilter("vpp", "rkrga", outFormat, swapOutputWandH, swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH);
-                var doScaling = !string.IsNullOrEmpty(GetHwScaleFilter("vpp", "rkrga", string.Empty, swapOutputWandH, swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH));
-
-                if (!hasSubs
-                     || doRkVppTranspose
-                     || !isFullAfbcPipeline
-                     || doScaling)
+                if (subtitle.IsTextSubtitleStream)
                 {
-                    var isScaleRatioSupported = IsScaleRatioSupported(inW, inH, reqW, reqH, reqMaxW, reqMaxH, 8.0f);
-
-                    // RGA3 hardware only support (1/8 ~ 8) scaling in each blit operation,
-                    // but in Trickplay there's a case: (3840/320 == 12), enable 2pass for it
-                    if (doScaling && !isScaleRatioSupported)
-                    {
-                        // Vendor provided BSP kernel has an RGA driver bug that causes the output to be corrupted for P010 format.
-                        // Use NV15 instead of P010 to avoid the issue.
-                        // SDR inputs are using BGRA formats already which is not affected.
-                        var intermediateFormat = doOclTonemap ? "nv15" : (isMjpegEncoder ? "bgra" : outFormat);
-                        var hwScaleFilterFirstPass = $"scale_rkrga=w=iw/7.9:h=ih/7.9:format={intermediateFormat}:force_original_aspect_ratio=increase:force_divisible_by=4:afbc=1";
-                        mainFilters.Add(hwScaleFilterFirstPass);
-                    }
-
-                    // The RKMPP MJPEG encoder on some newer chip models no longer supports RGB input.
-                    // Use 2pass here to enable RGA output of full-range YUV in the 2nd pass.
-                    if (isMjpegEncoder && !doOclTonemap && ((doScaling && isScaleRatioSupported) || !doScaling))
-                    {
-                        var hwScaleFilterFirstPass = "vpp_rkrga=format=bgra:afbc=1";
-                        mainFilters.Add(hwScaleFilterFirstPass);
-                    }
-
-                    if (!string.IsNullOrEmpty(hwScaleFilter) && doRkVppTranspose)
-                    {
-                        hwScaleFilter += $":transpose={transposeDir}";
-                    }
-
-                    // try enabling AFBC to save DDR bandwidth
-                    if (!string.IsNullOrEmpty(hwScaleFilter) && isFullAfbcPipeline)
-                    {
-                        hwScaleFilter += ":afbc=1";
-                    }
-
-                    // hw transpose & scale
-                    mainFilters.Add(hwScaleFilter);
+                    var ass = string.Equals(subtitle.Codec, "ass", StringComparison.OrdinalIgnoreCase) || string.Equals(subtitle.Codec, "ssa", StringComparison.OrdinalIgnoreCase);
+                    var fps = ass ? Math.Min(state.VideoStream?.RealFrameRate ?? 25, 60) : 10;
+                    subtitles = hardwareOverlay
+                        ? new RkmppPipelinePlan.Subtitle.OverlayText(
+                            GetAlphaSrcFilter(state, width, height, request.Width, request.Height, request.MaxWidth, overlayMaxHeight, fps),
+                            GetTextSubtitlesFilter(state, true, true))
+                        : new RkmppPipelinePlan.Subtitle.Text(GetTextSubtitlesFilter(state, false, false));
+                }
+                else
+                {
+                    subtitles = new RkmppPipelinePlan.Subtitle.Graphical(GetGraphicalSubPreProcessFilters(width, height, subtitle.Width, subtitle.Height, request.Width, request.Height, request.MaxWidth, overlayMaxHeight));
                 }
             }
 
-            if (doOclTonemap && isRkmppDecoder)
-            {
-                // map from rkmpp/drm to opencl via drm-opencl interop.
-                mainFilters.Add("hwmap=derive_device=opencl");
-            }
-
-            // ocl tonemap
-            if (doOclTonemap)
-            {
-                var tonemapFilter = GetHwTonemapFilter(options, "opencl", "nv12", isMjpegEncoder);
-                mainFilters.Add(tonemapFilter);
-            }
-
-            var memoryOutput = false;
-            var isUploadForOclTonemap = isSwDecoder && doOclTonemap;
-            if ((isRkmppDecoder && isSwEncoder) || isUploadForOclTonemap)
-            {
-                memoryOutput = true;
-
-                // OUTPUT nv12 surface(memory)
-                mainFilters.Add("hwdownload");
-                mainFilters.Add("format=nv12");
-            }
-
-            // OUTPUT nv12 surface(memory)
-            if (isSwDecoder && isRkmppEncoder)
-            {
-                memoryOutput = true;
-            }
-
-            if (memoryOutput)
-            {
-                // text subtitles
-                if (hasTextSubs)
-                {
-                    var textSubtitlesFilter = GetTextSubtitlesFilter(state, false, false);
-                    mainFilters.Add(textSubtitlesFilter);
-                }
-            }
-
-            if (isDrmInDrmOut)
-            {
-                if (doOclTonemap)
-                {
-                    // OUTPUT drm(nv12) surface(gem/dma-heap)
-                    // reverse-mapping via drm-opencl interop.
-                    mainFilters.Add("hwmap=derive_device=rkmpp:reverse=1");
-                    mainFilters.Add("format=drm_prime");
-                }
-            }
-
-            /* Make sub and overlay filters for subtitle stream */
-            var subFilters = new List<string>();
-            var overlayFilters = new List<string>();
-            if (isDrmInDrmOut)
-            {
-                if (hasSubs)
-                {
-                    var subMaxH = 1080;
-                    if (hasGraphicalSubs)
-                    {
-                        var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, subMaxH);
-                        subFilters.Add(subPreProcFilters);
-                        subFilters.Add("format=bgra");
-                    }
-                    else if (hasTextSubs)
-                    {
-                        var framerate = state.VideoStream?.RealFrameRate;
-                        var subFramerate = hasAssSubs ? Math.Min(framerate ?? 25, 60) : 10;
-
-                        // alphasrc=s=1280x720:r=10:start=0,format=bgra,subtitles,hwupload
-                        var alphaSrcFilter = GetAlphaSrcFilter(state, swpInW, swpInH, reqW, reqH, reqMaxW, subMaxH, subFramerate);
-                        var subTextSubtitlesFilter = GetTextSubtitlesFilter(state, true, true);
-                        subFilters.Add(alphaSrcFilter);
-                        subFilters.Add("format=bgra");
-                        subFilters.Add(subTextSubtitlesFilter);
-                    }
-
-                    subFilters.Add("hwupload=derive_device=rkmpp");
-
-                    // offload 1080p+ subtitles swscale upscaling from CPU to RGA
-                    var (overlayW, overlayH) = GetFixedOutputSize(swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH);
-                    if (overlayW.HasValue && overlayH.HasValue && overlayH.Value > subMaxH)
-                    {
-                        subFilters.Add($"vpp_rkrga=w={overlayW.Value}:h={overlayH.Value}:format=bgra:afbc=1");
-                    }
-
-                    // try enabling AFBC to save DDR bandwidth
-                    var hwOverlayFilter = "overlay_rkrga=eof_action=pass:repeatlast=0:format=nv12";
-                    if (isEncoderSupportAfbc)
-                    {
-                        hwOverlayFilter += ":afbc=1";
-                    }
-
-                    overlayFilters.Add(hwOverlayFilter);
-                }
-            }
-            else if (memoryOutput)
-            {
-                if (hasGraphicalSubs)
-                {
-                    var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, reqMaxH);
-                    subFilters.Add(subPreProcFilters);
-                    overlayFilters.Add("overlay=eof_action=pass:repeatlast=0");
-                }
-            }
-
-            return (mainFilters, subFilters, overlayFilters);
+            var swapOutput = transpose && swap;
+            var scaling = hardwareInput ? GetHwScaleFilter("vpp", "rkrga", tonemap ? "p010" : "nv12", swapOutput, width, height, request.Width, request.Height, request.MaxWidth, request.MaxHeight) : string.Empty;
+            var scalingNeeded = hardwareInput && !string.IsNullOrEmpty(GetHwScaleFilter("vpp", "rkrga", string.Empty, swapOutput, width, height, request.Width, request.Height, request.MaxWidth, request.MaxHeight));
+            var singlePass = !hardwareInput || IsScaleRatioSupported(state.VideoStream?.Width, state.VideoStream?.Height, request.Width, request.Height, request.MaxWidth, request.MaxHeight, 8.0f);
+            var (overlayWidth, overlayHeight) = GetFixedOutputSize(width, height, request.Width, request.Height, request.MaxWidth, request.MaxHeight);
+            return new RkmppPipelinePlan.Hardware(
+                hardwareInput,
+                hardwareOutput,
+                videoEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase),
+                hardwareOutput && (videoEncoder.Contains("h264", StringComparison.OrdinalIgnoreCase) || videoEncoder.Contains("hevc", StringComparison.OrdinalIgnoreCase)),
+                GetOverwriteColorPropertiesParam(state, tonemap),
+                !hardwareInput && IsDeinterlaceAvailable(state) ? CaptureSoftwareDeinterlacing(state, options) : null,
+                new SoftwareScalingPlan(videoEncoder, state.MediaSource.Video3DFormat, request.Width, request.Height, request.MaxWidth, request.MaxHeight),
+                transpose ? rotation : null,
+                scaling,
+                scalingNeeded,
+                singlePass,
+                tonemap ? GetHwTonemapFilter(options, "opencl", "nv12", videoEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase)) : null,
+                subtitles,
+                overlayWidth,
+                overlayHeight);
         }
 
         /// <summary>
@@ -4571,7 +4360,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 HardwareAccelerationType.qsv => RenderQsvFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.nvenc => RenderNvidiaFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.videotoolbox => RenderVideoToolboxFilterChain(state, options, outputVideoCodec),
-                HardwareAccelerationType.rkmpp => GetRkmppVidFilterChain(state, options, outputVideoCodec),
+                HardwareAccelerationType.rkmpp => RenderRkmppFilterChain(state, options, outputVideoCodec),
                 _ => RenderSoftwareFilterChain(state, options, outputVideoCodec),
             };
 

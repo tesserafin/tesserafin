@@ -449,5 +449,30 @@ The static baseline contains 234 pre-extraction backend graphs and 117 complete 
 Linux responses. D3D11 graph characterization executes explicit parameters on Linux; native
 Windows startup and Intel GPU execution remain unproven. Architecture checks cover all four
 renderer namespaces and removed entry points without expanding the consolidation baseline.
-No OpenAPI, SDK, project or package changes. AMF, VideoToolbox and RKMPP remain to be extracted;
+No OpenAPI, SDK, project or package changes. AMF, VideoToolbox and RKMPP are extracted in §16;
 step 5 and all remaining playback consumers in §6 stay open.
+
+## 16. Remaining backend renderers (consolidation step 5, candidate)
+
+AMF, VideoToolbox and RKMPP now capture immutable software/hardware plans before invoking
+their pure renderers. This completes backend-specific filter-sequence extraction across the
+seven renderer namespaces. AMF owns D3D11/OpenCL composition; VideoToolbox owns native/Metal
+filtering and surface upload policy; RKMPP owns AFBC, two-pass RGA scaling and DRM/OpenCL
+transfers. Software/copy-back filtering continues to use one software renderer.
+
+Six public entries lose their implementation and are deleted: `GetAmdVidFilterChain`,
+`GetAmdDx11VidFiltersPrefered`, `GetAppleVidFilterChain`, `GetAppleVidFiltersPreferred`,
+`GetRkmppVidFilterChain` and `GetRkmppVidFiltersPrefered`. Native platform and hardware support
+are resolved at capture; rendering reads no mutable job, options or capability services.
+No forwarder, coexistence flag, OpenAPI/SDK/project/package change or ratchet expansion.
+
+281 explicit pre-extraction graphs cover the three backends, plus 116 complete RKMPP/Linux
+production responses. The static reference originates from #421 (19079c53da), before all three
+extractions. Snapshot-isolation, immutable-output and architecture cases supplement it.
+Native Windows/macOS startup, real AMD/Apple/Rockchip execution and HDR/Dolby Vision/3D
+acceptance remain outstanding; explicit graph tests on Linux do not provide those proofs.
+
+Device/codec decisions, shared geometry and filter-expression helpers, quality/bitrate arguments,
+common FPS placement, mapping, final command serialization and process execution remain outside
+these renderers. Step 5 remains open, including library service decomposition. Remaining playback
+consumers in §6 are unchanged. The retained Sessions execution plan remains authoritative.

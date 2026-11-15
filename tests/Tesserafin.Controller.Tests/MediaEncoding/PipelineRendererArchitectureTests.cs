@@ -9,6 +9,7 @@ using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.MediaEncoding.Amf;
 using Tesserafin.Controller.MediaEncoding.Nvidia;
 using Tesserafin.Controller.MediaEncoding.Qsv;
+using Tesserafin.Controller.MediaEncoding.Rkmpp;
 using Tesserafin.Controller.MediaEncoding.Software;
 using Tesserafin.Controller.MediaEncoding.Vaapi;
 using Tesserafin.Controller.MediaEncoding.VideoToolbox;
@@ -21,6 +22,7 @@ public sealed partial class PipelineRendererArchitectureTests
     [Theory]
     [InlineData("Amf")]
     [InlineData("VideoToolbox")]
+    [InlineData("Rkmpp")]
     [InlineData("Software")]
     [InlineData("Nvidia")]
     [InlineData("Vaapi")]
@@ -57,6 +59,7 @@ public sealed partial class PipelineRendererArchitectureTests
     [Theory]
     [InlineData(typeof(AmfPipelinePlan))]
     [InlineData(typeof(VideoToolboxPipelinePlan))]
+    [InlineData(typeof(RkmppPipelinePlan))]
     [InlineData(typeof(SoftwarePipelinePlan))]
     [InlineData(typeof(NvidiaPipelinePlan))]
     [InlineData(typeof(VaapiPipelinePlan))]
@@ -86,6 +89,8 @@ public sealed partial class PipelineRendererArchitectureTests
     [InlineData("GetAmdVidFilterChain")]
     [InlineData("GetAppleVidFiltersPreferred")]
     [InlineData("GetAppleVidFilterChain")]
+    [InlineData("GetRkmppVidFiltersPrefered")]
+    [InlineData("GetRkmppVidFilterChain")]
     [InlineData("GetSwVidFilterChain")]
     [InlineData("GetSwScaleFilter")]
     [InlineData("GetSwDeinterlaceFilter")]

@@ -154,7 +154,49 @@ Les graphes D3D11 sont caractérisés depuis la méthode d'origine appelée avec
 explicites sur Linux : ils ne constituent pas une preuve de démarrage natif Windows. Cette
 preuve et l'exécution sur GPU Intel réel restent ouvertes, comme l'acceptation HDR/Dolby Vision/3D.
 Les tests logiciels FFmpeg/session sont distincts. Les autres renderers extraits gardent leurs
-régressions ; AMF, VideoToolbox et RKMPP restent à extraire. L'étape 5 n'est pas close.
+régressions ; AMF, VideoToolbox et RKMPP sont traités dans la tranche suivante. L'étape 5 n'est pas close.
+
+## Extraction AMF, VideoToolbox et RKMPP — consolidation, 2026-11-15
+
+Cette tranche suit #421, avec un commit par backend. Les séquences de filtres des sept
+backends sont désormais composées dans leurs renderers purs : Software, Nvidia, Vaapi, Qsv,
+Amf, VideoToolbox et Rkmpp. `EncodingHelper` passe de 6 596 à 6 097 lignes.
+
+| Renderer | Paramètres figés à la capture | Composition possédée par le renderer |
+| --- | --- | --- |
+| AMF | surfaces D3D11/mémoire, capacités OpenCL, rotation, tone mapping, pistes texte/graphiques | transferts D3D11/OpenCL, copie en mémoire, overlay et format alpha |
+| VideoToolbox | surface utilisable selon FFmpeg, géométrie, désentrelacement, tone mapping natif ou Metal, pistes | upload conditionnel, `scale_vt`, tone mapping, overlays et téléchargement |
+| RKMPP | surfaces, support AFBC de l'encodeur, limites de ratio RGA, géométrie, tone mapping, pistes | AFBC, scaling en deux passes, format intermédiaire NV15, transferts DRM/OpenCL, upscale des sous-titres par RGA |
+
+Chaque backend possède des variantes de plan immuables logiciel et matériel. Le parcours
+logiciel/copy-back réutilise `SoftwarePipelineRenderer`. La capture résout les capacités,
+les paramètres de géométrie et les chemins ; le renderer ne consulte aucun job, service,
+configuration, périphérique ou API de plateforme. Les conditions de version FFmpeg portent
+sur les capacités de surface, et ne créent pas de coexistence entre anciennes API clients.
+
+Les six anciennes entrées publiques sont supprimées : `GetAmdVidFilterChain`,
+`GetAmdDx11VidFiltersPrefered`, `GetAppleVidFilterChain`, `GetAppleVidFiltersPreferred`,
+`GetRkmppVidFilterChain` et `GetRkmppVidFiltersPrefered`. Les points de routage privés
+capturent un plan puis invoquent leur renderer ; aucun forwarder ou flag de coexistence.
+
+La référence statique, enregistrée sur #421 (`19079c53da`) avant toute extraction, contient
+281 graphes explicites (80 AMF, 85 VideoToolbox, 116 RKMPP), et 116 réponses complètes de la
+route de production RKMPP/Linux. Elle couvre les sorties matérielles/logiciel/MJPEG, SDR/HDR,
+SRT/ASS/PGS, rotation, désentrelacement/FPS, alpha, les grandes réductions d'image et les
+surfaces AFBC. Les tests de capture vérifient l'indépendance aux mutations du job, des options
+et des capacités ; les garde-fous de dépendances et d'immuabilité couvrent les sept espaces.
+Les tests ne régénèrent jamais le fichier de référence.
+
+AMF et VideoToolbox sont caractérisés avec des entrées explicites depuis leurs méthodes
+d'origine sur Linux. Leur démarrage natif Windows/macOS et l'exécution sur matériel AMD,
+Apple ou Rockchip restent à valider. Les graphes HDR/Dolby Vision/3D ne constituent pas une
+acceptation matérielle. Les tests FFmpeg/session valident séparément les parcours logiciels.
+
+La sélection des encodeurs/décodeurs et des devices, les paramètres qualité/débit, les helpers
+partagés de géométrie et de formatage, le placement FPS, le mapping, l'assemblage final et le
+lancement de FFmpeg restent aux étages existants. Le diagnostic `TranscodePlan` reste
+un diagnostic ; le plan d'exécution Sessions conservé reste autoritaire. L'étape 5 de #129
+reste ouverte pour ces responsabilités et le découpage des services de bibliothèque.
 
 Les sections suivantes conservent le diagnostic et le séquencement historiques ; leurs noms
 `MediaBrowser.*` et numéros de ligne ne décrivent pas l'arbre après cette extraction.
