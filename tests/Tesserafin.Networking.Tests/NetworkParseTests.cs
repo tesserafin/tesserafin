@@ -335,11 +335,12 @@ namespace Tesserafin.Networking.Tests
         // User on internal network, no binding specified - so result is the 1st internal.
         [InlineData("192.168.1.1", "192.168.1.0/24", "", false, "external=http://helloworld.com", "eth16")]
 
+        // A reserved external address keeps these policy assertions independent of public DNS.
         // User on external network, internal binding only - so assumption is a proxy forward, return external override.
-        [InlineData("jellyfin.org", "192.168.1.0/24", "eth16", false, "external=http://helloworld.com", "http://helloworld.com")]
+        [InlineData("203.0.113.7", "192.168.1.0/24", "eth16", false, "external=http://helloworld.com", "http://helloworld.com")]
 
         // User on external network, no binding - so result is the 1st external which is overridden.
-        [InlineData("jellyfin.org", "192.168.1.0/24", "", false, "external=http://helloworld.com", "http://helloworld.com")]
+        [InlineData("203.0.113.7", "192.168.1.0/24", "", false, "external=http://helloworld.com", "http://helloworld.com")]
 
         // User assumed to be internal, no binding - so result is the 1st matching interface.
         [InlineData("", "192.168.1.0/24", "", false, "all=http://helloworld.com", "eth16")]

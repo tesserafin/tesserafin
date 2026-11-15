@@ -2,6 +2,46 @@
 
 Basé sur analyse graphify + lecture code réel. Fichiers/lignes cités = état actuel du repo.
 
+## Première extraction logicielle — consolidation, 2026-11-14
+
+Cette tranche est construite sur `master` après la fusion du transcodage film (#411).
+Elle extrait la composition des filtres logiciels et leurs expressions de redimensionnement ;
+la sélection des codecs, les arguments de qualité/débit et l'exécution du processus restent aux
+étages existants. Elle ne clôt pas l'étape 5 de #129.
+
+- `EncodingHelper.CaptureSoftwarePipeline` résout une fois les capacités, le format de surface,
+  la géométrie demandée, le désentrelacement, les valeurs de tone mapping et les sous-titres.
+- `SoftwarePipelinePlan` et `SoftwareScalingPlan` ne retiennent que des valeurs immuables. Les
+  variantes texte/graphique des sous-titres sont exclusives. Les chemins/fonts ont déjà été
+  résolus avant la capture ; le renderer ne consulte pas le disque.
+- `SoftwarePipelineRenderer` compose les filtres, rend le scaling et le désentrelacement. Il
+  ne lit ni `EncodingJobInfo`, ni `EncodingOptions`, ni `IMediaEncoder`, ni l'environnement.
+  Ses sorties sont des tableaux immuables ; les assembleurs peuvent en faire leurs listes locales.
+- Le parcours logiciel et les branches matérielles qui font du copy-back utilisent la même
+  implémentation. Les entrées publiques `GetSwVidFilterChain`, `GetSwScaleFilter` et
+  `GetSwDeinterlaceFilter` sont supprimées. Aucun forwarder ni flag de coexistence n'est ajouté.
+- Le parcours Sessions SDR fusionné continue à produire sa requête d'encodage depuis le
+  `PlaybackExecutionPlan` conservé (`EnginePlanEncodingRequest`). Ce snapshot de filtres
+  constitue un détail de rendu ; il n'ajoute pas de décision de lecture.
+- Le mapping, l'insertion FPS commune et la sérialisation finale `-vf` / `-filter_complex`
+  restent dans l'assembleur actuel. Le `TranscodePlan` diagnostique existant reste diagnostique.
+
+Le garde-fou d'architecture interdit les dépendances à la configuration, aux jobs et aux API
+I/O dans ce renderer, vérifie l'immuabilité des paramètres et l'absence des anciennes entrées.
+Les tests couvrent scaling, copy-back, Main10, tone mapping invariant, sous-titres et capture
+indépendante des mutations ultérieures. Trois commandes FFmpeg réelles vérifient H.264,
+pixel format et dimensions avec ffprobe. Les parcours Sessions sont vérifiés séparément en
+intégration, avec FFmpeg, seek et nettoyage des jobs. Ces contrôles ne constituent pas une
+validation matérielle ou une nouvelle acceptation HDR/3D.
+
+Le retrait des trois méthodes est une rupture d'ABI autorisée par la politique pré-lancement.
+La comparaison reste exécutée et ses différences restent visibles. Cette branche reprend,
+à l'identique de #412, le mode explicite `ABI_ALLOW_BREAKING=1` dans le verdict CI : erreurs
+d'outillage, artefacts manquants, manifeste invalide et zéro comparaison restent bloquants.
+
+Les sections suivantes conservent le diagnostic et le séquencement historiques ; leurs noms
+`MediaBrowser.*` et numéros de ligne ne décrivent pas l'arbre après cette extraction.
+
 ## État actuel confirmé (fichiers clés)
 
 | Classe | Fichier | Lignes | Rôle actuel |

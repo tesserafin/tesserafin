@@ -17,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Extensions;
 using Tesserafin.Controller.IO;
+using Tesserafin.Controller.MediaEncoding.Software;
 using Tesserafin.Controller.Streaming;
 using Tesserafin.Data;
 using Tesserafin.Data.Enums;
@@ -3560,174 +3561,10 @@ namespace Tesserafin.Controller.MediaEncoding
             return string.Empty;
         }
 
-        public static string GetSwScaleFilter(
-            EncodingJobInfo state,
-            EncodingOptions options,
-            string videoEncoder,
-            int? videoWidth,
-            int? videoHeight,
-            Video3DFormat? threedFormat,
-            int? requestedWidth,
-            int? requestedHeight,
-            int? requestedMaxWidth,
-            int? requestedMaxHeight)
-        {
-            var isV4l2 = string.Equals(videoEncoder, "h264_v4l2m2m", StringComparison.OrdinalIgnoreCase);
-            var isMjpeg = videoEncoder is not null && videoEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase);
-            var scaleVal = isV4l2 ? 64 : 2;
-            var targetAr = isMjpeg ? "(a*sar)" : "a"; // manually calculate AR when using mjpeg encoder
-
-            // If fixed dimensions were supplied
-            if (requestedWidth.HasValue && requestedHeight.HasValue)
-            {
-                if (isV4l2)
-                {
-                    var widthParam = requestedWidth.Value.ToString(CultureInfo.InvariantCulture);
-                    var heightParam = requestedHeight.Value.ToString(CultureInfo.InvariantCulture);
-
-                    return string.Format(
-                            CultureInfo.InvariantCulture,
-                            "scale=trunc({0}/64)*64:trunc({1}/2)*2",
-                            widthParam,
-                            heightParam);
-                }
-
-                return GetFixedSwScaleFilter(threedFormat, requestedWidth.Value, requestedHeight.Value);
-            }
-
-            // If Max dimensions were supplied, for width selects lowest even number between input width and width req size and selects lowest even number from in width*display aspect and requested size
-
-            if (requestedMaxWidth.HasValue && requestedMaxHeight.HasValue)
-            {
-                var maxWidthParam = requestedMaxWidth.Value.ToString(CultureInfo.InvariantCulture);
-                var maxHeightParam = requestedMaxHeight.Value.ToString(CultureInfo.InvariantCulture);
-
-                return string.Format(
-                    CultureInfo.InvariantCulture,
-                    @"scale=trunc(min(max(iw\,ih*{3})\,min({0}\,{1}*{3}))/{2})*{2}:trunc(min(max(iw/{3}\,ih)\,min({0}/{3}\,{1}))/2)*2",
-                    maxWidthParam,
-                    maxHeightParam,
-                    scaleVal,
-                    targetAr);
-            }
-
-            // If a fixed width was requested
-            if (requestedWidth.HasValue)
-            {
-                if (threedFormat.HasValue)
-                {
-                    // This method can handle 0 being passed in for the requested height
-                    return GetFixedSwScaleFilter(threedFormat, requestedWidth.Value, 0);
-                }
-
-                var widthParam = requestedWidth.Value.ToString(CultureInfo.InvariantCulture);
-
-                return string.Format(
-                    CultureInfo.InvariantCulture,
-                    "scale={0}:trunc(ow/{1}/2)*2",
-                    widthParam,
-                    targetAr);
-            }
-
-            // If a fixed height was requested
-            if (requestedHeight.HasValue)
-            {
-                var heightParam = requestedHeight.Value.ToString(CultureInfo.InvariantCulture);
-
-                return string.Format(
-                    CultureInfo.InvariantCulture,
-                    "scale=trunc(oh*{2}/{1})*{1}:{0}",
-                    heightParam,
-                    scaleVal,
-                    targetAr);
-            }
-
-            // If a max width was requested
-            if (requestedMaxWidth.HasValue)
-            {
-                var maxWidthParam = requestedMaxWidth.Value.ToString(CultureInfo.InvariantCulture);
-
-                return string.Format(
-                    CultureInfo.InvariantCulture,
-                    @"scale=trunc(min(max(iw\,ih*{2})\,{0})/{1})*{1}:trunc(ow/{2}/2)*2",
-                    maxWidthParam,
-                    scaleVal,
-                    targetAr);
-            }
-
-            // If a max height was requested
-            if (requestedMaxHeight.HasValue)
-            {
-                var maxHeightParam = requestedMaxHeight.Value.ToString(CultureInfo.InvariantCulture);
-
-                return string.Format(
-                    CultureInfo.InvariantCulture,
-                    @"scale=trunc(oh*{2}/{1})*{1}:min(max(iw/{2}\,ih)\,{0})",
-                    maxHeightParam,
-                    scaleVal,
-                    targetAr);
-            }
-
-            return string.Empty;
-        }
-
-        private static string GetFixedSwScaleFilter(Video3DFormat? threedFormat, int requestedWidth, int requestedHeight)
-        {
-            var widthParam = requestedWidth.ToString(CultureInfo.InvariantCulture);
-            var heightParam = requestedHeight.ToString(CultureInfo.InvariantCulture);
-
-            string filter = null;
-
-            if (threedFormat.HasValue)
-            {
-                switch (threedFormat.Value)
-                {
-                    case Video3DFormat.HalfSideBySide:
-                        filter = @"crop=iw/2:ih:0:0,scale=(iw*2):ih,setdar=dar=a,crop=min(iw\,ih*dar):min(ih\,iw/dar):(iw-min(iw\,iw*sar))/2:(ih - min (ih\,ih/sar))/2,setsar=sar=1,scale={0}:trunc({0}/dar/2)*2";
-                        // hsbs crop width in half,scale to correct size, set the display aspect,crop out any black bars we may have made the scale width to requestedWidth. Work out the correct height based on the display aspect it will maintain the aspect where -1 in this case (3d) may not.
-                        break;
-                    case Video3DFormat.FullSideBySide:
-                        filter = @"crop=iw/2:ih:0:0,setdar=dar=a,crop=min(iw\,ih*dar):min(ih\,iw/dar):(iw-min(iw\,iw*sar))/2:(ih - min (ih\,ih/sar))/2,setsar=sar=1,scale={0}:trunc({0}/dar/2)*2";
-                        // fsbs crop width in half,set the display aspect,crop out any black bars we may have made the scale width to requestedWidth.
-                        break;
-                    case Video3DFormat.HalfTopAndBottom:
-                        filter = @"crop=iw:ih/2:0:0,scale=(iw*2):ih),setdar=dar=a,crop=min(iw\,ih*dar):min(ih\,iw/dar):(iw-min(iw\,iw*sar))/2:(ih - min (ih\,ih/sar))/2,setsar=sar=1,scale={0}:trunc({0}/dar/2)*2";
-                        // htab crop height in half,scale to correct size, set the display aspect,crop out any black bars we may have made the scale width to requestedWidth
-                        break;
-                    case Video3DFormat.FullTopAndBottom:
-                        filter = @"crop=iw:ih/2:0:0,setdar=dar=a,crop=min(iw\,ih*dar):min(ih\,iw/dar):(iw-min(iw\,iw*sar))/2:(ih - min (ih\,ih/sar))/2,setsar=sar=1,scale={0}:trunc({0}/dar/2)*2";
-                        // ftab crop height in half, set the display aspect,crop out any black bars we may have made the scale width to requestedWidth
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            // default
-            if (filter is null)
-            {
-                if (requestedHeight > 0)
-                {
-                    filter = "scale=trunc({0}/2)*2:trunc({1}/2)*2";
-                }
-                else
-                {
-                    filter = "scale={0}:trunc({0}/a/2)*2";
-                }
-            }
-
-            return string.Format(CultureInfo.InvariantCulture, filter, widthParam, heightParam);
-        }
-
-        public static string GetSwDeinterlaceFilter(EncodingJobInfo state, EncodingOptions options)
-        {
-            var doubleRateDeint = options.DeinterlaceDoubleRate && state.VideoStream?.ReferenceFrameRate <= 30;
-            return string.Format(
-                CultureInfo.InvariantCulture,
-                "{0}={1}:-1:0",
+        private static string CaptureSoftwareDeinterlacing(EncodingJobInfo state, EncodingOptions options)
+            => SoftwarePipelineRenderer.RenderDeinterlacing(
                 options.DeinterlaceMethod.ToString().ToLowerInvariant(),
-                doubleRateDeint ? "1" : "0");
-        }
+                options.DeinterlaceDoubleRate && state.VideoStream?.ReferenceFrameRate <= 30);
 
         public string GetHwDeinterlaceFilter(EncodingJobInfo state, EncodingOptions options, string hwDeintSuffix)
         {
@@ -3940,135 +3777,79 @@ namespace Tesserafin.Controller.MediaEncoding
             };
         }
 
-        /// <summary>
-        /// Gets the parameter of software filter chain.
-        /// </summary>
-        /// <param name="state">Encoding state.</param>
-        /// <param name="options">Encoding options.</param>
-        /// <param name="vidEncoder">Video encoder to use.</param>
-        /// <returns>The tuple contains three lists: main, sub and overlay filters.</returns>
-        public (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) GetSwVidFilterChain(
+        private (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) RenderSoftwareFilterChain(
             EncodingJobInfo state,
             EncodingOptions options,
-            string vidEncoder)
+            string videoEncoder)
         {
-            var inW = state.VideoStream?.Width;
-            var inH = state.VideoStream?.Height;
-            var reqW = state.BaseRequest.Width;
-            var reqH = state.BaseRequest.Height;
-            var reqMaxW = state.BaseRequest.MaxWidth;
-            var reqMaxH = state.BaseRequest.MaxHeight;
-            var threeDFormat = state.MediaSource.Video3DFormat;
+            var filters = SoftwarePipelineRenderer.Render(CaptureSoftwarePipeline(state, options, videoEncoder));
+            return (filters.MainFilters.ToList(), filters.SubFilters.ToList(), filters.OverlayFilters.ToList());
+        }
 
-            var vidDecoder = GetHardwareVideoDecoder(state, options) ?? string.Empty;
-            var isSwDecoder = string.IsNullOrEmpty(vidDecoder);
-            var isVaapiEncoder = vidEncoder.Contains("vaapi", StringComparison.OrdinalIgnoreCase);
-            var isV4l2Encoder = vidEncoder.Contains("h264_v4l2m2m", StringComparison.OrdinalIgnoreCase);
-
-            var doDeintH2645 = IsDeinterlaceAvailable(state);
-            var doToneMap = IsSwTonemapAvailable(state, options);
-            var requireDoviReshaping = doToneMap && state.VideoStream.VideoRangeType == VideoRangeType.DOVI;
-
-            var hasSubs = state.SubtitleStream is not null && ShouldEncodeSubtitle(state);
-            var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
-            var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
-
-            var rotation = state.VideoStream?.Rotation ?? 0;
-            var swapWAndH = Math.Abs(rotation) == 90;
-            var swpInW = swapWAndH ? inH : inW;
-            var swpInH = swapWAndH ? inW : inH;
-
-            /* Make main filters for video stream */
-            var mainFilters = new List<string>();
-
-            mainFilters.Add(GetOverwriteColorPropertiesParam(state, doToneMap));
-
-            // INPUT sw surface(memory/copy-back from vram)
-            // sw deint
-            if (doDeintH2645)
+        // Capture once at the orchestration edge. The renderer cannot re-read the job, configuration
+        // or capabilities, and cannot re-decide a retained Sessions execution request.
+        internal SoftwarePipelinePlan CaptureSoftwarePipeline(EncodingJobInfo state, EncodingOptions options, string videoEncoder)
+        {
+            var softwareDecoder = string.IsNullOrEmpty(GetHardwareVideoDecoder(state, options));
+            var pixelFormat = softwareDecoder ? "yuv420p" : "nv12";
+            if (string.Equals(videoEncoder, "libx265", StringComparison.OrdinalIgnoreCase)
+                && GetHevcOutputProfile(state, videoEncoder) == "main10")
             {
-                var deintFilter = GetSwDeinterlaceFilter(state, options);
-                mainFilters.Add(deintFilter);
+                pixelFormat = "yuv420p10le";
             }
 
-            var outFormat = isSwDecoder ? "yuv420p" : "nv12";
-            var softwareMain10 = string.Equals(vidEncoder, "libx265", StringComparison.OrdinalIgnoreCase)
-                && GetHevcOutputProfile(state, vidEncoder) == "main10";
-            if (softwareMain10)
+            if (videoEncoder.Contains("vaapi", StringComparison.OrdinalIgnoreCase))
             {
-                outFormat = "yuv420p10le";
+                pixelFormat = "nv12";
+            }
+            else if (videoEncoder.Contains("h264_v4l2m2m", StringComparison.OrdinalIgnoreCase))
+            {
+                pixelFormat = "yuv420p";
             }
 
-            var swScaleFilter = GetSwScaleFilter(state, options, vidEncoder, swpInW, swpInH, threeDFormat, reqW, reqH, reqMaxW, reqMaxH);
-            if (isVaapiEncoder)
+            var tonemap = IsSwTonemapAvailable(state, options);
+            var scaling = new SoftwareScalingPlan(
+                videoEncoder,
+                state.MediaSource.Video3DFormat,
+                state.BaseRequest.Width,
+                state.BaseRequest.Height,
+                state.BaseRequest.MaxWidth,
+                state.BaseRequest.MaxHeight);
+            SoftwarePipelinePlan.Subtitle subtitles = null;
+            if (state.SubtitleStream is not null && ShouldEncodeSubtitle(state))
             {
-                outFormat = "nv12";
-            }
-            else if (isV4l2Encoder)
-            {
-                outFormat = "yuv420p";
-            }
-
-            // sw scale
-            mainFilters.Add(swScaleFilter);
-
-            // sw tonemap
-            if (doToneMap)
-            {
-                // tonemapx requires yuv420p10 input for dovi reshaping, let ffmpeg convert the frame when necessary
-                var tonemapFormat = requireDoviReshaping ? "yuv420p" : outFormat;
-                var tonemapArgString = "tonemapx=tonemap={0}:desat={1}:peak={2}:t=bt709:m=bt709:p=bt709:format={3}";
-
-                if (options.TonemappingParam != 0)
+                if (state.SubtitleStream.IsTextSubtitleStream)
                 {
-                    tonemapArgString += ":param={4}";
+                    subtitles = new SoftwarePipelinePlan.Subtitle.Text(GetTextSubtitlesFilter(state, false, false));
                 }
-
-                var range = options.TonemappingRange;
-                if (range == TonemappingRange.tv || range == TonemappingRange.pc)
+                else
                 {
-                    tonemapArgString += ":range={5}";
+                    var swap = Math.Abs(state.VideoStream?.Rotation ?? 0) == 90;
+                    subtitles = new SoftwarePipelinePlan.Subtitle.Graphical(GetGraphicalSubPreProcessFilters(
+                        swap ? state.VideoStream?.Height : state.VideoStream?.Width,
+                        swap ? state.VideoStream?.Width : state.VideoStream?.Height,
+                        state.SubtitleStream.Width,
+                        state.SubtitleStream.Height,
+                        scaling.Width,
+                        scaling.Height,
+                        scaling.MaxWidth,
+                        scaling.MaxHeight));
                 }
+            }
 
-                var tonemapArgs = string.Format(
-                    CultureInfo.InvariantCulture,
-                    tonemapArgString,
-                    options.TonemappingAlgorithm,
+            return new SoftwarePipelinePlan(
+                pixelFormat,
+                GetOverwriteColorPropertiesParam(state, tonemap),
+                IsDeinterlaceAvailable(state) ? CaptureSoftwareDeinterlacing(state, options) : null,
+                scaling,
+                tonemap ? new SoftwarePipelinePlan.ToneMapping(
+                    options.TonemappingAlgorithm.ToString(),
                     options.TonemappingDesat,
                     options.TonemappingPeak,
-                    tonemapFormat,
                     options.TonemappingParam,
-                    options.TonemappingRange);
-
-                mainFilters.Add(tonemapArgs);
-            }
-            else
-            {
-                // OUTPUT yuv420p/nv12 surface(memory)
-                mainFilters.Add("format=" + outFormat);
-            }
-
-            /* Make sub and overlay filters for subtitle stream */
-            var subFilters = new List<string>();
-            var overlayFilters = new List<string>();
-            if (hasTextSubs)
-            {
-                // subtitles=f='*.ass':alpha=0
-                var textSubtitlesFilter = GetTextSubtitlesFilter(state, false, false);
-                mainFilters.Add(textSubtitlesFilter);
-            }
-            else if (hasGraphicalSubs)
-            {
-                var subW = state.SubtitleStream?.Width;
-                var subH = state.SubtitleStream?.Height;
-                var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, reqMaxH);
-                subFilters.Add(subPreProcFilters);
-                overlayFilters.Add(softwareMain10
-                    ? "overlay=format=yuv420p10:eof_action=pass:repeatlast=0"
-                    : "overlay=eof_action=pass:repeatlast=0");
-            }
-
-            return (mainFilters, subFilters, overlayFilters);
+                    options.TonemappingRange is TonemappingRange.tv or TonemappingRange.pc ? options.TonemappingRange.ToString() : null,
+                    state.VideoStream.VideoRangeType == VideoRangeType.DOVI ? "yuv420p" : pixelFormat) : null,
+                subtitles);
         }
 
         /// <summary>
@@ -4097,7 +3878,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 || !IsCudaFullSupported()
                 || !_mediaEncoder.SupportsFilter("alphasrc"))
             {
-                return GetSwVidFilterChain(state, options, vidEncoder);
+                return RenderSoftwareFilterChain(state, options, vidEncoder);
             }
 
             // preferred nvdec/cuvid + cuda filters + nvenc pipeline
@@ -4156,12 +3937,12 @@ namespace Tesserafin.Controller.MediaEncoding
                 // sw deint
                 if (doDeintH2645)
                 {
-                    var swDeintFilter = GetSwDeinterlaceFilter(state, options);
+                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
                     mainFilters.Add(swDeintFilter);
                 }
 
                 var outFormat = doCuTonemap ? "yuv420p10le" : "yuv420p";
-                var swScaleFilter = GetSwScaleFilter(state, options, vidEncoder, swpInW, swpInH, threeDFormat, reqW, reqH, reqMaxW, reqMaxH);
+                var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
                 // sw scale
                 mainFilters.Add(swScaleFilter);
                 mainFilters.Add($"format={outFormat}");
@@ -4307,7 +4088,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 || !isAmfDx11OclSupported
                 || !_mediaEncoder.SupportsFilter("alphasrc"))
             {
-                return GetSwVidFilterChain(state, options, vidEncoder);
+                return RenderSoftwareFilterChain(state, options, vidEncoder);
             }
 
             // preferred d3d11va + opencl filters + amf pipeline
@@ -4366,12 +4147,12 @@ namespace Tesserafin.Controller.MediaEncoding
                 // sw deint
                 if (doDeintH2645)
                 {
-                    var swDeintFilter = GetSwDeinterlaceFilter(state, options);
+                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
                     mainFilters.Add(swDeintFilter);
                 }
 
                 var outFormat = doOclTonemap ? "yuv420p10le" : "yuv420p";
-                var swScaleFilter = GetSwScaleFilter(state, options, vidEncoder, swpInW, swpInH, threeDFormat, reqW, reqH, reqMaxW, reqMaxH);
+                var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
                 // sw scale
                 mainFilters.Add(swScaleFilter);
                 mainFilters.Add($"format={outFormat}");
@@ -4540,7 +4321,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 || (!isIntelVaapiOclSupported && !isIntelDx11OclSupported)
                 || !_mediaEncoder.SupportsFilter("alphasrc"))
             {
-                return GetSwVidFilterChain(state, options, vidEncoder);
+                return RenderSoftwareFilterChain(state, options, vidEncoder);
             }
 
             // preferred qsv(vaapi) + opencl filters pipeline
@@ -4613,12 +4394,12 @@ namespace Tesserafin.Controller.MediaEncoding
                 // sw deint
                 if (doDeintH2645)
                 {
-                    var swDeintFilter = GetSwDeinterlaceFilter(state, options);
+                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
                     mainFilters.Add(swDeintFilter);
                 }
 
                 var outFormat = doOclTonemap ? "yuv420p10le" : (hasGraphicalSubs ? "yuv420p" : "nv12");
-                var swScaleFilter = GetSwScaleFilter(state, options, vidEncoder, swpInW, swpInH, threeDFormat, reqW, reqH, reqMaxW, reqMaxH);
+                var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
                 if (isMjpegEncoder && !doOclTonemap)
                 {
                     // sw decoder + hw mjpeg encoder
@@ -4905,12 +4686,12 @@ namespace Tesserafin.Controller.MediaEncoding
                 // sw deint
                 if (doDeintH2645)
                 {
-                    var swDeintFilter = GetSwDeinterlaceFilter(state, options);
+                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
                     mainFilters.Add(swDeintFilter);
                 }
 
                 var outFormat = doOclTonemap ? "yuv420p10le" : (hasGraphicalSubs ? "yuv420p" : "nv12");
-                var swScaleFilter = GetSwScaleFilter(state, options, vidEncoder, swpInW, swpInH, threeDFormat, reqW, reqH, reqMaxW, reqMaxH);
+                var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
                 if (isMjpegEncoder && !doOclTonemap)
                 {
                     // sw decoder + hw mjpeg encoder
@@ -5143,7 +4924,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 || !isVaapiOclSupported
                 || !_mediaEncoder.SupportsFilter("alphasrc"))
             {
-                var swFilterChain = GetSwVidFilterChain(state, options, vidEncoder);
+                var swFilterChain = RenderSoftwareFilterChain(state, options, vidEncoder);
 
                 if (!isSwEncoder)
                 {
@@ -5234,12 +5015,12 @@ namespace Tesserafin.Controller.MediaEncoding
                 // sw deint
                 if (doDeintH2645)
                 {
-                    var swDeintFilter = GetSwDeinterlaceFilter(state, options);
+                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
                     mainFilters.Add(swDeintFilter);
                 }
 
                 var outFormat = doOclTonemap ? "yuv420p10le" : "nv12";
-                var swScaleFilter = GetSwScaleFilter(state, options, vidEncoder, swpInW, swpInH, threeDFormat, reqW, reqH, reqMaxW, reqMaxH);
+                var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
                 if (isMjpegEncoder && !doOclTonemap)
                 {
                     // sw decoder + hw mjpeg encoder
@@ -5465,7 +5246,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 // sw deint
                 if (doDeintH2645)
                 {
-                    var swDeintFilter = GetSwDeinterlaceFilter(state, options);
+                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
                     mainFilters.Add(swDeintFilter);
                 }
 
@@ -5478,7 +5259,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 else
                 {
                     // sw scale
-                    var swScaleFilter = GetSwScaleFilter(state, options, vidEncoder, swpInW, swpInH, threeDFormat, reqW, reqH, reqMaxW, reqMaxH);
+                    var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
                     mainFilters.Add(swScaleFilter);
                     mainFilters.Add("format=nv12");
                 }
@@ -5699,12 +5480,12 @@ namespace Tesserafin.Controller.MediaEncoding
                 // sw deint
                 if (doDeintH2645)
                 {
-                    var swDeintFilter = GetSwDeinterlaceFilter(state, options);
+                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
                     mainFilters.Add(swDeintFilter);
                 }
 
                 outFormat = doOclTonemap ? "yuv420p10le" : "nv12";
-                var swScaleFilter = GetSwScaleFilter(state, options, vidEncoder, swpInW, swpInH, threeDFormat, reqW, reqH, reqMaxW, reqMaxH);
+                var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
                 if (isMjpegEncoder && !doOclTonemap)
                 {
                     // sw decoder + hw mjpeg encoder
@@ -5881,7 +5662,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 || !isVtFullSupported
                 || !_mediaEncoder.SupportsFilter("alphasrc"))
             {
-                return GetSwVidFilterChain(state, options, vidEncoder);
+                return RenderSoftwareFilterChain(state, options, vidEncoder);
             }
 
             // preferred videotoolbox + metal filters pipeline
@@ -6069,7 +5850,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 || !isRkmppOclSupported
                 || !_mediaEncoder.SupportsFilter("alphasrc"))
             {
-                return GetSwVidFilterChain(state, options, vidEncoder);
+                return RenderSoftwareFilterChain(state, options, vidEncoder);
             }
 
             // preferred rkmpp + rkrga + opencl filters pipeline
@@ -6135,12 +5916,12 @@ namespace Tesserafin.Controller.MediaEncoding
                 // sw deint
                 if (doDeintH2645)
                 {
-                    var swDeintFilter = GetSwDeinterlaceFilter(state, options);
+                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
                     mainFilters.Add(swDeintFilter);
                 }
 
                 var outFormat = doOclTonemap ? "yuv420p10le" : (hasGraphicalSubs ? "yuv420p" : "nv12");
-                var swScaleFilter = GetSwScaleFilter(state, options, vidEncoder, swpInW, swpInH, threeDFormat, reqW, reqH, reqMaxW, reqMaxH);
+                var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
                 if (isMjpegEncoder && !doOclTonemap)
                 {
                     // sw decoder + hw mjpeg encoder
@@ -6361,7 +6142,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 HardwareAccelerationType.nvenc => GetNvidiaVidFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.videotoolbox => GetAppleVidFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.rkmpp => GetRkmppVidFilterChain(state, options, outputVideoCodec),
-                _ => GetSwVidFilterChain(state, options, outputVideoCodec),
+                _ => RenderSoftwareFilterChain(state, options, outputVideoCodec),
             };
 
             mainFilters?.RemoveAll(string.IsNullOrEmpty);

@@ -5,6 +5,7 @@ using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
+using Tesserafin.Controller.MediaEncoding.Software;
 using Tesserafin.Controller.Streaming;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dlna;
@@ -42,7 +43,7 @@ public class EncodingHelperHevcMain10Tests
 
         if (encoder == "libx265")
         {
-            var (filters, _, _) = helper.GetSwVidFilterChain(state, Options(), encoder);
+            var (filters, _, _) = SoftwarePipelineRenderer.Render(helper.CaptureSoftwarePipeline(state, Options(), encoder));
             Assert.Contains("format=" + (expected == "main10" ? "yuv420p10le" : "yuv420p"), filters);
         }
     }
@@ -71,7 +72,7 @@ public class EncodingHelperHevcMain10Tests
         var state = State("main10", 10);
         state.SubtitleStream = new MediaStream { Index = 1, Type = MediaStreamType.Subtitle, Codec = "hdmv_pgs_subtitle", Width = 320, Height = 180 };
         state.SubtitleDeliveryMethod = SubtitleDeliveryMethod.Encode;
-        var (_, _, overlays) = CreateHelper(true).GetSwVidFilterChain(state, Options(), "libx265");
+        var (_, _, overlays) = SoftwarePipelineRenderer.Render(CreateHelper(true).CaptureSoftwarePipeline(state, Options(), "libx265"));
         Assert.Contains("overlay=format=yuv420p10:eof_action=pass:repeatlast=0", overlays);
     }
 

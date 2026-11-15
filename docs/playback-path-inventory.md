@@ -367,3 +367,23 @@ Still on `BaseItem.UserDataManager` (read and filter paths, not this command):
 children filter in `Folder` via `UserViewBuilder.Filter`; `Season.GetItemsInternal`;
 `UserView.GetItemsInternal`. The static and its `ApplicationHost` assignment therefore stay; the
 ratchet baseline is unchanged. Stacked on #415.
+
+
+## 12. Software filter renderer (consolidation step 5, candidate)
+
+The session film SDR transcode still consumes its retained execution plan through
+`EnginePlanEncodingRequest`; no request parameter is promoted into a new decision. The shared
+encoding helper now captures a `SoftwarePipelinePlan`, and `SoftwarePipelineRenderer` produces
+its immutable main/subtitle/overlay filter sequences. Software scaling and deinterlacing have
+one rendering implementation, including hardware copy-back consumers.
+
+The former public `GetSwVidFilterChain`, `GetSwScaleFilter` and `GetSwDeinterlaceFilter` methods
+are removed. Frame-rate insertion, map/filter-graph assembly, codec/bitrate/quality selection and
+process execution remain outside this extraction. The diagnostic `TranscodePlan` is not made an
+execution authority by this change. Hardware-only renderers, global playback switches and all
+remaining StreamInfo/StreamBuilder consumers above remain to be migrated.
+
+The Controller test suite checks snapshot isolation and forbids runtime/configuration services
+in the renderer. Real FFmpeg/ffprobe tests validate software output; existing film direct-play,
+remux and transcode integration cases validate their HTTP/session/job lifecycle. No new browser,
+physical-device, hardware, HDR or 3D acceptance is claimed.
