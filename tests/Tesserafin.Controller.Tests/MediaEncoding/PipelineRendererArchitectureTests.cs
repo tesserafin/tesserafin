@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Tesserafin.Controller.MediaEncoding;
+using Tesserafin.Controller.MediaEncoding.Amf;
 using Tesserafin.Controller.MediaEncoding.Nvidia;
 using Tesserafin.Controller.MediaEncoding.Qsv;
 using Tesserafin.Controller.MediaEncoding.Software;
@@ -17,6 +18,7 @@ namespace Tesserafin.Controller.Tests.MediaEncoding;
 public sealed partial class PipelineRendererArchitectureTests
 {
     [Theory]
+    [InlineData("Amf")]
     [InlineData("Software")]
     [InlineData("Nvidia")]
     [InlineData("Vaapi")]
@@ -51,6 +53,7 @@ public sealed partial class PipelineRendererArchitectureTests
     }
 
     [Theory]
+    [InlineData(typeof(AmfPipelinePlan))]
     [InlineData(typeof(SoftwarePipelinePlan))]
     [InlineData(typeof(NvidiaPipelinePlan))]
     [InlineData(typeof(VaapiPipelinePlan))]
@@ -76,6 +79,8 @@ public sealed partial class PipelineRendererArchitectureTests
     }
 
     [Theory]
+    [InlineData("GetAmdDx11VidFiltersPrefered")]
+    [InlineData("GetAmdVidFilterChain")]
     [InlineData("GetSwVidFilterChain")]
     [InlineData("GetSwScaleFilter")]
     [InlineData("GetSwDeinterlaceFilter")]

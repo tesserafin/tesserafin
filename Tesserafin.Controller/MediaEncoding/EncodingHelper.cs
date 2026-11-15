@@ -17,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Extensions;
 using Tesserafin.Controller.IO;
+using Tesserafin.Controller.MediaEncoding.Amf;
 using Tesserafin.Controller.MediaEncoding.Nvidia;
 using Tesserafin.Controller.MediaEncoding.Qsv;
 using Tesserafin.Controller.MediaEncoding.Software;
@@ -3925,230 +3926,66 @@ namespace Tesserafin.Controller.MediaEncoding
                 subtitles);
         }
 
-        /// <summary>
-        /// Gets the parameter of AMD AMF filter chain.
-        /// </summary>
-        /// <param name="state">Encoding state.</param>
-        /// <param name="options">Encoding options.</param>
-        /// <param name="vidEncoder">Video encoder to use.</param>
-        /// <returns>The tuple contains three lists: main, sub and overlay filters.</returns>
-        public (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) GetAmdVidFilterChain(
-            EncodingJobInfo state,
-            EncodingOptions options,
-            string vidEncoder)
+        private (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) RenderAmfFilterChain(EncodingJobInfo state, EncodingOptions options, string videoEncoder)
         {
-            if (options.HardwareAccelerationType != HardwareAccelerationType.amf)
-            {
-                return (null, null, null);
-            }
-
-            var isWindows = OperatingSystem.IsWindows();
-            var vidDecoder = GetHardwareVideoDecoder(state, options) ?? string.Empty;
-            var isSwDecoder = string.IsNullOrEmpty(vidDecoder);
-            var isSwEncoder = !vidEncoder.Contains("amf", StringComparison.OrdinalIgnoreCase);
-            var isAmfDx11OclSupported = isWindows && _mediaEncoder.SupportsHwaccel("d3d11va") && IsOpenclFullSupported();
-
-            // legacy d3d11va pipeline(copy-back)
-            if ((isSwDecoder && isSwEncoder)
-                || !isAmfDx11OclSupported
-                || !_mediaEncoder.SupportsFilter("alphasrc"))
-            {
-                return RenderSoftwareFilterChain(state, options, vidEncoder);
-            }
-
-            // preferred d3d11va + opencl filters + amf pipeline
-            return GetAmdDx11VidFiltersPrefered(state, options, vidDecoder, vidEncoder);
+            var graph = AmfPipelineRenderer.Render(CaptureAmfPipeline(state, options, videoEncoder));
+            return (graph.MainFilters.ToList(), graph.SubFilters.ToList(), graph.OverlayFilters.ToList());
         }
 
-        public (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) GetAmdDx11VidFiltersPrefered(
-            EncodingJobInfo state,
-            EncodingOptions options,
-            string vidDecoder,
-            string vidEncoder)
+        internal AmfPipelinePlan CaptureAmfPipeline(EncodingJobInfo state, EncodingOptions options, string videoEncoder)
         {
-            var inW = state.VideoStream?.Width;
-            var inH = state.VideoStream?.Height;
-            var reqW = state.BaseRequest.Width;
-            var reqH = state.BaseRequest.Height;
-            var reqMaxW = state.BaseRequest.MaxWidth;
-            var reqMaxH = state.BaseRequest.MaxHeight;
-            var threeDFormat = state.MediaSource.Video3DFormat;
-
-            var isD3d11vaDecoder = vidDecoder.Contains("d3d11va", StringComparison.OrdinalIgnoreCase);
-            var isAmfEncoder = vidEncoder.Contains("amf", StringComparison.OrdinalIgnoreCase);
-            var isSwDecoder = string.IsNullOrEmpty(vidDecoder);
-            var isSwEncoder = !isAmfEncoder;
-            var isMjpegEncoder = vidEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase);
-            var isDxInDxOut = isD3d11vaDecoder && isAmfEncoder;
-
-            var doDeintH2645 = IsDeinterlaceAvailable(state);
-            var doOclTonemap = IsHwTonemapAvailable(state, options);
-
-            var hasSubs = state.SubtitleStream is not null && ShouldEncodeSubtitle(state);
-            var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
-            var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
-            var hasAssSubs = hasSubs
-                && (string.Equals(state.SubtitleStream.Codec, "ass", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(state.SubtitleStream.Codec, "ssa", StringComparison.OrdinalIgnoreCase));
-            var subW = state.SubtitleStream?.Width;
-            var subH = state.SubtitleStream?.Height;
-
-            var rotation = state.VideoStream?.Rotation ?? 0;
-            var transposeDir = rotation == 0 ? string.Empty : GetVideoTransposeDirection(state);
-            var doOclTranspose = !string.IsNullOrEmpty(transposeDir)
-                && _mediaEncoder.SupportsFilterWithOption(FilterOptionType.TransposeOpenclReversal);
-            var swapWAndH = Math.Abs(rotation) == 90 && (isSwDecoder || (isD3d11vaDecoder && doOclTranspose));
-            var swpInW = swapWAndH ? inH : inW;
-            var swpInH = swapWAndH ? inW : inH;
-
-            /* Make main filters for video stream */
-            var mainFilters = new List<string>();
-
-            mainFilters.Add(GetOverwriteColorPropertiesParam(state, doOclTonemap));
-
-            if (isSwDecoder)
+            var decoder = GetHardwareVideoDecoder(state, options) ?? string.Empty;
+            if (!OperatingSystem.IsWindows() || !_mediaEncoder.SupportsHwaccel("d3d11va") || !IsOpenclFullSupported()
+                || !_mediaEncoder.SupportsFilter("alphasrc") || (decoder.Length == 0 && !videoEncoder.Contains("amf", StringComparison.OrdinalIgnoreCase)))
             {
-                // INPUT sw surface(memory)
-                // sw deint
-                if (doDeintH2645)
+                return new AmfPipelinePlan.Software(CaptureSoftwarePipeline(state, options, videoEncoder));
+            }
+
+            return CaptureAmfHardwarePipeline(state, options, decoder, videoEncoder);
+        }
+
+        internal AmfPipelinePlan CaptureAmfHardwarePipeline(EncodingJobInfo state, EncodingOptions options, string decoder, string videoEncoder)
+        {
+            var hardwareInput = decoder.Contains("d3d11va", StringComparison.OrdinalIgnoreCase);
+            var hardwareOutput = videoEncoder.Contains("amf", StringComparison.OrdinalIgnoreCase);
+            var tonemap = IsHwTonemapAvailable(state, options);
+            var rotation = GetVideoTransposeDirection(state);
+            var transpose = rotation.Length > 0 && _mediaEncoder.SupportsFilterWithOption(FilterOptionType.TransposeOpenclReversal);
+            var swap = Math.Abs(state.VideoStream?.Rotation ?? 0) == 90 && (!hardwareInput || transpose);
+            var width = swap ? state.VideoStream?.Height : state.VideoStream?.Width;
+            var height = swap ? state.VideoStream?.Width : state.VideoStream?.Height;
+            var request = state.BaseRequest;
+            var hardwareOverlay = (hardwareInput && hardwareOutput) || (!hardwareInput && tonemap);
+            AmfPipelinePlan.Subtitle subtitles = null;
+            if (state.SubtitleStream is { } subtitle && ShouldEncodeSubtitle(state))
+            {
+                if (subtitle.IsTextSubtitleStream)
                 {
-                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
-                    mainFilters.Add(swDeintFilter);
+                    var ass = string.Equals(subtitle.Codec, "ass", StringComparison.OrdinalIgnoreCase) || string.Equals(subtitle.Codec, "ssa", StringComparison.OrdinalIgnoreCase);
+                    var fps = ass ? Math.Min(state.VideoStream?.RealFrameRate ?? 25, 60) : 10;
+                    subtitles = hardwareOverlay
+                        ? new AmfPipelinePlan.Subtitle.OverlayText(
+                            GetAlphaSrcFilter(state, width, height, request.Width, request.Height, request.MaxWidth, request.MaxHeight, fps),
+                            GetTextSubtitlesFilter(state, true, true),
+                            _mediaEncoder.SupportsFilterWithOption(FilterOptionType.OverlayOpenclAlphaFormat))
+                        : new AmfPipelinePlan.Subtitle.Text(GetTextSubtitlesFilter(state, false, false));
                 }
-
-                var outFormat = doOclTonemap ? "yuv420p10le" : "yuv420p";
-                var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
-                // sw scale
-                mainFilters.Add(swScaleFilter);
-                mainFilters.Add($"format={outFormat}");
-
-                // keep video at memory except ocl tonemap,
-                // since the overhead caused by hwupload >>> using sw filter.
-                // sw => hw
-                if (doOclTonemap)
+                else
                 {
-                    mainFilters.Add("hwupload=derive_device=d3d11va:extra_hw_frames=24");
-                    mainFilters.Add("format=d3d11");
-                    mainFilters.Add("hwmap=derive_device=opencl:mode=read");
+                    subtitles = new AmfPipelinePlan.Subtitle.Graphical(GetGraphicalSubPreProcessFilters(width, height, subtitle.Width, subtitle.Height, request.Width, request.Height, request.MaxWidth, request.MaxHeight));
                 }
             }
 
-            if (isD3d11vaDecoder)
-            {
-                // INPUT d3d11 surface(vram)
-                // map from d3d11va to opencl via d3d11-opencl interop.
-                mainFilters.Add("hwmap=derive_device=opencl:mode=read");
-
-                // hw deint
-                if (doDeintH2645)
-                {
-                    var deintFilter = GetHwDeinterlaceFilter(state, options, "opencl");
-                    mainFilters.Add(deintFilter);
-                }
-
-                // hw transpose
-                if (doOclTranspose)
-                {
-                    mainFilters.Add($"transpose_opencl=dir={transposeDir}");
-                }
-
-                var outFormat = doOclTonemap ? string.Empty : "nv12";
-                var hwScaleFilter = GetHwScaleFilter("scale", "opencl", outFormat, false, swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH);
-                // hw scale
-                mainFilters.Add(hwScaleFilter);
-            }
-
-            // hw tonemap
-            if (doOclTonemap)
-            {
-                var tonemapFilter = GetHwTonemapFilter(options, "opencl", "nv12", isMjpegEncoder);
-                mainFilters.Add(tonemapFilter);
-            }
-
-            var memoryOutput = false;
-            var isUploadForOclTonemap = isSwDecoder && doOclTonemap;
-            if (isD3d11vaDecoder && isSwEncoder)
-            {
-                memoryOutput = true;
-
-                // OUTPUT nv12 surface(memory)
-                // prefer hwmap to hwdownload on opencl.
-                var hwTransferFilter = hasGraphicalSubs ? "hwdownload" : "hwmap=mode=read";
-                mainFilters.Add(hwTransferFilter);
-                mainFilters.Add("format=nv12");
-            }
-
-            // OUTPUT yuv420p surface
-            if (isSwDecoder && isAmfEncoder && !isUploadForOclTonemap)
-            {
-                memoryOutput = true;
-            }
-
-            if (memoryOutput)
-            {
-                // text subtitles
-                if (hasTextSubs)
-                {
-                    var textSubtitlesFilter = GetTextSubtitlesFilter(state, false, false);
-                    mainFilters.Add(textSubtitlesFilter);
-                }
-            }
-
-            if ((isDxInDxOut || isUploadForOclTonemap) && !hasSubs)
-            {
-                // OUTPUT d3d11(nv12) surface(vram)
-                // reverse-mapping via d3d11-opencl interop.
-                mainFilters.Add("hwmap=derive_device=d3d11va:mode=write:reverse=1");
-                mainFilters.Add("format=d3d11");
-            }
-
-            /* Make sub and overlay filters for subtitle stream */
-            var subFilters = new List<string>();
-            var overlayFilters = new List<string>();
-            if (isDxInDxOut || isUploadForOclTonemap)
-            {
-                if (hasSubs)
-                {
-                    var alphaFormatOpt = string.Empty;
-                    if (hasGraphicalSubs)
-                    {
-                        var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, reqMaxH);
-                        subFilters.Add(subPreProcFilters);
-                        subFilters.Add("format=yuva420p");
-                    }
-                    else if (hasTextSubs)
-                    {
-                        var framerate = state.VideoStream?.RealFrameRate;
-                        var subFramerate = hasAssSubs ? Math.Min(framerate ?? 25, 60) : 10;
-
-                        // alphasrc=s=1280x720:r=10:start=0,format=yuva420p,subtitles,hwupload
-                        var alphaSrcFilter = GetAlphaSrcFilter(state, swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH, subFramerate);
-                        var subTextSubtitlesFilter = GetTextSubtitlesFilter(state, true, true);
-                        subFilters.Add(alphaSrcFilter);
-                        subFilters.Add("format=yuva420p");
-                        subFilters.Add(subTextSubtitlesFilter);
-
-                        alphaFormatOpt = _mediaEncoder.SupportsFilterWithOption(FilterOptionType.OverlayOpenclAlphaFormat)
-                            ? ":alpha_format=premultiplied" : string.Empty;
-                    }
-
-                    subFilters.Add("hwupload=derive_device=opencl");
-                    overlayFilters.Add($"overlay_opencl=eof_action=pass:repeatlast=0{alphaFormatOpt}");
-                    overlayFilters.Add("hwmap=derive_device=d3d11va:mode=write:reverse=1");
-                    overlayFilters.Add("format=d3d11");
-                }
-            }
-            else if (memoryOutput)
-            {
-                if (hasGraphicalSubs)
-                {
-                    var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, reqMaxH);
-                    subFilters.Add(subPreProcFilters);
-                    overlayFilters.Add("overlay=eof_action=pass:repeatlast=0");
-                }
-            }
-
-            return (mainFilters, subFilters, overlayFilters);
+            return new AmfPipelinePlan.Hardware(
+                hardwareInput,
+                hardwareOutput,
+                GetOverwriteColorPropertiesParam(state, tonemap),
+                IsDeinterlaceAvailable(state) ? (hardwareInput ? GetHwDeinterlaceFilter(state, options, "opencl") : CaptureSoftwareDeinterlacing(state, options)) : null,
+                new SoftwareScalingPlan(videoEncoder, state.MediaSource.Video3DFormat, request.Width, request.Height, request.MaxWidth, request.MaxHeight),
+                transpose ? rotation : null,
+                hardwareInput ? GetHwScaleFilter("scale", "opencl", tonemap ? string.Empty : "nv12", false, width, height, request.Width, request.Height, request.MaxWidth, request.MaxHeight) : string.Empty,
+                tonemap ? GetHwTonemapFilter(options, "opencl", "nv12", videoEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase)) : null,
+                subtitles);
         }
 
         private (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) RenderQsvFilterChain(
@@ -4855,7 +4692,7 @@ namespace Tesserafin.Controller.MediaEncoding
             (mainFilters, subFilters, overlayFilters) = options.HardwareAccelerationType switch
             {
                 HardwareAccelerationType.vaapi => RenderVaapiFilterChain(state, options, outputVideoCodec),
-                HardwareAccelerationType.amf => GetAmdVidFilterChain(state, options, outputVideoCodec),
+                HardwareAccelerationType.amf => RenderAmfFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.qsv => RenderQsvFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.nvenc => RenderNvidiaFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.videotoolbox => GetAppleVidFilterChain(state, options, outputVideoCodec),
