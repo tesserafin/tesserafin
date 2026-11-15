@@ -17,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Extensions;
 using Tesserafin.Controller.IO;
+using Tesserafin.Controller.MediaEncoding.Nvidia;
 using Tesserafin.Controller.MediaEncoding.Software;
 using Tesserafin.Controller.Streaming;
 using Tesserafin.Data;
@@ -3569,17 +3570,6 @@ namespace Tesserafin.Controller.MediaEncoding
         public string GetHwDeinterlaceFilter(EncodingJobInfo state, EncodingOptions options, string hwDeintSuffix)
         {
             var doubleRateDeint = options.DeinterlaceDoubleRate && (state.VideoStream?.ReferenceFrameRate ?? 60) <= 30;
-            if (hwDeintSuffix.Contains("cuda", StringComparison.OrdinalIgnoreCase))
-            {
-                var useBwdif = options.DeinterlaceMethod == DeinterlaceMethod.bwdif && _mediaEncoder.SupportsFilter("bwdif_cuda");
-
-                return string.Format(
-                    CultureInfo.InvariantCulture,
-                    "{0}_cuda={1}:-1:0",
-                    useBwdif ? "bwdif" : "yadif",
-                    doubleRateDeint ? "1" : "0");
-            }
-
             if (hwDeintSuffix.Contains("opencl", StringComparison.OrdinalIgnoreCase))
             {
                 var useBwdif = options.DeinterlaceMethod == DeinterlaceMethod.bwdif;
@@ -3857,207 +3847,80 @@ namespace Tesserafin.Controller.MediaEncoding
         /// </summary>
         /// <param name="state">Encoding state.</param>
         /// <param name="options">Encoding options.</param>
-        /// <param name="vidEncoder">Video encoder to use.</param>
+        /// <param name="videoEncoder">Video encoder to use.</param>
         /// <returns>The tuple contains three lists: main, sub and overlay filters.</returns>
-        public (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) GetNvidiaVidFilterChain(
+        private (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) RenderNvidiaFilterChain(
             EncodingJobInfo state,
             EncodingOptions options,
-            string vidEncoder)
+            string videoEncoder)
         {
-            if (options.HardwareAccelerationType != HardwareAccelerationType.nvenc)
-            {
-                return (null, null, null);
-            }
-
-            var vidDecoder = GetHardwareVideoDecoder(state, options) ?? string.Empty;
-            var isSwDecoder = string.IsNullOrEmpty(vidDecoder);
-            var isSwEncoder = !vidEncoder.Contains("nvenc", StringComparison.OrdinalIgnoreCase);
-
-            // legacy cuvid pipeline(copy-back)
-            if ((isSwDecoder && isSwEncoder)
+            var videoDecoder = GetHardwareVideoDecoder(state, options) ?? string.Empty;
+            var softwareDecoder = string.IsNullOrEmpty(videoDecoder);
+            var softwareEncoder = !videoEncoder.Contains("nvenc", StringComparison.OrdinalIgnoreCase);
+            if ((softwareDecoder && softwareEncoder)
                 || !IsCudaFullSupported()
                 || !_mediaEncoder.SupportsFilter("alphasrc"))
             {
-                return RenderSoftwareFilterChain(state, options, vidEncoder);
+                return RenderSoftwareFilterChain(state, options, videoEncoder);
             }
 
-            // preferred nvdec/cuvid + cuda filters + nvenc pipeline
-            return GetNvidiaVidFiltersPrefered(state, options, vidDecoder, vidEncoder);
+            var filters = NvidiaPipelineRenderer.Render(CaptureNvidiaPipeline(state, options, videoDecoder.Contains("cuda", StringComparison.OrdinalIgnoreCase), videoEncoder));
+            return (filters.MainFilters.ToList(), filters.SubFilters.ToList(), filters.OverlayFilters.ToList());
         }
 
-        public (List<string> MainFilters, List<string> SubFilters, List<string> OverlayFilters) GetNvidiaVidFiltersPrefered(
-            EncodingJobInfo state,
-            EncodingOptions options,
-            string vidDecoder,
-            string vidEncoder)
+        // Resolve mutable state, hardware support and subtitle paths only at this boundary.
+        // The renderer owns filter ordering and surface transfers; it cannot re-probe or re-plan.
+        internal NvidiaPipelinePlan CaptureNvidiaPipeline(EncodingJobInfo state, EncodingOptions options, bool cudaInput, string videoEncoder)
         {
-            var inW = state.VideoStream?.Width;
-            var inH = state.VideoStream?.Height;
-            var reqW = state.BaseRequest.Width;
-            var reqH = state.BaseRequest.Height;
-            var reqMaxW = state.BaseRequest.MaxWidth;
-            var reqMaxH = state.BaseRequest.MaxHeight;
-            var threeDFormat = state.MediaSource.Video3DFormat;
-
-            var isNvDecoder = vidDecoder.Contains("cuda", StringComparison.OrdinalIgnoreCase);
-            var isNvencEncoder = vidEncoder.Contains("nvenc", StringComparison.OrdinalIgnoreCase);
-            var isSwDecoder = string.IsNullOrEmpty(vidDecoder);
-            var isSwEncoder = !isNvencEncoder;
-            var isMjpegEncoder = vidEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase);
-            var isCuInCuOut = isNvDecoder && isNvencEncoder;
-
-            var doubleRateDeint = options.DeinterlaceDoubleRate && (state.VideoStream?.ReferenceFrameRate ?? 60) <= 30;
-            var doDeintH2645 = IsDeinterlaceAvailable(state);
-            var doCuTonemap = IsHwTonemapAvailable(state, options);
-
-            var hasSubs = state.SubtitleStream is not null && ShouldEncodeSubtitle(state);
-            var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
-            var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
-            var hasAssSubs = hasSubs
-                && (string.Equals(state.SubtitleStream.Codec, "ass", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(state.SubtitleStream.Codec, "ssa", StringComparison.OrdinalIgnoreCase));
-            var subW = state.SubtitleStream?.Width;
-            var subH = state.SubtitleStream?.Height;
-
-            var rotation = state.VideoStream?.Rotation ?? 0;
-            var transposeDir = rotation == 0 ? string.Empty : GetVideoTransposeDirection(state);
-            var doCuTranspose = !string.IsNullOrEmpty(transposeDir) && _mediaEncoder.SupportsFilter("transpose_cuda");
-            var swapWAndH = Math.Abs(rotation) == 90 && (isSwDecoder || (isNvDecoder && doCuTranspose));
-            var swpInW = swapWAndH ? inH : inW;
-            var swpInH = swapWAndH ? inW : inH;
-
-            /* Make main filters for video stream */
-            var mainFilters = new List<string>();
-
-            mainFilters.Add(GetOverwriteColorPropertiesParam(state, doCuTonemap));
-
-            if (isSwDecoder)
+            var nvencOutput = videoEncoder.Contains("nvenc", StringComparison.OrdinalIgnoreCase);
+            var tonemap = IsHwTonemapAvailable(state, options);
+            var rotation = GetVideoTransposeDirection(state);
+            var transpose = rotation.Length > 0 && _mediaEncoder.SupportsFilter("transpose_cuda");
+            var swap = Math.Abs(state.VideoStream?.Rotation ?? 0) == 90 && (!cudaInput || transpose);
+            var width = swap ? state.VideoStream?.Height : state.VideoStream?.Width;
+            var height = swap ? state.VideoStream?.Width : state.VideoStream?.Height;
+            var request = state.BaseRequest;
+            var cudaFormat = tonemap ? (IsVideoStreamHevcRext(state) ? "p010" : string.Empty) : "yuv420p";
+            NvidiaPipelinePlan.Subtitle subtitles = null;
+            if (state.SubtitleStream is { } subtitle && ShouldEncodeSubtitle(state))
             {
-                // INPUT sw surface(memory)
-                // sw deint
-                if (doDeintH2645)
+                if (subtitle.IsTextSubtitleStream)
                 {
-                    var swDeintFilter = CaptureSoftwareDeinterlacing(state, options);
-                    mainFilters.Add(swDeintFilter);
+                    var cudaOverlay = cudaInput && nvencOutput;
+                    var ass = string.Equals(subtitle.Codec, "ass", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(subtitle.Codec, "ssa", StringComparison.OrdinalIgnoreCase);
+                    var frameRate = ass ? Math.Min(state.VideoStream?.RealFrameRate ?? 25, 60) : 10;
+                    subtitles = cudaOverlay
+                        ? new NvidiaPipelinePlan.Subtitle.CudaText(
+                            GetTextSubtitlesFilter(state, true, true),
+                            GetAlphaSrcFilter(state, width, height, request.Width, request.Height, request.MaxWidth, request.MaxHeight, frameRate),
+                            _mediaEncoder.SupportsFilterWithOption(FilterOptionType.OverlayCudaAlphaFormat))
+                        : new NvidiaPipelinePlan.Subtitle.Text(GetTextSubtitlesFilter(state, false, false));
                 }
-
-                var outFormat = doCuTonemap ? "yuv420p10le" : "yuv420p";
-                var swScaleFilter = SoftwarePipelineRenderer.RenderScaling(new SoftwareScalingPlan(vidEncoder, threeDFormat, reqW, reqH, reqMaxW, reqMaxH));
-                // sw scale
-                mainFilters.Add(swScaleFilter);
-                mainFilters.Add($"format={outFormat}");
-
-                // sw => hw
-                if (doCuTonemap)
+                else
                 {
-                    mainFilters.Add("hwupload=derive_device=cuda");
+                    subtitles = new NvidiaPipelinePlan.Subtitle.Graphical(GetGraphicalSubPreProcessFilters(
+                        width, height, subtitle.Width, subtitle.Height, request.Width, request.Height, request.MaxWidth, request.MaxHeight));
                 }
             }
 
-            if (isNvDecoder)
-            {
-                // INPUT cuda surface(vram)
-                // hw deint
-                if (doDeintH2645)
-                {
-                    var deintFilter = GetHwDeinterlaceFilter(state, options, "cuda");
-                    mainFilters.Add(deintFilter);
-                }
-
-                // hw transpose
-                if (doCuTranspose)
-                {
-                    mainFilters.Add($"transpose_cuda=dir={transposeDir}");
-                }
-
-                var isRext = IsVideoStreamHevcRext(state);
-                var outFormat = doCuTonemap ? (isRext ? "p010" : string.Empty) : "yuv420p";
-                var hwScaleFilter = GetHwScaleFilter("scale", "cuda", outFormat, false, swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH);
-                // hw scale
-                mainFilters.Add(hwScaleFilter);
-            }
-
-            // hw tonemap
-            if (doCuTonemap)
-            {
-                var tonemapFilter = GetHwTonemapFilter(options, "cuda", "yuv420p", isMjpegEncoder);
-                mainFilters.Add(tonemapFilter);
-            }
-
-            var memoryOutput = false;
-            var isUploadForCuTonemap = isSwDecoder && doCuTonemap;
-            if ((isNvDecoder && isSwEncoder) || (isUploadForCuTonemap && hasSubs))
-            {
-                memoryOutput = true;
-
-                // OUTPUT yuv420p surface(memory)
-                mainFilters.Add("hwdownload");
-                mainFilters.Add("format=yuv420p");
-            }
-
-            // OUTPUT yuv420p surface(memory)
-            if (isSwDecoder && isNvencEncoder && !isUploadForCuTonemap)
-            {
-                memoryOutput = true;
-            }
-
-            if (memoryOutput)
-            {
-                // text subtitles
-                if (hasTextSubs)
-                {
-                    var textSubtitlesFilter = GetTextSubtitlesFilter(state, false, false);
-                    mainFilters.Add(textSubtitlesFilter);
-                }
-            }
-
-            // OUTPUT cuda(yuv420p) surface(vram)
-
-            /* Make sub and overlay filters for subtitle stream */
-            var subFilters = new List<string>();
-            var overlayFilters = new List<string>();
-            if (isCuInCuOut)
-            {
-                if (hasSubs)
-                {
-                    var alphaFormatOpt = string.Empty;
-                    if (hasGraphicalSubs)
-                    {
-                        var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, reqMaxH);
-                        subFilters.Add(subPreProcFilters);
-                        subFilters.Add("format=yuva420p");
-                    }
-                    else if (hasTextSubs)
-                    {
-                        var framerate = state.VideoStream?.RealFrameRate;
-                        var subFramerate = hasAssSubs ? Math.Min(framerate ?? 25, 60) : 10;
-
-                        // alphasrc=s=1280x720:r=10:start=0,format=yuva420p,subtitles,hwupload
-                        var alphaSrcFilter = GetAlphaSrcFilter(state, swpInW, swpInH, reqW, reqH, reqMaxW, reqMaxH, subFramerate);
-                        var subTextSubtitlesFilter = GetTextSubtitlesFilter(state, true, true);
-                        subFilters.Add(alphaSrcFilter);
-                        subFilters.Add("format=yuva420p");
-                        subFilters.Add(subTextSubtitlesFilter);
-
-                        alphaFormatOpt = _mediaEncoder.SupportsFilterWithOption(FilterOptionType.OverlayCudaAlphaFormat)
-                            ? ":alpha_format=premultiplied" : string.Empty;
-                    }
-
-                    subFilters.Add("hwupload=derive_device=cuda");
-                    overlayFilters.Add($"overlay_cuda=eof_action=pass:repeatlast=0{alphaFormatOpt}");
-                }
-            }
-            else
-            {
-                if (hasGraphicalSubs)
-                {
-                    var subPreProcFilters = GetGraphicalSubPreProcessFilters(swpInW, swpInH, subW, subH, reqW, reqH, reqMaxW, reqMaxH);
-                    subFilters.Add(subPreProcFilters);
-                    overlayFilters.Add("overlay=eof_action=pass:repeatlast=0");
-                }
-            }
-
-            return (mainFilters, subFilters, overlayFilters);
+            var deinterlace = IsDeinterlaceAvailable(state)
+                ? (cudaInput
+                    ? NvidiaPipelineRenderer.RenderDeinterlacing(
+                        options.DeinterlaceMethod == DeinterlaceMethod.bwdif && _mediaEncoder.SupportsFilter("bwdif_cuda"),
+                        options.DeinterlaceDoubleRate && (state.VideoStream?.ReferenceFrameRate ?? 60) <= 30)
+                    : CaptureSoftwareDeinterlacing(state, options))
+                : null;
+            return new NvidiaPipelinePlan(
+                cudaInput,
+                nvencOutput,
+                GetOverwriteColorPropertiesParam(state, tonemap),
+                deinterlace,
+                cudaInput && transpose ? rotation : null,
+                new SoftwareScalingPlan(videoEncoder, state.MediaSource.Video3DFormat, request.Width, request.Height, request.MaxWidth, request.MaxHeight),
+                cudaInput ? GetHwScaleFilter("scale", "cuda", cudaFormat, false, width, height, request.Width, request.Height, request.MaxWidth, request.MaxHeight) : string.Empty,
+                tonemap ? GetHwTonemapFilter(options, "cuda", "yuv420p", videoEncoder.Contains("mjpeg", StringComparison.OrdinalIgnoreCase)) : null,
+                subtitles);
         }
 
         /// <summary>
@@ -6139,7 +6002,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 HardwareAccelerationType.vaapi => GetVaapiVidFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.amf => GetAmdVidFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.qsv => GetIntelVidFilterChain(state, options, outputVideoCodec),
-                HardwareAccelerationType.nvenc => GetNvidiaVidFilterChain(state, options, outputVideoCodec),
+                HardwareAccelerationType.nvenc => RenderNvidiaFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.videotoolbox => GetAppleVidFilterChain(state, options, outputVideoCodec),
                 HardwareAccelerationType.rkmpp => GetRkmppVidFilterChain(state, options, outputVideoCodec),
                 _ => RenderSoftwareFilterChain(state, options, outputVideoCodec),

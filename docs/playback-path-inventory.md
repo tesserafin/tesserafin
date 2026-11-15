@@ -380,10 +380,30 @@ one rendering implementation, including hardware copy-back consumers.
 The former public `GetSwVidFilterChain`, `GetSwScaleFilter` and `GetSwDeinterlaceFilter` methods
 are removed. Frame-rate insertion, map/filter-graph assembly, codec/bitrate/quality selection and
 process execution remain outside this extraction. The diagnostic `TranscodePlan` is not made an
-execution authority by this change. Hardware-only renderers, global playback switches and all
-remaining StreamInfo/StreamBuilder consumers above remain to be migrated.
+execution authority by this change. The NVIDIA filter renderer is extracted in §13. Other hardware
+renderers, global playback switches and all remaining StreamInfo/StreamBuilder consumers above
+remain to be migrated.
 
 The Controller test suite checks snapshot isolation and forbids runtime/configuration services
 in the renderer. Real FFmpeg/ffprobe tests validate software output; existing film direct-play,
 remux and transcode integration cases validate their HTTP/session/job lifecycle. No new browser,
 physical-device, hardware, HDR or 3D acceptance is claimed.
+
+## 13. NVIDIA filter renderer (consolidation step 5, candidate)
+
+The NVIDIA production routing now calls `NvidiaPipelineRenderer` with a captured immutable
+`NvidiaPipelinePlan`; this does not select a new playback decision. The renderer owns the
+main/subtitle/overlay sequences and CUDA upload/download ordering. Shared geometry, capability
+resolution and subtitle-path preparation stay at the capture boundary. Software/copy-back
+routing still consumes the single software renderer. Common FPS insertion and command assembly
+stay outside the renderer.
+
+`GetNvidiaVidFilterChain` and `GetNvidiaVidFiltersPrefered` are removed, with no public forwarding
+methods. CUDA deinterlacing is rendered in the NVIDIA renderer; the common helper retains only
+the other backends. The architecture guard covers both renderer namespaces, immutable captured
+values and the removed public entry points. No forbidden-dependency baseline is expanded.
+
+67 static pre-extraction command graphs cover production routing with mocked capabilities.
+These are supplemented by snapshot-isolation tests and software FFmpeg/session regression tests.
+There is no claim of real NVIDIA hardware acceptance, HDR/3D acceptance or completion of step 5.
+All remaining StreamInfo/StreamBuilder consumers in §6 are unchanged by this extraction.

@@ -6,15 +6,18 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Tesserafin.Controller.MediaEncoding;
+using Tesserafin.Controller.MediaEncoding.Nvidia;
 using Tesserafin.Controller.MediaEncoding.Software;
 using Xunit;
 
 namespace Tesserafin.Controller.Tests.MediaEncoding;
 
-public sealed partial class SoftwarePipelineArchitectureTests
+public sealed partial class PipelineRendererArchitectureTests
 {
-    [Fact]
-    public void RendererSources_ReachOnlyImmutableValuesAndFormatting()
+    [Theory]
+    [InlineData("Software")]
+    [InlineData("Nvidia")]
+    public void RendererSources_ReachOnlyImmutableValuesAndFormatting(string backend)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Tesserafin.sln")))
@@ -23,12 +26,13 @@ public sealed partial class SoftwarePipelineArchitectureTests
         }
 
         Assert.NotNull(directory);
-        var root = Path.Combine(directory.FullName, "Tesserafin.Controller", "MediaEncoding", "Software");
+        var root = Path.Combine(directory.FullName, "Tesserafin.Controller", "MediaEncoding", backend);
         var files = Directory.GetFiles(root, "*.cs");
         Assert.NotEmpty(files);
         var allowedImports = new HashSet<string>(StringComparer.Ordinal)
         {
             "System", "System.Collections.Immutable", "System.Globalization", "Tesserafin.Model.Entities",
+            "Tesserafin.Controller.MediaEncoding.Software",
         };
         foreach (var file in files)
         {
@@ -42,18 +46,20 @@ public sealed partial class SoftwarePipelineArchitectureTests
         }
     }
 
-    [Fact]
-    public void CapturedPlans_ContainOnlyImmutableValues()
+    [Theory]
+    [InlineData(typeof(SoftwarePipelinePlan))]
+    [InlineData(typeof(NvidiaPipelinePlan))]
+    public void CapturedPlans_ContainOnlyImmutableValues(Type planType)
     {
-        var types = typeof(SoftwarePipelinePlan).Assembly.GetTypes()
-            .Where(type => type.Namespace == typeof(SoftwarePipelinePlan).Namespace && type != typeof(SoftwarePipelineRenderer));
+        var types = planType.Assembly.GetTypes()
+            .Where(type => type.Namespace == planType.Namespace && !type.IsAbstract);
         foreach (var type in types)
         {
             foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
             {
                 var valueType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
                 Assert.True(
-                    valueType.IsPrimitive || valueType.IsEnum || valueType == typeof(string) || valueType == typeof(Type) || valueType.Namespace == type.Namespace,
+                    valueType.IsPrimitive || valueType.IsEnum || valueType == typeof(string) || valueType == typeof(Type) || valueType.Namespace == type.Namespace || valueType == typeof(SoftwareScalingPlan),
                     $"{type.Name}.{property.Name} must not retain a mutable request/configuration object.");
                 if (property.SetMethod is { } setter)
                 {
@@ -67,7 +73,9 @@ public sealed partial class SoftwarePipelineArchitectureTests
     [InlineData("GetSwVidFilterChain")]
     [InlineData("GetSwScaleFilter")]
     [InlineData("GetSwDeinterlaceFilter")]
-    public void EncodingHelper_HasNoFormerSoftwareImplementationEntryPoints(string method)
+    [InlineData("GetNvidiaVidFilterChain")]
+    [InlineData("GetNvidiaVidFiltersPrefered")]
+    public void EncodingHelper_HasNoFormerRendererImplementationEntryPoints(string method)
         => Assert.Null(typeof(EncodingHelper).GetMethod(method));
 
     [GeneratedRegex(@"^using\s+([A-Za-z0-9_.]+)\s*;", RegexOptions.Multiline)]

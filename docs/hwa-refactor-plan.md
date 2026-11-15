@@ -1,6 +1,7 @@
 # Plan implémentation refactor pipeline FFmpeg (préalable autodétection HWA)
 
-Basé sur analyse graphify + lecture code réel. Fichiers/lignes cités = état actuel du repo.
+Les premières sections décrivent les extractions implémentées sur les branches de consolidation.
+Le diagnostic et le séquencement historiques sont conservés ensuite avec leurs anciennes références.
 
 ## Première extraction logicielle — consolidation, 2026-11-14
 
@@ -38,6 +39,39 @@ Le retrait des trois méthodes est une rupture d'ABI autorisée par la politique
 La comparaison reste exécutée et ses différences restent visibles. Cette branche reprend,
 à l'identique de #412, le mode explicite `ABI_ALLOW_BREAKING=1` dans le verdict CI : erreurs
 d'outillage, artefacts manquants, manifeste invalide et zéro comparaison restent bloquants.
+
+## Extraction NVIDIA/CUDA — consolidation, 2026-11-14
+
+Cette tranche suit #417 et reste dans l'étape 5 de #129. Elle ne change pas le choix du codec,
+du périphérique ou du parcours Sessions. `EncodingHelper` passe de 7 878 à 7 741 lignes.
+
+- `RenderNvidiaFilterChain` reste un point de routage privé : si le pipeline CUDA n'est pas
+  disponible, il utilise le renderer logiciel unique. Ce parcours logiciel est une décision
+  d'exécution selon les capacités, pas une couche de compatibilité avec un ancien serveur.
+- `CaptureNvidiaPipeline` résout une fois les surfaces d'entrée/sortie, les capacités, les
+  dimensions après rotation, les paramètres de tone mapping et les filtres de sous-titres.
+  Les fonctions partagées de géométrie et de formatage tone mapping restent partagées ;
+  leurs résultats sont des chaînes immuables, sans callback vers le job ou les services.
+- `NvidiaPipelineRenderer` possède l'ordre des filtres et les transferts mémoire/CUDA,
+  le désentrelacement CUDA, la rotation et les graphes d'overlay. Les sous-titres texte en
+  mémoire, texte sur source alpha CUDA et graphiques sont des variantes exclusives.
+  Le scaling logiciel réutilise `SoftwarePipelineRenderer`, y compris le format 3D existant.
+- Les entrées publiques `GetNvidiaVidFilterChain` et `GetNvidiaVidFiltersPrefered` sont
+  supprimées, ainsi que la branche CUDA de `GetHwDeinterlaceFilter`. Aucun forwarder,
+  flag ou second renderer n'est conservé. Le mapping, les FPS et la commande finale restent
+  dans l'assembleur commun.
+
+La matrice de 67 graphes a été enregistrée sur l'implémentation de #417 (`f402a38783`), avant
+l'extraction, puis comparée par `GetVideoProcessingFilterParam`, le point d'entrée de production.
+Elle couvre mémoire/CUDA, NVENC/logiciel/MJPEG, SDR/HDR, sous-titres SRT/ASS/PGS, rotation,
+désentrelacement et capacités optionnelles absentes. Le fichier de référence est statique ;
+les tests ne le régénèrent pas. D'autres contrôles vérifient la capture indépendante des
+mutations du job, de la configuration et des capacités, les sorties immuables, et les mêmes
+interdictions de services/I/O que pour le renderer logiciel.
+
+Ces graphes caractérisent le rendu des commandes ; ils ne prouvent pas une exécution CUDA,
+NVENC, HDR ou Dolby Vision sur matériel NVIDIA. La validation des sessions avec FFmpeg logiciel
+reste distincte. Les autres backends et la sélection des encodeurs/décodeurs restent à extraire.
 
 Les sections suivantes conservent le diagnostic et le séquencement historiques ; leurs noms
 `MediaBrowser.*` et numéros de ligne ne décrivent pas l'arbre après cette extraction.
