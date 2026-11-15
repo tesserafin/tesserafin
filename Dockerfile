@@ -28,9 +28,9 @@ ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet@sha256:1fa23fc4872d95fd71c2833
 # Pinned BY MANIFEST DIGEST, never by tag: the tag is recorded for provenance
 # only. WEB_VCS_REF is the exact tesserafin-web commit the digest was built from
 # and must be kept in step with it.
-ARG WEB_ASSETS_IMAGE=ghcr.io/tesserafin/tesserafin-web-assets@sha256:ecf684b15b26587a7a824e739433da24dca0dbfae7aeb093b1a39793f7bebf41
-ARG WEB_ASSETS_TAG=ghcr.io/tesserafin/tesserafin-web-assets:0.3.0-dev.467b27e43eb1
-ARG WEB_VCS_REF=467b27e43eb1136d3179864bb512f7c306d5b22d
+ARG WEB_ASSETS_IMAGE=ghcr.io/tesserafin/tesserafin-web-assets@sha256:e027944be561614a2ae62a0357975888ecc1e0775718acf4c21a5f3a68b8ebf0
+ARG WEB_ASSETS_TAG=ghcr.io/tesserafin/tesserafin-web-assets:0.3.0-dev.6112f44a2ed2
+ARG WEB_VCS_REF=6112f44a2ed21dc76732fb0551bd87671ed50744
 ARG WEB_VERSION=0.3.0
 
 # ---- FFmpeg: the accepted Tesserafin runtime (F0), never a downloaded binary ----

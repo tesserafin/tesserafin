@@ -130,9 +130,9 @@ every artifact derives from it.
 
 | Input | Value |
 | --- | --- |
-| Tesserafin Web commit | `467b27e43eb1136d3179864bb512f7c306d5b22d` |
-| Tesserafin Web assets image | `ghcr.io/tesserafin/tesserafin-web-assets@sha256:ecf684b15b26587a7a824e739433da24dca0dbfae7aeb093b1a39793f7bebf41` |
-| Tesserafin Web payload SHA-256 | `c7174ab97228d1efd7d56462de659b261d54895b380aa6428c92c727fb3f90b0` |
+| Tesserafin Web commit | `6112f44a2ed21dc76732fb0551bd87671ed50744` |
+| Tesserafin Web assets image | `ghcr.io/tesserafin/tesserafin-web-assets@sha256:e027944be561614a2ae62a0357975888ecc1e0775718acf4c21a5f3a68b8ebf0` |
+| Tesserafin Web payload SHA-256 | `b1dd23a2869387565c49ce9b038b5d658abda88ac298bca34682d9ae74c73596` |
 | FFmpeg runtime revision | `7.1.4-tesserafin.1` |
 | FFmpeg upstream commit | `d4590e12452f94d40e413caecb34b08de608353b` |
 
