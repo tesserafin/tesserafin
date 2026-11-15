@@ -27,7 +27,7 @@ public class HardwareBackendProbeTests
     {
         Assert.SkipUnless(OperatingSystem.IsLinux() && File.Exists(RealVaapiRenderNode), "requires a real VAAPI render node - not present in this environment");
 
-        var probe = new HardwareBackendProbe(new FfmpegProcessRunner(), NullLogger.Instance);
+        var probe = new HardwareBackendProbe(new FfmpegProcessRunner(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner>.Instance), NullLogger.Instance);
         var arguments = BuildVaapiArguments(RealVaapiRenderNode);
 
         var result = await probe.ProbeAsync("ffmpeg", arguments, TestContext.Current.CancellationToken);
@@ -40,7 +40,7 @@ public class HardwareBackendProbeTests
     {
         Assert.SkipUnless(OperatingSystem.IsLinux(), "VAAPI is Linux-only");
 
-        var probe = new HardwareBackendProbe(new FfmpegProcessRunner(), NullLogger.Instance);
+        var probe = new HardwareBackendProbe(new FfmpegProcessRunner(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner>.Instance), NullLogger.Instance);
         var arguments = BuildVaapiArguments("/dev/dri/renderD999");
 
         var result = await probe.ProbeAsync("ffmpeg", arguments, TestContext.Current.CancellationToken);

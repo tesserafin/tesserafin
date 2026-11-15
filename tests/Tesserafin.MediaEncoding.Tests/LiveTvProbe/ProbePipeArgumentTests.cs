@@ -72,7 +72,7 @@ public sealed class ProbePipeArgumentTests
         Mock.Of<ILocalizationManager>(),
         new ConfigurationBuilder().Build(),
         Mock.Of<IServerConfigurationManager>(),
-        new FfmpegProcessRunner());
+        new FfmpegProcessRunner(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner>.Instance));
 
     private static MediaInfoRequest Request(IDirectStreamProvider? reader) => new()
     {

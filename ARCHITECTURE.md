@@ -232,8 +232,13 @@ This is the headline rewrite and has its own section below (§5).
   executor validates exit status and every nonempty output, then removes the attempt's outputs
   on failure/cancellation before releasing cache locks. Attachment output names use sanitized
   basenames prefixed by stream index; embedded paths never select filesystem destinations.
-  Image processes retain their existing lifecycle; interval trickplay extraction also receives
-  the captured child-environment overrides.
+  `FfmpegImageScheduler` owns image concurrency and shutdown. It registers queued/running
+  attempts before launch and waits for cancellation, native exit and cleanup before releasing
+  their permits or disposing. Images/trickplay use the runner's bounded image profile, retaining
+  captured child-environment overrides and optional priority. Trickplay renews its inactivity
+  deadline only when a new nonempty JPEG appears; single-image extraction has a total timeout.
+  General media-info probing (including its live input pump) still has its existing process
+  wrapper and remains separate work.
   Argument serialization remains a quoted string, not a tokenized argv vector.
 
 **Hardware acceleration** was rewritten into a decision-first design

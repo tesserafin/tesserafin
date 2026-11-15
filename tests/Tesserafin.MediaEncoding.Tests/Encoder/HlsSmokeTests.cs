@@ -77,7 +77,7 @@ public class HlsSmokeTests
         var argumentLine = string.Join(' ', arguments);
 
         var command = FfmpegCommand.FromArgumentLine("ffmpeg", argumentLine, workingDirectory: workDir.Path);
-        var runner = new FfmpegProcessRunner();
+        var runner = new FfmpegProcessRunner(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner>.Instance);
 
         var result = await runner.RunProbeAsync(command, TimeSpan.FromSeconds(60), CancellationToken.None);
 

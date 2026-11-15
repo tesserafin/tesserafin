@@ -192,7 +192,7 @@ public sealed class PlaybackPingOwnershipTests
             Mock.Of<IMediaEncoder>(),
             Mock.Of<IMediaSourceManager>(),
             Mock.Of<IAttachmentExtractor>(),
-            new Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner());
+            new Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner>.Instance));
 
         return (manager, sessionManager);
     }

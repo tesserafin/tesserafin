@@ -34,7 +34,7 @@ internal sealed class ExtractionTestContext : IDisposable
 
     public Mock<IMediaEncoder> Encoder { get; } = new();
 
-    public FfmpegProcessRunner Runner { get; } = new();
+    public FfmpegProcessRunner Runner { get; } = new(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner>.Instance);
 
     public FfmpegFileExecutor Executor => new(Runner, FileSystem.Object, NullLogger.Instance);
 

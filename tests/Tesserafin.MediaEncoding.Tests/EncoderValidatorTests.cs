@@ -7,7 +7,7 @@ namespace Tesserafin.MediaEncoding.Tests
 {
     public class EncoderValidatorTests
     {
-        private readonly EncoderValidator _encoderValidator = new EncoderValidator(new NullLogger<EncoderValidatorTests>(), "ffmpeg", new FfmpegProcessRunner());
+        private readonly EncoderValidator _encoderValidator = new EncoderValidator(new NullLogger<EncoderValidatorTests>(), "ffmpeg", new FfmpegProcessRunner(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner>.Instance));
 
         [Theory]
         [ClassData(typeof(GetFFmpegVersionTestData))]

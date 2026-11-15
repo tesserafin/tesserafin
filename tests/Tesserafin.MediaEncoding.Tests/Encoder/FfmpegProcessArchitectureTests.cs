@@ -31,6 +31,20 @@ public sealed partial class FfmpegProcessArchitectureTests
         Assert.False(NativeProcessCreationOrLaunch().IsMatch(source), $"{file} must run finite commands through IFfmpegProcessRunner.");
     }
 
+    [Fact]
+    public void ImageScheduler_HasNoNativeProcessLaunch()
+        => Assert.DoesNotMatch(NativeProcessCreationOrLaunch(), Source("Tesserafin.MediaEncoding", "Encoder", "FfmpegImageScheduler.cs"));
+
+    [Fact]
+    public void MediaEncoderImagePaths_HaveNoNativeProcessLaunch()
+    {
+        var source = Source("Tesserafin.MediaEncoding", "Encoder", "MediaEncoder.cs");
+        var start = source.IndexOf("private async Task<string> ExtractImageInternal(", StringComparison.Ordinal);
+        var end = source.IndexOf("public string GetTimeParameter(long ticks)", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        Assert.DoesNotMatch(NativeProcessCreationOrLaunch(), source[start..end]);
+    }
+
     private static string Source(params string[] components)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

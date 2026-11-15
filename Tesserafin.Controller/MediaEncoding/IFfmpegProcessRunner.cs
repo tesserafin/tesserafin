@@ -33,6 +33,15 @@ public interface IFfmpegProcessRunner
     /// <returns>The exit code, bounded diagnostics and timeout outcome.</returns>
     Task<FfmpegProcessResult> RunFileAsync(FfmpegCommand command, TimeSpan timeout, CancellationToken cancellationToken);
 
+    /// <summary>Runs an image command, extending its deadline only when new output is observed.</summary>
+    /// <param name="command">The immutable invocation and child environment.</param>
+    /// <param name="timeout">Maximum wait without new output, or total time when no observer is supplied.</param>
+    /// <param name="hasProgress">An optional observer returning true only for new nonempty image files.</param>
+    /// <param name="priority">Requested child priority; inability to set it is diagnostic only.</param>
+    /// <param name="cancellationToken">Cancellation kills and waits for the child before throwing.</param>
+    /// <returns>Exit status and bounded, fully drained diagnostics.</returns>
+    Task<FfmpegProcessResult> RunImageAsync(FfmpegCommand command, TimeSpan timeout, Func<bool>? hasProgress, ProcessPriorityClass priority, CancellationToken cancellationToken);
+
     /// <summary>
     /// Starts <paramref name="command"/>, drains stdout and stderr concurrently, and waits for
     /// exit or <paramref name="timeout"/>, whichever comes first.

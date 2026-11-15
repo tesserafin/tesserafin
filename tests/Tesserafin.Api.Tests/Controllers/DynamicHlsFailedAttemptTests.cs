@@ -797,7 +797,7 @@ public sealed partial class DynamicHlsFailedAttemptTests : IDisposable
             mediaEncoder.Object,
             mediaSourceManager.Object,
             Mock.Of<IAttachmentExtractor>(),
-            new Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner())
+            new Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner>.Instance))
         {
             TimeProvider = _clock
         };

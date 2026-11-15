@@ -11,7 +11,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using AsyncKeyedLock;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common;
@@ -62,7 +61,7 @@ namespace Tesserafin.MediaEncoding.Encoder
         private readonly IServerConfigurationManager _serverConfig;
         private readonly string _startupOptionFFmpegPath;
 
-        private readonly AsyncNonKeyedLocker _thumbnailResourcePool;
+        private readonly FfmpegImageScheduler _images;
 
         private readonly Lock _runningProcessesLock = new();
         private readonly List<ProcessWrapper> _runningProcesses = new List<ProcessWrapper>();
@@ -134,7 +133,7 @@ namespace Tesserafin.MediaEncoding.Encoder
                 semaphoreCount = Environment.ProcessorCount;
             }
 
-            _thumbnailResourcePool = new(semaphoreCount);
+            _images = new FfmpegImageScheduler(processRunner, fileSystem, logger, semaphoreCount);
         }
 
         /// <inheritdoc />
@@ -815,6 +814,14 @@ namespace Tesserafin.MediaEncoding.Encoder
                 {
                     throw;
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (ObjectDisposedException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "I-frame image extraction failed, will attempt standard way. Input: {Arguments}", inputArgument);
@@ -866,7 +873,6 @@ namespace Tesserafin.MediaEncoding.Encoder
             var outputExtension = targetFormat?.GetExtension() ?? ".jpg";
 
             var tempExtractPath = Path.Combine(_configurationManager.ApplicationPaths.TempDirectory, Guid.NewGuid() + outputExtension);
-            Directory.CreateDirectory(Path.GetDirectoryName(tempExtractPath));
 
             // deint -> scale -> thumbnail -> tonemap.
             // put the SW tonemap right after the thumbnail to do it only once to reduce cpu usage.
@@ -956,54 +962,17 @@ namespace Tesserafin.MediaEncoding.Encoder
                 }
             }
 
-            var process = new Process
+            var timeoutMs = _configurationManager.Configuration.ImageExtractionTimeoutMs;
+            if (timeoutMs <= 0)
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    FileName = _ffmpegPath,
-                    Arguments = args,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    ErrorDialog = false,
-                },
-                EnableRaisingEvents = true
-            };
-
-            _logger.LogDebug("{ProcessFileName} {ProcessArguments}", process.StartInfo.FileName, process.StartInfo.Arguments);
-
-            using (var processWrapper = new ProcessWrapper(process, this))
-            {
-                using (await _thumbnailResourcePool.LockAsync(cancellationToken).ConfigureAwait(false))
-                {
-                    StartProcess(processWrapper);
-
-                    var timeoutMs = _configurationManager.Configuration.ImageExtractionTimeoutMs;
-                    if (timeoutMs <= 0)
-                    {
-                        timeoutMs = enableHdrExtraction ? DefaultHdrImageExtractionTimeout : DefaultSdrImageExtractionTimeout;
-                    }
-
-                    try
-                    {
-                        await process.WaitForExitAsync(TimeSpan.FromMilliseconds(timeoutMs)).ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException ex)
-                    {
-                        process.Kill(true);
-                        throw new FfmpegException(string.Format(CultureInfo.InvariantCulture, "ffmpeg image extraction timed out for {0} after {1}ms", inputPath, timeoutMs), ex);
-                    }
-                }
-
-                var file = _fileSystem.GetFileInfo(tempExtractPath);
-
-                if (processWrapper.ExitCode > 0 || !file.Exists || file.Length == 0)
-                {
-                    throw new FfmpegException(string.Format(CultureInfo.InvariantCulture, "ffmpeg image extraction failed for {0}", inputPath));
-                }
-
-                return tempExtractPath;
+                timeoutMs = enableHdrExtraction ? DefaultHdrImageExtractionTimeout : DefaultSdrImageExtractionTimeout;
             }
+
+            return await _images.ExtractImageAsync(
+                FfmpegCommand.FromArgumentLine(_ffmpegPath, "-nostdin -y " + args),
+                tempExtractPath,
+                TimeSpan.FromMilliseconds(timeoutMs),
+                cancellationToken).ConfigureAwait(false);
         }
 
         /// <inheritdoc />
@@ -1173,7 +1142,6 @@ namespace Tesserafin.MediaEncoding.Encoder
 
             // Output arguments
             var targetDirectory = Path.Combine(_configurationManager.ApplicationPaths.TempDirectory, Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(targetDirectory);
             var outputPath = Path.Combine(targetDirectory, "%08d.jpg");
 
             // Final command arguments
@@ -1190,109 +1158,14 @@ namespace Tesserafin.MediaEncoding.Encoder
                 "image2",
                 outputPath);
 
-            // Start ffmpeg process
-            var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    FileName = _ffmpegPath,
-                    Arguments = args,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    ErrorDialog = false,
-                },
-                EnableRaisingEvents = true
-            };
-
-            foreach (var (key, value) in input.EnvironmentVariables)
-            {
-                process.StartInfo.Environment[key] = value;
-            }
-
-            var processDescription = string.Format(CultureInfo.InvariantCulture, "{0} {1}", process.StartInfo.FileName, process.StartInfo.Arguments);
-            _logger.LogInformation("Trickplay generation: {ProcessDescription}", processDescription);
-
-            using (var processWrapper = new ProcessWrapper(process, this))
-            {
-                bool ranToCompletion = false;
-
-                using (await _thumbnailResourcePool.LockAsync(cancellationToken).ConfigureAwait(false))
-                {
-                    StartProcess(processWrapper);
-
-                    // Set process priority
-                    if (priority.HasValue)
-                    {
-                        try
-                        {
-                            processWrapper.Process.PriorityClass = priority.Value;
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogDebug(ex, "Unable to set process priority to {Priority} for {Description}", priority.Value, processDescription);
-                        }
-                    }
-
-                    // Need to give ffmpeg enough time to make all the thumbnails, which could be a while,
-                    // but we still need to detect if the process hangs.
-                    // Making the assumption that as long as new jpegs are showing up, everything is good.
-
-                    bool isResponsive = true;
-                    int lastCount = 0;
-                    var timeoutMs = _configurationManager.Configuration.ImageExtractionTimeoutMs;
-                    timeoutMs = timeoutMs <= 0 ? DefaultHdrImageExtractionTimeout : timeoutMs;
-
-                    while (isResponsive && !cancellationToken.IsCancellationRequested)
-                    {
-                        try
-                        {
-                            await process.WaitForExitAsync(TimeSpan.FromMilliseconds(timeoutMs)).ConfigureAwait(false);
-
-                            ranToCompletion = true;
-                            break;
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            // We don't actually expect the process to be finished in one timeout span, just that one image has been generated.
-                        }
-
-                        var jpegCount = _fileSystem.GetFilePaths(targetDirectory).Count();
-
-                        isResponsive = jpegCount > lastCount;
-                        lastCount = jpegCount;
-                    }
-
-                    if (!ranToCompletion)
-                    {
-                        if (!isResponsive)
-                        {
-                            _logger.LogInformation("Trickplay process unresponsive.");
-                        }
-
-                        _logger.LogInformation("Stopping trickplay extraction.");
-                        StopProcess(processWrapper, 1000);
-                    }
-                }
-
-                if (!ranToCompletion || processWrapper.ExitCode != 0)
-                {
-                    // Cleanup temp folder here, because the targetDirectory is not returned and the cleanup for failed ffmpeg process is not possible for caller.
-                    // Ideally the ffmpeg should not write any files if it fails, but it seems like it is not guaranteed.
-                    try
-                    {
-                        Directory.Delete(targetDirectory, true);
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.LogError(e, "Failed to delete ffmpeg temp directory {TargetDirectory}", targetDirectory);
-                    }
-
-                    throw new FfmpegException(string.Format(CultureInfo.InvariantCulture, "ffmpeg image extraction failed for {0}", processDescription));
-                }
-
-                return targetDirectory;
-            }
+            var timeoutMs = _configurationManager.Configuration.ImageExtractionTimeoutMs;
+            timeoutMs = timeoutMs <= 0 ? DefaultHdrImageExtractionTimeout : timeoutMs;
+            return await _images.ExtractIntervalAsync(
+                FfmpegCommand.FromArgumentLine(_ffmpegPath, "-nostdin -y " + args, input.EnvironmentVariables),
+                targetDirectory,
+                TimeSpan.FromMilliseconds(timeoutMs),
+                priority,
+                cancellationToken).ConfigureAwait(false);
         }
 
         public string GetTimeParameter(long ticks)
@@ -1399,8 +1272,14 @@ namespace Tesserafin.MediaEncoding.Encoder
         {
             if (dispose)
             {
-                StopProcesses();
-                _thumbnailResourcePool.Dispose();
+                try
+                {
+                    _images.Dispose();
+                }
+                finally
+                {
+                    StopProcesses();
+                }
             }
         }
 

@@ -21,7 +21,7 @@ public class FfmpegProcessRunnerTests
 {
     private static readonly TimeSpan _ample = TimeSpan.FromSeconds(30);
 
-    private readonly FfmpegProcessRunner _runner = new();
+    private readonly FfmpegProcessRunner _runner = new(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner>.Instance);
 
     [Fact]
     public async Task RunProbeAsync_FloodsBothStreamsPastPipeBuffer_NoDeadlock()

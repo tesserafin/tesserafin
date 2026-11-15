@@ -563,3 +563,45 @@ consolidation ratchet; real software FFmpeg film/OpenAPI/HLS/progressive integra
 Injecting native construction into either extractor fails its architecture check. Removing
 file-content validation fails both the missing-output and empty-output controls; restoring
 the implementation passes the full MediaEncoding suite.
+
+## 19. Image/trickplay scheduling (consolidation step 5, candidate)
+
+`MediaEncoder` no longer constructs or controls native processes in its image/trickplay paths.
+`FfmpegImageScheduler` owns the shared concurrency permits and an attempt registry, including
+queued attempts. Registration happens before the runner can launch. Closing the scheduler
+rejects new work, cancels active/queued work, waits for every attempt's runner and cleanup,
+then disposes the permit pool. Concurrent disposal waits for the same shutdown completion.
+`MediaEncoder.Dispose` closes this scheduler before stopping its remaining general probes.
+
+`IFfmpegProcessRunner.RunImageAsync` shares finite-process creation, closed stdin, bounded
+diagnostic drains, kill-tree and wait-for-exit with the file/probe profiles. Child priority is
+optional at the OS level: failure is logged without changing another attempt's settings.
+The runner receives its logger through DI; no compatibility constructor or native image launch
+fallback remains. Hardware initialization environment remains part of the captured command.
+
+Single images retain the configured total timeout (SDR/HDR defaults unchanged). Trickplay
+retains the configured inactivity window and renews it only when another nonempty JPEG appears;
+zero-byte files, unchanged images and unrelated files do not count as progress. Observer I/O
+errors propagate after native shutdown. Cancellation overrides a healthy progress observer.
+Native exit 0 still requires real output; failed attempts clean their own file/directory before
+releasing a permit. Queued cancellation creates no output. Cancellation and disposal do not
+trigger the I-frame retry; content/decoder failures retain the existing standard-decode retry.
+
+Twenty-two new cases cover permit limits, queued cancellation, progress observation, immutable
+command/priority handoff, missing/failed/timed-out output, concurrent disposal, real child
+shutdown, inactivity renewal, observer failure and cancellation without retry. Real software
+FFmpeg produces a JPEG and two interval sequences (keyframe-only on/off); JPEG signatures are
+checked. Two architecture guards reject native process creation/launch in the scheduler and
+the image region of `MediaEncoder` without pretending its remaining probe wrapper is removed.
+
+General media probing and its live-stream pump, transactional cache publication and tokenized
+argv remain separate work. No OpenAPI, SDK, project/package or ratchet-baseline change. Step 5
+and remaining playback consumers in §6 stay open; native GPU/Windows/macOS acceptance is not
+provided by these Linux software tests.
+
+Local validation: Controller 1,673 passed / 2 hardware skips; MediaEncoding 366 passed /
+2 platform/hardware skips; API 650 passed; Server 528 passed, including the unchanged
+consolidation ratchet; real software FFmpeg film/OpenAPI/HLS/progressive integration 94 passed.
+Native-launch injections fail both image architecture guards. Removing the configured permit
+limit fails both concurrency cases. Reintroducing the cancellation/disposal retry fails both
+public image-reader checks. Restoring source passes the full MediaEncoding suite.

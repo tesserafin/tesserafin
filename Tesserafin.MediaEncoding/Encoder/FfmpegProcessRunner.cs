@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.MediaEncoding;
 
 namespace Tesserafin.MediaEncoding.Encoder;
@@ -10,6 +11,12 @@ namespace Tesserafin.MediaEncoding.Encoder;
 /// <inheritdoc cref="IFfmpegProcessRunner" />
 public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
 {
+    private readonly ILogger<FfmpegProcessRunner> _logger;
+
+    /// <summary>Initializes a new instance of the <see cref="FfmpegProcessRunner"/> class.</summary>
+    /// <param name="logger">Diagnostics for optional native process settings.</param>
+    public FfmpegProcessRunner(ILogger<FfmpegProcessRunner> logger) => _logger = logger;
+
     /// <inheritdoc />
     public Process CreateTranscodeProcess(FfmpegCommand command)
         => CreateProcess(command, redirectOutput: false, redirectInput: true, raiseEvents: true);
@@ -30,7 +37,11 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
     public Task<FfmpegProcessResult> RunFileAsync(FfmpegCommand command, TimeSpan timeout, CancellationToken cancellationToken)
         => RunAsync(command, timeout, standardInput: string.Empty, outputCaptureLimit: 64 * 1024, cancellationToken);
 
-    private static async Task<FfmpegProcessResult> RunAsync(FfmpegCommand command, TimeSpan timeout, string? standardInput, int? outputCaptureLimit, CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public Task<FfmpegProcessResult> RunImageAsync(FfmpegCommand command, TimeSpan timeout, Func<bool>? hasProgress, ProcessPriorityClass priority, CancellationToken cancellationToken)
+        => RunAsync(command, timeout, standardInput: string.Empty, outputCaptureLimit: 64 * 1024, cancellationToken, hasProgress, priority);
+
+    private async Task<FfmpegProcessResult> RunAsync(FfmpegCommand command, TimeSpan timeout, string? standardInput, int? outputCaptureLimit, CancellationToken cancellationToken, Func<bool>? hasProgress = null, ProcessPriorityClass? priority = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var timeoutCts = new CancellationTokenSource(timeout);
@@ -49,13 +60,32 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
         bool timedOut = false;
         try
         {
+            if (priority is { } requestedPriority)
+            {
+                try
+                {
+                    process.PriorityClass = requestedPriority;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Unable to set child priority to {Priority} for {Executable}", requestedPriority, command.Executable);
+                }
+            }
+
             if (standardInput is not null)
             {
                 using var writer = process.StandardInput;
                 await writer.WriteAsync(standardInput.AsMemory(), linkedCts.Token).ConfigureAwait(false);
             }
 
-            await process.WaitForExitAsync(linkedCts.Token).ConfigureAwait(false);
+            if (hasProgress is null)
+            {
+                await process.WaitForExitAsync(linkedCts.Token).ConfigureAwait(false);
+            }
+            else
+            {
+                await WaitForObservedExitAsync(process, timeout, hasProgress, cancellationToken).ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -85,6 +115,31 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
             stdOut,
             stdErr,
             timedOut);
+    }
+
+    private static async Task WaitForObservedExitAsync(Process process, TimeSpan timeout, Func<bool> hasProgress, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            using var window = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            window.CancelAfter(timeout);
+            try
+            {
+                await process.WaitForExitAsync(window.Token).ConfigureAwait(false);
+                return;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Invoke the observer in the handler: exceptions thrown inside an exception filter
+                // are swallowed by the runtime and would hide an output-directory I/O failure.
+                if (!hasProgress())
+                {
+                    throw;
+                }
+
+                // A new nonempty image buys another window, never immunity to cancellation.
+            }
+        }
     }
 
     private static async Task<string> ReadOutputAsync(StreamReader reader, int? captureLimit)

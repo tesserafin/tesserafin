@@ -136,6 +136,6 @@ public class MediaEncoderCapabilityTests
             Mock.Of<Tesserafin.Model.Globalization.ILocalizationManager>(),
             configuration,
             serverConfig.Object,
-            new FfmpegProcessRunner());
+            new FfmpegProcessRunner(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner>.Instance));
     }
 }
