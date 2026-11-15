@@ -37,7 +37,7 @@ public class BackupService : IBackupService
     private readonly IServerApplicationPaths _applicationPaths;
     private readonly ITesserafinDatabaseProvider _reefinDatabaseProvider;
     private readonly IHostApplicationLifetime _hostApplicationLifetime;
-    private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryScanCoordinator _scans;
     private static readonly JsonSerializerOptions _serializerSettings = new JsonSerializerOptions(JsonSerializerDefaults.General)
     {
         AllowTrailingCommas = true,
@@ -55,7 +55,7 @@ public class BackupService : IBackupService
     /// <param name="applicationPaths">The application paths.</param>
     /// <param name="reefinDatabaseProvider">The Tesserafin database Provider in use.</param>
     /// <param name="applicationLifetime">The SystemManager.</param>
-    /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="scans">Instance of the <see cref="ILibraryScanCoordinator"/> interface.</param>
     public BackupService(
         ILogger<BackupService> logger,
         IDbContextFactory<TesserafinDbContext> dbProvider,
@@ -63,7 +63,7 @@ public class BackupService : IBackupService
         IServerApplicationPaths applicationPaths,
         ITesserafinDatabaseProvider reefinDatabaseProvider,
         IHostApplicationLifetime applicationLifetime,
-        ILibraryManager libraryManager)
+        ILibraryScanCoordinator scans)
     {
         _logger = logger;
         _dbProvider = dbProvider;
@@ -71,7 +71,7 @@ public class BackupService : IBackupService
         _applicationPaths = applicationPaths;
         _reefinDatabaseProvider = reefinDatabaseProvider;
         _hostApplicationLifetime = applicationLifetime;
-        _libraryManager = libraryManager;
+        _scans = scans;
     }
 
     /// <inheritdoc/>
@@ -309,7 +309,7 @@ public class BackupService : IBackupService
     {
         // Creating a backup runs a database optimization and reads the entire database under a transaction, both of
         // which heavily contend with an active library scan and could capture an inconsistent database state.
-        if (_libraryManager.IsScanRunning)
+        if (_scans.IsScanRunning)
         {
             _logger.LogWarning("Cannot create a backup while a library scan is running.");
             throw new InvalidOperationException("Cannot create a backup while a library scan is running. Please try again once the scan has finished.");

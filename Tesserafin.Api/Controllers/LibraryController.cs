@@ -51,6 +51,7 @@ public class LibraryController : BaseTesserafinApiController
     private readonly IProviderManager _providerManager;
     private readonly ISimilarItemsManager _similarItemsManager;
     private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryScanCoordinator _scans;
     private readonly IUserManager _userManager;
     private readonly ICollectionManager _collectionManager;
     private readonly IDtoService _dtoService;
@@ -66,6 +67,7 @@ public class LibraryController : BaseTesserafinApiController
     /// </summary>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="similarItemsManager">Instance of the <see cref="ISimilarItemsManager"/> interface.</param>
+    /// <param name="scans">Library scan scheduling and state.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="collectionManager">Instance of the <see cref="ICollectionManager"/> interface.</param>
@@ -80,6 +82,7 @@ public class LibraryController : BaseTesserafinApiController
         IProviderManager providerManager,
         ISimilarItemsManager similarItemsManager,
         ILibraryManager libraryManager,
+        ILibraryScanCoordinator scans,
         IUserManager userManager,
         ICollectionManager collectionManager,
         IDtoService dtoService,
@@ -93,6 +96,7 @@ public class LibraryController : BaseTesserafinApiController
         _providerManager = providerManager;
         _similarItemsManager = similarItemsManager;
         _libraryManager = libraryManager;
+        _scans = scans;
         _userManager = userManager;
         _collectionManager = collectionManager;
         _dtoService = dtoService;
@@ -348,11 +352,11 @@ public class LibraryController : BaseTesserafinApiController
     [HttpPost("Library/Refresh")]
     [Authorize(Policy = Policies.RequiresElevation)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<ActionResult> RefreshLibrary()
+    public ActionResult RefreshLibrary()
     {
         try
         {
-            await _libraryManager.ValidateMediaLibrary(new Progress<double>(), CancellationToken.None).ConfigureAwait(false);
+            _scans.RequestScan();
         }
         catch (Exception ex)
         {

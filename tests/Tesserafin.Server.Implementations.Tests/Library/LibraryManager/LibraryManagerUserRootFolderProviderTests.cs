@@ -132,8 +132,7 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
                 Array.Empty<IResolverIgnoreRule>(),
                 new IItemResolver[] { new FolderResolver() },
                 Array.Empty<IIntroProvider>(),
-                fixture.Create<IEnumerable<IBaseItemComparer>>(),
-                Array.Empty<ILibraryPostScanTask>()))
+                fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
 
         Directory.CreateDirectory(_userRootPath);

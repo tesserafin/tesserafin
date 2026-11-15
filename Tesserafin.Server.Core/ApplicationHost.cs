@@ -585,6 +585,11 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<ILiveTvPresenceProvider, LiveTvPresenceProvider>();
             serviceCollection.AddSingleton<IVisibleContentProbe, VisibleContentProbe>();
             serviceCollection.AddSingleton<IUserViewCatalog, UserViewCatalog>();
+            serviceCollection.AddSingleton<ILibraryRootFolderProvider, LibraryRootFolderProvider>();
+            serviceCollection.AddSingleton<ILibraryScanTraversal, LibraryScanTraversal>();
+            serviceCollection.AddSingleton<LibraryScanCoordinator>();
+            serviceCollection.AddSingleton<ILibraryScanCoordinator>(sp => sp.GetRequiredService<LibraryScanCoordinator>());
+            serviceCollection.AddSingleton<Microsoft.Extensions.Hosting.IHostedService>(sp => sp.GetRequiredService<LibraryScanCoordinator>());
             serviceCollection.AddSingleton<ILibraryManager, LibraryManager>();
             serviceCollection.AddSingleton<IItemQueryScopeService, ItemQueryScopeService>();
             serviceCollection.AddSingleton<NamingOptions>();
@@ -831,8 +836,8 @@ namespace Tesserafin.Server.Core
                 GetExports<IResolverIgnoreRule>(),
                 GetExports<IItemResolver>(),
                 GetExports<IIntroProvider>(),
-                GetExports<IBaseItemComparer>(),
-                GetExports<ILibraryPostScanTask>());
+                GetExports<IBaseItemComparer>());
+            Resolve<ILibraryScanCoordinator>().SetPostScanTasks(GetExports<ILibraryPostScanTask>());
 
             Resolve<IProviderManager>().AddParts(
                 GetExports<IImageProvider>(),

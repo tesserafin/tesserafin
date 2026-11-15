@@ -122,8 +122,7 @@ public class LibraryManagerUserViewFactoryTests
                 fixture.Create<IEnumerable<IResolverIgnoreRule>>(),
                 fixture.Create<IEnumerable<IItemResolver>>(),
                 fixture.Create<IEnumerable<IIntroProvider>>(),
-                fixture.Create<IEnumerable<IBaseItemComparer>>(),
-                fixture.Create<IEnumerable<ILibraryPostScanTask>>()))
+                fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
     }
 

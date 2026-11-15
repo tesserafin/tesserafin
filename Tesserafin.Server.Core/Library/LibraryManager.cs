@@ -39,13 +39,10 @@ using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.Library;
 using Tesserafin.Model.Querying;
-using Tesserafin.Model.Tasks;
 using Tesserafin.Naming.Common;
 using Tesserafin.Naming.Video;
 using Tesserafin.Server.Core.Library.Resolvers;
 using Tesserafin.Server.Core.Library.Validators;
-using Tesserafin.Server.Core.Playlists;
-using Tesserafin.Server.Core.ScheduledTasks.Tasks;
 using Episode = Tesserafin.Controller.Entities.TV.Episode;
 using Genre = Tesserafin.Controller.Entities.Genre;
 using Person = Tesserafin.Controller.Entities.Person;
@@ -67,11 +64,9 @@ namespace Tesserafin.Server.Core.Library
         private const string ShortcutFileExtension = ".mblink";
 
         private readonly ILogger<LibraryManager> _logger;
-        private readonly ITaskManager _taskManager;
         private readonly IUserManager _userManager;
         private readonly IUserDataManager _userDataManager;
         private readonly IServerConfigurationManager _configurationManager;
-        private readonly Lazy<ILibraryMonitor> _libraryMonitorFactory;
         private readonly Lazy<IProviderManager> _providerManagerFactory;
         private readonly IUserViewCatalog _userViewCatalog;
         private readonly IServerApplicationHost _appHost;
@@ -97,32 +92,21 @@ namespace Tesserafin.Server.Core.Library
         private readonly IUserViewFactory _userViewFactory;
         private readonly IUserRootFolderProvider _userRootFolderProvider;
         private readonly ICollectionFolderResolver _collectionFolderResolver;
-        private readonly DotIgnoreIgnoreRule _dotIgnoreIgnoreRule;
         private readonly IMediaStreamLanguageService _mediaStreamLanguageService;
         private readonly Lazy<IExternalDataManager> _externalDataManagerFactory;
 
-        /// <summary>
-        /// The _root folder sync lock.
-        /// </summary>
-        private readonly Lock _rootFolderSyncLock = new();
-
-        /// <summary>
-        /// The _root folder.
-        /// </summary>
-        private volatile AggregateFolder? _rootFolder;
-
-        private bool _wizardCompleted;
+        private readonly DotIgnoreIgnoreRule _dotIgnoreIgnoreRule;
+        private readonly ILibraryScanCoordinator _scans;
+        private readonly ILibraryRootFolderProvider _roots;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="LibraryManager" /> class.
         /// </summary>
         /// <param name="appHost">The application host.</param>
         /// <param name="loggerFactory">The logger factory.</param>
-        /// <param name="taskManager">The task manager.</param>
         /// <param name="userManager">The user manager.</param>
         /// <param name="configurationManager">The configuration manager.</param>
         /// <param name="userDataManager">The user data manager.</param>
-        /// <param name="libraryMonitorFactory">The library monitor.</param>
         /// <param name="fileSystem">The file system.</param>
         /// <param name="providerManagerFactory">The provider manager.</param>
         /// <param name="userViewCatalog">
@@ -148,7 +132,6 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="directoryService">The directory service.</param>
         /// <param name="peopleRepository">The people repository.</param>
         /// <param name="pathManager">The path manager.</param>
-        /// <param name="dotIgnoreIgnoreRule">The .ignore rule handler.</param>
         /// <param name="mediaStreamLanguageService">The media stream language service.</param>
         /// <param name="externalDataManagerFactory">The external data manager (lazy, to break the DI cycle through ChapterManager).</param>
         /// <param name="itemLookupService">The item lookup service (read side of the item lookup cache; see PR75/PR76).</param>
@@ -158,14 +141,15 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="userViewFactory">The user-view factory leaf (named/shadow view creation; see PR106b). <see cref="GetNamedView(User, string, CollectionType?, string)"/> and the other overloads delegate to it - a leaf dependency, not a cycle: <c>UserViewFactory</c> never references <see cref="ILibraryManager"/>.</param>
         /// <param name="userRootFolderProvider">The user root folder provider leaf (construction/cache of the per-server <see cref="UserRootFolder"/>; see PR107). <see cref="GetUserRootFolder"/> and this class's internal callers delegate to it - a leaf dependency, not a cycle: <c>UserRootFolderProvider</c> never references <see cref="ILibraryManager"/>. <see cref="LibraryManager"/> no longer implements <see cref="IUserRootFolderProvider"/> itself (it used to be aliased onto it via a DI factory cast - RFC <c>docs/rfc-di-query-user-views-v2.md</c> §0/§1's "piège n°1").</param>
         /// <param name="collectionFolderResolver">The library membership leaf (<see cref="GetCollectionFolders(BaseItem)"/> and its overload delegate to it; see DEBT-SERVER-2) - a leaf dependency, not a cycle: <c>CollectionFolderResolver</c> never references <see cref="ILibraryManager"/>.</param>
+        /// <param name="dotIgnoreIgnoreRule">The ignore rules.</param>
+        /// <param name="scans">Scan scheduling and lifecycle.</param>
+        /// <param name="roots">Application aggregate root ownership.</param>
         public LibraryManager(
             IServerApplicationHost appHost,
             ILoggerFactory loggerFactory,
-            ITaskManager taskManager,
             IUserManager userManager,
             IServerConfigurationManager configurationManager,
             IUserDataManager userDataManager,
-            Lazy<ILibraryMonitor> libraryMonitorFactory,
             IFileSystem fileSystem,
             Lazy<IProviderManager> providerManagerFactory,
             IUserViewCatalog userViewCatalog,
@@ -183,7 +167,6 @@ namespace Tesserafin.Server.Core.Library
             IDirectoryService directoryService,
             IPeopleRepository peopleRepository,
             IPathManager pathManager,
-            DotIgnoreIgnoreRule dotIgnoreIgnoreRule,
             IMediaStreamLanguageService mediaStreamLanguageService,
             Lazy<IExternalDataManager> externalDataManagerFactory,
             IItemLookupService itemLookupService,
@@ -192,15 +175,16 @@ namespace Tesserafin.Server.Core.Library
             IItemStore itemStore,
             IUserViewFactory userViewFactory,
             IUserRootFolderProvider userRootFolderProvider,
-            ICollectionFolderResolver collectionFolderResolver)
+            ICollectionFolderResolver collectionFolderResolver,
+            DotIgnoreIgnoreRule dotIgnoreIgnoreRule,
+            ILibraryScanCoordinator scans,
+            ILibraryRootFolderProvider roots)
         {
             _appHost = appHost;
             _logger = loggerFactory.CreateLogger<LibraryManager>();
-            _taskManager = taskManager;
             _userManager = userManager;
             _configurationManager = configurationManager;
             _userDataManager = userDataManager;
-            _libraryMonitorFactory = libraryMonitorFactory;
             _fileSystem = fileSystem;
             _providerManagerFactory = providerManagerFactory;
             _userViewCatalog = userViewCatalog;
@@ -224,19 +208,17 @@ namespace Tesserafin.Server.Core.Library
             _userViewFactory = userViewFactory;
             _userRootFolderProvider = userRootFolderProvider;
             _collectionFolderResolver = collectionFolderResolver;
+            _dotIgnoreIgnoreRule = dotIgnoreIgnoreRule;
+            _scans = scans;
+            _roots = roots;
 
             _namingOptions = namingOptions;
             _peopleRepository = peopleRepository;
             _pathManager = pathManager;
-            _dotIgnoreIgnoreRule = dotIgnoreIgnoreRule;
             _extraResolver = new ExtraResolver(loggerFactory.CreateLogger<ExtraResolver>(), namingOptions, directoryService);
-
-            _configurationManager.ConfigurationUpdated += ConfigurationUpdated;
 
             _mediaStreamLanguageService = mediaStreamLanguageService;
             _externalDataManagerFactory = externalDataManagerFactory;
-
-            RecordConfigurationValues(_configurationManager.Configuration);
         }
 
         /// <summary>
@@ -258,31 +240,9 @@ namespace Tesserafin.Server.Core.Library
         /// Gets the root folder.
         /// </summary>
         /// <value>The root folder.</value>
-        public AggregateFolder RootFolder
-        {
-            get
-            {
-                if (_rootFolder is null)
-                {
-                    lock (_rootFolderSyncLock)
-                    {
-                        _rootFolder ??= CreateRootFolder();
-                    }
-                }
-
-                return _rootFolder;
-            }
-        }
-
-        private ILibraryMonitor LibraryMonitor => _libraryMonitorFactory.Value;
+        public AggregateFolder RootFolder => _roots.GetRootFolder();
 
         private IProviderManager ProviderManager => _providerManagerFactory.Value;
-
-        /// <summary>
-        /// Gets or sets the postscan tasks.
-        /// </summary>
-        /// <value>The postscan tasks.</value>
-        private ILibraryPostScanTask[] PostScanTasks { get; set; } = [];
 
         /// <summary>
         /// Gets or sets the intro providers.
@@ -304,8 +264,6 @@ namespace Tesserafin.Server.Core.Library
 
         private IMultiItemResolver[] MultiItemResolvers { get; set; } = [];
 
-        public bool IsScanRunning { get; private set; }
-
         /// <summary>
         /// Adds the parts.
         /// </summary>
@@ -313,48 +271,17 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="resolvers">The resolvers.</param>
         /// <param name="introProviders">The intro providers.</param>
         /// <param name="itemComparers">The item comparers.</param>
-        /// <param name="postScanTasks">The post scan tasks.</param>
         public void AddParts(
             IEnumerable<IResolverIgnoreRule> rules,
             IEnumerable<IItemResolver> resolvers,
             IEnumerable<IIntroProvider> introProviders,
-            IEnumerable<IBaseItemComparer> itemComparers,
-            IEnumerable<ILibraryPostScanTask> postScanTasks)
+            IEnumerable<IBaseItemComparer> itemComparers)
         {
             EntityResolutionIgnoreRules = rules.ToArray();
             EntityResolvers = resolvers.OrderBy(i => i.Priority).ToArray();
             MultiItemResolvers = EntityResolvers.OfType<IMultiItemResolver>().ToArray();
             IntroProviders = introProviders.ToArray();
             _itemSortService.AddParts(itemComparers);
-            PostScanTasks = postScanTasks.ToArray();
-        }
-
-        /// <summary>
-        /// Records the configuration values.
-        /// </summary>
-        /// <param name="configuration">The configuration.</param>
-        private void RecordConfigurationValues(ServerConfiguration configuration)
-        {
-            _wizardCompleted = configuration.IsStartupWizardCompleted;
-        }
-
-        /// <summary>
-        /// Configurations the updated.
-        /// </summary>
-        /// <param name="sender">The sender.</param>
-        /// <param name="e">The <see cref="EventArgs" /> instance containing the event data.</param>
-        private void ConfigurationUpdated(object? sender, EventArgs e)
-        {
-            var config = _configurationManager.Configuration;
-
-            var wizardChanged = config.IsStartupWizardCompleted != _wizardCompleted;
-
-            RecordConfigurationValues(config);
-
-            if (wizardChanged)
-            {
-                _taskManager.CancelIfRunningAndQueue<RefreshMediaLibraryTask>();
-            }
         }
 
         public void RegisterItem(BaseItem item)
@@ -1121,63 +1048,6 @@ namespace Tesserafin.Server.Core.Library
             }
         }
 
-        /// <summary>
-        /// Creates the root media folder.
-        /// </summary>
-        /// <returns>AggregateFolder.</returns>
-        /// <exception cref="InvalidOperationException">Cannot create the root folder until plugins have loaded.</exception>
-        public AggregateFolder CreateRootFolder()
-        {
-            var rootFolderPath = _configurationManager.ApplicationPaths.RootFolderPath;
-
-            var rootFolder = GetItemById(GetNewItemId(rootFolderPath, typeof(AggregateFolder))) as AggregateFolder ??
-                             (ResolvePath(_fileSystem.GetDirectoryInfo(rootFolderPath)) as Folder ?? throw new InvalidOperationException("Something went very wong"))
-                             .DeepCopy<Folder, AggregateFolder>();
-
-            // In case program data folder was moved
-            if (!string.Equals(rootFolder.Path, rootFolderPath, StringComparison.Ordinal))
-            {
-                _logger.LogInformation("Resetting root folder path to {0}", rootFolderPath);
-                rootFolder.Path = rootFolderPath;
-            }
-
-            // Add in the plug-in folders
-            var path = Path.Combine(_configurationManager.ApplicationPaths.DataPath, "playlists");
-
-            var info = Directory.CreateDirectory(path);
-            Folder folder = new PlaylistsFolder
-            {
-                Path = path,
-                DateCreated = info.CreationTimeUtc,
-                DateModified = info.LastWriteTimeUtc,
-            };
-
-            if (folder.Id.IsEmpty())
-            {
-                folder.Id = GetNewItemId(folder.Path, folder.GetType());
-            }
-
-            var dbItem = GetItemById(folder.Id) as BasePluginFolder;
-
-            if (dbItem is not null && string.Equals(dbItem.Path, folder.Path, StringComparison.OrdinalIgnoreCase))
-            {
-                folder = dbItem;
-            }
-
-            if (!folder.ParentId.Equals(rootFolder.Id))
-            {
-                rootFolder.UpdateToRepositoryAsync(ItemUpdateType.MetadataImport, CancellationToken.None).GetAwaiter().GetResult();
-                folder.ParentId = rootFolder.Id;
-                folder.UpdateToRepositoryAsync(ItemUpdateType.MetadataImport, CancellationToken.None).GetAwaiter().GetResult();
-            }
-
-            rootFolder.AddVirtualChild(folder);
-
-            RegisterItem(folder);
-
-            return rootFolder;
-        }
-
         /// <inheritdoc />
         /// <remarks>
         /// Delegates to <see cref="IUserRootFolderProvider"/> (PR107) - construction, caching and the
@@ -1354,177 +1224,6 @@ namespace Tesserafin.Server.Core.Library
             Directory.CreateDirectory(_configurationManager.ApplicationPaths.PeoplePath);
 
             return new PeopleValidator(this, _itemPeopleService, _logger, _fileSystem).ValidatePeople(cancellationToken, progress);
-        }
-
-        /// <summary>
-        /// Reloads the root media folder.
-        /// </summary>
-        /// <param name="progress">The progress.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>Task.</returns>
-        public Task ValidateMediaLibrary(IProgress<double> progress, CancellationToken cancellationToken)
-        {
-            // Just run the scheduled task so that the user can see it
-            _taskManager.CancelIfRunningAndQueue<RefreshMediaLibraryTask>();
-
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Validates the media library internal.
-        /// </summary>
-        /// <param name="progress">The progress.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>Task.</returns>
-        public async Task ValidateMediaLibraryInternal(IProgress<double> progress, CancellationToken cancellationToken)
-        {
-            IsScanRunning = true;
-            ClearIgnoreRuleCache();
-            LibraryMonitor.Stop();
-
-            try
-            {
-                await PerformLibraryValidation(progress, cancellationToken).ConfigureAwait(false);
-            }
-            finally
-            {
-                ClearIgnoreRuleCache();
-                LibraryMonitor.Start();
-                IsScanRunning = false;
-            }
-        }
-
-        public async Task ValidateTopLibraryFolders(CancellationToken cancellationToken, bool removeRoot = false)
-        {
-            ClearIgnoreRuleCache();
-            RootFolder.Children = null;
-            await RootFolder.RefreshMetadata(cancellationToken).ConfigureAwait(false);
-
-            // Start by just validating the children of the root, but go no further
-            await RootFolder.ValidateChildren(
-                new Progress<double>(),
-                new MetadataRefreshOptions(new DirectoryService(_fileSystem)),
-                recursive: false,
-                allowRemoveRoot: removeRoot,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-
-            var rootFolder = GetUserRootFolder();
-            rootFolder.Children = null;
-
-            await rootFolder.RefreshMetadata(cancellationToken).ConfigureAwait(false);
-
-            await rootFolder.ValidateChildren(
-                new Progress<double>(),
-                new MetadataRefreshOptions(new DirectoryService(_fileSystem)),
-                recursive: false,
-                allowRemoveRoot: removeRoot,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-
-            // Quickly scan CollectionFolders for changes
-            var toDelete = new List<Guid>();
-            foreach (var child in rootFolder.Children!.OfType<Folder>())
-            {
-                // If the user has somehow deleted the collection directory, remove the metadata from the database.
-                if (child is CollectionFolder collectionFolder && !Directory.Exists(collectionFolder.Path))
-                {
-                    toDelete.Add(collectionFolder.Id);
-                }
-                else
-                {
-                    await child.RefreshMetadata(cancellationToken).ConfigureAwait(false);
-                }
-            }
-
-            if (toDelete.Count > 0)
-            {
-                _persistenceService.DeleteItem(toDelete.ToArray());
-                _itemCacheStore.RemoveRange(toDelete);
-            }
-
-            ClearIgnoreRuleCache();
-        }
-
-        /// <inheritdoc />
-        public void ClearIgnoreRuleCache()
-        {
-            _dotIgnoreIgnoreRule.ClearDirectoryCache();
-        }
-
-        private async Task PerformLibraryValidation(IProgress<double> progress, CancellationToken cancellationToken)
-        {
-            _logger.LogInformation("Validating media library");
-
-            await ValidateTopLibraryFolders(cancellationToken).ConfigureAwait(false);
-
-            var innerProgress = new Progress<double>(pct => progress.Report(pct * 0.96));
-
-            // Validate the entire media library
-            await RootFolder.ValidateChildren(innerProgress, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), recursive: true, cancellationToken: cancellationToken).ConfigureAwait(false);
-
-            progress.Report(96);
-
-            innerProgress = new Progress<double>(pct => progress.Report(96 + (pct * .04)));
-
-            await RunPostScanTasks(innerProgress, cancellationToken).ConfigureAwait(false);
-
-            progress.Report(100);
-        }
-
-        /// <summary>
-        /// Runs the post scan tasks.
-        /// </summary>
-        /// <param name="progress">The progress.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>Task.</returns>
-        private async Task RunPostScanTasks(IProgress<double> progress, CancellationToken cancellationToken)
-        {
-            var tasks = PostScanTasks.ToList();
-
-            var numComplete = 0;
-            var numTasks = tasks.Count;
-
-            foreach (var task in tasks)
-            {
-                // Prevent access to modified closure
-                var currentNumComplete = numComplete;
-
-                var innerProgress = new Progress<double>(pct =>
-                {
-                    double innerPercent = pct;
-                    innerPercent /= 100;
-                    innerPercent += currentNumComplete;
-
-                    innerPercent /= numTasks;
-                    innerPercent *= 100;
-
-                    progress.Report(innerPercent);
-                });
-
-                _logger.LogDebug("Running post-scan task {0}", task.GetType().Name);
-
-                try
-                {
-                    await task.Run(innerProgress, cancellationToken).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    _logger.LogInformation("Post-scan task cancelled: {0}", task.GetType().Name);
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error running post-scan task");
-                }
-
-                numComplete++;
-                double percent = numComplete;
-                percent /= numTasks;
-                progress.Report(percent * 100);
-            }
-
-            _persistenceService.UpdateInheritedValues();
-
-            progress.Report(100);
         }
 
         /// <summary>
@@ -2894,12 +2593,6 @@ namespace Tesserafin.Server.Core.Library
         }
 
         /// <inheritdoc />
-        public void QueueLibraryScan()
-        {
-            _taskManager.QueueScheduledTask<RefreshMediaLibraryTask>();
-        }
-
-        /// <inheritdoc />
         public int? GetSeasonNumberFromPath(string path, Guid? parentId)
         {
             var parentPath = parentId.HasValue ? GetItemById(parentId.Value)?.ContainingFolderPath : null;
@@ -3154,44 +2847,27 @@ namespace Tesserafin.Server.Core.Library
                 }
             }
 
-            LibraryMonitor.Stop();
-
-            try
-            {
-                Directory.CreateDirectory(virtualFolderPath);
-
-                if (collectionType is not null)
+            await _scans.ApplyLibraryChangeAsync(
+                () =>
                 {
-                    var path = Path.Combine(virtualFolderPath, collectionType.ToString()!.ToLowerInvariant() + ".collection"); // Can't be null with legal values?
-
-                    FileHelper.CreateEmpty(path);
-                }
-
-                CollectionFolder.SaveLibraryOptions(virtualFolderPath, options);
-
-                if (mediaPathInfos is not null)
-                {
-                    foreach (var path in mediaPathInfos)
+                    Directory.CreateDirectory(virtualFolderPath);
+                    if (collectionType is not null)
                     {
-                        AddMediaPathInternal(name, path, false);
+                        FileHelper.CreateEmpty(Path.Combine(virtualFolderPath, collectionType.ToString()!.ToLowerInvariant() + ".collection"));
                     }
-                }
-            }
-            finally
-            {
-                await ValidateTopLibraryFolders(CancellationToken.None).ConfigureAwait(false);
 
-                if (refreshLibrary)
-                {
-                    StartScanInBackground();
-                }
-                else
-                {
-                    // Need to add a delay here or directory watchers may still pick up the changes
-                    await Task.Delay(1000).ConfigureAwait(false);
-                    LibraryMonitor.Start();
-                }
-            }
+                    CollectionFolder.SaveLibraryOptions(virtualFolderPath, options);
+                    if (mediaPathInfos is not null)
+                    {
+                        foreach (var path in mediaPathInfos)
+                        {
+                            AddMediaPathInternal(name, path, false);
+                        }
+                    }
+                },
+                refreshLibrary,
+                removeRoot: false,
+                CancellationToken.None).ConfigureAwait(false);
         }
 
         private async Task SavePeopleMetadataAsync(IEnumerable<PersonInfo> people, CancellationToken cancellationToken)
@@ -3267,15 +2943,6 @@ namespace Tesserafin.Server.Core.Library
                     CreateItems([personEntity], null, CancellationToken.None);
                 }
             }
-        }
-
-        private void StartScanInBackground()
-        {
-            Task.Run(() =>
-            {
-                // No need to start if scanning the library because it will handle it
-                ValidateMediaLibrary(new Progress<double>(), CancellationToken.None);
-            });
         }
 
         public void AddMediaPath(string virtualFolderName, MediaPathInfo mediaPath)
@@ -3367,29 +3034,21 @@ namespace Tesserafin.Server.Core.Library
                 throw new FileNotFoundException("The media folder does not exist");
             }
 
-            LibraryMonitor.Stop();
-
-            try
-            {
-                Directory.Delete(path, true);
-            }
-            finally
-            {
-                CollectionFolder.OnCollectionFolderChange();
-
-                if (refreshLibrary)
+            await _scans.ApplyLibraryChangeAsync(
+                () =>
                 {
-                    await ValidateTopLibraryFolders(CancellationToken.None, true).ConfigureAwait(false);
-
-                    StartScanInBackground();
-                }
-                else
-                {
-                    // Need to add a delay here or directory watchers may still pick up the changes
-                    await Task.Delay(1000).ConfigureAwait(false);
-                    LibraryMonitor.Start();
-                }
-            }
+                    try
+                    {
+                        Directory.Delete(path, true);
+                    }
+                    finally
+                    {
+                        CollectionFolder.OnCollectionFolderChange();
+                    }
+                },
+                refreshLibrary,
+                removeRoot: true,
+                CancellationToken.None).ConfigureAwait(false);
         }
 
         private void RemoveContentTypeOverrides(string path)

@@ -50,6 +50,7 @@ public sealed class StandaloneVisibilityTests
     private readonly IItemAccessService _access;
     private readonly IServerConfigurationManager _configuration;
     private readonly Tesserafin.Server.Core.Library.LibraryManager _manager;
+    private readonly Mock<ILibraryRootFolderProvider> _aggregateRoots;
     private Folder _root;
     private CollectionFolder? _sets;
     private Folder? _setsFolder;
@@ -58,6 +59,7 @@ public sealed class StandaloneVisibilityTests
     public StandaloneVisibilityTests()
     {
         var fixture = new Fixture().Customize(new AutoMoqCustomization());
+        _aggregateRoots = fixture.Freeze<Mock<ILibraryRootFolderProvider>>();
 
         var configuration = fixture.Freeze<Mock<IServerConfigurationManager>>();
         configuration.Setup(c => c.Configuration).Returns(new ServerConfiguration());
@@ -83,8 +85,7 @@ public sealed class StandaloneVisibilityTests
                 Array.Empty<IResolverIgnoreRule>(),
                 Array.Empty<IItemResolver>(),
                 Array.Empty<IIntroProvider>(),
-                fixture.Create<IEnumerable<IBaseItemComparer>>(),
-                Array.Empty<ILibraryPostScanTask>()))
+                fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
 
         // The service scores through the same stub as the static (Scores), held here so that the static can throw.
@@ -1166,7 +1167,7 @@ public sealed class StandaloneVisibilityTests
 
         // The user's root lists the aggregate root's virtual children too (a box set never belongs to one).
         aggregate.AddVirtualChild(Add(new Tesserafin.Server.Core.Playlists.PlaylistsFolder { Path = "/config/data/playlists", ParentId = aggregate.Id }));
-        typeof(Tesserafin.Server.Core.Library.LibraryManager).GetField("_rootFolder", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(_manager, aggregate);
+        _aggregateRoots.Setup(p => p.GetRootFolder()).Returns(aggregate);
 
         var userRoot = Add(new UserRootFolder { Path = "/config/data/root/default" });
         Mock.Get(BaseItem.ItemRepository).Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.ParentId.Equals(userRoot.Id)))).Returns(_libraries);

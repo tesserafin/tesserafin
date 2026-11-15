@@ -25,6 +25,7 @@ namespace Tesserafin.Server.Core.ScheduledTasks.Tasks;
 public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
 {
     private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryScanCoordinator _scans;
     private readonly ILocalizationManager _localization;
     private readonly IDbContextFactory<TesserafinDbContext> _dbContextFactory;
     private readonly IFileSystem _fileSystem;
@@ -34,6 +35,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     /// <summary>
     /// Initializes a new instance of the <see cref="PeopleValidationTask" /> class.
     /// </summary>
+    /// <param name="scans">Library scan scheduling and state.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="localization">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="dbContextFactory">Instance of the <see cref="IDbContextFactory{TContext}"/> interface.</param>
@@ -42,6 +44,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     /// <param name="itemTypeLookup">Instance of the <see cref="IItemTypeLookup"/> interface.</param>
     public PeopleValidationTask(
         ILibraryManager libraryManager,
+        ILibraryScanCoordinator scans,
         ILocalizationManager localization,
         IDbContextFactory<TesserafinDbContext> dbContextFactory,
         IFileSystem fileSystem,
@@ -49,6 +52,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
         IItemTypeLookup itemTypeLookup)
     {
         _libraryManager = libraryManager;
+        _scans = scans;
         _localization = localization;
         _dbContextFactory = dbContextFactory;
         _fileSystem = fileSystem;
@@ -95,7 +99,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     {
         // People validation performs heavy database writes that contend with an active library scan.
         // Defer it until the scan has finished; the task will run again on its next trigger.
-        if (_libraryManager.IsScanRunning)
+        if (_scans.IsScanRunning)
         {
             _logger.LogInformation("Skipping people validation because a library scan is currently running.");
             return;

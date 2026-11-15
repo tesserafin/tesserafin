@@ -34,22 +34,22 @@ public class LibraryStructureController : BaseTesserafinApiController
 {
     private readonly IServerApplicationPaths _appPaths;
     private readonly ILibraryManager _libraryManager;
-    private readonly ILibraryMonitor _libraryMonitor;
+    private readonly ILibraryScanCoordinator _scans;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LibraryStructureController"/> class.
     /// </summary>
     /// <param name="serverConfigurationManager">Instance of <see cref="IServerConfigurationManager"/> interface.</param>
+    /// <param name="scans">Library scan scheduling and state.</param>
     /// <param name="libraryManager">Instance of <see cref="ILibraryManager"/> interface.</param>
-    /// <param name="libraryMonitor">Instance of <see cref="ILibraryMonitor"/> interface.</param>
     public LibraryStructureController(
         IServerConfigurationManager serverConfigurationManager,
         ILibraryManager libraryManager,
-        ILibraryMonitor libraryMonitor)
+        ILibraryScanCoordinator scans)
     {
         _appPaths = serverConfigurationManager.ApplicationPaths;
         _libraryManager = libraryManager;
-        _libraryMonitor = libraryMonitor;
+        _scans = scans;
     }
 
     /// <summary>
@@ -132,7 +132,7 @@ public class LibraryStructureController : BaseTesserafinApiController
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public ActionResult RenameVirtualFolder(
+    public async Task<ActionResult> RenameVirtualFolder(
         [FromQuery] string? name,
         [FromQuery] string? newName,
         [FromQuery] bool refreshLibrary = false)
@@ -165,60 +165,28 @@ public class LibraryStructureController : BaseTesserafinApiController
             return Conflict($"The media library {newName} already exists.");
         }
 
-        _libraryMonitor.Stop();
-
-        try
-        {
-            // Changing capitalization. Handle windows case insensitivity
-            if (string.Equals(currentPath, newPath, StringComparison.OrdinalIgnoreCase))
+        await _scans.ApplyLibraryChangeAsync(
+            () =>
             {
-                var tempPath = VirtualFolderPath.Resolve(
-                    rootFolderPath,
-                    Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture));
-                Directory.Move(currentPath, tempPath);
-                currentPath = tempPath;
-            }
-
-            Directory.Move(currentPath, newPath);
-        }
-        finally
-        {
-            CollectionFolder.OnCollectionFolderChange();
-
-            Task.Run(async () =>
-            {
-                // No need to start if scanning the library because it will handle it
-                if (refreshLibrary)
+                try
                 {
-                    await _libraryManager.ValidateTopLibraryFolders(CancellationToken.None, true).ConfigureAwait(false);
-                    var newLib = _libraryManager.GetUserRootFolder().Children.FirstOrDefault(f => f.Path.Equals(newPath, StringComparison.OrdinalIgnoreCase));
-                    if (newLib is CollectionFolder folder)
+                    if (string.Equals(currentPath, newPath, StringComparison.OrdinalIgnoreCase))
                     {
-                        _libraryManager.ClearIgnoreRuleCache();
-                        foreach (var child in folder.GetPhysicalFolders())
-                        {
-                            await child.RefreshMetadata(CancellationToken.None).ConfigureAwait(false);
-                            await child.ValidateChildren(new Progress<double>(), CancellationToken.None).ConfigureAwait(false);
-                        }
-                    }
-                    else
-                    {
-                        _libraryManager.ClearIgnoreRuleCache();
-                        // We don't know if this one can be validated individually, trigger a new validation
-                        await _libraryManager.ValidateMediaLibrary(new Progress<double>(), CancellationToken.None).ConfigureAwait(false);
+                        var tempPath = VirtualFolderPath.Resolve(_appPaths.DefaultUserViewsPath, Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture));
+                        Directory.Move(currentPath, tempPath);
+                        currentPath = tempPath;
                     }
 
-                    _libraryManager.ClearIgnoreRuleCache();
+                    Directory.Move(currentPath, newPath);
                 }
-                else
+                finally
                 {
-                    // Need to add a delay here or directory watchers may still pick up the changes
-                    // Have to block here to allow exceptions to bubble
-                    await Task.Delay(1000).ConfigureAwait(false);
-                    _libraryMonitor.Start();
+                    CollectionFolder.OnCollectionFolderChange();
                 }
-            });
-        }
+            },
+            refreshLibrary,
+            removeRoot: true,
+            CancellationToken.None).ConfigureAwait(false);
 
         return NoContent();
     }
@@ -233,36 +201,12 @@ public class LibraryStructureController : BaseTesserafinApiController
     /// <exception cref="ArgumentNullException">The name of the library may not be empty.</exception>
     [HttpPost("Paths")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public ActionResult AddMediaPath(
+    public async Task<ActionResult> AddMediaPath(
         [FromBody, Required] MediaPathDto mediaPathDto,
         [FromQuery] bool refreshLibrary = false)
     {
-        _libraryMonitor.Stop();
-
-        try
-        {
-            var mediaPath = mediaPathDto.PathInfo ?? new MediaPathInfo(mediaPathDto.Path ?? throw new ArgumentException("PathInfo and Path can't both be null."));
-
-            _libraryManager.AddMediaPath(mediaPathDto.Name, mediaPath);
-        }
-        finally
-        {
-            Task.Run(async () =>
-            {
-                // No need to start if scanning the library because it will handle it
-                if (refreshLibrary)
-                {
-                    await _libraryManager.ValidateMediaLibrary(new Progress<double>(), CancellationToken.None).ConfigureAwait(false);
-                }
-                else
-                {
-                    // Need to add a delay here or directory watchers may still pick up the changes
-                    // Have to block here to allow exceptions to bubble
-                    await Task.Delay(1000).ConfigureAwait(false);
-                    _libraryMonitor.Start();
-                }
-            });
-        }
+        var mediaPath = mediaPathDto.PathInfo ?? new MediaPathInfo(mediaPathDto.Path ?? throw new ArgumentException("PathInfo and Path can't both be null."));
+        await _scans.ApplyLibraryChangeAsync(() => _libraryManager.AddMediaPath(mediaPathDto.Name, mediaPath), refreshLibrary, removeRoot: false, CancellationToken.None).ConfigureAwait(false);
 
         return NoContent();
     }
@@ -298,7 +242,7 @@ public class LibraryStructureController : BaseTesserafinApiController
     /// <exception cref="ArgumentException">The name of the library and path may not be empty.</exception>
     [HttpDelete("Paths")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public ActionResult RemoveMediaPath(
+    public async Task<ActionResult> RemoveMediaPath(
         [FromQuery] string name,
         [FromQuery] string path,
         [FromQuery] bool refreshLibrary = false)
@@ -306,30 +250,7 @@ public class LibraryStructureController : BaseTesserafinApiController
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        _libraryMonitor.Stop();
-
-        try
-        {
-            _libraryManager.RemoveMediaPath(name, path);
-        }
-        finally
-        {
-            Task.Run(async () =>
-            {
-                // No need to start if scanning the library because it will handle it
-                if (refreshLibrary)
-                {
-                    await _libraryManager.ValidateMediaLibrary(new Progress<double>(), CancellationToken.None).ConfigureAwait(false);
-                }
-                else
-                {
-                    // Need to add a delay here or directory watchers may still pick up the changes
-                    // Have to block here to allow exceptions to bubble
-                    await Task.Delay(1000).ConfigureAwait(false);
-                    _libraryMonitor.Start();
-                }
-            });
-        }
+        await _scans.ApplyLibraryChangeAsync(() => _libraryManager.RemoveMediaPath(name, path), refreshLibrary, removeRoot: true, CancellationToken.None).ConfigureAwait(false);
 
         return NoContent();
     }

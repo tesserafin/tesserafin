@@ -73,8 +73,7 @@ public sealed class InheritedTagVisibilityTests
                 Array.Empty<IResolverIgnoreRule>(),
                 Array.Empty<IItemResolver>(),
                 Array.Empty<IIntroProvider>(),
-                fixture.Create<IEnumerable<IBaseItemComparer>>(),
-                Array.Empty<ILibraryPostScanTask>()))
+                fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
 
         _lookup = lookup;

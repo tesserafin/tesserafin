@@ -700,3 +700,62 @@ Injecting native construction into the encoder fails the expanded architecture g
 metadata despite failed/timed-out native execution fails both process-result cases. After source
 restoration, the full MediaEncoding suite and analyzer-enabled builds pass. No hosted CI result
 or physical tuner/GPU acceptance is claimed.
+
+## 22. Library scan ownership (consolidation step 5, candidate)
+
+`ILibraryScanCoordinator` now owns visible scan requests, full execution, top-folder refreshes,
+post-scan registration and running status. `RefreshMediaLibraryTask` calls it directly. The old
+scan methods, state, post-scan array, wizard subscription, queue helper and concrete-manager cast
+are removed from `LibraryManager`/`ILibraryManager`. The manager loses its task-manager and lazy
+monitor dependencies; it consumes the scan/root ports for its remaining library operations.
+Its source shrinks from 3,522 to 3,181 lines. Constructor arity remains 34: these two responsibilities
+are replaced by two narrow ports, while its remaining item-management dependencies stay open work.
+
+`LibraryScanCoordinator` owns one traversal slot for full scans, top-folder reconciliation and
+monitored structure edits. Queued cancellation touches neither files nor monitoring. Active
+cancellation propagates through traversal/post-scan tasks; cancellation prevents inherited-value
+commit. Non-cancellation post-scan failures retain the existing log-and-continue policy. Inline
+progress callbacks map traversal to 0–96 and post-scan work to 96–100. Monitor restoration and
+ignore-cache cleanup are both attempted on error, preserving the first failure and resetting the
+running state before releasing admission. Status covers active full scans through cleanup; it is
+not a transaction lock for maintenance or every metadata operation.
+
+One DI singleton is exposed through both the scan port and `IHostedService`. Host stop closes
+admission, cancels queued/active traversal, joins cleanup and leaves monitoring stopped. Repeated
+stop/disposal awaits the same completion. Exported post-scan tasks are registered after application
+composition, avoiding an eager task-enumeration construction cycle. Cancellation remains cooperative
+with the existing metadata/Folder implementations. Wizard completion, API requests,
+recording setup, backup and maintenance status checks use the dedicated scan port.
+
+`LibraryScanTraversal` owns root/recursive metadata validation and deletion/cache invalidation for
+missing collection folders. `LibraryRootFolderProvider` owns the shared aggregate root and playlist
+child, with explicit container types/IDs and a single persistence batch for their relationship.
+Application-owned containers bypass media resolvers, metadata exporters and item-update events.
+New root identities use `AggregateFolder` directly. The remaining manager root getter reads the
+same provider; it has no independent cache or construction algorithm. Entity-level refresh and
+validation still use the existing `Folder`/`BaseItem` implementation and its remaining statics.
+
+Create/remove library and rename/add/remove path operations use the coordinator's traversal slot
+and monitor scope. The controller's detached `Task.Run` cleanup paths are removed: the response
+awaits reconciliation and restoration; a requested full scan is then queued visibly. Structure
+edit errors retain their original failure if reconciliation also fails. The existing one-second
+notification-settling delay remains for edits without a full refresh.
+
+The contract change is internal to server composition: scan members move off the public .NET
+`ILibraryManager` interface. HTTP routes, operation shapes, OpenAPI and SDK remain unchanged.
+No project/package dependency or consolidation-ratchet baseline is expanded. Step 5 remains open,
+including the remaining manager responsibilities and entity static services.
+
+Local validation for §22: Server.Implementations 1,296 passed / 4 Windows-path skips; API 650
+passed; Server 528 passed, including the unchanged consolidation ratchet; Providers 358 passed;
+Live TV 61 passed. Integration 111 passed: the existing film/OpenAPI/HLS/progressive checks,
+library-structure cases and a new booted-host create → full scan → rename → remove journey,
+including the shared root and shared hosted-service instance. The 27 new unit cases cover
+ordering/progress, post-task error/cancellation, each cleanup failure, queued cancellation,
+serialization, stop/drain, host stop, structure edits, wizard scheduling, root caching/persistence
+and architectural boundaries. Both the restored scan facade and a second traversal slot fail
+their negative controls; restored source passes. Analyzer-enabled builds and diff checks pass.
+The backup roundtrips use a temporary directory on the workspace filesystem because this
+container's /tmp volume is smaller than the existing 5-GiB backup requirement; the requirement
+and assertions remain unchanged. The scan fixture uses an empty disabled library, not a large
+media-library performance benchmark or a native Windows acceptance run. Hosted CI is unclaimed.

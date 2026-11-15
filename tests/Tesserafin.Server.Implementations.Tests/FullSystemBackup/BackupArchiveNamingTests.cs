@@ -95,7 +95,7 @@ public sealed class BackupArchiveNamingTests : IDisposable
             paths.Object,
             databaseProvider,
             new Mock<IHostApplicationLifetime>().Object,
-            new Mock<ILibraryManager>().Object);
+            new Mock<ILibraryScanCoordinator>().Object);
     }
 
     public void Dispose()

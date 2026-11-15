@@ -99,8 +99,7 @@ public class LibraryManagerItemLookupTests
                 fixture.Create<IEnumerable<IResolverIgnoreRule>>(),
                 fixture.Create<IEnumerable<IItemResolver>>(),
                 fixture.Create<IEnumerable<IIntroProvider>>(),
-                fixture.Create<IEnumerable<IBaseItemComparer>>(),
-                fixture.Create<IEnumerable<ILibraryPostScanTask>>()))
+                fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
     }
 
@@ -533,10 +532,10 @@ public class LibraryManagerItemLookupTests
     // ---------------------------------------------------------------
 
     [Fact]
-    public async Task ValidateTopLibraryFolders_MissingCollectionFolderDirectory_InvalidatesCacheEntry()
+    public async Task ScanTraversal_MissingCollectionFolderDirectory_InvalidatesCacheEntry()
     {
         // The heavy machinery (root construction, metadata refresh, children validation) is
-        // neutralized: stub root folders are injected into LibraryManager's private lazy fields,
+        // neutralized: stub root folders are supplied through their dedicated provider ports,
         // their ValidateChildrenInternal/Children members are overridden to no-ops, and the
         // BaseItem statics used by the non-virtual RefreshMetadata path are pointed at mocks.
         // What remains under test is exactly the PR75 fix: the missing-directory cleanup loop in
@@ -558,11 +557,6 @@ public class LibraryManagerItemLookupTests
         Assert.Same(missing, _libraryManager.GetItemById(missing.Id));
         _itemRepositoryMock.Verify(r => r.RetrieveItem(missing.Id), Times.Never);
 
-        var libraryManagerType = typeof(Tesserafin.Server.Core.Library.LibraryManager);
-        libraryManagerType
-            .GetField("_rootFolder", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-            .SetValue(_libraryManager, new StubAggregateFolder());
-
         // PR107: UserRootFolder construction/caching moved off LibraryManager to
         // IUserRootFolderProvider - stub the injected mock's GetUserRootFolder() instead of poking a
         // (now-removed) private LibraryManager field.
@@ -570,7 +564,9 @@ public class LibraryManagerItemLookupTests
             .Setup(p => p.GetUserRootFolder())
             .Returns(new StubUserRootFolder { StubChildren = [missing] });
 
-        await _libraryManager.ValidateTopLibraryFolders(CancellationToken.None);
+        var roots = Mock.Of<ILibraryRootFolderProvider>(p => p.GetRootFolder() == new StubAggregateFolder());
+        var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
+        await traversal.RefreshTopFoldersAsync(TestContext.Current.CancellationToken, false);
 
         // Deleted from the database...
         _persistenceServiceMock.Verify(

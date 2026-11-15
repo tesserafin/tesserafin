@@ -58,6 +58,7 @@ namespace Tesserafin.Providers.Manager
         private readonly IFileSystem _fileSystem;
         private readonly IServerApplicationPaths _appPaths;
         private readonly ILibraryManager _libraryManager;
+        private readonly ILibraryScanCoordinator _scans;
         private readonly ISubtitleManager _subtitleManager;
         private readonly ILyricManager _lyricManager;
         private readonly IServerConfigurationManager _configurationManager;
@@ -100,6 +101,7 @@ namespace Tesserafin.Providers.Manager
         /// <param name="logger">The logger.</param>
         /// <param name="fileSystem">The filesystem.</param>
         /// <param name="appPaths">The server application paths.</param>
+        /// <param name="scans">Library scan scheduling and state.</param>
         /// <param name="libraryManager">The library manager.</param>
         /// <param name="baseItemManager">The BaseItem manager.</param>
         /// <param name="lyricManager">The lyric manager.</param>
@@ -115,6 +117,7 @@ namespace Tesserafin.Providers.Manager
             IFileSystem fileSystem,
             IServerApplicationPaths appPaths,
             ILibraryManager libraryManager,
+            ILibraryScanCoordinator scans,
             IBaseItemManager baseItemManager,
             ILyricManager lyricManager,
             IMemoryCache memoryCache,
@@ -128,6 +131,7 @@ namespace Tesserafin.Providers.Manager
             _fileSystem = fileSystem;
             _appPaths = appPaths;
             _libraryManager = libraryManager;
+            _scans = scans;
             _subtitleManager = subtitleManager;
             _baseItemManager = baseItemManager;
             _lyricManager = lyricManager;
@@ -1148,7 +1152,7 @@ namespace Tesserafin.Providers.Manager
 
             var cancellationToken = _disposeCancellationTokenSource.Token;
 
-            libraryManager.ClearIgnoreRuleCache();
+            _scans.ClearIgnoreRuleCache();
             while (_refreshQueue.TryDequeue(out var refreshItem, out _))
             {
                 if (_disposed)
@@ -1183,7 +1187,7 @@ namespace Tesserafin.Providers.Manager
             lock (_refreshQueueLock)
             {
                 _isProcessingRefreshQueue = false;
-                libraryManager.ClearIgnoreRuleCache();
+                _scans.ClearIgnoreRuleCache();
             }
         }
 

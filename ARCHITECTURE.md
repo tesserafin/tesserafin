@@ -138,13 +138,23 @@ libraries. Every project has a matching `*.Tests` project in `tests/`.
 
 ### Stage 1 — Library scan
 
-- The public contract is `ILibraryManager` (`Tesserafin.Controller/Library/`),
-  implemented by `LibraryManager` (`Tesserafin.Server.Core/Library/LibraryManager.cs`).
-- A scan is queued as a scheduled task: `QueueLibraryScan()` / `ValidateMediaLibrary()`
-  enqueue `RefreshMediaLibraryTask` (`Tesserafin.Server.Core/ScheduledTasks/Tasks/`).
-  The work walks the tree — `ValidateTopLibraryFolders` then
-  `RootFolder.ValidateChildren(...)` recursively over `Folder`/`AggregateFolder`,
-  guarded by `ILibraryMonitor` (filesystem watching) and an `IsScanRunning` gate.
+- `ILibraryScanCoordinator` (`Tesserafin.Controller/Library/`) owns scan requests, execution
+  and status. `RequestScan()` queues `RefreshMediaLibraryTask`, which calls `ScanAsync`
+  directly; no concrete-manager cast or scan facade remains on `ILibraryManager`.
+- `LibraryScanCoordinator` serializes full scans, top-level refreshes and monitored structure
+  edits through one traversal slot. It stops monitoring, clears ignore lookups, runs
+  `LibraryScanTraversal`, then clears lookups and restores monitoring before releasing the slot.
+  Cleanup errors preserve the original failure. A cancelled queued traversal does no work.
+  The same singleton is registered as `IHostedService` for joined shutdown: admission closes,
+  active/queued work is cancelled and joined, and monitoring stays stopped. `IsScanRunning` covers the active full scan through cleanup, not queued
+  scans or unrelated metadata work; it is a status hint, not a database/backup transaction lock.
+- `LibraryRootFolderProvider` owns the shared aggregate root and playlist child. These internal
+  containers have explicit types/IDs and are persisted together through the item store/persistence
+  ports. They do not run media resolvers, metadata exporters or item-update notifications.
+  `LibraryScanTraversal` uses this root and `IUserRootFolderProvider` to refresh top-level folders,
+  invalidate missing collection folders in the repository and cache, then walk the full tree.
+  Entity refresh/validation still uses the existing `Folder`/`BaseItem` implementation; removing
+  its remaining static service access is further consolidation work.
 - **Resolution.** `LibraryManager.ResolvePath(s)` dispatches to ordered
   `IItemResolver` implementations (`MovieResolver`, `EpisodeResolver`,
   `SeriesResolver`, `AudioResolver`, `PhotoResolver`, …) that turn paths into the
@@ -154,7 +164,10 @@ libraries. Every project has a matching `*.Tests` project in `tests/`.
   pure parser: `VideoResolver`, `StackResolver`, `EpisodePathParser`,
   `CleanDateTimeParser`, …), wrapped server-side by `IItemNamingService`.
 - Post-scan aggregation runs via `ILibraryPostScanTask` validators
-  (`GenresPostScanTask`, `StudiosPostScanTask`, …).
+  (`GenresPostScanTask`, `StudiosPostScanTask`, …), registered after application composition.
+  Non-cancellation task errors are logged and subsequent tasks continue; cancellation aborts
+  before inherited values are committed. Progress maps traversal to 0–96 and post-scan work
+  to 96–100 with inline callbacks.
 
 ### Stage 2 — Metadata & media probing
 
@@ -495,7 +508,7 @@ streaming controllers (retained behind the v2 execution adapter for now).
 
 | I want to understand… | Start here |
 |---|---|
-| A library scan | `Tesserafin.Server.Core/Library/LibraryManager.cs`, `.../ScheduledTasks/Tasks/RefreshMediaLibraryTask.cs` |
+| A library scan | `Tesserafin.Server.Core/Library/LibraryScanCoordinator.cs`, `LibraryScanTraversal.cs`, `.../ScheduledTasks/Tasks/RefreshMediaLibraryTask.cs` |
 | Metadata fetching | `Tesserafin.Providers/Manager/ProviderManager.cs` |
 | Why something transcodes | `src/Tesserafin.Playback.Engine`, `src/Tesserafin.Playback.Decision/PlaybackDecision.cs` |
 | How a stream is produced | `Tesserafin.MediaEncoding/Transcoding/TranscodeManager.cs`, `Tesserafin.Api/Controllers/DynamicHlsController.cs` |

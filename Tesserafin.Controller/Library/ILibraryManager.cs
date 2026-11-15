@@ -44,13 +44,8 @@ namespace Tesserafin.Controller.Library
         /// </summary>
         event EventHandler<ItemChangeEventArgs>? ItemRemoved;
 
-        /// <summary>
-        /// Gets the root folder.
-        /// </summary>
-        /// <value>The root folder.</value>
+        /// <summary>Gets the shared application root.</summary>
         AggregateFolder RootFolder { get; }
-
-        bool IsScanRunning { get; }
 
         /// <summary>
         /// Resolves the path.
@@ -160,29 +155,6 @@ namespace Tesserafin.Controller.Library
         /// <returns>Task.</returns>
         Task ValidatePeopleAsync(IProgress<double> progress, CancellationToken cancellationToken);
 
-        /// <summary>
-        /// Reloads the root media folder.
-        /// </summary>
-        /// <param name="progress">The progress.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>Task.</returns>
-        Task ValidateMediaLibrary(IProgress<double> progress, CancellationToken cancellationToken);
-
-        /// <summary>
-        /// Reloads the root media folder.
-        /// </summary>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <param name="removeRoot">Is remove the library itself allowed.</param>
-        /// <returns>Task.</returns>
-        Task ValidateTopLibraryFolders(CancellationToken cancellationToken, bool removeRoot = false);
-
-        /// <summary>
-        /// Clears the cached ignore rule directory lookups.
-        /// Call this before triggering a library scan or item refresh to ensure
-        /// any changes to .ignore files are picked up.
-        /// </summary>
-        void ClearIgnoreRuleCache();
-
         Task UpdateImagesAsync(BaseItem item, bool forceUpdate = false);
 
         /// <summary>
@@ -269,13 +241,11 @@ namespace Tesserafin.Controller.Library
         /// <param name="resolvers">The resolvers.</param>
         /// <param name="introProviders">The intro providers.</param>
         /// <param name="itemComparers">The item comparers.</param>
-        /// <param name="postScanTasks">The post scan tasks.</param>
         void AddParts(
             IEnumerable<IResolverIgnoreRule> rules,
             IEnumerable<IItemResolver> resolvers,
             IEnumerable<IIntroProvider> introProviders,
-            IEnumerable<IBaseItemComparer> itemComparers,
-            IEnumerable<ILibraryPostScanTask> postScanTasks);
+            IEnumerable<IBaseItemComparer> itemComparers);
 
         /// <summary>
         /// Sorts the specified items.
@@ -762,14 +732,6 @@ namespace Tesserafin.Controller.Library
         Task RunMetadataSavers(BaseItem item, ItemUpdateType updateReason);
 
         BaseItem GetParentItem(Guid? parentId, Guid? userId);
-
-        /// <summary>
-        /// Queue a library scan.
-        /// </summary>
-        /// <remarks>
-        /// This exists so plugins can trigger a library scan.
-        /// </remarks>
-        void QueueLibraryScan();
 
         /// <summary>
         /// Add mblink file for a media path.

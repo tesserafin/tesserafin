@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Tesserafin.Controller.Library;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.Tasks;
-using Tesserafin.Server.Core.Library;
 
 namespace Tesserafin.Server.Core.ScheduledTasks.Tasks;
 
@@ -15,19 +14,19 @@ namespace Tesserafin.Server.Core.ScheduledTasks.Tasks;
 public class RefreshMediaLibraryTask : IScheduledTask
 {
     /// <summary>
-    /// The _library manager.
+    /// The scan coordinator.
     /// </summary>
-    private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryScanCoordinator _scans;
     private readonly ILocalizationManager _localization;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RefreshMediaLibraryTask" /> class.
     /// </summary>
-    /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="scans">Instance of the <see cref="ILibraryScanCoordinator"/> interface.</param>
     /// <param name="localization">Instance of the <see cref="ILocalizationManager"/> interface.</param>
-    public RefreshMediaLibraryTask(ILibraryManager libraryManager, ILocalizationManager localization)
+    public RefreshMediaLibraryTask(ILibraryScanCoordinator scans, ILocalizationManager localization)
     {
-        _libraryManager = libraryManager;
+        _scans = scans;
         _localization = localization;
     }
 
@@ -58,8 +57,6 @@ public class RefreshMediaLibraryTask : IScheduledTask
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        progress.Report(0);
-
-        await ((LibraryManager)_libraryManager).ValidateMediaLibraryInternal(progress, cancellationToken).ConfigureAwait(false);
+        await _scans.ScanAsync(progress, cancellationToken).ConfigureAwait(false);
     }
 }

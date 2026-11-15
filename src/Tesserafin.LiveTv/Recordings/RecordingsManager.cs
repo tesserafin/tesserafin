@@ -41,6 +41,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IFileSystem _fileSystem;
     private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryScanCoordinator _scans;
     private readonly ILibraryMonitor _libraryMonitor;
     private readonly IProviderManager _providerManager;
     private readonly IMediaEncoder _mediaEncoder;
@@ -61,6 +62,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     /// <param name="config">The <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="httpClientFactory">The <see cref="IHttpClientFactory"/>.</param>
     /// <param name="fileSystem">The <see cref="IFileSystem"/>.</param>
+    /// <param name="scans">Library scan scheduling and state.</param>
     /// <param name="libraryManager">The <see cref="ILibraryManager"/>.</param>
     /// <param name="libraryMonitor">The <see cref="ILibraryMonitor"/>.</param>
     /// <param name="providerManager">The <see cref="IProviderManager"/>.</param>
@@ -77,6 +79,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         IHttpClientFactory httpClientFactory,
         IFileSystem fileSystem,
         ILibraryManager libraryManager,
+        ILibraryScanCoordinator scans,
         ILibraryMonitor libraryMonitor,
         IProviderManager providerManager,
         IMediaEncoder mediaEncoder,
@@ -92,6 +95,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         _httpClientFactory = httpClientFactory;
         _fileSystem = fileSystem;
         _libraryManager = libraryManager;
+        _scans = scans;
         _libraryMonitor = libraryMonitor;
         _providerManager = providerManager;
         _mediaEncoder = mediaEncoder;
@@ -272,7 +276,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
 
         if (requiresRefresh)
         {
-            await _libraryManager.ValidateMediaLibrary(new Progress<double>(), CancellationToken.None).ConfigureAwait(false);
+            _scans.RequestScan();
         }
     }
 
