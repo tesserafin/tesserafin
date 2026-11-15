@@ -22,6 +22,15 @@ public sealed partial class FfmpegProcessArchitectureTests
         Assert.DoesNotContain("SetEnvironmentVariable", source, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("Attachments", "AttachmentExtractor.cs")]
+    [InlineData("Subtitles", "SubtitleEncoder.cs")]
+    public void FileExtractors_DelegateNativeProcessLifecycle(string component, string file)
+    {
+        var source = Source("Tesserafin.MediaEncoding", component, file);
+        Assert.False(NativeProcessCreationOrLaunch().IsMatch(source), $"{file} must run finite commands through IFfmpegProcessRunner.");
+    }
+
     private static string Source(params string[] components)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Tesserafin.Controller.MediaEncoding;
@@ -22,9 +23,18 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
     }
 
     /// <inheritdoc />
-    public async Task<FfmpegProcessResult> RunProbeAsync(FfmpegCommand command, TimeSpan timeout, CancellationToken cancellationToken, string? standardInput = null)
+    public Task<FfmpegProcessResult> RunProbeAsync(FfmpegCommand command, TimeSpan timeout, CancellationToken cancellationToken, string? standardInput = null)
+        => RunAsync(command, timeout, standardInput, outputCaptureLimit: null, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<FfmpegProcessResult> RunFileAsync(FfmpegCommand command, TimeSpan timeout, CancellationToken cancellationToken)
+        => RunAsync(command, timeout, standardInput: string.Empty, outputCaptureLimit: 64 * 1024, cancellationToken);
+
+    private static async Task<FfmpegProcessResult> RunAsync(FfmpegCommand command, TimeSpan timeout, string? standardInput, int? outputCaptureLimit, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var timeoutCts = new CancellationTokenSource(timeout);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         using var process = CreateProcess(command, redirectOutput: true, redirectInput: standardInput is not null, raiseEvents: false);
         process.Start();
 
@@ -33,11 +43,8 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
         // read with CancellationToken.None deliberately - killing the process below closes its
         // pipes, which is what ends these reads (with whatever was captured so far), rather than
         // having them throw and lose that partial output.
-        var stdOutTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-        var stdErrTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
-
-        using var timeoutCts = new CancellationTokenSource(timeout);
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        var stdOutTask = ReadOutputAsync(process.StandardOutput, outputCaptureLimit);
+        var stdErrTask = ReadOutputAsync(process.StandardError, outputCaptureLimit);
 
         bool timedOut = false;
         try
@@ -78,6 +85,32 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
             stdOut,
             stdErr,
             timedOut);
+    }
+
+    private static async Task<string> ReadOutputAsync(StreamReader reader, int? captureLimit)
+    {
+        if (captureLimit is null)
+        {
+            return await reader.ReadToEndAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+
+        var tail = new char[captureLimit.Value];
+        var buffer = new char[4096];
+        var position = 0;
+        var length = 0;
+        int read;
+        while ((read = await reader.ReadAsync(buffer.AsMemory(), CancellationToken.None).ConfigureAwait(false)) != 0)
+        {
+            var first = Math.Min(read, tail.Length - position);
+            Array.Copy(buffer, 0, tail, position, first);
+            Array.Copy(buffer, first, tail, 0, read - first);
+            position = (position + read) % tail.Length;
+            length = Math.Min(length + read, tail.Length);
+        }
+
+        return length < tail.Length
+            ? new string(tail, 0, length)
+            : string.Concat(new string(tail, position, tail.Length - position), new string(tail, 0, position));
     }
 
     private static Process CreateProcess(FfmpegCommand command, bool redirectOutput, bool redirectInput, bool raiseEvents)

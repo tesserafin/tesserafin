@@ -818,7 +818,8 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
             _item,
             [new MediaAttachment { Index = AttachmentIndex, Codec = "ttf", FileName = FileName, MimeType = "font/ttf" }],
             cancellationToken);
-        var extracted = _factory.Services.GetRequiredService<IPathManager>().GetAttachmentPath(_item.ToString("N", CultureInfo.InvariantCulture), FileName)!;
+        var cacheName = AttachmentIndex.ToString(CultureInfo.InvariantCulture) + "-" + FileName;
+        var extracted = _factory.Services.GetRequiredService<IPathManager>().GetAttachmentPath(_item.ToString("N", CultureInfo.InvariantCulture), cacheName)!;
         Directory.CreateDirectory(Path.GetDirectoryName(extracted)!);
         await File.WriteAllBytesAsync(extracted, _mark, cancellationToken);
 

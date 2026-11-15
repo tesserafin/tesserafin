@@ -515,3 +515,51 @@ this boundary. Both architecture negative controls fail when their violation is 
 then pass after source restoration. The startup-exit fixture explicitly disables network-change
 subscriptions after clearing inherited settings, so a restricted netlink socket cannot replace
 the failure it is meant to observe. No startup/exit assertion is removed or relaxed.
+
+## 18. Finite attachment/subtitle extraction (consolidation step 5, candidate)
+
+The six native process implementations in `AttachmentExtractor` and `SubtitleEncoder` are
+removed. Both inject `IFfmpegProcessRunner` and use its finite-file profile through one
+`FfmpegFileExecutor`. The runner closes stdin, drains stdout/stderr concurrently, retains at
+most 65,536 characters per diagnostic stream, and kills/waits/drains before returning a timeout
+or throwing cancellation. Probe capture remains complete; managed transcodes retain their
+owner-before-launch lifecycle from §17.
+
+The file executor accepts only the caller's permitted exit statuses and requires every expected
+file to exist and contain data. On failure it cleans the attempt's named outputs while its
+consumer still owns the cache locks. Cleanup I/O errors are logged while preserving the primary
+failure. Output publication still uses the existing cache paths; transactional publication is
+not implemented by this slice.
+
+Attachment bulk/single extraction now share one folder lock and one command builder. Explicit
+per-stream destinations replace the filename-driven bulk dump. Cache names consist of stream
+index plus an ASCII-safe basename (original extension retained), so separators, quotes and
+duplicate basenames do not select another output. This deliberately changes internal cache
+names without a compatibility lookup. Previously completed attachments are not rewritten or
+deleted by a later failed attempt. The no-audio/video Matroska/MKS exit-code-1 case is accepted
+only when all requested attachments were produced. Attachments retain their caller-controlled
+lifetime; subtitle extraction retains its configured timeout and now also observes cancellation.
+
+Subtitle extraction/conversion refuses nonzero exits even if a partial nonempty file exists.
+Batch errors and cancellation propagate to the requesting reader; failure no longer turns into
+a successful descriptor for a missing file. Source metadata is published only after successful
+extraction and postprocessing. The three duplicated subtitle launch/validation/cleanup blocks
+are replaced with the common executor.
+
+Twenty new cases cover bounded diagnostics, closed stdin, accepted/rejected exits, missing/empty
+outputs, kill-and-wait before cleanup, primary-error preservation, cache-lock handoff, failed
+subtitle retry, real Matroska/MKS attachments and real embedded/external subtitle extraction.
+Architecture guards reject native process creation/launch in both consumers. The new real
+FFmpeg cases are regular tests, included by the existing hosted non-Smoke test job that installs
+FFmpeg. No OpenAPI, SDK, project/package or consolidation-baseline change.
+
+Image/trickplay scheduling, general media probing outside the runner, transactional cache
+publication and tokenized argv remain separate work. Step 5 and remaining playback consumers
+in §6 stay open; no physical GPU or native Windows/macOS acceptance is claimed here.
+
+Local validation: Controller 1,673 passed / 2 hardware skips; MediaEncoding 344 passed /
+2 platform/hardware skips; API 650 passed; Server 528 passed, including the unchanged
+consolidation ratchet; real software FFmpeg film/OpenAPI/HLS/progressive integration 94 passed.
+Injecting native construction into either extractor fails its architecture check. Removing
+file-content validation fails both the missing-output and empty-output controls; restoring
+the implementation passes the full MediaEncoding suite.

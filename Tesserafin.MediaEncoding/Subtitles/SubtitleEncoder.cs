@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
@@ -24,6 +23,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
+using Tesserafin.MediaEncoding.Encoder;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
@@ -36,6 +36,7 @@ namespace Tesserafin.MediaEncoding.Subtitles
     public sealed class SubtitleEncoder : ISubtitleEncoder, IDisposable
     {
         private readonly ILogger<SubtitleEncoder> _logger;
+        private readonly FfmpegFileExecutor _executor;
         private readonly IFileSystem _fileSystem;
         private readonly IMediaEncoder _mediaEncoder;
         private readonly IHttpClientFactory _httpClientFactory;
@@ -61,9 +62,11 @@ namespace Tesserafin.MediaEncoding.Subtitles
             IMediaSourceManager mediaSourceManager,
             ISubtitleParser subtitleParser,
             IPathManager pathManager,
-            IServerConfigurationManager serverConfigurationManager)
+            IServerConfigurationManager serverConfigurationManager,
+            IFfmpegProcessRunner processRunner)
         {
             _logger = logger;
+            _executor = new FfmpegFileExecutor(processRunner, fileSystem, logger);
             _fileSystem = fileSystem;
             _mediaEncoder = mediaEncoder;
             _httpClientFactory = httpClientFactory;
@@ -445,92 +448,8 @@ namespace Tesserafin.MediaEncoding.Subtitles
                 encodingParam = " -sub_charenc " + encodingParam;
             }
 
-            int exitCode;
-
-            using (var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    FileName = _mediaEncoder.EncoderPath,
-                    Arguments = string.Format(CultureInfo.InvariantCulture, "-y {0} -i \"{1}\" -c:s srt \"{2}\"", encodingParam, inputPath, outputPath),
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    ErrorDialog = false
-                },
-                EnableRaisingEvents = true
-            })
-            {
-                _logger.LogInformation("{0} {1}", process.StartInfo.FileName, process.StartInfo.Arguments);
-
-                try
-                {
-                    process.Start();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error starting ffmpeg");
-
-                    throw;
-                }
-
-                try
-                {
-                    var timeoutMinutes = _serverConfigurationManager.GetEncodingOptions().SubtitleExtractionTimeoutMinutes;
-                    await process.WaitForExitAsync(TimeSpan.FromMinutes(timeoutMinutes)).ConfigureAwait(false);
-                    exitCode = process.ExitCode;
-                }
-                catch (OperationCanceledException)
-                {
-                    process.Kill(true);
-                    exitCode = -1;
-                }
-            }
-
-            var failed = false;
-
-            if (exitCode == -1)
-            {
-                failed = true;
-
-                if (File.Exists(outputPath))
-                {
-                    try
-                    {
-                        _logger.LogInformation("Deleting converted subtitle due to failure: {Path}", outputPath);
-                        _fileSystem.DeleteFile(outputPath);
-                    }
-                    catch (IOException ex)
-                    {
-                        _logger.LogError(ex, "Error deleting converted subtitle {Path}", outputPath);
-                    }
-                }
-            }
-            else if (!File.Exists(outputPath) || _fileSystem.GetFileInfo(outputPath).Length == 0)
-            {
-                failed = true;
-
-                try
-                {
-                    _logger.LogWarning("Deleting converted subtitle due to failure: {Path}", outputPath);
-                    _fileSystem.DeleteFile(outputPath);
-                }
-                catch (FileNotFoundException)
-                {
-                }
-                catch (IOException ex)
-                {
-                    _logger.LogError(ex, "Error deleting converted subtitle {Path}", outputPath);
-                }
-            }
-
-            if (failed)
-            {
-                _logger.LogError("ffmpeg subtitle conversion failed for {Path}", inputPath);
-
-                throw new FfmpegException(
-                    string.Format(CultureInfo.InvariantCulture, "ffmpeg subtitle conversion failed for {0}", inputPath));
-            }
+            var arguments = string.Format(CultureInfo.InvariantCulture, "-nostdin -y {0} -i \"{1}\" -c:s srt \"{2}\"", encodingParam, inputPath, outputPath);
+            await ExecuteFileCommand(arguments, [outputPath], cancellationToken).ConfigureAwait(false);
 
             await SetAssFont(outputPath, cancellationToken).ConfigureAwait(false);
 
@@ -629,9 +548,14 @@ namespace Tesserafin.MediaEncoding.Subtitles
                     await ExtractAllExtractableSubtitlesMKS(mediaSource, extractableStreams, cancellationToken).ConfigureAwait(false);
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Unable to get streams for File:{File}", mediaSource.Path);
+                throw;
             }
             finally
             {
@@ -784,110 +708,24 @@ namespace Tesserafin.MediaEncoding.Subtitles
             List<string> outputPaths,
             CancellationToken cancellationToken)
         {
-            int exitCode;
-
-            using (var process = new Process
+            await ExecuteFileCommand("-nostdin -y " + args, outputPaths, cancellationToken).ConfigureAwait(false);
+            foreach (var outputPath in outputPaths)
             {
-                StartInfo = new ProcessStartInfo
+                if (outputPath.EndsWith("ass", StringComparison.OrdinalIgnoreCase))
                 {
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    FileName = _mediaEncoder.EncoderPath,
-                    Arguments = args,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    ErrorDialog = false
-                },
-                EnableRaisingEvents = true
-            })
-            {
-                _logger.LogInformation("{File} {Arguments}", process.StartInfo.FileName, process.StartInfo.Arguments);
-
-                try
-                {
-                    process.Start();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error starting ffmpeg");
-
-                    throw;
+                    await SetAssFont(outputPath, cancellationToken).ConfigureAwait(false);
                 }
 
-                try
-                {
-                    var timeoutMinutes = _serverConfigurationManager.GetEncodingOptions().SubtitleExtractionTimeoutMinutes;
-                    await process.WaitForExitAsync(TimeSpan.FromMinutes(timeoutMinutes)).ConfigureAwait(false);
-                    exitCode = process.ExitCode;
-                }
-                catch (OperationCanceledException)
-                {
-                    process.Kill(true);
-                    exitCode = -1;
-                }
-            }
-
-            var failed = false;
-
-            if (exitCode == -1)
-            {
-                failed = true;
-
-                foreach (var outputPath in outputPaths)
-                {
-                    try
-                    {
-                        _logger.LogWarning("Deleting extracted subtitle due to failure: {Path}", outputPath);
-                        _fileSystem.DeleteFile(outputPath);
-                    }
-                    catch (FileNotFoundException)
-                    {
-                    }
-                    catch (IOException ex)
-                    {
-                        _logger.LogError(ex, "Error deleting extracted subtitle {Path}", outputPath);
-                    }
-                }
-            }
-            else
-            {
-                foreach (var outputPath in outputPaths)
-                {
-                    if (!File.Exists(outputPath) || _fileSystem.GetFileInfo(outputPath).Length == 0)
-                    {
-                        _logger.LogError("ffmpeg subtitle extraction failed for {InputPath} to {OutputPath}", inputPath, outputPath);
-                        failed = true;
-
-                        try
-                        {
-                            _logger.LogWarning("Deleting extracted subtitle due to failure: {Path}", outputPath);
-                            _fileSystem.DeleteFile(outputPath);
-                        }
-                        catch (FileNotFoundException)
-                        {
-                        }
-                        catch (IOException ex)
-                        {
-                            _logger.LogError(ex, "Error deleting extracted subtitle {Path}", outputPath);
-                        }
-
-                        continue;
-                    }
-
-                    if (outputPath.EndsWith("ass", StringComparison.OrdinalIgnoreCase))
-                    {
-                        await SetAssFont(outputPath, cancellationToken).ConfigureAwait(false);
-                    }
-
-                    _logger.LogInformation("ffmpeg subtitle extraction completed for {InputPath} to {OutputPath}", inputPath, outputPath);
-                }
-            }
-
-            if (failed)
-            {
-                throw new FfmpegException(
-                    string.Format(CultureInfo.InvariantCulture, "ffmpeg subtitle extraction failed for {0}", inputPath));
+                _logger.LogInformation("ffmpeg subtitle extraction completed for {InputPath} to {OutputPath}", inputPath, outputPath);
             }
         }
+
+        private Task ExecuteFileCommand(string arguments, IReadOnlyCollection<string> outputPaths, CancellationToken cancellationToken)
+            => _executor.ExecuteAsync(
+                FfmpegCommand.FromArgumentLine(_mediaEncoder.EncoderPath, arguments),
+                outputPaths,
+                TimeSpan.FromMinutes(_serverConfigurationManager.GetEncodingOptions().SubtitleExtractionTimeoutMinutes),
+                cancellationToken);
 
         /// <summary>
         /// Extracts the text subtitle.
@@ -950,93 +788,7 @@ namespace Tesserafin.MediaEncoding.Subtitles
                 outputCodec,
                 outputPath);
 
-            int exitCode;
-
-            using (var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    FileName = _mediaEncoder.EncoderPath,
-                    Arguments = processArgs,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    ErrorDialog = false
-                },
-                EnableRaisingEvents = true
-            })
-            {
-                _logger.LogInformation("{File} {Arguments}", process.StartInfo.FileName, process.StartInfo.Arguments);
-
-                try
-                {
-                    process.Start();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error starting ffmpeg");
-
-                    throw;
-                }
-
-                try
-                {
-                    var timeoutMinutes = _serverConfigurationManager.GetEncodingOptions().SubtitleExtractionTimeoutMinutes;
-                    await process.WaitForExitAsync(TimeSpan.FromMinutes(timeoutMinutes)).ConfigureAwait(false);
-                    exitCode = process.ExitCode;
-                }
-                catch (OperationCanceledException)
-                {
-                    process.Kill(true);
-                    exitCode = -1;
-                }
-            }
-
-            var failed = false;
-
-            if (exitCode == -1)
-            {
-                failed = true;
-
-                try
-                {
-                    _logger.LogWarning("Deleting extracted subtitle due to failure: {Path}", outputPath);
-                    _fileSystem.DeleteFile(outputPath);
-                }
-                catch (FileNotFoundException)
-                {
-                }
-                catch (IOException ex)
-                {
-                    _logger.LogError(ex, "Error deleting extracted subtitle {Path}", outputPath);
-                }
-            }
-            else if (!File.Exists(outputPath) || _fileSystem.GetFileInfo(outputPath).Length == 0)
-            {
-                failed = true;
-
-                try
-                {
-                    _logger.LogWarning("Deleting extracted subtitle due to failure: {Path}", outputPath);
-                    _fileSystem.DeleteFile(outputPath);
-                }
-                catch (FileNotFoundException)
-                {
-                }
-                catch (IOException ex)
-                {
-                    _logger.LogError(ex, "Error deleting extracted subtitle {Path}", outputPath);
-                }
-            }
-
-            if (failed)
-            {
-                _logger.LogError("ffmpeg subtitle extraction failed for {InputPath} to {OutputPath}", inputPath, outputPath);
-
-                throw new FfmpegException(
-                    string.Format(CultureInfo.InvariantCulture, "ffmpeg subtitle extraction failed for {0} to {1}", inputPath, outputPath));
-            }
-
+            await ExecuteFileCommand("-nostdin -y " + processArgs, [outputPath], cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("ffmpeg subtitle extraction completed for {InputPath} to {OutputPath}", inputPath, outputPath);
 
             if (string.Equals(outputCodec, "ass", StringComparison.OrdinalIgnoreCase))

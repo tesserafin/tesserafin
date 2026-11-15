@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 namespace Tesserafin.Controller.MediaEncoding;
 
 /// <summary>
-/// Creates managed transcode processes and runs short-lived ffmpeg/ffprobe probes behind one
-/// process factory. Transcode ownership is registered by the caller before launch. Probes drain
-/// both stdout and stderr concurrently; managed transcodes redirect only stderr, whose drain
+/// Creates managed transcode processes and runs finite probes and file extractions behind one
+/// process factory. Transcode ownership is registered by the caller before launch. Finite commands
+/// drain both output streams concurrently; managed transcodes redirect only stderr, whose drain
 /// belongs to the caller. Every redirected output pipe must have a reader.
 /// </summary>
 public interface IFfmpegProcessRunner
@@ -22,6 +22,16 @@ public interface IFfmpegProcessRunner
     /// <param name="process">The unstarted child.</param>
     /// <param name="cancellationToken">Cancellation checked immediately before launch.</param>
     void StartTranscode(Process process, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Runs a finite file-producing command with closed stdin and concurrent output drains.
+    /// Only the final 65,536 characters of each diagnostic stream are retained.
+    /// </summary>
+    /// <param name="command">The immutable invocation and child environment.</param>
+    /// <param name="timeout">Time limit, or <see cref="Timeout.InfiniteTimeSpan"/>.</param>
+    /// <param name="cancellationToken">Cancellation kills and waits for the child before throwing.</param>
+    /// <returns>The exit code, bounded diagnostics and timeout outcome.</returns>
+    Task<FfmpegProcessResult> RunFileAsync(FfmpegCommand command, TimeSpan timeout, CancellationToken cancellationToken);
 
     /// <summary>
     /// Starts <paramref name="command"/>, drains stdout and stderr concurrently, and waits for

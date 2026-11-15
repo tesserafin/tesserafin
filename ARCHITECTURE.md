@@ -227,8 +227,13 @@ This is the headline rewrite and has its own section below (§5).
 - Probe/validation and managed transcodes share `FfmpegProcessRunner` through DI.
   Probes drain stdout+stderr while writing optional stdin, and kill on timeout or
   cancellation. Managed transcodes leave stdout unredirected and drain stderr through
-  the job logger. Image/attachment/subtitle processes retain their existing lifecycles;
-  interval trickplay extraction also receives the captured child-environment overrides.
+  the job logger. Attachment/subtitle extraction uses its finite-command profile, which closes
+  stdin and retains only the final 65,536 characters of each diagnostic stream. A common file
+  executor validates exit status and every nonempty output, then removes the attempt's outputs
+  on failure/cancellation before releasing cache locks. Attachment output names use sanitized
+  basenames prefixed by stream index; embedded paths never select filesystem destinations.
+  Image processes retain their existing lifecycle; interval trickplay extraction also receives
+  the captured child-environment overrides.
   Argument serialization remains a quoted string, not a tokenized argv vector.
 
 **Hardware acceleration** was rewritten into a decision-first design
