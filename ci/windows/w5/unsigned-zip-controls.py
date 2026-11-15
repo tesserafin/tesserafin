@@ -83,9 +83,11 @@ FROZEN_PINS = {
     ".github/workflows/w4-windows-msi.yml": "deffcba556b413f5823ec8605f3ad6560a703f0b95660763968c124fd7b001c0",
     "ci/windows/runtime-retention/consume.ps1": "80e3ca9aaa9323192537afafb01302869d2a58a869d1faf613048fc60dde3053",
     "ci/windows/runtime-retention/accepted-runtime.json": "b599c3c1a2e6130549759b2beb5701fef6a196357a8244d4f0ecd751e4d11adb",
-    # Re-pinned for #342: only F0_ACCEPTED_CI_TREE moved (Linux F0 baseline);
-    # WEB_PAYLOAD_SHA256, which P02 reads, is unchanged.
-    "ci/package/pins.env": "7239360f3f2d1299db4282a465c46446ff9e5694221f138f88667141e0a6cfa7",
+    # Re-pinned for #342: only F0_ACCEPTED_CI_TREE moved (Linux F0 baseline).
+    # Re-pinned for #426: the Linux WEB_PAYLOAD_SHA256 moved to Web 0.3.0 and the
+    # Windows accepted payload was split out, unchanged, as
+    # WINDOWS_WEB_PAYLOAD_SHA256, which P02 reads.
+    "ci/package/pins.env": "128094b9d257a3f32e17bddb7dea51669c5ef58a354bc75fb51dc5b6e2a53cd1",
     "packaging/windows/msi/Tesserafin.wxs": "097bb7c68f62a3b15d64af0c58d947ce28377810752681407afd99f0d4b983dc",
 }
 
@@ -585,13 +587,13 @@ def pin_controls():
 
     verifier = load_verifier()
     pins_env = open(os.path.join(REPO_ROOT, "ci", "package", "pins.env"), encoding="utf-8").read()
-    web = re.search(r"^WEB_PAYLOAD_SHA256=([0-9a-f]{64})$", pins_env, re.M).group(1)
+    web = re.search(r"^WINDOWS_WEB_PAYLOAD_SHA256=([0-9a-f]{64})$", pins_env, re.M).group(1)
     accepted = json.load(open(os.path.join(REPO_ROOT, "ci", "windows", "runtime-retention",
                                            "accepted-runtime.json"), encoding="utf-8"))
     record(verifier.PINS == {"web": web, "ffmpeg": accepted["runtimeSha256"]}
            and web == "4148c4bc6e0c7c2d6b35ed9992e874a06dcc11d2b6d9e0aad06719e36567be4f"
            and accepted["runtimeSha256"] == "f28cc9186aad757491a6f44e7950d39bc39354dfe9505e278af91d7619811c9e",
-           "P02", "the verifier's pins equal pins.env WEB_PAYLOAD_SHA256 and accepted-runtime.json runtimeSha256")
+           "P02", "the verifier's pins equal pins.env WINDOWS_WEB_PAYLOAD_SHA256 and accepted-runtime.json runtimeSha256")
 
 
 def main():
