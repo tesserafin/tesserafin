@@ -212,15 +212,24 @@ This is the headline rewrite and has its own section below (§5).
 
 - `ITranscodeManager` / `TranscodeManager` (`Tesserafin.MediaEncoding/Transcoding/`,
   a DI singleton) owns the live-job registry and per-output locks.
-- `StartFfMpeg(StreamState, outputPath, args, …)` builds an ffmpeg command line
-  via `EncodingHelper` (`Tesserafin.Controller/MediaEncoding/`), spawns a
-  `Process` (`MediaEncoder.EncoderPath`), streams stderr to a per-job log, and
-  registers a `TranscodingJob` (holds the process, `PlaySessionId`, output path,
-  job type). `KillTranscodingJob(s)` tears jobs down and optionally deletes temp
-  output; idle jobs are reaped off playback-progress pings.
-- Probe/validation uses a separate, safe process path
-  (`IFfmpegProcessRunner`/`FfmpegProcessRunner`) that drains stdout+stderr
-  concurrently and kills on timeout.
+- HLS/progressive command builders capture `FfmpegCommand` values through
+  `EncodingHelper` (`Tesserafin.Controller/MediaEncoding/`): executable, serialized
+  argument line, immutable child-environment overrides and optional working directory.
+  Input initialization returns `FfmpegArguments`, keeping driver overrides alongside
+  the text that requires them; it never changes the server's environment.
+- `StartFfMpeg(StreamState, outputPath, command, …)` asks `IFfmpegProcessRunner`
+  for an unstarted child, registers its `TranscodingJob` (process, owner,
+  `PlaySessionId`, output path, job type), then starts it under the registry lock.
+  The manager owns stdin, stderr logging, cancellation, teardown and output cleanup.
+  Preparation/launch failure releases the registered attempt and closes its log.
+  `KillTranscodingJob(s)` tears jobs down and optionally deletes temp output;
+  idle jobs are reaped off playback-progress pings.
+- Probe/validation and managed transcodes share `FfmpegProcessRunner` through DI.
+  Probes drain stdout+stderr while writing optional stdin, and kill on timeout or
+  cancellation. Managed transcodes leave stdout unredirected and drain stderr through
+  the job logger. Image/attachment/subtitle processes retain their existing lifecycles;
+  interval trickplay extraction also receives the captured child-environment overrides.
+  Argument serialization remains a quoted string, not a tokenized argv vector.
 
 **Hardware acceleration** was rewritten into a decision-first design
 (`docs/hwa-refactor-plan.md`), with the types in `Tesserafin.Controller/MediaEncoding/`:

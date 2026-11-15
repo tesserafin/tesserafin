@@ -476,3 +476,42 @@ Device/codec decisions, shared geometry and filter-expression helpers, quality/b
 common FPS placement, mapping, final command serialization and process execution remain outside
 these renderers. Step 5 remains open, including library service decomposition. Remaining playback
 consumers in §6 are unchanged. The retained Sessions execution plan remains authoritative.
+
+## 17. Managed FFmpeg process boundary (consolidation step 5, candidate)
+
+HLS and progressive playback now carry `FfmpegCommand` into `ITranscodeManager`.
+`IFfmpegProcessRunner` creates the unstarted process and launches it only after the manager
+has registered its owner, under the same registry lock that removes stopped jobs. Probes,
+encoder validation and hardware selection use the same injected runner. The manager retains
+its registry, input pump, logging, throttling, failure classification and output cleanup.
+There is no second launch path or compatibility overload in the manager.
+
+`EncodingHelper` no longer calls `Environment.SetEnvironmentVariable`. `FfmpegArguments`
+captures i965 (`LIBVA_DRIVER_NAME`, `LIBVA_DRIVER_NAME_REEFIN`) and AMD (`AMD_DEBUG`) overrides
+in the same branch that selects device arguments. HLS/progressive commands and interval
+trickplay extraction deliver these values to their own child only. The parent's configured
+environment remains inherited normally. The former singleton `ImmutableArray<string>` that
+held an entire quoted command line is replaced with an explicit `ArgumentLine` string;
+tokenized argv construction is not implemented or claimed by this slice.
+
+Managed transcodes redirect stdin/stderr only. Probes drain stdout and stderr before feeding
+optional input, preventing pipe deadlock when a child writes before reading a large input.
+Preparation/launch cancellation and errors remove the failed registered attempt and dispose
+its log, including cancellation during pre-launch log writes.
+
+Tests cover concurrent driver captures, separate real child environments, a concurrent probe,
+unstarted creation, pre-launch cancellation, launch failure, both-pipe flooding with large
+stdin, and the existing ownership/restart/fallback cases. Architecture checks forbid native
+creation/launch in `TranscodeManager` and environment mutation in command construction.
+Image/attachment/subtitle process scheduling, tokenized argv and physical GPU/Windows/macOS
+acceptance remain separate work. No OpenAPI, SDK, project/package or ratchet-baseline change;
+step 5 and the remaining playback consumers in §6 stay open.
+
+Local validation: Controller 1,673 passed / 2 hardware skips; MediaEncoding 324 passed /
+2 platform/hardware skips; API 650 passed; Server 528 passed, including the consolidation
+ratchet with its baseline unchanged; integration 94 passed (82 film/OpenAPI cases and 12
+HLS/progressive output-isolation cases with software FFmpeg). Fifteen new cases exercise
+this boundary. Both architecture negative controls fail when their violation is injected,
+then pass after source restoration. The startup-exit fixture explicitly disables network-change
+subscriptions after clearing inherited settings, so a restricted netlink socket cannot replace
+the failure it is meant to observe. No startup/exit assertion is removed or relaxed.

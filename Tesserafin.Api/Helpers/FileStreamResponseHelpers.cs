@@ -118,7 +118,7 @@ public static class FileStreamResponseHelpers
     /// <param name="httpContext">The current http context.</param>
     /// <param name="transcodeManager">The <see cref="ITranscodeManager"/> singleton.</param>
     /// <param name="jobOwnership">Compares the caller with the job that writes the output.</param>
-    /// <param name="ffmpegCommandLineArguments">The command line arguments to start ffmpeg.</param>
+    /// <param name="command">The immutable command to start FFmpeg.</param>
     /// <param name="transcodingJobType">The <see cref="TranscodingJobType"/>.</param>
     /// <param name="cancellationTokenSource">The <see cref="CancellationTokenSource"/>.</param>
     /// <returns>A <see cref="Task{ActionResult}"/> containing the transcoded file.</returns>
@@ -135,7 +135,7 @@ public static class FileStreamResponseHelpers
         HttpContext httpContext,
         ITranscodeManager transcodeManager,
         IHlsJobOwnershipAuthorizer jobOwnership,
-        string ffmpegCommandLineArguments,
+        FfmpegCommand command,
         TranscodingJobType transcodingJobType,
         CancellationTokenSource cancellationTokenSource)
     {
@@ -176,7 +176,7 @@ public static class FileStreamResponseHelpers
                 job = await transcodeManager.StartFfMpeg(
                     state,
                     outputPath,
-                    ffmpegCommandLineArguments,
+                    command,
                     httpContext.User.GetUserId(),
                     transcodingJobType,
                     cancellationTokenSource).ConfigureAwait(false);

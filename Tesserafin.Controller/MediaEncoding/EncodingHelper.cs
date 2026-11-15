@@ -6,6 +6,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -1058,20 +1059,21 @@ namespace Tesserafin.Controller.MediaEncoding
         /// <param name="state">Encoding state.</param>
         /// <param name="options">Encoding options.</param>
         /// <returns>Input video hwaccel arguments.</returns>
-        public string GetInputVideoHwaccelArgs(EncodingJobInfo state, EncodingOptions options)
+        public FfmpegArguments GetInputVideoHwaccelArgs(EncodingJobInfo state, EncodingOptions options)
         {
             if (!state.IsVideoRequest)
             {
-                return string.Empty;
+                return FfmpegArguments.Empty;
             }
 
             var vidEncoder = GetVideoEncoder(state, options) ?? string.Empty;
             if (IsCopyCodec(vidEncoder))
             {
-                return string.Empty;
+                return FfmpegArguments.Empty;
             }
 
             var args = new StringBuilder();
+            var environment = ImmutableDictionary.CreateBuilder<string, string>();
             var isWindows = OperatingSystem.IsWindows();
             var isLinux = OperatingSystem.IsLinux();
             var isMacOS = OperatingSystem.IsMacOS();
@@ -1083,14 +1085,14 @@ namespace Tesserafin.Controller.MediaEncoding
             {
                 if (!isLinux || !_mediaEncoder.SupportsHwaccel("vaapi"))
                 {
-                    return string.Empty;
+                    return FfmpegArguments.Empty;
                 }
 
                 var isVaapiDecoder = vidDecoder.Contains("vaapi", StringComparison.OrdinalIgnoreCase);
                 var isVaapiEncoder = vidEncoder.Contains("vaapi", StringComparison.OrdinalIgnoreCase);
                 if (!isVaapiDecoder && !isVaapiEncoder)
                 {
-                    return string.Empty;
+                    return FfmpegArguments.Empty;
                 }
 
                 if (_mediaEncoder.IsVaapiDeviceInteliHD)
@@ -1100,8 +1102,8 @@ namespace Tesserafin.Controller.MediaEncoding
                 else if (_mediaEncoder.IsVaapiDeviceInteli965)
                 {
                     // Only override i965 since it has lower priority than iHD in libva lookup.
-                    Environment.SetEnvironmentVariable("LIBVA_DRIVER_NAME", "i965");
-                    Environment.SetEnvironmentVariable("LIBVA_DRIVER_NAME_REEFIN", "i965");
+                    environment["LIBVA_DRIVER_NAME"] = "i965";
+                    environment["LIBVA_DRIVER_NAME_REEFIN"] = "i965";
                     args.Append(GetVaapiDeviceArgs(options.VaapiDevice, "i965", null, null, null, VaapiAlias));
                 }
 
@@ -1119,7 +1121,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 else if (_mediaEncoder.IsVaapiDeviceAmd)
                 {
                     // Disable AMD EFC feature since it's still unstable in upstream Mesa.
-                    Environment.SetEnvironmentVariable("AMD_DEBUG", "noefc");
+                    environment["AMD_DEBUG"] = "noefc";
 
                     if (IsVulkanFullSupported()
                         && _mediaEncoder.IsVaapiDeviceSupportVulkanDrmInterop
@@ -1157,7 +1159,7 @@ namespace Tesserafin.Controller.MediaEncoding
             {
                 if ((!isLinux && !isWindows) || !_mediaEncoder.SupportsHwaccel("qsv"))
                 {
-                    return string.Empty;
+                    return FfmpegArguments.Empty;
                 }
 
                 var isD3d11vaDecoder = vidDecoder.Contains("d3d11va", StringComparison.OrdinalIgnoreCase);
@@ -1167,7 +1169,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 var isHwDecoder = isQsvDecoder || isVaapiDecoder || isD3d11vaDecoder;
                 if (!isHwDecoder && !isQsvEncoder)
                 {
-                    return string.Empty;
+                    return FfmpegArguments.Empty;
                 }
 
                 args.Append(GetQsvDeviceArgs(options.QsvDevice, QsvAlias));
@@ -1192,7 +1194,7 @@ namespace Tesserafin.Controller.MediaEncoding
             {
                 if ((!isLinux && !isWindows) || !IsCudaFullSupported())
                 {
-                    return string.Empty;
+                    return FfmpegArguments.Empty;
                 }
 
                 var isCuvidDecoder = vidDecoder.Contains("cuvid", StringComparison.OrdinalIgnoreCase);
@@ -1201,7 +1203,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 var isHwDecoder = isNvdecDecoder || isCuvidDecoder;
                 if (!isHwDecoder && !isNvencEncoder)
                 {
-                    return string.Empty;
+                    return FfmpegArguments.Empty;
                 }
 
                 args.Append(GetCudaDeviceArgs(0, CudaAlias))
@@ -1211,14 +1213,14 @@ namespace Tesserafin.Controller.MediaEncoding
             {
                 if (!isWindows || !_mediaEncoder.SupportsHwaccel("d3d11va"))
                 {
-                    return string.Empty;
+                    return FfmpegArguments.Empty;
                 }
 
                 var isD3d11vaDecoder = vidDecoder.Contains("d3d11va", StringComparison.OrdinalIgnoreCase);
                 var isAmfEncoder = vidEncoder.Contains("amf", StringComparison.OrdinalIgnoreCase);
                 if (!isD3d11vaDecoder && !isAmfEncoder)
                 {
-                    return string.Empty;
+                    return FfmpegArguments.Empty;
                 }
 
                 // no dxva video processor hw filter.
@@ -1236,14 +1238,14 @@ namespace Tesserafin.Controller.MediaEncoding
             {
                 if (!isMacOS || !_mediaEncoder.SupportsHwaccel("videotoolbox"))
                 {
-                    return string.Empty;
+                    return FfmpegArguments.Empty;
                 }
 
                 var isVideotoolboxDecoder = vidDecoder.Contains("videotoolbox", StringComparison.OrdinalIgnoreCase);
                 var isVideotoolboxEncoder = vidEncoder.Contains("videotoolbox", StringComparison.OrdinalIgnoreCase);
                 if (!isVideotoolboxDecoder && !isVideotoolboxEncoder)
                 {
-                    return string.Empty;
+                    return FfmpegArguments.Empty;
                 }
 
                 // videotoolbox hw filter does not require device selection
@@ -1253,14 +1255,14 @@ namespace Tesserafin.Controller.MediaEncoding
             {
                 if (!isLinux || !_mediaEncoder.SupportsHwaccel("rkmpp"))
                 {
-                    return string.Empty;
+                    return FfmpegArguments.Empty;
                 }
 
                 var isRkmppDecoder = vidDecoder.Contains("rkmpp", StringComparison.OrdinalIgnoreCase);
                 var isRkmppEncoder = vidEncoder.Contains("rkmpp", StringComparison.OrdinalIgnoreCase);
                 if (!isRkmppDecoder && !isRkmppEncoder)
                 {
-                    return string.Empty;
+                    return FfmpegArguments.Empty;
                 }
 
                 args.Append(GetRkmppDeviceArgs(RkmppAlias));
@@ -1282,7 +1284,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 args.Append(vidDecoder);
             }
 
-            return args.ToString().Trim();
+            return new FfmpegArguments(args.ToString().Trim(), environment.ToImmutable());
         }
 
         /// <summary>
@@ -1307,14 +1309,14 @@ namespace Tesserafin.Controller.MediaEncoding
         /// <param name="options">Encoding options.</param>
         /// <param name="segmentContainer">Segment Container.</param>
         /// <returns>Input arguments.</returns>
-        public string GetInputArgument(EncodingJobInfo state, EncodingOptions options, string segmentContainer)
+        public FfmpegArguments GetInputArgument(EncodingJobInfo state, EncodingOptions options, string segmentContainer)
         {
             var arg = new StringBuilder();
             var inputVidHwaccelArgs = GetInputVideoHwaccelArgs(state, options);
 
-            if (!string.IsNullOrEmpty(inputVidHwaccelArgs))
+            if (!string.IsNullOrEmpty(inputVidHwaccelArgs.ArgumentLine))
             {
-                arg.Append(inputVidHwaccelArgs);
+                arg.Append(inputVidHwaccelArgs.ArgumentLine);
             }
 
             var canvasArgs = GetGraphicalSubCanvasSize(state);
@@ -1415,7 +1417,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 arg.Append(" -noautoscale");
             }
 
-            return arg.ToString();
+            return new FfmpegArguments(arg.ToString(), inputVidHwaccelArgs.EnvironmentVariables);
         }
 
         /// <summary>
@@ -5752,7 +5754,7 @@ namespace Tesserafin.Controller.MediaEncoding
             return " -codec:s:0 " + codec + " -disposition:s:0 default";
         }
 
-        public string GetProgressiveVideoFullCommandLine(EncodingJobInfo state, EncodingOptions encodingOptions, EncoderPreset defaultPreset)
+        public FfmpegCommand GetProgressiveVideoCommand(EncodingJobInfo state, EncodingOptions encodingOptions, EncoderPreset defaultPreset)
         {
             // Get the output codec name
             var videoCodec = GetVideoEncoder(state, encodingOptions);
@@ -5772,11 +5774,12 @@ namespace Tesserafin.Controller.MediaEncoding
 
             var inputModifier = GetInputModifier(state, encodingOptions, null);
 
-            return string.Format(
+            var input = GetInputArgument(state, encodingOptions, null);
+            var arguments = string.Format(
                 CultureInfo.InvariantCulture,
                 "{0} {1}{2} {3} {4} -map_metadata -1 -map_chapters -1 -threads {5} {6}{7}{8} -y \"{9}\"",
                 inputModifier,
-                GetInputArgument(state, encodingOptions, null),
+                input.ArgumentLine,
                 keyFrame,
                 GetMapArgs(state),
                 GetProgressiveVideoArguments(state, encodingOptions, videoCodec, defaultPreset),
@@ -5785,6 +5788,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 GetSubtitleEmbedArguments(state),
                 format,
                 outputPath).Trim();
+            return FfmpegCommand.FromArgumentLine(_mediaEncoder.EncoderPath, arguments, input.EnvironmentVariables);
         }
 
         public string GetOutputFFlags(EncodingJobInfo state)
@@ -5942,7 +5946,7 @@ namespace Tesserafin.Controller.MediaEncoding
             return args;
         }
 
-        public string GetProgressiveAudioFullCommandLine(EncodingJobInfo state, EncodingOptions encodingOptions, string outputPath)
+        public FfmpegCommand GetProgressiveAudioCommand(EncodingJobInfo state, EncodingOptions encodingOptions, string outputPath)
         {
             var audioTranscodeParams = new List<string>();
 
@@ -6010,11 +6014,12 @@ namespace Tesserafin.Controller.MediaEncoding
 
             var inputModifier = GetInputModifier(state, encodingOptions, null);
 
-            return string.Format(
+            var input = GetInputArgument(state, encodingOptions, null);
+            var arguments = string.Format(
                 CultureInfo.InvariantCulture,
                 "{0} {1}{7}{8} -threads {2}{3} {4} -id3v2_version 3 -write_id3v1 1{6} -y \"{5}\"",
                 inputModifier,
-                GetInputArgument(state, encodingOptions, null),
+                input.ArgumentLine,
                 threads,
                 " -vn",
                 string.Join(' ', audioTranscodeParams),
@@ -6022,6 +6027,7 @@ namespace Tesserafin.Controller.MediaEncoding
                 string.Empty,
                 string.Empty,
                 string.Empty).Trim();
+            return FfmpegCommand.FromArgumentLine(_mediaEncoder.EncoderPath, arguments, input.EnvironmentVariables);
         }
 
         public static int FindIndex(IReadOnlyList<MediaStream> mediaStreams, MediaStream streamToFind)

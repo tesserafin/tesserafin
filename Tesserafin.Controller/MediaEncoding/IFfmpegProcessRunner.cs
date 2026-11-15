@@ -1,17 +1,28 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Tesserafin.Controller.MediaEncoding;
 
 /// <summary>
-/// Runs short-lived ffmpeg/ffprobe probe invocations (codec/filter/hwaccel detection, version
-/// checks) behind a single, testable component. Unlike ad-hoc <see cref="System.Diagnostics.Process"/>
-/// usage, implementations must drain both stdout and stderr concurrently - reading only one can
-/// deadlock once the unread stream's OS pipe buffer fills.
+/// Creates managed transcode processes and runs short-lived ffmpeg/ffprobe probes behind one
+/// process factory. Transcode ownership is registered by the caller before launch. Probes drain
+/// both stdout and stderr concurrently; managed transcodes redirect only stderr, whose drain
+/// belongs to the caller. Every redirected output pipe must have a reader.
 /// </summary>
 public interface IFfmpegProcessRunner
 {
+    /// <summary>Creates an unstarted child configured for managed transcoding.</summary>
+    /// <param name="command">The immutable invocation and child environment.</param>
+    /// <returns>A process with stderr/stdin redirected and stdout unredirected.</returns>
+    Process CreateTranscodeProcess(FfmpegCommand command);
+
+    /// <summary>Starts a registered child under the caller's ownership lock.</summary>
+    /// <param name="process">The unstarted child.</param>
+    /// <param name="cancellationToken">Cancellation checked immediately before launch.</param>
+    void StartTranscode(Process process, CancellationToken cancellationToken);
+
     /// <summary>
     /// Starts <paramref name="command"/>, drains stdout and stderr concurrently, and waits for
     /// exit or <paramref name="timeout"/>, whichever comes first.

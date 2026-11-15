@@ -82,20 +82,18 @@ public interface ITranscodeManager
     /// </summary>
     /// <param name="state">The state.</param>
     /// <param name="outputPath">The output path.</param>
-    /// <param name="commandLineArguments">The command line arguments for FFmpeg.</param>
+    /// <param name="command">The fully captured invocation.</param>
     /// <param name="userId">The user id.</param>
     /// <param name="transcodingJobType">The <see cref="TranscodingJobType"/>.</param>
     /// <param name="cancellationTokenSource">The cancellation token source.</param>
-    /// <param name="workingDirectory">The working directory.</param>
     /// <returns>Task.</returns>
     public Task<TranscodingJob> StartFfMpeg(
         StreamState state,
         string outputPath,
-        string commandLineArguments,
+        FfmpegCommand command,
         Guid userId,
         TranscodingJobType transcodingJobType,
-        CancellationTokenSource cancellationTokenSource,
-        string? workingDirectory = null);
+        CancellationTokenSource cancellationTokenSource);
 
     /// <summary>
     /// Called when [transcode begin request].

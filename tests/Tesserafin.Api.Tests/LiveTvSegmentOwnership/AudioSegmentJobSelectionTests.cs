@@ -286,7 +286,8 @@ public sealed class AudioSegmentJobSelectionTests : IDisposable
                 Mock.Of<IPathManager>()),
             Mock.Of<IMediaEncoder>(),
             Mock.Of<IMediaSourceManager>(),
-            Mock.Of<IAttachmentExtractor>());
+            Mock.Of<IAttachmentExtractor>(),
+            new Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner());
     }
 
     private TranscodingJob Job(string playlistId, Guid ownerUserId, string ownerDeviceId, Guid itemId, string mediaSourceId, string playSessionId, long generation)

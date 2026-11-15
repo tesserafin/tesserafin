@@ -69,6 +69,7 @@ namespace Tesserafin.MediaEncoding.Encoder
 
         // MediaEncoder is registered as a Singleton
         private readonly JsonSerializerOptions _jsonSerializerOptions;
+        private readonly IFfmpegProcessRunner _processRunner;
 
         private HardwareCapabilitySnapshot _capabilities = HardwareCapabilitySnapshot.Empty;
 
@@ -110,7 +111,8 @@ namespace Tesserafin.MediaEncoding.Encoder
             IBlurayExaminer blurayExaminer,
             ILocalizationManager localization,
             IConfiguration config,
-            IServerConfigurationManager serverConfig)
+            IServerConfigurationManager serverConfig,
+            IFfmpegProcessRunner processRunner)
         {
             _logger = logger;
             _configurationManager = configurationManager;
@@ -119,6 +121,7 @@ namespace Tesserafin.MediaEncoding.Encoder
             _localization = localization;
             _config = config;
             _serverConfig = serverConfig;
+            _processRunner = processRunner;
             _startupOptionFFmpegPath = config.GetValue<string>(Tesserafin.Controller.Extensions.ConfigurationExtensions.FfmpegPathKey) ?? string.Empty;
 
             _jsonSerializerOptions = new JsonSerializerOptions(JsonDefaults.Options);
@@ -226,7 +229,7 @@ namespace Tesserafin.MediaEncoding.Encoder
                 _ffprobePath = FfprobePathRegex().Replace(_ffmpegPath, "ffprobe$1");
 
                 // Interrogate to understand what coders are supported
-                var validator = new EncoderValidator(_logger, _ffmpegPath);
+                var validator = new EncoderValidator(_logger, _ffmpegPath, _processRunner);
 
                 SetAvailableDecoders(validator.GetDecoders());
                 SetAvailableEncoders(validator.GetEncoders());
@@ -334,7 +337,7 @@ namespace Tesserafin.MediaEncoding.Encoder
         /// <param name="options">The current encoding options. Mutated to carry the effective backend.</param>
         private void SelectHardwareAcceleration(EncodingOptions options)
         {
-            var probe = new HardwareBackendProbe(new FfmpegProcessRunner(), _logger);
+            var probe = new HardwareBackendProbe(_processRunner, _logger);
 
             var decision = HardwareSelectionPlanner.Decide(
                 HardwareBackendCatalog.CandidatesInPriorityOrder,
@@ -390,7 +393,7 @@ namespace Tesserafin.MediaEncoding.Encoder
                 return false;
             }
 
-            bool rc = new EncoderValidator(_logger, path).ValidateVersion();
+            bool rc = new EncoderValidator(_logger, path, _processRunner).ValidateVersion();
             if (!rc)
             {
                 _logger.LogError("FFmpeg: Failed version check: {Path}", path);
@@ -1079,7 +1082,8 @@ namespace Tesserafin.MediaEncoding.Encoder
             var vidEncoder = enableHwEncoding ? encodingHelper.GetVideoEncoder(jobState, options) : jobState.OutputVideoCodec;
 
             // Get input and filter arguments
-            var inputArg = encodingHelper.GetInputArgument(jobState, options, container).Trim();
+            var input = encodingHelper.GetInputArgument(jobState, options, container);
+            var inputArg = input.ArgumentLine.Trim();
             if (string.IsNullOrWhiteSpace(inputArg))
             {
                 throw new InvalidOperationException("EncodingHelper returned empty input arguments.");
@@ -1105,7 +1109,7 @@ namespace Tesserafin.MediaEncoding.Encoder
             try
             {
                 return await ExtractVideoImagesOnIntervalInternal(
-                    (enableKeyFrameOnlyExtraction ? "-skip_frame nokey " : string.Empty) + inputArg,
+                    input with { ArgumentLine = (enableKeyFrameOnlyExtraction ? "-skip_frame nokey " : string.Empty) + inputArg },
                     filterParam,
                     vidEncoder,
                     threads,
@@ -1123,11 +1127,11 @@ namespace Tesserafin.MediaEncoding.Encoder
                 _logger.LogWarning(ex, "I-frame trickplay extraction failed, will attempt standard way. Input: {InputFile}", inputFile);
             }
 
-            return await ExtractVideoImagesOnIntervalInternal(inputArg, filterParam, vidEncoder, threads, qualityScale, priority, cancellationToken).ConfigureAwait(false);
+            return await ExtractVideoImagesOnIntervalInternal(input with { ArgumentLine = inputArg }, filterParam, vidEncoder, threads, qualityScale, priority, cancellationToken).ConfigureAwait(false);
         }
 
         private async Task<string> ExtractVideoImagesOnIntervalInternal(
-            string inputArg,
+            FfmpegArguments input,
             string filterParam,
             string vidEncoder,
             int? outputThreads,
@@ -1135,6 +1139,7 @@ namespace Tesserafin.MediaEncoding.Encoder
             ProcessPriorityClass? priority,
             CancellationToken cancellationToken)
         {
+            var inputArg = input.ArgumentLine;
             if (string.IsNullOrWhiteSpace(inputArg))
             {
                 throw new InvalidOperationException("Empty or invalid input argument.");
@@ -1199,6 +1204,11 @@ namespace Tesserafin.MediaEncoding.Encoder
                 },
                 EnableRaisingEvents = true
             };
+
+            foreach (var (key, value) in input.EnvironmentVariables)
+            {
+                process.StartInfo.Environment[key] = value;
+            }
 
             var processDescription = string.Format(CultureInfo.InvariantCulture, "{0} {1}", process.StartInfo.FileName, process.StartInfo.Arguments);
             _logger.LogInformation("Trickplay generation: {ProcessDescription}", processDescription);

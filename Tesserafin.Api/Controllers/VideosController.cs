@@ -493,7 +493,7 @@ public class VideosController : BaseTesserafinApiController
         // tesserafin#119: built with the options in force for this source, like every other command.
         var encodingOptions = _transcodeManager.GetEffectiveEncodingOptions(streamingRequest.MediaSourceId)
             ?? _serverConfigurationManager.GetEncodingOptions();
-        var ffmpegCommandLineArguments = _encodingHelper.GetProgressiveVideoFullCommandLine(state, encodingOptions, EncoderPreset.superfast);
+        var ffmpegCommandLineArguments = _encodingHelper.GetProgressiveVideoCommand(state, encodingOptions, EncoderPreset.superfast);
         return await FileStreamResponseHelpers.GetTranscodedFile(
             state,
             isHeadRequest,

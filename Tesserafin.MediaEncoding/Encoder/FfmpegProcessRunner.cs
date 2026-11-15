@@ -10,35 +10,23 @@ namespace Tesserafin.MediaEncoding.Encoder;
 public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
 {
     /// <inheritdoc />
+    public Process CreateTranscodeProcess(FfmpegCommand command)
+        => CreateProcess(command, redirectOutput: false, redirectInput: true, raiseEvents: true);
+
+    /// <inheritdoc />
+    public void StartTranscode(Process process, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        cancellationToken.ThrowIfCancellationRequested();
+        process.Start();
+    }
+
+    /// <inheritdoc />
     public async Task<FfmpegProcessResult> RunProbeAsync(FfmpegCommand command, TimeSpan timeout, CancellationToken cancellationToken, string? standardInput = null)
     {
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo(command.Executable, command.ToArgumentLine())
-            {
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                WindowStyle = ProcessWindowStyle.Hidden,
-                ErrorDialog = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                RedirectStandardInput = standardInput is not null,
-                WorkingDirectory = string.IsNullOrEmpty(command.WorkingDirectory) ? string.Empty : command.WorkingDirectory,
-            }
-        };
-
-        foreach (var (key, value) in command.EnvironmentVariables)
-        {
-            process.StartInfo.Environment[key] = value;
-        }
-
+        cancellationToken.ThrowIfCancellationRequested();
+        using var process = CreateProcess(command, redirectOutput: true, redirectInput: standardInput is not null, raiseEvents: false);
         process.Start();
-
-        if (standardInput is not null)
-        {
-            using var writer = process.StandardInput;
-            await writer.WriteAsync(standardInput).ConfigureAwait(false);
-        }
 
         // Both streams must be drained concurrently: reading one to completion before starting
         // the other can deadlock if the unread stream fills its OS pipe buffer first. They are
@@ -54,18 +42,32 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
         bool timedOut = false;
         try
         {
+            if (standardInput is not null)
+            {
+                using var writer = process.StandardInput;
+                await writer.WriteAsync(standardInput.AsMemory(), linkedCts.Token).ConfigureAwait(false);
+            }
+
             await process.WaitForExitAsync(linkedCts.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
             TryKill(process);
-
+            await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+            await Task.WhenAll(stdOutTask, stdErrTask).ConfigureAwait(false);
             if (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
 
             timedOut = true;
+        }
+        catch
+        {
+            TryKill(process);
+            await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+            await Task.WhenAll(stdOutTask, stdErrTask).ConfigureAwait(false);
+            throw;
         }
 
         var stdOut = await stdOutTask.ConfigureAwait(false);
@@ -76,6 +78,34 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
             stdOut,
             stdErr,
             timedOut);
+    }
+
+    private static Process CreateProcess(FfmpegCommand command, bool redirectOutput, bool redirectInput, bool raiseEvents)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentException.ThrowIfNullOrEmpty(command.Executable);
+        ArgumentNullException.ThrowIfNull(command.ArgumentLine);
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo(command.Executable, command.ArgumentLine)
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                ErrorDialog = false,
+                RedirectStandardOutput = redirectOutput,
+                RedirectStandardError = true,
+                RedirectStandardInput = redirectInput,
+                WorkingDirectory = string.IsNullOrWhiteSpace(command.WorkingDirectory) ? string.Empty : command.WorkingDirectory,
+            },
+            EnableRaisingEvents = raiseEvents
+        };
+        foreach (var (key, value) in command.EnvironmentVariables)
+        {
+            process.StartInfo.Environment[key] = value;
+        }
+
+        return process;
     }
 
     private static void TryKill(Process process)

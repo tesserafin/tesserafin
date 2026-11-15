@@ -24,7 +24,8 @@ namespace Tesserafin.MediaEncoding.Tests.Probing
                 Mock.Of<IBlurayExaminer>(),
                 Mock.Of<ILocalizationManager>(),
                 new ConfigurationBuilder().Build(),
-                Mock.Of<IServerConfigurationManager>());
+                Mock.Of<IServerConfigurationManager>(),
+                new FfmpegProcessRunner());
 
             var userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
             var req = new Tesserafin.Controller.MediaEncoding.MediaInfoRequest()

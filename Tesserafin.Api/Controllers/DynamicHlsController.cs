@@ -369,7 +369,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
                         job = await _transcodeManager.StartFfMpeg(
                                 state,
                                 playlistPath,
-                                GetCommandLineArguments(playlistPath, state, true, 0),
+                                BuildCommand(playlistPath, state, true, 0),
                                 Request.HttpContext.User.GetUserId(),
                                 TranscodingJobType,
                                 cancellationTokenSource)
@@ -1748,7 +1748,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
                     job = await _transcodeManager.StartFfMpeg(
                         state,
                         playlistPath,
-                        GetCommandLineArguments(playlistPath, state, false, segmentId),
+                        BuildCommand(playlistPath, state, false, segmentId),
                         Request.HttpContext.User.GetUserId(),
                         TranscodingJobType,
                         cancellationTokenSource).ConfigureAwait(false);
@@ -1857,7 +1857,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
         return segments;
     }
 
-    private string GetCommandLineArguments(string outputPath, StreamState state, bool isEventPlaylist, int startNumber)
+    private FfmpegCommand BuildCommand(string outputPath, StreamState state, bool isEventPlaylist, int startNumber)
     {
         var videoCodec = _encodingHelper.GetVideoEncoder(state, _encodingOptions);
         var threads = EncodingHelper.GetNumberOfThreads(state, _encodingOptions, videoCodec);
@@ -1918,11 +1918,12 @@ public partial class DynamicHlsController : BaseTesserafinApiController
                 Path.GetFileNameWithoutExtension(outputPath));
         }
 
-        return string.Format(
+        var input = _encodingHelper.GetInputArgument(state, _encodingOptions, segmentContainer);
+        var arguments = string.Format(
             CultureInfo.InvariantCulture,
             "{0} {1} -map_metadata -1 -map_chapters -1 -threads {2} {3} {4} {5} -copyts -avoid_negative_ts disabled -max_muxing_queue_size {6} -f hls -max_delay 5000000 -hls_time {7} -hls_segment_type {8} -start_number {9}{10} -hls_segment_filename \"{11}\" {12} -y \"{13}\"",
             inputModifier,
-            _encodingHelper.GetInputArgument(state, _encodingOptions, segmentContainer),
+            input.ArgumentLine,
             threads,
             mapArgs,
             GetVideoArguments(state, startNumber, isEventPlaylist, segmentContainer),
@@ -1935,6 +1936,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
             EncodingUtils.NormalizePath(outputTsArg),
             hlsArguments,
             EncodingUtils.NormalizePath(outputPath)).Trim();
+        return FfmpegCommand.FromArgumentLine(_mediaEncoder.EncoderPath, arguments, input.EnvironmentVariables);
     }
 
     /// <summary>

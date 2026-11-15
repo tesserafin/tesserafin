@@ -107,7 +107,8 @@ namespace Tesserafin.Server.Tests.LogForging
                     Mock.Of<IPathManager>()),
                 Mock.Of<IMediaEncoder>(),
                 Mock.Of<IMediaSourceManager>(),
-                Mock.Of<IAttachmentExtractor>());
+                Mock.Of<IAttachmentExtractor>(),
+                new Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner());
         }
     }
 }

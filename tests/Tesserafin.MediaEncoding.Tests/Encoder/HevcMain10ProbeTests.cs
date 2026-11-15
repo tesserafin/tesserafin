@@ -25,7 +25,7 @@ public class HevcMain10ProbeTests
         Assert.Equal(expected, validator.CheckSoftwareHevcMain10());
         runner.Verify(
             x => x.RunProbeAsync(
-                It.Is<FfmpegCommand>(c => c.Executable == "chosen-ffmpeg" && c.ToArgumentLine().Contains("+yuv420p10le", StringComparison.Ordinal)),
+                It.Is<FfmpegCommand>(c => c.Executable == "chosen-ffmpeg" && c.ArgumentLine.Contains("+yuv420p10le", StringComparison.Ordinal)),
                 It.Is<TimeSpan>(t => t > TimeSpan.Zero && t <= TimeSpan.FromSeconds(60)),
                 It.IsAny<CancellationToken>(),
                 null),

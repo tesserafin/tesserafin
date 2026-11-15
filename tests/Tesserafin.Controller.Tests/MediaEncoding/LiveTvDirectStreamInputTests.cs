@@ -36,7 +36,7 @@ public class LiveTvDirectStreamInputTests
     {
         var state = BuildLiveState(withProvider: true);
 
-        var args = CreateHelper().GetInputArgument(state, new EncodingOptions(), null);
+        var args = CreateHelper().GetInputArgument(state, new EncodingOptions(), null).ArgumentLine;
 
         Assert.Contains(" -i pipe:0", args, StringComparison.Ordinal);
         Assert.DoesNotContain("LiveStreamFiles", args, StringComparison.OrdinalIgnoreCase);
@@ -48,7 +48,7 @@ public class LiveTvDirectStreamInputTests
     {
         var state = BuildLiveState(withProvider: true);
 
-        var args = CreateHelper().GetInputArgument(state, new EncodingOptions(), null);
+        var args = CreateHelper().GetInputArgument(state, new EncodingOptions(), null).ArgumentLine;
 
         foreach (var forbidden in new[] { "api_key", "apikey", "X-Emby-Token", "X-MediaBrowser-Token", "Authorization", "token", "playSessionId" })
         {
@@ -63,7 +63,7 @@ public class LiveTvDirectStreamInputTests
         // by " -i ", is exactly what it produced before stdin selection existed.
         var state = BuildLiveState(withProvider: false);
 
-        var args = CreateHelper().GetInputArgument(state, new EncodingOptions(), null);
+        var args = CreateHelper().GetInputArgument(state, new EncodingOptions(), null).ArgumentLine;
 
         Assert.Contains(" -i " + InputPathArgumentMarker, args, StringComparison.Ordinal);
         Assert.DoesNotContain("pipe:0", args, StringComparison.Ordinal);
@@ -88,7 +88,7 @@ public class LiveTvDirectStreamInputTests
             IsInputVideo = true,
         };
 
-        var args = CreateHelper().GetInputArgument(state, new EncodingOptions(), null);
+        var args = CreateHelper().GetInputArgument(state, new EncodingOptions(), null).ArgumentLine;
 
         Assert.Contains(" -i " + InputPathArgumentMarker, args, StringComparison.Ordinal);
         Assert.DoesNotContain("pipe:0", args, StringComparison.Ordinal);

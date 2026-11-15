@@ -198,11 +198,11 @@ namespace Tesserafin.MediaEncoding.Encoder
 
         private readonly Version _minFFmpegMultiThreadedCli = new Version(7, 0);
 
-        public EncoderValidator(ILogger logger, string encoderPath, IFfmpegProcessRunner? processRunner = null)
+        public EncoderValidator(ILogger logger, string encoderPath, IFfmpegProcessRunner processRunner)
         {
             _logger = logger;
             _encoderPath = encoderPath;
-            _processRunner = processRunner ?? new FfmpegProcessRunner();
+            _processRunner = processRunner;
         }
 
         private enum Codec

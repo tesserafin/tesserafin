@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Tesserafin.Controller.MediaEncoding;
@@ -114,6 +115,107 @@ public class FfmpegProcessRunnerTests
         var result = await _runner.RunProbeAsync(command, _ample, CancellationToken.None, standardInput: "hello-stdin\n");
 
         Assert.Contains("got:-hello-stdin", result.StandardOutput, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CreateTranscodeProcess_ConfiguresButDoesNotLaunchChild()
+    {
+        var command = FfmpegCommand.FromArgumentLine("ffmpeg", "-i \"a movie.mkv\" -vf \"scale=320:180\"", workingDirectory: Path.GetTempPath());
+        using var process = _runner.CreateTranscodeProcess(command);
+
+        Assert.Throws<InvalidOperationException>(() => process.Id);
+        Assert.Equal(command.ArgumentLine, process.StartInfo.Arguments);
+        Assert.Equal(command.WorkingDirectory, process.StartInfo.WorkingDirectory);
+        Assert.True(process.StartInfo.RedirectStandardError);
+        Assert.True(process.StartInfo.RedirectStandardInput);
+        Assert.False(process.StartInfo.RedirectStandardOutput);
+        Assert.True(process.EnableRaisingEvents);
+        Assert.False(process.StartInfo.UseShellExecute);
+    }
+
+    [Fact]
+    public void StartTranscode_PreCancelled_DoesNotLaunchChild()
+    {
+        using var process = _runner.CreateTranscodeProcess(ShellCommand("exit 0", "exit /b 0"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.ThrowsAny<OperationCanceledException>(() => _runner.StartTranscode(process, cancellation.Token));
+        Assert.Throws<InvalidOperationException>(() => process.Id);
+    }
+
+    [Fact]
+    public async Task ConcurrentTranscodes_KeepDistinctEnvironments_AndProbeInheritsParent()
+    {
+        const string variable = "TESSERAFIN_TEST_JOB_DRIVER";
+        var parent = Environment.GetEnvironmentVariable(variable);
+        var directory = Directory.CreateTempSubdirectory("tesserafin-process-");
+        var script = ShellCommand("printf '%s' $TESSERAFIN_TEST_JOB_DRIVER > $TESSERAFIN_TEST_RESULT; read line", "echo %TESSERAFIN_TEST_JOB_DRIVER% > %TESSERAFIN_TEST_RESULT% & set /p line=");
+        var firstCommand = script with { EnvironmentVariables = ImmutableDictionary<string, string>.Empty.Add(variable, "first").Add("TESSERAFIN_TEST_RESULT", "first"), WorkingDirectory = directory.FullName };
+        var secondCommand = script with { EnvironmentVariables = ImmutableDictionary<string, string>.Empty.Add(variable, "second").Add("TESSERAFIN_TEST_RESULT", "second"), WorkingDirectory = directory.FullName };
+        using var first = _runner.CreateTranscodeProcess(firstCommand);
+        using var second = _runner.CreateTranscodeProcess(secondCommand);
+        try
+        {
+            _runner.StartTranscode(first, TestContext.Current.CancellationToken);
+            _runner.StartTranscode(second, TestContext.Current.CancellationToken);
+            Assert.NotEqual(first.Id, second.Id);
+            Assert.False(first.HasExited);
+            Assert.False(second.HasExited);
+            var probe = await _runner.RunProbeAsync(ShellCommand("echo value=$TESSERAFIN_TEST_JOB_DRIVER", "echo value=%TESSERAFIN_TEST_JOB_DRIVER%"), _ample, TestContext.Current.CancellationToken);
+            Assert.DoesNotContain("first", probe.StandardOutput, StringComparison.Ordinal);
+            Assert.DoesNotContain("second", probe.StandardOutput, StringComparison.Ordinal);
+
+            await first.StandardInput.WriteLineAsync("finish");
+            await second.StandardInput.WriteLineAsync("finish");
+            first.StandardInput.Close();
+            second.StandardInput.Close();
+            await Task.WhenAll(first.WaitForExitAsync(TestContext.Current.CancellationToken), second.WaitForExitAsync(TestContext.Current.CancellationToken)).WaitAsync(_ample, TestContext.Current.CancellationToken);
+            Assert.Equal("first", (await File.ReadAllTextAsync(Path.Combine(directory.FullName, "first"), TestContext.Current.CancellationToken)).Trim());
+            Assert.Equal("second", (await File.ReadAllTextAsync(Path.Combine(directory.FullName, "second"), TestContext.Current.CancellationToken)).Trim());
+            Assert.Equal(parent, Environment.GetEnvironmentVariable(variable));
+        }
+        finally
+        {
+            if (!first.HasExited)
+            {
+                first.Kill(entireProcessTree: true);
+                await first.WaitForExitAsync(CancellationToken.None);
+            }
+
+            if (!second.HasExited)
+            {
+                second.Kill(entireProcessTree: true);
+                await second.WaitForExitAsync(CancellationToken.None);
+            }
+
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RunProbeAsync_FloodBeforeReadingLargeInput_DrainsWhileWriting()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Uses POSIX shell input consumption");
+        var command = ShellCommand("for i in $(seq 1 20000); do echo out-line-$i; echo err-line-$i 1>&2; done; cat >/dev/null; echo input-consumed", string.Empty);
+        var result = await _runner.RunProbeAsync(command, _ample, TestContext.Current.CancellationToken, standardInput: new string('x', 200_000));
+
+        Assert.False(result.TimedOut);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("input-consumed", result.StandardOutput, StringComparison.Ordinal);
+        Assert.Contains("err-line-20000", result.StandardError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunProbeAsync_ChildNeverReadsLargeInput_TimeoutStillKillsIt()
+    {
+        var command = ShellCommand("sleep 30", "ping -n 31 127.0.0.1 >NUL");
+        var stopwatch = Stopwatch.StartNew();
+        var result = await _runner.RunProbeAsync(command, TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken, standardInput: new string('x', 200_000));
+
+        Assert.True(result.TimedOut);
+        Assert.Null(result.ExitCode);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(10), $"Input blocked timeout handling for {stopwatch.Elapsed}");
     }
 
     /// <summary>

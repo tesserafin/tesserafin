@@ -194,7 +194,7 @@ public class EncodingHelperTests
                 Path = subFile
             };
             var state = BuildState(sub, deliveryMethod);
-            var inputArgs = CreateHelper().GetInputArgument(state, new EncodingOptions(), null);
+            var inputArgs = CreateHelper().GetInputArgument(state, new EncodingOptions(), null).ArgumentLine;
 
             Assert.Contains(expectedFilename, inputArgs, StringComparison.Ordinal);
         }
@@ -218,7 +218,7 @@ public class EncodingHelperTests
         int expectedSampleRate)
     {
         var state = BuildAudioState(audioCodec, requestedSampleRate);
-        var args = CreateHelper().GetProgressiveAudioFullCommandLine(state, new EncodingOptions(), "/tmp/out");
+        var args = CreateHelper().GetProgressiveAudioCommand(state, new EncodingOptions(), "/tmp/out").ArgumentLine;
 
         Assert.Contains("-ar " + expectedSampleRate, args, StringComparison.Ordinal);
     }

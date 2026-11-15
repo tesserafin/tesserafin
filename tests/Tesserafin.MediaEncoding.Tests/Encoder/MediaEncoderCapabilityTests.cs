@@ -135,6 +135,7 @@ public class MediaEncoderCapabilityTests
             Mock.Of<IBlurayExaminer>(),
             Mock.Of<Tesserafin.Model.Globalization.ILocalizationManager>(),
             configuration,
-            serverConfig.Object);
+            serverConfig.Object,
+            new FfmpegProcessRunner());
     }
 }

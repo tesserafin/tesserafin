@@ -71,7 +71,8 @@ public sealed class ProbePipeArgumentTests
         Mock.Of<IBlurayExaminer>(),
         Mock.Of<ILocalizationManager>(),
         new ConfigurationBuilder().Build(),
-        Mock.Of<IServerConfigurationManager>());
+        Mock.Of<IServerConfigurationManager>(),
+        new FfmpegProcessRunner());
 
     private static MediaInfoRequest Request(IDirectStreamProvider? reader) => new()
     {

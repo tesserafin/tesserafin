@@ -401,6 +401,10 @@ public sealed class FatalStartupExitCodeTests
             }
 
             startInfo.Environment["PATH"] = Path.Combine(_root, "emptypath");
+            // These children test startup/exit behavior, not network-change subscriptions.
+            // A restricted host may deny the netlink socket before the intended failure is reached.
+            // Set this explicitly after clearing inherited TESSERAFIN settings above.
+            startInfo.Environment["TESSERAFIN_DetectNetworkChange"] = "false";
             startInfo.Environment["DOTNET_ROOT"] = DotnetRoot();
             startInfo.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
             startInfo.Environment["DOTNET_NOLOGO"] = "1";

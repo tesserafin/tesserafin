@@ -149,7 +149,7 @@ public class AudioHelper
 
         // Need to start ffmpeg (because media can't be returned directly)
         var encodingOptions = _serverConfigurationManager.GetEncodingOptions();
-        var ffmpegCommandLineArguments = _encodingHelper.GetProgressiveAudioFullCommandLine(state, encodingOptions, outputPath);
+        var ffmpegCommandLineArguments = _encodingHelper.GetProgressiveAudioCommand(state, encodingOptions, outputPath);
         return await FileStreamResponseHelpers.GetTranscodedFile(
             state,
             isHeadRequest,

@@ -6,12 +6,7 @@ namespace Tesserafin.Controller.MediaEncoding;
 /// A fully-resolved invocation of an ffmpeg/ffprobe-family executable.
 /// </summary>
 /// <param name="Executable">Path to the executable.</param>
-/// <param name="Arguments">
-/// The command-line argument segments. Today this always contains exactly one element - the
-/// already-assembled argument string - because the pipeline still builds one long string
-/// (<see cref="EncodingHelper"/> and friends). It is kept as an array so callers can migrate to
-/// discrete arguments later without changing this type's shape.
-/// </param>
+/// <param name="ArgumentLine">The already-serialized argument line, including .NET process quoting.</param>
 /// <param name="EnvironmentVariables">
 /// Environment variables to set on the child process only. Never mutate
 /// <see cref="System.Environment"/> for values that belong here - that leaks into every other
@@ -20,7 +15,7 @@ namespace Tesserafin.Controller.MediaEncoding;
 /// <param name="WorkingDirectory">Working directory for the process, or null/empty for the current one.</param>
 public sealed record FfmpegCommand(
     string Executable,
-    ImmutableArray<string> Arguments,
+    string ArgumentLine,
     ImmutableDictionary<string, string> EnvironmentVariables,
     string? WorkingDirectory = null)
 {
@@ -38,11 +33,5 @@ public sealed record FfmpegCommand(
         string argumentLine,
         ImmutableDictionary<string, string>? environmentVariables = null,
         string? workingDirectory = null)
-        => new(executable, [argumentLine], environmentVariables ?? ImmutableDictionary<string, string>.Empty, workingDirectory);
-
-    /// <summary>
-    /// Gets the argument line to hand to <see cref="System.Diagnostics.ProcessStartInfo.Arguments"/>.
-    /// </summary>
-    /// <returns>The joined argument string.</returns>
-    public string ToArgumentLine() => string.Join(' ', Arguments);
+        => new(executable, argumentLine, environmentVariables ?? ImmutableDictionary<string, string>.Empty, workingDirectory);
 }

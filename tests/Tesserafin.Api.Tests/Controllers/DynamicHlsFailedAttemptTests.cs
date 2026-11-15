@@ -796,7 +796,8 @@ public sealed partial class DynamicHlsFailedAttemptTests : IDisposable
             encodingHelper,
             mediaEncoder.Object,
             mediaSourceManager.Object,
-            Mock.Of<IAttachmentExtractor>())
+            Mock.Of<IAttachmentExtractor>(),
+            new Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner())
         {
             TimeProvider = _clock
         };
@@ -1047,8 +1048,8 @@ public sealed partial class DynamicHlsFailedAttemptTests : IDisposable
         public void ReportTranscodingProgress(TranscodingJob job, StreamState state, TimeSpan? transcodingPosition, float? framerate, double? percentComplete, long? bytesTranscoded, int? bitRate)
             => _inner.ReportTranscodingProgress(job, state, transcodingPosition, framerate, percentComplete, bytesTranscoded, bitRate);
 
-        public Task<TranscodingJob> StartFfMpeg(StreamState state, string outputPath, string commandLineArguments, Guid userId, TranscodingJobType transcodingJobType, CancellationTokenSource cancellationTokenSource, string? workingDirectory = null)
-            => _inner.StartFfMpeg(state, outputPath, commandLineArguments, userId, transcodingJobType, cancellationTokenSource, workingDirectory);
+        public Task<TranscodingJob> StartFfMpeg(StreamState state, string outputPath, FfmpegCommand command, Guid userId, TranscodingJobType transcodingJobType, CancellationTokenSource cancellationTokenSource)
+            => _inner.StartFfMpeg(state, outputPath, command, userId, transcodingJobType, cancellationTokenSource);
 
         public TranscodingJob? OnTranscodeBeginRequest(string path, TranscodingJobType type) => _inner.OnTranscodeBeginRequest(path, type);
 

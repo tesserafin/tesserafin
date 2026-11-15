@@ -552,6 +552,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IKeyframeRepository, KeyframeRepository>();
             serviceCollection.AddSingleton<IItemTypeLookup, ItemTypeLookup>();
 
+            serviceCollection.AddSingleton<IFfmpegProcessRunner, Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner>();
             serviceCollection.AddSingleton<IMediaEncoder, Tesserafin.MediaEncoding.Encoder.MediaEncoder>();
             serviceCollection.AddSingleton<EncodingHelper>();
             serviceCollection.AddSingleton<IPathManager, PathManager>();

@@ -44,6 +44,7 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
     private readonly ISessionManager _sessionManager;
     private readonly EncodingHelper _encodingHelper;
     private readonly IMediaEncoder _mediaEncoder;
+    private readonly IFfmpegProcessRunner _processRunner;
     private readonly IMediaSourceManager _mediaSourceManager;
     private readonly IAttachmentExtractor _attachmentExtractor;
     private readonly IRequestCorrelationAccessor _requestCorrelation;
@@ -89,12 +90,12 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
     /// <param name="mediaEncoder">The <see cref="IMediaEncoder"/>.</param>
     /// <param name="mediaSourceManager">The <see cref="IMediaSourceManager"/>.</param>
     /// <param name="attachmentExtractor">The <see cref="IAttachmentExtractor"/>.</param>
+    /// <param name="processRunner">The shared FFmpeg process factory and launcher.</param>
     /// <param name="requestCorrelation">
     /// Issue #42: supplies the correlation id of the HTTP request currently in flight, so the
     /// ping/kill log lines below carry it alongside the session-scoped <c>PlaySessionId</c> they
     /// already had. Defaults to <see cref="NullRequestCorrelationAccessor"/> when not supplied, so
-    /// every existing call site — test constructors above all — keeps compiling and simply logs no
-    /// request id. Reads <c>null</c> on purpose for the timer-driven kill path, which is caused by
+    /// callers that omit correlation log no request id. Reads <c>null</c> on purpose for the timer-driven kill path, which is caused by
     /// no request at all.
     /// </param>
     public TranscodeManager(
@@ -108,6 +109,7 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
         IMediaEncoder mediaEncoder,
         IMediaSourceManager mediaSourceManager,
         IAttachmentExtractor attachmentExtractor,
+        IFfmpegProcessRunner processRunner,
         IRequestCorrelationAccessor? requestCorrelation = null)
     {
         _requestCorrelation = requestCorrelation ?? NullRequestCorrelationAccessor.Instance;
@@ -119,6 +121,7 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
         _sessionManager = sessionManager;
         _encodingHelper = encodingHelper;
         _mediaEncoder = mediaEncoder;
+        _processRunner = processRunner;
         _mediaSourceManager = mediaSourceManager;
         _attachmentExtractor = attachmentExtractor;
 
@@ -721,11 +724,10 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
     public async Task<TranscodingJob> StartFfMpeg(
         StreamState state,
         string outputPath,
-        string commandLineArguments,
+        FfmpegCommand command,
         Guid userId,
         TranscodingJobType transcodingJobType,
-        CancellationTokenSource cancellationTokenSource,
-        string? workingDirectory = null)
+        CancellationTokenSource cancellationTokenSource)
     {
         var directory = Path.GetDirectoryName(outputPath) ?? throw new ArgumentException($"Provided path ({outputPath}) is not valid.", nameof(outputPath));
         Directory.CreateDirectory(directory);
@@ -749,7 +751,7 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
             }
         }
 
-        ArgumentException.ThrowIfNullOrEmpty(_mediaEncoder.EncoderPath);
+        ArgumentNullException.ThrowIfNull(command);
 
         // If subtitles get burned in fonts may need to be extracted from the media file
         if (state.SubtitleStream is not null && (state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode || state.BaseRequest.AlwaysBurnInSubtitleWhenTranscoding))
@@ -770,25 +772,7 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
             }
         }
 
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                WindowStyle = ProcessWindowStyle.Hidden,
-                CreateNoWindow = true,
-                UseShellExecute = false,
-
-                // Must consume both stdout and stderr or deadlocks may occur
-                // RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                RedirectStandardInput = true,
-                FileName = _mediaEncoder.EncoderPath,
-                Arguments = commandLineArguments,
-                WorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? string.Empty : workingDirectory,
-                ErrorDialog = false
-            },
-            EnableRaisingEvents = true
-        };
+        var process = _processRunner.CreateTranscodeProcess(command);
 
         var transcodingJob = OnTranscodeBeginning(
             outputPath,
@@ -802,51 +786,52 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
             state,
             cancellationTokenSource);
 
-        DescribeAttempt(transcodingJob.CurrentAttempt!, state, commandLineArguments);
-
-        _logger.LogInformation("{Filename} {Arguments}", process.StartInfo.FileName, process.StartInfo.Arguments);
-
-        var logFilePrefix = "FFmpeg.Transcode-";
-        if (state.VideoRequest is not null
-            && EncodingHelper.IsCopyCodec(state.OutputVideoCodec))
-        {
-            logFilePrefix = EncodingHelper.IsCopyCodec(state.OutputAudioCodec)
-                ? "FFmpeg.Remux-"
-                : "FFmpeg.DirectStream-";
-        }
-
-        if (state.VideoRequest is null && EncodingHelper.IsCopyCodec(state.OutputAudioCodec))
-        {
-            logFilePrefix = "FFmpeg.Remux-";
-        }
-
-        var logFilePath = Path.Combine(
-            _serverConfigurationManager.ApplicationPaths.LogDirectoryPath,
-            $"{logFilePrefix}{DateTime.Now:yyyy-MM-dd_HH-mm-ss}_{state.Request.MediaSourceId}_{Guid.NewGuid().ToString()[..8]}.log");
-
-        // FFmpeg writes debug/error info to stderr. This is useful when debugging so let's put it in the log directory.
-        Stream logStream = new FileStream(
-            logFilePath,
-            FileMode.Create,
-            FileAccess.Write,
-            FileShare.Read,
-            IODefaults.FileStreamBufferSize,
-            FileOptions.Asynchronous);
-
-        await JsonSerializer.SerializeAsync(logStream, state.MediaSource, cancellationToken: cancellationTokenSource.Token).ConfigureAwait(false);
-        var commandLineLogMessageBytes = Encoding.UTF8.GetBytes(
-            Environment.NewLine
-            + Environment.NewLine
-            + process.StartInfo.FileName + " " + process.StartInfo.Arguments
-            + Environment.NewLine
-            + Environment.NewLine);
-
-        await logStream.WriteAsync(commandLineLogMessageBytes, cancellationTokenSource.Token).ConfigureAwait(false);
-
-        process.Exited += (_, _) => OnFfMpegProcessExited(process, transcodingJob, state);
-
+        Stream? logStream = null;
         try
         {
+            DescribeAttempt(transcodingJob.CurrentAttempt!, state, command.ArgumentLine);
+
+            _logger.LogInformation("{Filename} {Arguments}", process.StartInfo.FileName, process.StartInfo.Arguments);
+
+            var logFilePrefix = "FFmpeg.Transcode-";
+            if (state.VideoRequest is not null
+                && EncodingHelper.IsCopyCodec(state.OutputVideoCodec))
+            {
+                logFilePrefix = EncodingHelper.IsCopyCodec(state.OutputAudioCodec)
+                    ? "FFmpeg.Remux-"
+                    : "FFmpeg.DirectStream-";
+            }
+
+            if (state.VideoRequest is null && EncodingHelper.IsCopyCodec(state.OutputAudioCodec))
+            {
+                logFilePrefix = "FFmpeg.Remux-";
+            }
+
+            var logFilePath = Path.Combine(
+                _serverConfigurationManager.ApplicationPaths.LogDirectoryPath,
+                $"{logFilePrefix}{DateTime.Now:yyyy-MM-dd_HH-mm-ss}_{state.Request.MediaSourceId}_{Guid.NewGuid().ToString()[..8]}.log");
+
+            // FFmpeg writes debug/error info to stderr. This is useful when debugging so let's put it in the log directory.
+            logStream = new FileStream(
+                logFilePath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.Read,
+                IODefaults.FileStreamBufferSize,
+                FileOptions.Asynchronous);
+
+            await JsonSerializer.SerializeAsync(logStream, state.MediaSource, cancellationToken: cancellationTokenSource.Token).ConfigureAwait(false);
+            var commandLineLogMessageBytes = Encoding.UTF8.GetBytes(
+                Environment.NewLine
+                + Environment.NewLine
+                + process.StartInfo.FileName + " " + process.StartInfo.Arguments
+                + Environment.NewLine
+                + Environment.NewLine);
+
+            await logStream.WriteAsync(commandLineLogMessageBytes, cancellationTokenSource.Token).ConfigureAwait(false);
+
+            process.Exited += (_, _) => OnFfMpegProcessExited(process, transcodingJob, state);
+
             // A job is registered before its process is started, and can be stopped in between.
             // There is no process to stop then, so the job leaves the registry - and a process
             // started after that would write to an output nobody owns. Decided under the lock a
@@ -858,13 +843,31 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
                     throw new OperationCanceledException("The transcoding job was stopped before its process was started.");
                 }
 
-                process.Start();
+                _processRunner.StartTranscode(process, cancellationTokenSource.Token);
             }
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
-            _logger.LogError(ex, "Error starting FFmpeg");
-            OnTranscodeFailedToStart(transcodingJob, state);
+            if (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Error preparing or starting FFmpeg");
+            }
+
+            bool registered;
+            lock (_activeTranscodingJobs)
+            {
+                registered = _activeTranscodingJobs.Contains(transcodingJob);
+            }
+
+            if (registered)
+            {
+                OnTranscodeFailedToStart(transcodingJob, state);
+            }
+
+            if (logStream is not null)
+            {
+                await logStream.DisposeAsync().ConfigureAwait(false);
+            }
 
             throw;
         }
@@ -914,7 +917,7 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
         // It is kept, though: what it recognised in stderr is the evidence a failure is judged on.
         var jobLogger = new JobLogger(_logger);
         transcodingJob.CurrentAttempt!.Diagnostics = jobLogger;
-        transcodingJob.CurrentAttempt.DiagnosticsCompleted = jobLogger.StartStreamingLog(state, process.StandardError, logStream);
+        transcodingJob.CurrentAttempt.DiagnosticsCompleted = jobLogger.StartStreamingLog(state, process.StandardError, logStream!);
 
         // Wait for the file to exist before proceeding
         var ffmpegTargetFile = state.WaitForPath ?? outputPath;

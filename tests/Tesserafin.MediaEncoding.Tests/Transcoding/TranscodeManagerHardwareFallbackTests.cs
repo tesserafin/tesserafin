@@ -167,7 +167,8 @@ public sealed class TranscodeManagerHardwareFallbackTests
                 Mock.Of<IPathManager>()),
             Mock.Of<IMediaEncoder>(),
             Mock.Of<IMediaSourceManager>(),
-            Mock.Of<IAttachmentExtractor>());
+            Mock.Of<IAttachmentExtractor>(),
+            new Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner());
 
         return (manager, configured, configurationManager);
     }

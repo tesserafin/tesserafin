@@ -178,7 +178,7 @@ public sealed partial class DynamicHlsFailedAttemptTests
         };
         using var cancellation = new CancellationTokenSource();
 
-        await Assert.ThrowsAsync<FfmpegException>(() => _manager!.StartFfMpeg(state, output, "-i pipe:0", _owner, TranscodingJobType.Hls, cancellation));
+        await Assert.ThrowsAsync<FfmpegException>(() => _manager!.StartFfMpeg(state, output, FfmpegCommand.FromArgumentLine(Path.Combine(_root, "ffmpeg"), "-i pipe:0"), _owner, TranscodingJobType.Hls, cancellation));
 
         var start = Assert.Single(_starts);
         Assert.True(
@@ -203,7 +203,7 @@ public sealed partial class DynamicHlsFailedAttemptTests
         var registered = new Gate("the job registered, its process not started");
         _beforeStartGate = registered;
 
-        var start = Task.Run(() => _manager!.StartFfMpeg(state, output, "-i film.mkv", _owner, TranscodingJobType.Hls, cancellation), TestContext.Current.CancellationToken);
+        var start = Task.Run(() => _manager!.StartFfMpeg(state, output, FfmpegCommand.FromArgumentLine(Path.Combine(_root, "ffmpeg"), "-i film.mkv"), _owner, TranscodingJobType.Hls, cancellation), TestContext.Current.CancellationToken);
         await registered.Reached;
         var job = _manager!.GetTranscodingJob(output, TranscodingJobType.Hls);
         Assert.NotNull(job);
