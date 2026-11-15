@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
@@ -50,8 +51,8 @@ public sealed class FfmpegFileExecutorTests
         Assert.SkipWhen(OperatingSystem.IsWindows(), "Uses a POSIX shell child");
         using var context = new ExtractionTestContext();
         var output = Path.Combine(context.Root, "file");
-        var command = Shell($"echo extracted > $EXTRACTION_OUTPUT; exit {code}") with { EnvironmentVariables = ImmutableDictionary<string, string>.Empty.Add("EXTRACTION_OUTPUT", output) };
-        var error = await Record.ExceptionAsync(() => context.Executor.ExecuteAsync(command, [output], TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken, acceptOne ? [0, 1] : [0]));
+        FfmpegCommand Command(IReadOnlyList<string> staged) => Shell($"echo extracted > $EXTRACTION_OUTPUT; exit {code}") with { EnvironmentVariables = ImmutableDictionary<string, string>.Empty.Add("EXTRACTION_OUTPUT", staged[0]) };
+        var error = await Record.ExceptionAsync(() => context.Executor.ExecuteAsync(Command, [output], TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken, acceptOne ? [0, 1] : [0]));
 
         if (succeeds)
         {
@@ -76,9 +77,13 @@ public sealed class FfmpegFileExecutorTests
         var second = Path.Combine(context.Root, "second");
         var existing = Path.Combine(context.Root, "unrelated");
         await File.WriteAllTextAsync(existing, "already cached", TestContext.Current.CancellationToken);
-        var command = Shell("echo partial > first; " + (createEmpty ? ": > second" : ":")) with { WorkingDirectory = context.Root };
+        FfmpegCommand Command(IReadOnlyList<string> staged) => Shell("echo partial > $FIRST; " + (createEmpty ? ": > $SECOND" : ":")) with
+        {
+            WorkingDirectory = context.Root,
+            EnvironmentVariables = ImmutableDictionary<string, string>.Empty.Add("FIRST", staged[0]).Add("SECOND", staged[1])
+        };
 
-        await Assert.ThrowsAsync<FfmpegException>(() => context.Executor.ExecuteAsync(command, [first, second], TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<FfmpegException>(() => context.Executor.ExecuteAsync(Command, [first, second], TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.False(File.Exists(first));
         Assert.False(File.Exists(second));
         Assert.Equal("already cached", await File.ReadAllTextAsync(existing, TestContext.Current.CancellationToken));
@@ -94,21 +99,33 @@ public sealed class FfmpegFileExecutorTests
         using var cancellation = new CancellationTokenSource();
         var output = Path.Combine(context.Root, "partial");
         var pidFile = Path.Combine(context.Root, "pid");
-        var command = Shell("echo $$ > pid; echo partial > partial; sleep 30") with { WorkingDirectory = context.Root };
-        var checkedTermination = false;
-        context.FileSystem.Setup(fs => fs.DeleteFile(output)).Callback(() =>
+        string? stagedPath = null;
+        FfmpegCommand Command(IReadOnlyList<string> staged)
         {
+            stagedPath = staged[0];
+            return Shell("echo $$ > pid; echo partial > $OUTPUT; sleep 30") with { WorkingDirectory = context.Root, EnvironmentVariables = ImmutableDictionary<string, string>.Empty.Add("OUTPUT", staged[0]) };
+        }
+
+        var checkedTermination = false;
+        context.FileSystem.Setup(fs => fs.DeleteFile(It.IsAny<string>())).Callback((string path) =>
+        {
+            if (path != stagedPath)
+            {
+                File.Delete(path);
+                return;
+            }
+
             Assert.True(File.Exists(pidFile));
             var pid = int.Parse(File.ReadAllText(pidFile).Trim(), System.Globalization.CultureInfo.InvariantCulture);
             Assert.Throws<ArgumentException>(() => Process.GetProcessById(pid));
             checkedTermination = true;
-            File.Delete(output);
+            File.Delete(path);
         });
-        var run = context.Executor.ExecuteAsync(command, [output], timeout ? TimeSpan.FromSeconds(1) : Timeout.InfiniteTimeSpan, cancellation.Token);
+        var run = context.Executor.ExecuteAsync(Command, [output], timeout ? TimeSpan.FromSeconds(1) : Timeout.InfiniteTimeSpan, cancellation.Token);
         if (!timeout)
         {
             using var patience = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            while (!File.Exists(output))
+            while (stagedPath is null || !File.Exists(stagedPath))
             {
                 await Task.Delay(10, patience.Token);
             }
@@ -136,11 +153,11 @@ public sealed class FfmpegFileExecutorTests
     {
         using var context = new ExtractionTestContext();
         var output = Path.Combine(context.Root, "partial");
-        context.FileSystem.Setup(fs => fs.DeleteFile(output)).Throws(new IOException("cleanup failed"));
+        context.FileSystem.Setup(fs => fs.DeleteFile(It.IsAny<string>())).Throws(new IOException("cleanup failed"));
         var command = FfmpegCommand.FromArgumentLine(Path.Combine(context.Root, "missing-executable"), string.Empty);
 
-        await Assert.ThrowsAsync<System.ComponentModel.Win32Exception>(() => context.Executor.ExecuteAsync(command, [output], TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
-        context.FileSystem.Verify(fs => fs.DeleteFile(output), Times.Once);
+        await Assert.ThrowsAsync<System.ComponentModel.Win32Exception>(() => context.Executor.ExecuteAsync(_ => command, [output], TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        context.FileSystem.Verify(fs => fs.DeleteFile(It.IsAny<string>()), Times.AtLeastOnce);
     }
 
     private static FfmpegCommand Shell(string script) => FfmpegCommand.FromArgumentLine("/bin/sh", $"-c \"{script}\"");

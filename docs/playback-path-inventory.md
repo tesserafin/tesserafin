@@ -605,3 +605,49 @@ consolidation ratchet; real software FFmpeg film/OpenAPI/HLS/progressive integra
 Native-launch injections fail both image architecture guards. Removing the configured permit
 limit fails both concurrency cases. Reintroducing the cancellation/disposal retry fails both
 public image-reader checks. Restoring source passes the full MediaEncoding suite.
+
+## 20. Atomic extraction-cache publication (consolidation step 5, candidate)
+
+`FfmpegFileExecutor` now accepts a command factory receiving staged output paths. Attachment
+and subtitle builders assemble against those paths directly; no serialized-path replacement
+or direct-to-cache overload remains. `AtomicCachePublication` owns a private sibling directory
+outside the served source-cache folder, preserving file extensions for FFmpeg's muxer selection.
+An abandoned or undeletable attempt is never selected by a cache lookup or the attachment font
+directory. Cleanup failure is logged while preserving the primary error and previous cache.
+
+All expected outputs must exist and be nonempty before postprocessing. ASS font rewriting and
+subtitle metadata preparation happen in staging. Publication revalidates every artifact and
+sidecar and observes a final cancellation checkpoint before native renaming starts. Cancellation
+after that checkpoint does not interrupt an artifact's data/metadata pair. Failure, cancellation,
+missing output or a postprocessing error before the first rename leaves the previous cache untouched.
+
+Data is renamed before its freshness marker: metadata must never bless old data with a new
+source revision. Source size/mtime is captured before extraction and checked again after
+preparation; change or removal aborts publication. A failed metadata rename can leave complete
+new data with an old/missing marker, which remains subject to the existing freshness checks.
+
+Native POSIX `rename` and Windows `MoveFileExW(REPLACE_EXISTING)` are used without a cross-device
+copy fallback. A mount boundary fails closed instead of copying a partially visible file.
+Atomicity is per file: all staging is validated before the first rename, but an I/O failure
+during a multi-file commit may leave a prefix of complete, prepared artifacts published. The
+remaining artifacts keep their old values. This is not a batch transaction or an fsync/crash-
+durability guarantee. Open readers can finish reading the old file while new readers see the
+replacement where the filesystem/share permissions permit the rename.
+
+Seventeen new cases cover failure/cancellation with an existing cache, whole-attempt validation,
+postprocessing failure/cancellation/empty output, old-reader isolation, data/metadata rename
+failures, complete-prefix behavior, real cross-device refusal, undeletable orphan staging and
+retry, source-change refusal and real ASS extraction. The copy/move fallback is forbidden by
+an architecture guard. Existing native extraction and kill-before-cleanup tests now exercise
+the staging contract. No OpenAPI, SDK, project/package or consolidation-baseline change.
+
+Windows/macOS native execution remains unproven by the Linux tests. General media probing and
+its live input pump, other cache families and tokenized argv remain separate work. Step 5 and
+remaining playback consumers in §6 stay open.
+
+Local validation for §20: Controller 1,673 passed / 2 hardware skips; MediaEncoding 383 passed /
+2 platform/hardware skips; API 650 passed; Server 528 passed, including the unchanged
+consolidation ratchet; real software FFmpeg film/OpenAPI/HLS/progressive integration 94 passed.
+Publishing before preparation fails all three postprocessing controls. Publishing metadata
+before data fails the disappeared-data control. A copy/delete fallback fails the cross-device
+case and architecture guard. Restoring source passes the full MediaEncoding suite.

@@ -390,27 +390,15 @@ namespace Tesserafin.MediaEncoding.Subtitles
             }
         }
 
-        private void WriteCacheMeta(string cachePath, string? sourcePath)
+        private string? SourceStamp(string? path)
         {
-            if (string.IsNullOrEmpty(sourcePath))
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
             {
-                return;
+                return null;
             }
 
-            try
-            {
-                var sourceInfo = _fileSystem.GetFileInfo(sourcePath);
-                if (!sourceInfo.Exists)
-                {
-                    return;
-                }
-
-                File.WriteAllText(GetCacheMetaPath(cachePath), FormatCacheMeta(sourceInfo.Length, sourceInfo.LastWriteTimeUtc));
-            }
-            catch (IOException ex)
-            {
-                _logger.LogWarning(ex, "Failed to record subtitle cache metadata for {CachePath}", cachePath);
-            }
+            var file = _fileSystem.GetFileInfo(path);
+            return FormatCacheMeta(file.Length, file.LastWriteTimeUtc);
         }
 
         /// <summary>
@@ -448,12 +436,11 @@ namespace Tesserafin.MediaEncoding.Subtitles
                 encodingParam = " -sub_charenc " + encodingParam;
             }
 
-            var arguments = string.Format(CultureInfo.InvariantCulture, "-nostdin -y {0} -i \"{1}\" -c:s srt \"{2}\"", encodingParam, inputPath, outputPath);
-            await ExecuteFileCommand(arguments, [outputPath], cancellationToken).ConfigureAwait(false);
-
-            await SetAssFont(outputPath, cancellationToken).ConfigureAwait(false);
-
-            WriteCacheMeta(outputPath, inputPath);
+            await ExecuteFileCommand(
+                staged => string.Format(CultureInfo.InvariantCulture, "-nostdin -y {0} -i \"{1}\" -c:s srt \"{2}\"", encodingParam, inputPath, staged[0]),
+                [outputPath],
+                inputPath,
+                cancellationToken).ConfigureAwait(false);
 
             _logger.LogInformation("ffmpeg subtitle conversion succeeded for {Path}", inputPath);
         }
@@ -592,6 +579,7 @@ namespace Tesserafin.MediaEncoding.Subtitles
             {
                 var inputPath = _mediaEncoder.GetInputArgument(mksFile, mediaSource);
                 var outputPaths = new List<string>();
+                var outputArguments = new List<string>();
                 var args = string.Format(
                     CultureInfo.InvariantCulture,
                     "-y -i {0}",
@@ -624,20 +612,17 @@ namespace Tesserafin.MediaEncoding.Subtitles
                     Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? throw new FileNotFoundException($"Calculated path ({outputPath}) is not valid."));
 
                     outputPaths.Add(outputPath);
-                    args += string.Format(
+                    outputArguments.Add(string.Format(
                         CultureInfo.InvariantCulture,
-                        " -map 0:{0} -an -vn -c:s {1}{2} -flush_packets 1 \"{3}\"",
+                        " -map 0:{0} -an -vn -c:s {1}{2} -flush_packets 1",
                         streamIndex,
                         outputCodec,
-                        outputFormatOption,
-                        outputPath);
+                        outputFormatOption));
                 }
 
-                await ExtractSubtitlesForFile(inputPath, args, outputPaths, cancellationToken).ConfigureAwait(false);
-
-                foreach (var outputPath in outputPaths)
+                if (outputPaths.Count > 0)
                 {
-                    WriteCacheMeta(outputPath, mksFile);
+                    await ExtractSubtitlesForFile(inputPath, args, outputArguments, outputPaths, mksFile, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -649,6 +634,7 @@ namespace Tesserafin.MediaEncoding.Subtitles
         {
             var inputPath = _mediaEncoder.GetInputArgument(mediaSource.Path, mediaSource);
             var outputPaths = new List<string>();
+            var outputArguments = new List<string>();
             var args = string.Format(
                 CultureInfo.InvariantCulture,
                 "-i {0}",
@@ -682,50 +668,69 @@ namespace Tesserafin.MediaEncoding.Subtitles
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? throw new FileNotFoundException($"Calculated path ({outputPath}) is not valid."));
 
                 outputPaths.Add(outputPath);
-                args += string.Format(
+                outputArguments.Add(string.Format(
                     CultureInfo.InvariantCulture,
-                    " -map 0:{0} -an -vn -c:s {1}{2} -flush_packets 1 \"{3}\"",
+                    " -map 0:{0} -an -vn -c:s {1}{2} -flush_packets 1",
                     streamIndex,
                     outputCodec,
-                    outputFormatOption,
-                    outputPath);
+                    outputFormatOption));
             }
 
             if (outputPaths.Count > 0)
             {
-                await ExtractSubtitlesForFile(inputPath, args, outputPaths, cancellationToken).ConfigureAwait(false);
-
-                foreach (var outputPath in outputPaths)
-                {
-                    WriteCacheMeta(outputPath, mediaSource.Path);
-                }
+                await ExtractSubtitlesForFile(inputPath, args, outputArguments, outputPaths, mediaSource.Path, cancellationToken).ConfigureAwait(false);
             }
         }
 
         private async Task ExtractSubtitlesForFile(
             string inputPath,
             string args,
-            List<string> outputPaths,
+            IReadOnlyList<string> outputArguments,
+            IReadOnlyList<string> outputPaths,
+            string sourcePath,
             CancellationToken cancellationToken)
         {
-            await ExecuteFileCommand("-nostdin -y " + args, outputPaths, cancellationToken).ConfigureAwait(false);
+            await ExecuteFileCommand(
+                staged => "-nostdin -y " + args + string.Concat(outputArguments.Zip(staged, (fragment, path) => fragment + " \"" + path + "\"")),
+                outputPaths,
+                sourcePath,
+                cancellationToken).ConfigureAwait(false);
             foreach (var outputPath in outputPaths)
             {
-                if (outputPath.EndsWith("ass", StringComparison.OrdinalIgnoreCase))
-                {
-                    await SetAssFont(outputPath, cancellationToken).ConfigureAwait(false);
-                }
-
                 _logger.LogInformation("ffmpeg subtitle extraction completed for {InputPath} to {OutputPath}", inputPath, outputPath);
             }
         }
 
-        private Task ExecuteFileCommand(string arguments, IReadOnlyCollection<string> outputPaths, CancellationToken cancellationToken)
-            => _executor.ExecuteAsync(
-                FfmpegCommand.FromArgumentLine(_mediaEncoder.EncoderPath, arguments),
+        private Task ExecuteFileCommand(Func<IReadOnlyList<string>, string> arguments, IReadOnlyList<string> outputPaths, string? sourcePath, CancellationToken cancellationToken)
+        {
+            var stamp = SourceStamp(sourcePath);
+            return _executor.ExecuteAsync(
+                staged => FfmpegCommand.FromArgumentLine(_mediaEncoder.EncoderPath, arguments(staged)),
                 outputPaths,
                 TimeSpan.FromMinutes(_serverConfigurationManager.GetEncodingOptions().SubtitleExtractionTimeoutMinutes),
-                cancellationToken);
+                cancellationToken,
+                prepare: async (publication, token) =>
+                {
+                    for (var index = 0; index < publication.Files.Count; index++)
+                    {
+                        var file = publication.Files[index];
+                        if (Path.GetExtension(file.Path).Equals(".ass", StringComparison.OrdinalIgnoreCase))
+                        {
+                            await SetAssFont(file.StagedPath, token).ConfigureAwait(false);
+                        }
+
+                        if (stamp is not null)
+                        {
+                            await publication.WriteMetadataAsync(index, stamp, token).ConfigureAwait(false);
+                        }
+                    }
+
+                    if (!string.Equals(stamp, SourceStamp(sourcePath), StringComparison.Ordinal))
+                    {
+                        throw new IOException($"Subtitle source changed during extraction: {sourcePath}.");
+                    }
+                });
+        }
 
         /// <summary>
         /// Extracts the text subtitle.
@@ -759,6 +764,7 @@ namespace Tesserafin.MediaEncoding.Subtitles
 
                     await ExtractTextSubtitleInternal(
                         args,
+                        subtitleStream.IsExternal ? subtitleStream.Path : mediaSource.Path,
                         subtitleStreamIndex,
                         outputCodec,
                         outputPath,
@@ -769,6 +775,7 @@ namespace Tesserafin.MediaEncoding.Subtitles
 
         private async Task ExtractTextSubtitleInternal(
             string inputPath,
+            string sourcePath,
             int subtitleStreamIndex,
             string outputCodec,
             string outputPath,
@@ -780,21 +787,12 @@ namespace Tesserafin.MediaEncoding.Subtitles
 
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? throw new ArgumentException($"Provided path ({outputPath}) is not valid.", nameof(outputPath)));
 
-            var processArgs = string.Format(
-                CultureInfo.InvariantCulture,
-                "-i {0} -copyts -map 0:{1} -an -vn -c:s {2} \"{3}\"",
-                inputPath,
-                subtitleStreamIndex,
-                outputCodec,
-                outputPath);
-
-            await ExecuteFileCommand("-nostdin -y " + processArgs, [outputPath], cancellationToken).ConfigureAwait(false);
+            await ExecuteFileCommand(
+                staged => string.Format(CultureInfo.InvariantCulture, "-nostdin -y -i {0} -copyts -map 0:{1} -an -vn -c:s {2} \"{3}\"", inputPath, subtitleStreamIndex, outputCodec, staged[0]),
+                [outputPath],
+                sourcePath,
+                cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("ffmpeg subtitle extraction completed for {InputPath} to {OutputPath}", inputPath, outputPath);
-
-            if (string.Equals(outputCodec, "ass", StringComparison.OrdinalIgnoreCase))
-            {
-                await SetAssFont(outputPath, cancellationToken).ConfigureAwait(false);
-            }
         }
 
         /// <summary>

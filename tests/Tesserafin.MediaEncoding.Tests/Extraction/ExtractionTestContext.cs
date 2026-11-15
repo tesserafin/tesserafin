@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.IO;
@@ -37,6 +39,12 @@ internal sealed class ExtractionTestContext : IDisposable
     public FfmpegProcessRunner Runner { get; } = new(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.MediaEncoding.Encoder.FfmpegProcessRunner>.Instance);
 
     public FfmpegFileExecutor Executor => new(Runner, FileSystem.Object, NullLogger.Instance);
+
+    public static string[] CommandOutputs(FfmpegCommand command)
+        => Regex.Matches(command.ArgumentLine, "\"([^\"]+)\"")
+            .Select(match => match.Groups[1].Value)
+            .Where(path => Path.GetFileName(Path.GetDirectoryName(path))?.StartsWith(".tesserafin-extraction-", StringComparison.Ordinal) == true)
+            .ToArray();
 
     public void Dispose() => Directory.Delete(Root, recursive: true);
 }

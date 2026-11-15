@@ -93,19 +93,21 @@ public sealed class ExtractionConsumerTests
         var calls = 0;
         var runner = new Mock<IFfmpegProcessRunner>();
         runner.Setup(r => r.RunFileAsync(It.IsAny<FfmpegCommand>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
-            .Returns(async (FfmpegCommand _, TimeSpan _, CancellationToken token) =>
+            .Returns(async (FfmpegCommand command, TimeSpan _, CancellationToken token) =>
             {
+                var staged = Assert.Single(ExtractionTestContext.CommandOutputs(command));
+                Assert.NotEqual(path, staged);
                 var call = Interlocked.Increment(ref calls);
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 if (call == 1)
                 {
-                    await File.WriteAllTextAsync(path, "partial", token);
+                    await File.WriteAllTextAsync(staged, "partial", token);
+                    Assert.False(File.Exists(path));
                     reached.SetResult();
                     await Task.Delay(Timeout.InfiniteTimeSpan, token);
                 }
 
                 Assert.False(File.Exists(path), "the failed attempt's output must be gone before its successor runs");
-                await File.WriteAllTextAsync(path, "complete", token);
+                await File.WriteAllTextAsync(staged, "complete", token);
                 return new FfmpegProcessResult(0, string.Empty, string.Empty, false);
             });
         using var extractor = Attachments(context, source, runner.Object);
@@ -137,9 +139,11 @@ public sealed class ExtractionConsumerTests
         var attempts = 0;
         var runner = new Mock<IFfmpegProcessRunner>();
         runner.Setup(r => r.RunFileAsync(It.IsAny<FfmpegCommand>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
-            .Returns(async (FfmpegCommand _, TimeSpan _, CancellationToken token) =>
+            .Returns(async (FfmpegCommand command, TimeSpan _, CancellationToken token) =>
             {
-                await File.WriteAllTextAsync(output, "content", token);
+                var staged = Assert.Single(ExtractionTestContext.CommandOutputs(command));
+                Assert.NotEqual(output, staged);
+                await File.WriteAllTextAsync(staged, "content", token);
                 return new FfmpegProcessResult(++attempts == 1 ? 7 : 0, string.Empty, "failure", false);
             });
         using var encoder = Subtitles(context, runner.Object);
@@ -158,6 +162,54 @@ public sealed class ExtractionConsumerTests
         var manager = new Mock<IMediaSourceManager>();
         manager.Setup(m => m.GetPlaybackMediaSources(It.IsAny<BaseItem>(), null, true, false, It.IsAny<CancellationToken>())).ReturnsAsync(new List<MediaSourceInfo> { source });
         return new AttachmentExtractor(NullLogger<AttachmentExtractor>.Instance, context.FileSystem.Object, context.Encoder.Object, manager.Object, context.Paths.Object, runner);
+    }
+
+    [Fact]
+    public async Task SourceChangedDuringExtraction_PreservesPreviousCacheAndStamp_UntilSuccessfulRetry()
+    {
+        using var context = new ExtractionTestContext();
+        var source = Source(context, attachmentOnly: false);
+        await File.WriteAllTextAsync(source.Path, "input", TestContext.Current.CancellationToken);
+        var output = context.Paths.Object.GetSubtitlePath(source.Id, 1, ".srt")!;
+        Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+        await File.WriteAllTextAsync(output, "old cached subtitle", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(output + ".meta", "old stamp", TestContext.Current.CancellationToken);
+        var calls = 0;
+        var runner = new Mock<IFfmpegProcessRunner>();
+        runner.Setup(r => r.RunFileAsync(It.IsAny<FfmpegCommand>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .Returns(async (FfmpegCommand command, TimeSpan _, CancellationToken token) =>
+            {
+                var staged = Assert.Single(ExtractionTestContext.CommandOutputs(command));
+                await File.WriteAllTextAsync(staged, "new cached subtitle", token);
+                if (++calls == 1)
+                {
+                    await File.WriteAllTextAsync(source.Path, "different source revision", token);
+                }
+
+                return new FfmpegProcessResult(0, string.Empty, string.Empty, false);
+            });
+        using var encoder = Subtitles(context, runner.Object);
+        await Assert.ThrowsAsync<IOException>(() => encoder.GetReadableFile(source, source.MediaStreams[1], TestContext.Current.CancellationToken));
+        Assert.Equal("old cached subtitle", await File.ReadAllTextAsync(output, TestContext.Current.CancellationToken));
+        Assert.Equal("old stamp", await File.ReadAllTextAsync(output + ".meta", TestContext.Current.CancellationToken));
+        await encoder.GetReadableFile(source, source.MediaStreams[1], TestContext.Current.CancellationToken);
+        Assert.Equal("new cached subtitle", await File.ReadAllTextAsync(output, TestContext.Current.CancellationToken));
+        Assert.NotEqual("old stamp", await File.ReadAllTextAsync(output + ".meta", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task RealAssSubtitle_IsPostprocessedBeforeCachePublication()
+    {
+        using var context = new ExtractionTestContext();
+        var source = await Fixture(context, attachmentOnly: false, ass: true);
+        source.MediaStreams[1].Codec = "ass";
+        using var encoder = Subtitles(context, context.Runner);
+        var info = await encoder.GetReadableFile(source, source.MediaStreams[1], TestContext.Current.CancellationToken);
+        var text = await File.ReadAllTextAsync(info.Path, TestContext.Current.CancellationToken);
+        Assert.Contains(",Arial Unicode MS,", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(",Arial,", text, StringComparison.Ordinal);
+        Assert.Contains("extraction-proof", text, StringComparison.Ordinal);
+        Assert.True(File.Exists(info.Path + ".meta"));
     }
 
     private static SubtitleEncoder Subtitles(ExtractionTestContext context, IFfmpegProcessRunner runner)
@@ -180,12 +232,12 @@ public sealed class ExtractionConsumerTests
         };
     }
 
-    private static async Task<MediaSourceInfo> Fixture(ExtractionTestContext context, bool attachmentOnly)
+    private static async Task<MediaSourceInfo> Fixture(ExtractionTestContext context, bool attachmentOnly, bool ass = false)
     {
         var source = Source(context, attachmentOnly);
         await File.WriteAllTextAsync(Path.Combine(context.Root, "source.srt"), "1\n00:00:00,000 --> 00:00:00,500\nextraction-proof\n", TestContext.Current.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(context.Root, "font.bin"), "attachment payload", TestContext.Current.CancellationToken);
-        var input = attachmentOnly ? "-i source.srt -map 0:s -c:s copy" : "-f lavfi -i color=size=32x32:duration=1 -i source.srt -map 0:v -map 1:s -c:v mpeg4 -c:s srt";
+        var input = attachmentOnly ? "-i source.srt -map 0:s -c:s copy" : "-f lavfi -i color=size=32x32:duration=1 -i source.srt -map 0:v -map 1:s -c:v mpeg4 -c:s " + (ass ? "ass" : "srt");
         var command = FfmpegCommand.FromArgumentLine("ffmpeg", $"-nostdin -y {input} -attach font.bin -metadata:s:t mimetype=application/octet-stream -metadata:s:t filename=../font.bin -f matroska \"{source.Path}\"", workingDirectory: context.Root);
         var result = await context.Runner.RunProbeAsync(command, TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.True(result.ExitCode == 0, result.StandardError);

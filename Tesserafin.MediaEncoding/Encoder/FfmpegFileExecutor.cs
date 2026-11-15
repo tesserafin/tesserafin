@@ -11,53 +11,37 @@ using Tesserafin.Model.IO;
 namespace Tesserafin.MediaEncoding.Encoder;
 
 /// <summary>
-/// Validates file-producing attempts and cleans their owned outputs before the caller releases
-/// its cache lock. Process termination and diagnostic draining belong to the runner.
+/// Executes into private staging files, validates/postprocesses the complete attempt, then
+/// publishes artifacts under the caller's cache locks. Failed staging is never a cache hit.
 /// </summary>
 internal sealed class FfmpegFileExecutor(IFfmpegProcessRunner runner, IFileSystem fileSystem, ILogger logger)
 {
     public async Task ExecuteAsync(
-        FfmpegCommand command,
-        IReadOnlyCollection<string> outputPaths,
+        Func<IReadOnlyList<string>, FfmpegCommand> createCommand,
+        IReadOnlyList<string> outputPaths,
         TimeSpan timeout,
         CancellationToken cancellationToken,
-        IReadOnlyCollection<int>? acceptedExitCodes = null)
+        IReadOnlyCollection<int>? acceptedExitCodes = null,
+        Func<AtomicCachePublication, CancellationToken, Task>? prepare = null)
     {
-        try
+        cancellationToken.ThrowIfCancellationRequested();
+        using var publication = new AtomicCachePublication(outputPaths, fileSystem, logger);
+        var command = createCommand(publication.StagedPaths);
+        logger.LogInformation("{File} {Arguments}", command.Executable, command.ArgumentLine);
+        var result = await runner.RunFileAsync(command, timeout, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (result.TimedOut || result.ExitCode is not { } code || !(acceptedExitCodes?.Contains(code) ?? code == 0))
         {
-            logger.LogInformation("{File} {Arguments}", command.Executable, command.ArgumentLine);
-            var result = await runner.RunFileAsync(command, timeout, cancellationToken).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (result.TimedOut || result.ExitCode is not { } code || !(acceptedExitCodes?.Contains(code) ?? code == 0))
-            {
-                logger.LogError("FFmpeg extraction failed: timeout={TimedOut}, exit={ExitCode}, stderr={StandardError}", result.TimedOut, result.ExitCode, result.StandardError);
-                throw new FfmpegException(result.TimedOut ? "FFmpeg extraction timed out." : $"FFmpeg extraction exited with code {result.ExitCode}.");
-            }
-
-            foreach (var path in outputPaths)
-            {
-                var file = fileSystem.GetFileInfo(path);
-                if (!file.Exists || file.Length == 0)
-                {
-                    throw new FfmpegException($"FFmpeg extraction produced no content at {path}.");
-                }
-            }
+            logger.LogError("FFmpeg extraction failed: timeout={TimedOut}, exit={ExitCode}, stderr={StandardError}", result.TimedOut, result.ExitCode, result.StandardError);
+            throw new FfmpegException(result.TimedOut ? "FFmpeg extraction timed out." : $"FFmpeg extraction exited with code {result.ExitCode}.");
         }
-        catch
+
+        publication.Validate();
+        if (prepare is not null)
         {
-            foreach (var path in outputPaths)
-            {
-                try
-                {
-                    fileSystem.DeleteFile(path);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Error deleting failed extraction output {Path}", path);
-                }
-            }
-
-            throw;
+            await prepare(publication, cancellationToken).ConfigureAwait(false);
         }
+
+        publication.Publish(cancellationToken);
     }
 }

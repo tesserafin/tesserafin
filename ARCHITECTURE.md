@@ -229,8 +229,12 @@ This is the headline rewrite and has its own section below (§5).
   cancellation. Managed transcodes leave stdout unredirected and drain stderr through
   the job logger. Attachment/subtitle extraction uses its finite-command profile, which closes
   stdin and retains only the final 65,536 characters of each diagnostic stream. A common file
-  executor validates exit status and every nonempty output, then removes the attempt's outputs
-  on failure/cancellation before releasing cache locks. Attachment output names use sanitized
+  executor builds commands against private staging files outside the served cache, validates all
+  output and postprocessing, then publishes complete artifacts with native renames under cache
+  locks. Failed cleanup cannot turn temporary output into a cache hit. Subtitle freshness stamps
+  follow the data rename and refer to the source size/mtime captured before extraction; a changed
+  source aborts publication. Cross-volume renames fail without a copy/delete fallback. Atomicity
+  is per artifact, with no multi-file rollback or crash-durability promise. Attachment names use sanitized
   basenames prefixed by stream index; embedded paths never select filesystem destinations.
   `FfmpegImageScheduler` owns image concurrency and shutdown. It registers queued/running
   attempts before launch and waits for cancellation, native exit and cleanup before releasing

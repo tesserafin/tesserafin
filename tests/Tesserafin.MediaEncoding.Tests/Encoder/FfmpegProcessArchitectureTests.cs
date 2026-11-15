@@ -45,6 +45,10 @@ public sealed partial class FfmpegProcessArchitectureTests
         Assert.DoesNotMatch(NativeProcessCreationOrLaunch(), source[start..end]);
     }
 
+    [Fact]
+    public void CachePublisher_HasNoCopyOrManagedMoveFallback()
+        => Assert.DoesNotMatch(@"\bFile\.(?:Copy|Move)\s*\(", Source("Tesserafin.MediaEncoding", "Encoder", "AtomicCachePublication.cs"));
+
     private static string Source(params string[] components)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

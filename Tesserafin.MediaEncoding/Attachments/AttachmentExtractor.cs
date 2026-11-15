@@ -136,28 +136,33 @@ namespace Tesserafin.MediaEncoding.Attachments
                 var input = _mediaEncoder.GetInputArgument(inputFile, mediaSource);
                 ArgumentException.ThrowIfNullOrEmpty(input);
                 Directory.CreateDirectory(outputFolder);
-                var arguments = new StringBuilder("-nostdin -y ");
-                foreach (var (attachment, path) in missing)
-                {
-                    arguments.AppendFormat(CultureInfo.InvariantCulture, "-dump_attachment:{0} \"{1}\" ", attachment.Index, EncodingUtils.NormalizePath(path));
-                }
-
-                if (input.EndsWith(".concat\"", StringComparison.OrdinalIgnoreCase))
-                {
-                    arguments.Append("-f concat -safe 0 ");
-                }
-
-                arguments.Append("-i ").Append(input);
                 var hasAudioOrVideo = mediaSource.MediaStreams.Any(stream => stream.Type is MediaStreamType.Audio or MediaStreamType.Video);
-                if (hasAudioOrVideo)
+                FfmpegCommand CreateCommand(IReadOnlyList<string> staged)
                 {
-                    arguments.Append(" -t 0 -f null null");
+                    var arguments = new StringBuilder("-nostdin -y ");
+                    for (var index = 0; index < missing.Count; index++)
+                    {
+                        arguments.AppendFormat(CultureInfo.InvariantCulture, "-dump_attachment:{0} \"{1}\" ", missing[index].Attachment.Index, EncodingUtils.NormalizePath(staged[index]));
+                    }
+
+                    if (input.EndsWith(".concat\"", StringComparison.OrdinalIgnoreCase))
+                    {
+                        arguments.Append("-f concat -safe 0 ");
+                    }
+
+                    arguments.Append("-i ").Append(input);
+                    if (hasAudioOrVideo)
+                    {
+                        arguments.Append(" -t 0 -f null null");
+                    }
+
+                    return FfmpegCommand.FromArgumentLine(_mediaEncoder.EncoderPath, arguments.ToString());
                 }
 
                 // An attachment-only MKS has no output stream; FFmpeg exits 1 after dumping it.
                 // Accept that exit only if every requested attachment was actually produced.
                 await _executor.ExecuteAsync(
-                    FfmpegCommand.FromArgumentLine(_mediaEncoder.EncoderPath, arguments.ToString()),
+                    CreateCommand,
                     missing.Select(output => output.Path).ToArray(),
                     Timeout.InfiniteTimeSpan,
                     cancellationToken,
