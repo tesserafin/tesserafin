@@ -3,11 +3,8 @@
 #pragma warning disable CS1591
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,10 +15,8 @@ using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.IO;
-using Tesserafin.Model.Serialization;
 
 namespace Tesserafin.Controller.Entities
 {
@@ -31,8 +26,6 @@ namespace Tesserafin.Controller.Entities
     /// </summary>
     public class CollectionFolder : Folder, ICollectionFolder
     {
-        private static readonly JsonSerializerOptions _jsonOptions = JsonDefaults.Options;
-        private static readonly ConcurrentDictionary<string, LibraryOptions> _libraryOptions = new ConcurrentDictionary<string, LibraryOptions>();
         private bool _requiresRefresh;
 
         /// <summary>
@@ -43,11 +36,6 @@ namespace Tesserafin.Controller.Entities
             PhysicalLocationsList = Array.Empty<string>();
             PhysicalFolderIds = Array.Empty<Guid>();
         }
-
-        /// <summary>
-        /// Event raised when library options are updated for any collection folder.
-        /// </summary>
-        public static event EventHandler<LibraryOptionsUpdatedEventArgs> LibraryOptionsUpdated;
 
         /// <summary>
         /// Gets the display preferences id.
@@ -65,8 +53,6 @@ namespace Tesserafin.Controller.Entities
         public string[] PhysicalLocationsList { get; set; }
 
         public Guid[] PhysicalFolderIds { get; set; }
-
-        public static IXmlSerializer XmlSerializer { get; set; }
 
         public static IServerApplicationHost ApplicationHost { get; set; }
 
@@ -109,88 +95,18 @@ namespace Tesserafin.Controller.Entities
             return false;
         }
 
-        public LibraryOptions GetLibraryOptions()
-        {
-            return GetLibraryOptions(Path);
-        }
-
         public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
         {
-            if (GetLibraryOptions().Enabled)
+            var options = tagVisibility is IStandaloneVisibilityService scope
+                ? scope.GetLibraryOptions(this)
+                : LibraryManager.GetLibraryOptions(this);
+            if (options.Enabled)
             {
                 return base.IsVisible(user, skipAllowedTagsCheck, tagVisibility);
             }
 
             return false;
         }
-
-        private static LibraryOptions LoadLibraryOptions(string path)
-        {
-            try
-            {
-                if (XmlSerializer.DeserializeFromFile(typeof(LibraryOptions), GetLibraryOptionsPath(path)) is not LibraryOptions result)
-                {
-                    return new LibraryOptions();
-                }
-
-                foreach (var mediaPath in result.PathInfos)
-                {
-                    if (!string.IsNullOrEmpty(mediaPath.Path))
-                    {
-                        mediaPath.Path = ApplicationHost.ExpandVirtualPath(mediaPath.Path);
-                    }
-                }
-
-                return result;
-            }
-            catch (FileNotFoundException)
-            {
-                return new LibraryOptions();
-            }
-            catch (IOException)
-            {
-                return new LibraryOptions();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error loading library options");
-
-                return new LibraryOptions();
-            }
-        }
-
-        private static string GetLibraryOptionsPath(string path)
-        {
-            return System.IO.Path.Combine(path, "options.xml");
-        }
-
-        public void UpdateLibraryOptions(LibraryOptions options)
-        {
-            SaveLibraryOptions(Path, options);
-        }
-
-        public static LibraryOptions GetLibraryOptions(string path)
-            => _libraryOptions.GetOrAdd(path, LoadLibraryOptions);
-
-        public static void SaveLibraryOptions(string path, LibraryOptions options)
-        {
-            var clone = JsonSerializer.Deserialize<LibraryOptions>(JsonSerializer.SerializeToUtf8Bytes(options, _jsonOptions), _jsonOptions);
-            foreach (var mediaPath in clone.PathInfos)
-            {
-                if (!string.IsNullOrEmpty(mediaPath.Path))
-                {
-                    mediaPath.Path = ApplicationHost.ReverseVirtualPath(mediaPath.Path);
-                }
-            }
-
-            XmlSerializer.SerializeToFile(clone, GetLibraryOptionsPath(path));
-            _libraryOptions[path] = options;
-
-            LibraryOptionsUpdated?.Invoke(null, new LibraryOptionsUpdatedEventArgs(path, options));
-        }
-
-        public static void OnCollectionFolderChange()
-            => _libraryOptions.Clear();
 
         public override bool IsSaveLocalMetadataEnabled()
         {

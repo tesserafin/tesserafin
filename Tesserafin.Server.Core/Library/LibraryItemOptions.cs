@@ -16,19 +16,20 @@ internal sealed class LibraryItemOptions(
     IItemLookupService lookup,
     IUserRootFolderProvider roots,
     IServerConfigurationManager configuration,
-    IFileSystem files) : ILibraryItemOptions
+    IFileSystem files,
+    ILibraryOptionsStore store) : ILibraryItemOptions
 {
     public LibraryOptions GetLibraryOptions(BaseItem item)
     {
         if (item is CollectionFolder collectionFolder)
         {
-            return collectionFolder.GetLibraryOptions();
+            return store.Get(collectionFolder.Path);
         }
 
         // List.Find is more performant than FirstOrDefault due to enumerator allocation
         return collections.GetCollectionFolders(item)
             .Find(folder => folder is CollectionFolder) is CollectionFolder collectionFolder2
-            ? collectionFolder2.GetLibraryOptions()
+            ? store.Get(collectionFolder2.Path)
             : new LibraryOptions();
     }
 

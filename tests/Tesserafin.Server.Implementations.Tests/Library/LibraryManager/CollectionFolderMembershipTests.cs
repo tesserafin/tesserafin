@@ -40,6 +40,7 @@ public sealed class CollectionFolderMembershipTests
     private readonly List<Folder> _libraries = [];
     private readonly ILibraryManager _libraryManager;
     private readonly ICollectionFolderResolver _resolver;
+    private readonly Mock<IXmlSerializer> _xml = new();
 
     public CollectionFolderMembershipTests()
     {
@@ -61,6 +62,8 @@ public sealed class CollectionFolderMembershipTests
 
         _resolver = new Tesserafin.Server.Core.Library.CollectionFolderResolver(lookup, rootProvider);
         fixture.Register<ICollectionFolderResolver>(() => _resolver);
+        var store = new Tesserafin.Server.Core.Library.LibraryOptionsStore(_xml.Object, Mock.Of<Tesserafin.Controller.IServerApplicationPaths>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.LibraryOptionsStore>.Instance);
+        fixture.Register<ILibraryOptionsStore>(() => store);
 
         Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
 
@@ -196,8 +199,7 @@ public sealed class CollectionFolderMembershipTests
     {
         var movies = AddLibrary("Movies", "/media/movies");
         var options = new LibraryOptions { PreferredMetadataLanguage = "fr" };
-        CollectionFolder.XmlSerializer = Mock.Of<IXmlSerializer>(x =>
-            x.DeserializeFromFile(typeof(LibraryOptions), System.IO.Path.Combine(movies.Path, "options.xml")) == options);
+        _xml.Setup(x => x.DeserializeFromFile(typeof(LibraryOptions), System.IO.Path.Combine(movies.Path, "options.xml"))).Returns(options);
         var movie = AddMovie(Add(new Folder { Path = "/media/movies" }), "/media/movies/j.mkv");
 
         Assert.Same(options, _libraryManager.GetLibraryOptions(movie));

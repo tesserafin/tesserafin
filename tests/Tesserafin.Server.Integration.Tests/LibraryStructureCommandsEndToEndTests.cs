@@ -105,13 +105,14 @@ public sealed class LibraryStructureCommandsEndToEndTests(TesserafinApplicationF
         using var client = await ClientAsync();
         using var sources = new Sources();
         var commands = factory.Services.GetRequiredService<ILibraryStructureCommands>();
+        var store = factory.Services.GetRequiredService<ILibraryOptionsStore>();
         var name = "failure-" + Guid.NewGuid().ToString("N");
         await commands.AddVirtualFolderAsync(name, null, Options(sources.First), false, TestContext.Current.CancellationToken);
         var folder = factory.Services.GetRequiredService<ILibraryManager>().GetVirtualFolders().Single(folder => folder.Name == name);
         var root = factory.Services.GetRequiredService<IServerConfigurationManager>().ApplicationPaths.DefaultUserViewsPath;
         var path = Path.Combine(root, name);
         var file = Path.Combine(path, "options.xml");
-        var previous = CollectionFolder.GetLibraryOptions(path);
+        var previous = store.Get(path);
         var bytes = await File.ReadAllBytesAsync(file, TestContext.Current.CancellationToken);
         File.Delete(file);
         Directory.CreateDirectory(file);
@@ -119,9 +120,9 @@ public sealed class LibraryStructureCommandsEndToEndTests(TesserafinApplicationF
         {
             var changed = Options(sources.First);
             changed.SaveLocalMetadata = true;
-            var failure = Record.Exception(() => CollectionFolder.SaveLibraryOptions(path, changed));
+            var failure = Record.Exception(() => store.Save(path, changed));
             Assert.True(failure is IOException or UnauthorizedAccessException);
-            Assert.Same(previous, CollectionFolder.GetLibraryOptions(path));
+            Assert.Same(previous, store.Get(path));
             await Assert.ThrowsAnyAsync<IOException>(async () =>
             {
                 try
@@ -138,10 +139,10 @@ public sealed class LibraryStructureCommandsEndToEndTests(TesserafinApplicationF
         {
             Directory.Delete(file);
             await File.WriteAllBytesAsync(file, bytes, TestContext.Current.CancellationToken);
-            CollectionFolder.OnCollectionFolderChange();
+            store.Invalidate();
         }
 
-        Assert.False(CollectionFolder.GetLibraryOptions(path).SaveLocalMetadata);
+        Assert.False(store.Get(path).SaveLocalMetadata);
         await commands.RemoveVirtualFolderAsync(name, false, TestContext.Current.CancellationToken);
         sources.AssertMediaUntouched();
     }

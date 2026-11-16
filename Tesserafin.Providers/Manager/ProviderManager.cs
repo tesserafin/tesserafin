@@ -58,6 +58,7 @@ namespace Tesserafin.Providers.Manager
         private readonly IItemImageService _images;
         private readonly IRemoteImageSource _remoteImages;
         private readonly IItemDeletionCommands _deletions;
+        private readonly ILibraryOptionsStore _libraryOptions;
         private readonly Lock _refreshQueueLock = new();
         private readonly ILogger<ProviderManager> _logger;
         private readonly ILibraryMonitor _libraryMonitor;
@@ -97,6 +98,9 @@ namespace Tesserafin.Providers.Manager
         /// <param name="metadataExporter">Metadata saver selection and execution.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="deletions">Item deletion operations.</param>
+        /// <param name="scheduler">Runs folder validation work with bounded concurrency.</param>
+        /// <param name="libraryOptions">The persisted library options, whose updates invalidate cached provider choices.</param>
+        /// <param name="httpClientFactory">The Http client factory.</param>
         /// <param name="subtitleManager">The subtitle manager.</param>
         /// <param name="configurationManager">The configuration manager.</param>
         /// <param name="libraryMonitor">The library monitor.</param>
@@ -110,12 +114,14 @@ namespace Tesserafin.Providers.Manager
         /// <param name="remoteImages">The image-only HTTP source.</param>
         /// <param name="mediaSegmentManager">The media segment manager.</param>
         /// <param name="similarItemsManager">The similar items manager.</param>
-        /// <param name="scheduler">Runs folder validation work with bounded concurrency.</param>
         public ProviderManager(
             IItemWriteCommands writes,
             IItemMetadataExporter metadataExporter,
             IItemImageService images,
             IItemDeletionCommands deletions,
+            ILimitedConcurrencyLibraryScheduler scheduler,
+            ILibraryOptionsStore libraryOptions,
+            IHttpClientFactory httpClientFactory,
             ISubtitleManager subtitleManager,
             IServerConfigurationManager configurationManager,
             ILibraryMonitor libraryMonitor,
@@ -128,14 +134,14 @@ namespace Tesserafin.Providers.Manager
             ILyricManager lyricManager,
             IRemoteImageSource remoteImages,
             IMediaSegmentManager mediaSegmentManager,
-            ISimilarItemsManager similarItemsManager,
-            ILimitedConcurrencyLibraryScheduler scheduler)
+            ISimilarItemsManager similarItemsManager)
         {
             _scheduler = scheduler;
             _writes = writes;
             _metadataExporter = metadataExporter;
             _images = images;
             _deletions = deletions;
+            _libraryOptions = libraryOptions;
             _logger = logger;
             _configurationManager = configurationManager;
             _libraryMonitor = libraryMonitor;
@@ -150,7 +156,7 @@ namespace Tesserafin.Providers.Manager
             _mediaSegmentManager = mediaSegmentManager;
             _similarItemsManager = similarItemsManager;
 
-            CollectionFolder.LibraryOptionsUpdated += OnLibraryOptionsUpdated;
+            _libraryOptions.Updated += OnLibraryOptionsUpdated;
         }
 
         /// <inheritdoc/>
@@ -1100,7 +1106,7 @@ namespace Tesserafin.Providers.Manager
 
             if (disposing)
             {
-                CollectionFolder.LibraryOptionsUpdated -= OnLibraryOptionsUpdated;
+                _libraryOptions.Updated -= OnLibraryOptionsUpdated;
 
                 if (!_disposeCancellationTokenSource.IsCancellationRequested)
                 {

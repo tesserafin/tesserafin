@@ -17,7 +17,6 @@
     "BaseItem.ProviderManager",
     "BaseItem.UserDataManager",
     "CollectionFolder.ApplicationHost",
-    "CollectionFolder.XmlSerializer",
     "Folder.CollectionManager",
     "Folder.UserViewManager",
     "UserView.TVSeriesManager",

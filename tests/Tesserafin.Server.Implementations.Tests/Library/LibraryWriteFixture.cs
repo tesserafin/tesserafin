@@ -24,7 +24,13 @@ internal static class LibraryWriteFixture
             Mock.Get(configuration).Setup(c => c.GetConfiguration("metadata")).Returns(new MetadataConfiguration());
         }
 
-        var options = new LibraryItemOptions(fixture.Create<ICollectionFolderResolver>(), fixture.Create<IItemLookupService>(), fixture.Create<IUserRootFolderProvider>(), configuration, fixture.Create<IFileSystem>());
+        var store = fixture.Create<ILibraryOptionsStore>();
+        if (store is Moq.IMocked<ILibraryOptionsStore> mocked && store.Get("/") is null)
+        {
+            mocked.Mock.Setup(s => s.Get(It.IsAny<string>())).Returns(new LibraryOptions());
+        }
+
+        var options = new LibraryItemOptions(fixture.Create<ICollectionFolderResolver>(), fixture.Create<IItemLookupService>(), fixture.Create<IUserRootFolderProvider>(), configuration, fixture.Create<IFileSystem>(), store);
         fixture.Inject<ILibraryItemOptions>(options);
         var resolution = new ItemResolutionService(configuration, fixture.Create<IFileSystem>(), fixture.Create<IServerApplicationHost>(), options, fixture.Create<IItemLookupService>(), fixture.Create<NamingOptions>(), NullLogger<ItemResolutionService>.Instance);
         fixture.Inject<IItemResolutionService>(resolution);

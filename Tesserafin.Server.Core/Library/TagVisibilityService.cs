@@ -7,6 +7,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Entities;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
 
@@ -30,6 +31,7 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     internal sealed class TagVisibilityService : ILinkedChildVisibilityService, IRatingVisibilityService, IRecordingVisibilityService
     {
+        private readonly ILibraryItemOptions _libraryOptions;
         private readonly IItemLookupService _itemLookupService;
         private readonly ICollectionFolderResolver _collectionFolderResolver;
         private readonly IUserRootFolderProvider _userRootFolderProvider;
@@ -48,8 +50,10 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="localizationManager">The localization (rating scores).</param>
         /// <param name="configurationManager">The server configuration (country code).</param>
         /// <param name="activeRecordings">The recordings in progress.</param>
-        public TagVisibilityService(IItemLookupService itemLookupService, ICollectionFolderResolver collectionFolderResolver, IUserRootFolderProvider userRootFolderProvider, IItemRepository itemRepository, ILocalizationManager localizationManager, IServerConfigurationManager configurationManager, ActiveRecordings activeRecordings)
+        /// <param name="libraryOptions">The options of an item's library.</param>
+        public TagVisibilityService(IItemLookupService itemLookupService, ICollectionFolderResolver collectionFolderResolver, IUserRootFolderProvider userRootFolderProvider, IItemRepository itemRepository, ILocalizationManager localizationManager, IServerConfigurationManager configurationManager, ActiveRecordings activeRecordings, ILibraryItemOptions libraryOptions)
         {
+            _libraryOptions = libraryOptions;
             _itemLookupService = itemLookupService;
             _collectionFolderResolver = collectionFolderResolver;
             _userRootFolderProvider = userRootFolderProvider;
@@ -77,6 +81,9 @@ namespace Tesserafin.Server.Core.Library
         {
             return _collectionFolderResolver.GetCollectionFolders(item);
         }
+
+        /// <inheritdoc />
+        public LibraryOptions GetLibraryOptions(BaseItem item) => _libraryOptions.GetLibraryOptions(item);
 
         /// <inheritdoc />
         public IReadOnlyList<Guid> GetLibraryIds()
