@@ -31,6 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           python ci/materialize-item-writes.py
+          git restore -- .github/workflows/ci-tests.yml .github/workflows/materialize-item-writes.yml
           python - <<'PY'
           import subprocess
           files = subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()
