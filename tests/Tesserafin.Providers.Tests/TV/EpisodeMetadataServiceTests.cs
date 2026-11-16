@@ -5,6 +5,7 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Entities;
@@ -100,7 +101,9 @@ public class EpisodeMetadataServiceTests
                 Mock.Of<ILibraryManager>(),
                 Mock.Of<IItemNamingService>(),
                 Mock.Of<IExternalDataManager>(),
-                Mock.Of<IItemRepository>())
+                Mock.Of<IItemRepository>(),
+                Mock.Of<IMediaEncoder>(),
+                Mock.Of<IMediaSourceManager>())
         {
         }
 

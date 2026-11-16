@@ -922,3 +922,16 @@ Seven services read entity statics only to dodge DI cycles. They now receive dep
 `entityStaticServiceAccessFiles` shrinks from 13 to 6: the entities (`AggregateFolder`,
 `BaseItemExtensions`, `Folder`), `ItemResolveArgs`, `ResolverHelper` (both reached from
 `LibraryManager` scan code) and the `ApplicationHost` assignments. The statics themselves remain.
+
+## 26. Embedded episode tags leave the entity (consolidation step 5)
+
+`Episode.BeforeMetadataRefresh` no longer probes mp4 files. `MetadataService` runs an async
+`BeforeMetadataRefreshAsync` hook just before the entity hook; `EpisodeMetadataService` overrides it
+with injected `IMediaEncoder` and `IMediaSourceManager`. Conditions are unchanged (unlocked library
+or Live TV episode, `EnableEmbeddedEpisodeInfos`, mp4 container), and path parsing still runs after,
+filling only what the tags left missing. Differences: the refresh cancellation token reaches ffprobe
+(cancellation propagates instead of being logged), the call is no longer synchronous over async, and
+a tag that changes a field now marks the refresh as `MetadataImport`.
+
+`Episode.MediaEncoder` and `BaseItem.MediaSegmentManager` are deleted with their `ApplicationHost`
+assignments; `entityStaticServices` shrinks from 19 to 17.

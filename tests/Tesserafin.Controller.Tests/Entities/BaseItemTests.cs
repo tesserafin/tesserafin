@@ -170,10 +170,6 @@ public class BaseItemTests
             .Returns((Guid id) => new List<MediaStream> { new MediaStream { Type = MediaStreamType.Video, Width = widths.GetValueOrDefault(id) } });
         mediaSourceManager.Setup(x => x.GetMediaAttachments(It.IsAny<Guid>())).Returns(new List<MediaAttachment>());
 
-        var segmentManager = new Mock<IMediaSegmentManager>();
-        segmentManager.Setup(x => x.IsTypeSupported(It.IsAny<BaseItem>())).Returns(false);
-        BaseItem.MediaSegmentManager = segmentManager.Object;
-
         var libraryManager = new Mock<ILibraryManager>();
         libraryManager.Setup(x => x.GetLinkedAlternateVersions(It.IsAny<Video>())).Returns(Array.Empty<Video>());
         libraryManager.Setup(x => x.GetLocalAlternateVersionIds(primary)).Returns(new[] { alt1.Id, alt2.Id });
@@ -200,10 +196,10 @@ public class BaseItemTests
 
         // Resuming the 1080p alternate must default to the 1080p source, not the higher-resolution
         // 2160p primary that the width ordering would otherwise place first.
-        Assert.Equal(alt1.Id.ToString("N"), alt1.GetMediaSources(false, BaseItem.MediaSourceManager, BaseItem.MediaSegmentManager, BaseItem.ChannelManager)[0].Id);
+        Assert.Equal(alt1.Id.ToString("N"), alt1.GetMediaSources(false, BaseItem.MediaSourceManager, Mock.Of<IMediaSegmentManager>(), BaseItem.ChannelManager)[0].Id);
 
         // Opening the primary still defaults to the primary's own (here highest-resolution) source.
-        Assert.Equal(primary.Id.ToString("N"), primary.GetMediaSources(false, BaseItem.MediaSourceManager, BaseItem.MediaSegmentManager, BaseItem.ChannelManager)[0].Id);
+        Assert.Equal(primary.Id.ToString("N"), primary.GetMediaSources(false, BaseItem.MediaSourceManager, Mock.Of<IMediaSegmentManager>(), BaseItem.ChannelManager)[0].Id);
     }
 
     [Fact]

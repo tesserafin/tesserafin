@@ -823,7 +823,6 @@ namespace Tesserafin.Server.Core
             BaseItem.LibraryManager = Resolve<ILibraryManager>();
             BaseItem.LocalizationManager = Resolve<ILocalizationManager>();
             BaseItem.Logger = Resolve<ILogger<BaseItem>>();
-            BaseItem.MediaSegmentManager = Resolve<IMediaSegmentManager>();
             BaseItem.MediaSourceManager = Resolve<IMediaSourceManager>();
             BaseItem.ProviderManager = Resolve<IProviderManager>();
             BaseItem.UserDataManager = Resolve<IUserDataManager>();
@@ -832,7 +831,6 @@ namespace Tesserafin.Server.Core
             Folder.UserViewManager = Resolve<IUserViewManager>();
             Folder.CollectionManager = Resolve<ICollectionManager>();
             Folder.LimitedConcurrencyLibraryScheduler = Resolve<ILimitedConcurrencyLibraryScheduler>();
-            Episode.MediaEncoder = Resolve<IMediaEncoder>();
             UserView.TVSeriesManager = Resolve<ITVSeriesManager>();
             Video.RecordingsManager = Resolve<IRecordingsManager>();
         }
