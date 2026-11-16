@@ -22,6 +22,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Lyrics;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Providers;
@@ -51,6 +52,7 @@ namespace Tesserafin.Providers.Manager
     /// </summary>
     public class ProviderManager : IProviderManager, IDisposable
     {
+        private readonly ILimitedConcurrencyLibraryScheduler _scheduler;
         private readonly IItemWriteCommands _writes;
         private readonly IItemMetadataExporter _metadataExporter;
         private readonly IItemImageService _images;
@@ -108,6 +110,7 @@ namespace Tesserafin.Providers.Manager
         /// <param name="remoteImages">The image-only HTTP source.</param>
         /// <param name="mediaSegmentManager">The media segment manager.</param>
         /// <param name="similarItemsManager">The similar items manager.</param>
+        /// <param name="scheduler">Runs folder validation work with bounded concurrency.</param>
         public ProviderManager(
             IItemWriteCommands writes,
             IItemMetadataExporter metadataExporter,
@@ -125,8 +128,10 @@ namespace Tesserafin.Providers.Manager
             ILyricManager lyricManager,
             IRemoteImageSource remoteImages,
             IMediaSegmentManager mediaSegmentManager,
-            ISimilarItemsManager similarItemsManager)
+            ISimilarItemsManager similarItemsManager,
+            ILimitedConcurrencyLibraryScheduler scheduler)
         {
+            _scheduler = scheduler;
             _writes = writes;
             _metadataExporter = metadataExporter;
             _images = images;
@@ -1021,7 +1026,7 @@ namespace Tesserafin.Providers.Manager
                     await RefreshCollectionFolderChildren(options, collectionFolder, cancellationToken).ConfigureAwait(false);
                     break;
                 case Folder folder:
-                    await folder.ValidateChildren(_deletions, _writes, _images, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await folder.ValidateChildren(_deletions, _writes, _images, _scheduler, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
                     break;
             }
         }
@@ -1032,7 +1037,7 @@ namespace Tesserafin.Providers.Manager
             {
                 await child.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
 
-                await child.ValidateChildren(_deletions, _writes, _images, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                await child.ValidateChildren(_deletions, _writes, _images, _scheduler, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -1055,7 +1060,7 @@ namespace Tesserafin.Providers.Manager
                 .Where(i => i is not null)
                 .Distinct();
 
-            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_deletions, _writes, _images, new Progress<double>(), options, true, false, cancellationToken));
+            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_deletions, _writes, _images, _scheduler, new Progress<double>(), options, true, false, cancellationToken));
 
             await Task.WhenAll(musicArtistRefreshTasks).ConfigureAwait(false);
 

@@ -923,7 +923,7 @@ Seven services read entity statics only to dodge DI cycles. They now receive dep
 `BaseItemExtensions`, `Folder`), `ItemResolveArgs`, `ResolverHelper` (both reached from
 `LibraryManager` scan code) and the `ApplicationHost` assignments. The statics themselves remain.
 
-## 26. Embedded episode tags leave the entity (consolidation step 5)
+## 29. Embedded episode tags leave the entity (consolidation step 5)
 
 `Episode.BeforeMetadataRefresh` no longer probes mp4 files. `MetadataService` runs an async
 `BeforeMetadataRefreshAsync` hook just before the entity hook; `EpisodeMetadataService` overrides it
@@ -935,3 +935,16 @@ a tag that changes a field now marks the refresh as `MetadataImport`.
 
 `Episode.MediaEncoder` and `BaseItem.MediaSegmentManager` are deleted with their `ApplicationHost`
 assignments; `entityStaticServices` shrinks from 19 to 17.
+
+## 30. Folder validation takes its scheduler (consolidation step 5)
+
+`Folder.ValidateChildren` and its `ValidateChildrenInternal` overrides take the
+`ILimitedConcurrencyLibraryScheduler` explicitly, next to the deletion, write and image ports; the private
+child-refresh and sub-folder helpers pass it down to `RunTasks`, now static. `LibraryScanTraversal`
+and `ProviderManager` inject it. The unused `ValidateChildren(deletions, writes, images, progress, token)` overload,
+which also read `BaseItem.FileSystem`, is deleted. `Folder.LimitedConcurrencyLibraryScheduler` and
+its `ApplicationHost` assignment are gone; `entityStaticServices` shrinks from 17 to 16.
+
+`BaseItem.ItemRepository` stays: its two readers are `Folder.LoadChildren` (behind the lazy
+`Children` getter) and `Folder.IsPlayed`, both on entity read paths that need a children/played
+service of their own before the static can go.
