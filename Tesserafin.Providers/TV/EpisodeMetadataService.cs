@@ -13,6 +13,7 @@ using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.Manager;
 
@@ -41,6 +42,7 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     /// <param name="mediaEncoder">Reads the episode information embedded in the file.</param>
     /// <param name="mediaSourceManager">Supplies the episode's media source to read.</param>
+    /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     public EpisodeMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -53,8 +55,9 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
         IMediaEncoder mediaEncoder,
-        IMediaSourceManager mediaSourceManager)
-        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        IMediaSourceManager mediaSourceManager,
+        ILocalizationManager localizationManager)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
         _mediaEncoder = mediaEncoder;
         _mediaSourceManager = mediaSourceManager;

@@ -27,6 +27,7 @@ using Tesserafin.LiveTv;
 using Tesserafin.Model.Channels;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.Querying;
 using Episode = Tesserafin.Controller.Entities.TV.Episode;
@@ -43,6 +44,7 @@ namespace Tesserafin.LiveTv.Channels
     public class ChannelManager : IChannelManager, IDisposable
     {
         private readonly IItemPeopleCommands _peopleCommands;
+        private readonly ILocalizationManager _localization;
         private readonly IItemWriteCommands _writes;
         private readonly IStandaloneVisibilityService _visibility;
         private readonly IItemDeletionCommands _deletions;
@@ -76,6 +78,7 @@ namespace Tesserafin.LiveTv.Channels
         /// <param name="memoryCache">The memory cache.</param>
         /// <param name="channels">The channels.</param>
         /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
+        /// <param name="localization">Scores ratings when item metadata changes.</param>
         public ChannelManager(
             IItemPeopleCommands peopleCommands,
             IItemWriteCommands writes,
@@ -90,9 +93,11 @@ namespace Tesserafin.LiveTv.Channels
             IProviderManager providerManager,
             IMemoryCache memoryCache,
             IEnumerable<IChannel> channels,
-            IStandaloneVisibilityService visibility)
+            IStandaloneVisibilityService visibility,
+            ILocalizationManager localization)
         {
             _peopleCommands = peopleCommands;
+            _localization = localization;
             _writes = writes;
             _visibility = visibility;
             _deletions = deletions;
@@ -501,7 +506,7 @@ namespace Tesserafin.LiveTv.Channels
 
             if (isNew)
             {
-                item.OnMetadataChanged();
+                item.OnMetadataChanged(_localization);
                 _writes.CreateItem(item, null);
             }
 
@@ -1152,7 +1157,7 @@ namespace Tesserafin.LiveTv.Channels
                 }
             }
 
-            item.OnMetadataChanged();
+            item.OnMetadataChanged(_localization);
 
             if (isNew)
             {

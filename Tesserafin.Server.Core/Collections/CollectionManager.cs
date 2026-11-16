@@ -284,7 +284,7 @@ namespace Tesserafin.Server.Core.Collections
                 }
 
                 collection.LinkedChildren = newChildren;
-                collection.UpdateRatingToItems(linkedChildrenList);
+                collection.UpdateRatingToItems(linkedChildrenList, _localizationManager);
 
                 await collection.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 

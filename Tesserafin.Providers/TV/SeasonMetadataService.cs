@@ -12,6 +12,7 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.Manager;
 
@@ -38,6 +39,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
+    /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     public SeasonMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -49,8 +51,9 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
-        IItemSortService itemSortService)
-        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        IItemSortService itemSortService,
+        ILocalizationManager localizationManager)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
         _itemSortService = itemSortService;
     }

@@ -61,7 +61,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
         IItemSortService itemSortService)
-        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
         _deletions = deletions;
         _localizationManager = localizationManager;

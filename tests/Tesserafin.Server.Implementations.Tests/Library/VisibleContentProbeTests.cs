@@ -380,7 +380,6 @@ public sealed class VisibleContentProbeTests
             localization
                 .Setup(l => l.GetRatingScore("R", It.IsAny<string?>()))
                 .Returns(new ParentalRatingScore(17, null));
-            BaseItem.LocalizationManager = localization.Object;
 
             BackRepository(_staticRepository);
             BaseItem.ItemRepository = _staticRepository.Object;

@@ -14,6 +14,7 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.TV;
 using Xunit;
@@ -142,7 +143,8 @@ public sealed class EpisodeEmbeddedInfoProbeTests
             Mock.Of<IExternalDataManager>(),
             Mock.Of<IItemRepository>(),
             _encoder.Object,
-            _sources.Object);
+            _sources.Object,
+            Mock.Of<ILocalizationManager>());
 
         try
         {
@@ -178,7 +180,8 @@ public sealed class EpisodeEmbeddedInfoProbeTests
                 Mock.Of<IExternalDataManager>(),
                 Mock.Of<IItemRepository>(),
                 encoder,
-                sources)
+                sources,
+                Mock.Of<ILocalizationManager>())
         {
         }
 

@@ -12,7 +12,6 @@
     "BaseItem.FileSystem",
     "BaseItem.ItemRepository",
     "BaseItem.LibraryManager",
-    "BaseItem.LocalizationManager",
     "BaseItem.MediaSourceManager",
     "BaseItem.ProviderManager",
     "BaseItem.UserDataManager",

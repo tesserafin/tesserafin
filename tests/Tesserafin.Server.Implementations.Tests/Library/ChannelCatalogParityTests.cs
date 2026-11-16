@@ -17,6 +17,7 @@ using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.LiveTv.Channels;
 using Tesserafin.Model.Channels;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Server.Core.Library;
 using Xunit;
@@ -180,7 +181,8 @@ public sealed class ChannelCatalogParityTests
                 Mock.Of<IProviderManager>(),
                 new MemoryCache(new MemoryCacheOptions()),
                 Plugins,
-                Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<Tesserafin.Controller.Entities.BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())));
+                Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<Tesserafin.Controller.Entities.BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())),
+                Mock.Of<ILocalizationManager>());
         }
 
         public Channel AddMaterializedChannel(string name)

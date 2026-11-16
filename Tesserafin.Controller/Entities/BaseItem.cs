@@ -94,8 +94,6 @@ namespace Tesserafin.Controller.Entities
 
         private string _name;
 
-        private string _originalLanguage;
-
         public const char SlugChar = '-';
 
         protected BaseItem()
@@ -219,11 +217,7 @@ namespace Tesserafin.Controller.Entities
         public string OriginalTitle { get; set; }
 
         [JsonIgnore]
-        public string OriginalLanguage
-        {
-            get => _originalLanguage;
-            set => _originalLanguage = LocalizationManager?.FindLanguageInfo(value)?.TwoLetterISOLanguageName ?? value;
-        }
+        public string OriginalLanguage { get; set; }
 
         /// <summary>
         /// Gets or sets the id.
@@ -478,8 +472,6 @@ namespace Tesserafin.Controller.Entities
         public static IServerConfigurationManager ConfigurationManager { get; set; }
 
         public static IProviderManager ProviderManager { get; set; }
-
-        public static ILocalizationManager LocalizationManager { get; set; }
 
         public static IItemRepository ItemRepository { get; set; }
 
@@ -1921,7 +1913,7 @@ namespace Tesserafin.Controller.Entities
             return !maxAllowedSubRating.HasValue || (ratingScore.SubScore ?? 0) <= maxAllowedSubRating.Value;
         }
 
-        public ParentalRatingScore GetParentalRatingScore()
+        public ParentalRatingScore GetParentalRatingScore(ILocalizationManager localization)
         {
             var rating = CustomRatingForComparison;
 
@@ -1935,7 +1927,7 @@ namespace Tesserafin.Controller.Entities
                 return null;
             }
 
-            return LocalizationManager.GetRatingScore(rating, GetPreferredMetadataCountryCode());
+            return localization.GetRatingScore(rating, GetPreferredMetadataCountryCode());
         }
 
         public List<string> GetInheritedTags()
@@ -2923,13 +2915,13 @@ namespace Tesserafin.Controller.Entities
             return null;
         }
 
-        public virtual ItemUpdateType OnMetadataChanged()
+        public virtual ItemUpdateType OnMetadataChanged(ILocalizationManager localization)
         {
             var updateType = ItemUpdateType.None;
 
             var item = this;
 
-            var rating = item.GetParentalRatingScore();
+            var rating = item.GetParentalRatingScore(localization);
             if (rating is not null)
             {
                 if (rating.Score != item.InheritedParentalRatingValue)
@@ -2961,8 +2953,9 @@ namespace Tesserafin.Controller.Entities
         /// Updates the official rating based on content and returns true or false indicating if it changed.
         /// </summary>
         /// <param name="children">Media children.</param>
+        /// <param name="localization">Scores the ratings.</param>
         /// <returns><c>true</c> if the rating was updated; otherwise <c>false</c>.</returns>
-        public bool UpdateRatingToItems(IReadOnlyList<BaseItem> children)
+        public bool UpdateRatingToItems(IReadOnlyList<BaseItem> children, ILocalizationManager localization)
         {
             var currentOfficialRating = OfficialRating;
 
@@ -2971,7 +2964,7 @@ namespace Tesserafin.Controller.Entities
                 .Select(i => i.OfficialRating)
                 .Where(i => !string.IsNullOrEmpty(i))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Select(rating => (rating, LocalizationManager.GetRatingScore(rating, GetPreferredMetadataCountryCode())))
+                .Select(rating => (rating, localization.GetRatingScore(rating, GetPreferredMetadataCountryCode())))
                 .OrderBy(i => i.Item2 is null ? 1001 : i.Item2.Score)
                 .ThenBy(i => i.Item2 is null ? 1001 : i.Item2.SubScore)
                 .Select(i => i.rating);

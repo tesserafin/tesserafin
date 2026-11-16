@@ -586,7 +586,6 @@ public sealed class StandaloneVisibilityTests
         // The three statics the check could read throw on any call.
         ThrowingStatic();
         BaseItem.ConfigurationManager = new Mock<IServerConfigurationManager>(MockBehavior.Strict).Object;
-        BaseItem.LocalizationManager = new Mock<ILocalizationManager>(MockBehavior.Strict).Object;
 
         foreach (var state in states)
         {
@@ -1063,7 +1062,6 @@ public sealed class StandaloneVisibilityTests
         ThrowingStatic();
         BaseItem.ChannelManager = new Mock<IChannelManager>(MockBehavior.Strict).Object;
         BaseItem.ConfigurationManager = new Mock<IServerConfigurationManager>(MockBehavior.Strict).Object;
-        BaseItem.LocalizationManager = new Mock<ILocalizationManager>(MockBehavior.Strict).Object;
         Video.RecordingsManager = new Mock<IRecordingsManager>(MockBehavior.Strict).Object;
 
         Assert.Equal(expected, items.Select(i => Decisions(i, users)));
@@ -1119,7 +1117,7 @@ public sealed class StandaloneVisibilityTests
     }
 
     private void Scores(System.Linq.Expressions.Expression<Func<ILocalizationManager, bool>> scores) =>
-        BaseItem.LocalizationManager = _scores = Mock.Of(scores);
+        _scores = Mock.Of(scores);
 
     private void RatingScores() => Scores(l =>
         l.GetRatingScore("R", "US") == new ParentalRatingScore(17, null)

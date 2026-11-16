@@ -1198,3 +1198,32 @@ Removed from `CollectionFolder`: the `XmlSerializer` static, the static cache, `
 `SaveLibraryOptions`, `OnCollectionFolderChange`, `UpdateLibraryOptions`, the instance
 `GetLibraryOptions()` and the static `LibraryOptionsUpdated` event. `entityStaticServices` 16 → 15.
 `CollectionFolder.ApplicationHost` stays (file-system child enumeration and shortcut expansion).
+
+## 35. Entity visibility through a mandatory scope; `BaseItem.LocalizationManager` removed (consolidation step 5)
+
+Three stacked PRs (#443, #445 and this one):
+
+1. DI services and controllers that called the scope-less `IsVisible(user)` / `IsVisibleStandalone(user)`
+   pass the injected `IStandaloneVisibilityService`. `LibraryManager` goes through `IItemAccessService`
+   (`IsVisible`, `IsVisibleStandalone`, `GetChildren`), so its constructor is unchanged.
+2. The scope-less overloads and every null-scope fallback to `BaseItem.LibraryManager`,
+   `LocalizationManager` or `ChannelManager` are deleted. `IRatingVisibilityService`,
+   `IBoxSetVisibilityService`, `ILinkedChildVisibilityService` and `IRecordingVisibilityService` are folded
+   into `IStandaloneVisibilityService`, a single scope contract.
+   - Children reads carry the scope on `InternalItemsQuery.Visibility`. `RequireVisibility()` fails a
+     user-filtered read that has no scope.
+   - `ItemQueryService` fills the scope on every query; derived child queries copy it.
+3. `OriginalLanguage` is a plain property. It is normalised to the two-letter code by its writers
+   (`ItemUpdateController`, and `MetadataService` before `OnMetadataChanged`) through
+   `ILocalizationManager.NormalizeLanguage`.
+   - `OnMetadataChanged`, `GetParentalRatingScore` and `UpdateRatingToItems` take the localization.
+   - `MetadataService` and its 26 subclasses receive it, as do `ChannelManager` and `GuideManager`.
+   - `BaseItem.LocalizationManager` and its `ApplicationHost` assignment are deleted;
+     `entityStaticServices` goes from 15 to 14.
+
+Still static on read paths:
+- `BaseItem.LibraryManager`, `ItemRepository` and `ChannelManager`, on the scope-less non-visibility
+  helpers: metadata language and country, linked-child lookup, box-set library ids;
+- the children listing (`UserView`/`Folder` `GetItems` with `ChannelManager`, `CollectionManager`,
+  `UserViewManager` and `TVSeriesManager`), which is Phase B;
+- `Folder.LoadChildren`/`IsPlayed`, and `Video.RecordingsManager`, which are Phase C.

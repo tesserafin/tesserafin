@@ -19,6 +19,7 @@ using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.Providers;
 
@@ -38,8 +39,10 @@ namespace Tesserafin.Providers.Manager
             ILibraryManager libraryManager,
             IItemNamingService itemNamingService,
             IExternalDataManager externalDataManager,
-            IItemRepository itemRepository)
+            IItemRepository itemRepository,
+            ILocalizationManager localizationManager)
         {
+            LocalizationManager = localizationManager;
             Writes = writes;
             PeopleCommands = peopleCommands;
             ServerConfigurationManager = serverConfigurationManager;
@@ -74,6 +77,8 @@ namespace Tesserafin.Providers.Manager
         protected IExternalDataManager ExternalDataManager { get; }
 
         protected IItemRepository ItemRepository { get; }
+
+        protected ILocalizationManager LocalizationManager { get; }
 
         protected virtual bool EnableUpdatingPremiereDateFromChildren => false;
 
@@ -229,7 +234,7 @@ namespace Tesserafin.Providers.Manager
             if (hasRefreshedMetadata && hasRefreshedImages)
             {
                 item.DateLastRefreshed = DateTime.UtcNow;
-                updateType |= item.OnMetadataChanged();
+                updateType |= ApplyMetadataChanged(item);
             }
 
             updateType = await SaveInternal(item, refreshOptions, updateType, isFirstRefresh, requiresRefresh, metadataResult, cancellationToken).ConfigureAwait(false);
@@ -320,6 +325,25 @@ namespace Tesserafin.Providers.Manager
         protected virtual Task<bool> BeforeMetadataRefreshAsync(TItemType item, LibraryOptions libraryOptions, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
             => Task.FromResult(false);
 
+        /// <summary>
+        /// Normalises the original language to its two-letter code, then lets the item recompute what derives
+        /// from its metadata (the inherited parental rating among others).
+        /// </summary>
+        /// <param name="item">The item.</param>
+        /// <returns>What changed.</returns>
+        private ItemUpdateType ApplyMetadataChanged(BaseItem item)
+        {
+            var updateType = ItemUpdateType.None;
+            var language = LocalizationManager.NormalizeLanguage(item.OriginalLanguage);
+            if (!string.Equals(language, item.OriginalLanguage, StringComparison.Ordinal))
+            {
+                item.OriginalLanguage = language;
+                updateType |= ItemUpdateType.MetadataImport;
+            }
+
+            return updateType | item.OnMetadataChanged(LocalizationManager);
+        }
+
         protected virtual Task AfterMetadataRefresh(TItemType item, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
         {
             item.AfterMetadataRefresh();
@@ -337,7 +361,7 @@ namespace Tesserafin.Providers.Manager
         {
             var updateType = BeforeSaveInternal(item, isFullRefresh, currentUpdateType);
 
-            updateType |= item.OnMetadataChanged();
+            updateType |= ApplyMetadataChanged(item);
 
             if (updateType == ItemUpdateType.None)
             {
@@ -621,7 +645,7 @@ namespace Tesserafin.Providers.Manager
 
             if (!item.LockedFields.Contains(MetadataField.OfficialRating))
             {
-                if (item.UpdateRatingToItems(children))
+                if (item.UpdateRatingToItems(children, LocalizationManager))
                 {
                     updateType |= ItemUpdateType.MetadataEdit;
                 }

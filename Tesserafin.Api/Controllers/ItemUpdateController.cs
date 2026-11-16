@@ -113,7 +113,7 @@ public class ItemUpdateController : BaseTesserafinApiController
 
         await UpdateItem(request, item).ConfigureAwait(false);
 
-        item.OnMetadataChanged();
+        item.OnMetadataChanged(_localizationManager);
 
         await item.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
@@ -251,7 +251,7 @@ public class ItemUpdateController : BaseTesserafinApiController
         item.ForcedSortName = request.ForcedSortName;
 
         item.OriginalTitle = string.IsNullOrWhiteSpace(request.OriginalTitle) ? null : request.OriginalTitle;
-        item.OriginalLanguage = string.IsNullOrWhiteSpace(request.OriginalLanguage) ? null : request.OriginalLanguage;
+        item.OriginalLanguage = string.IsNullOrWhiteSpace(request.OriginalLanguage) ? null : _localizationManager.NormalizeLanguage(request.OriginalLanguage);
 
         item.CriticRating = request.CriticRating;
 
@@ -318,7 +318,7 @@ public class ItemUpdateController : BaseTesserafinApiController
                     season.Tags = season.Tags.Concat(addedTags).Except(removedTags).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
                 }
 
-                season.OnMetadataChanged();
+                season.OnMetadataChanged(_localizationManager);
                 await season.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
                 foreach (var ep in season.Children.OfType<Episode>())
@@ -335,7 +335,7 @@ public class ItemUpdateController : BaseTesserafinApiController
                         ep.Tags = ep.Tags.Concat(addedTags).Except(removedTags).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
                     }
 
-                    ep.OnMetadataChanged();
+                    ep.OnMetadataChanged(_localizationManager);
                     await ep.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
                 }
             }
@@ -356,7 +356,7 @@ public class ItemUpdateController : BaseTesserafinApiController
                     ep.Tags = ep.Tags.Concat(addedTags).Except(removedTags).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
                 }
 
-                ep.OnMetadataChanged();
+                ep.OnMetadataChanged(_localizationManager);
                 await ep.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
             }
         }
@@ -376,7 +376,7 @@ public class ItemUpdateController : BaseTesserafinApiController
                     track.Tags = track.Tags.Concat(addedTags).Except(removedTags).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
                 }
 
-                track.OnMetadataChanged();
+                track.OnMetadataChanged(_localizationManager);
                 await track.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
             }
         }

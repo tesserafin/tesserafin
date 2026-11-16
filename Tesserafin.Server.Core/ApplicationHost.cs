@@ -827,7 +827,6 @@ namespace Tesserafin.Server.Core
             BaseItem.FileSystem = Resolve<IFileSystem>();
             BaseItem.ItemRepository = Resolve<IItemRepository>();
             BaseItem.LibraryManager = Resolve<ILibraryManager>();
-            BaseItem.LocalizationManager = Resolve<ILocalizationManager>();
             BaseItem.Logger = Resolve<ILogger<BaseItem>>();
             BaseItem.MediaSourceManager = Resolve<IMediaSourceManager>();
             BaseItem.ProviderManager = Resolve<IProviderManager>();

@@ -16,6 +16,7 @@ using Tesserafin.Extensions;
 using Tesserafin.LiveTv;
 using Tesserafin.LiveTv.Configuration;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.LiveTv;
 
@@ -29,6 +30,8 @@ public class GuideManager : IGuideManager
     private const string ExternalServiceTag = "ExternalServiceId";
 
     private static readonly ParallelOptions _cacheParallelOptions = new() { MaxDegreeOfParallelism = Math.Min(Environment.ProcessorCount, 10) };
+
+    private readonly ILocalizationManager _localization;
 
     private readonly IItemWriteCommands _writes;
     private readonly IItemImageService _images;
@@ -65,6 +68,7 @@ public class GuideManager : IGuideManager
     /// <param name="recordingsManager">The <see cref="IRecordingsManager"/>.</param>
     /// <param name="schedulesDirectService">The <see cref="ISchedulesDirectService"/>.</param>
     /// <param name="tvDtoService">The <see cref="LiveTvDtoService"/>.</param>
+    /// <param name="localization">Scores ratings when item metadata changes.</param>
     public GuideManager(
         IItemWriteCommands writes,
         IItemImageService images,
@@ -78,8 +82,10 @@ public class GuideManager : IGuideManager
         ITunerHostManager tunerHostManager,
         IRecordingsManager recordingsManager,
         ISchedulesDirectService schedulesDirectService,
-        LiveTvDtoService tvDtoService)
+        LiveTvDtoService tvDtoService,
+        ILocalizationManager localization)
     {
+        _localization = localization;
         _writes = writes;
         _images = images;
         _deletions = deletions;
@@ -629,7 +635,7 @@ public class GuideManager : IGuideManager
 
         if (isNew)
         {
-            item.OnMetadataChanged();
+            item.OnMetadataChanged(_localization);
 
             return (item, true, false);
         }
@@ -648,7 +654,7 @@ public class GuideManager : IGuideManager
 
         if (isUpdated)
         {
-            item.OnMetadataChanged();
+            item.OnMetadataChanged(_localization);
 
             return (item, false, true);
         }
