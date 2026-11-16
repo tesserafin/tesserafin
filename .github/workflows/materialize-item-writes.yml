@@ -1,0 +1,46 @@
+name: Materialize isolated item write extraction
+
+on:
+  push:
+    branches: [consol/item-write-commands-hosted]
+    paths:
+      - ci/materialize-item-writes.py
+      - .github/workflows/materialize-item-writes.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: isolated-item-write-materialization
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    if: github.repository == 'tesserafin/tesserafin' && github.ref == 'refs/heads/consol/item-write-commands-hosted'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: '10.0.x'
+      - name: Materialize the approved extraction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python ci/materialize-item-writes.py
+          python - <<'PY'
+          import subprocess
+          files = subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()
+          files += subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard'], text=True).splitlines()
+          files = sorted({path for path in files if path.endswith('.cs')})
+          subprocess.run(['dotnet', 'format', 'whitespace', '.', '--folder', '--include', *files], check=True)
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git commit -m 'refactor(library): extract item graph writes and resolution'
+          git push origin HEAD:refs/heads/consol/item-write-commands-hosted
