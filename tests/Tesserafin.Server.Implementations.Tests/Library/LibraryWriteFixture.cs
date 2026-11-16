@@ -19,7 +19,7 @@ internal static class LibraryWriteFixture
     public static IItemWriteCommands Register(IFixture fixture)
     {
         var configuration = fixture.Create<IServerConfigurationManager>();
-        if (configuration.GetConfiguration("metadata") is null)
+        if (configuration.GetConfiguration("metadata") is not MetadataConfiguration)
         {
             Mock.Get(configuration).Setup(c => c.GetConfiguration("metadata")).Returns(new MetadataConfiguration());
         }
@@ -30,7 +30,7 @@ internal static class LibraryWriteFixture
         fixture.Inject<IItemResolutionService>(resolution);
         var versions = new ItemVersionGraphPlanner(resolution, options, fixture.Create<IItemLookupService>());
         fixture.Inject(versions);
-        var writes = new ItemWriteCommands(versions, fixture.Create<IItemPersistenceService>(), fixture.Create<IItemCacheStore>(), fixture.Create<IItemLookupService>(), fixture.Create<ILinkedChildrenService>(), fixture.Create<IItemMetadataExporter>(), fixture.Create<IItemChangePublisher>(), new ActiveRecordings(), NullLogger<ItemWriteCommands>.Instance);
+        var writes = new ItemWriteCommands(versions, fixture.Create<IItemPersistenceService>(), fixture.Create<IItemCacheStore>(), fixture.Create<IItemLookupService>(), fixture.Create<ILinkedChildrenService>(), fixture.Create<IItemMetadataExporter>(), fixture.Create<IFileSystem>(), fixture.Create<IItemChangePublisher>(), new ActiveRecordings(), NullLogger<ItemWriteCommands>.Instance);
         fixture.Inject<IItemWriteCommands>(writes);
         return writes;
     }

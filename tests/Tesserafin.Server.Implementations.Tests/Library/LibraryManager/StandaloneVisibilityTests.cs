@@ -81,6 +81,8 @@ public sealed class StandaloneVisibilityTests
         var resolver = new Tesserafin.Server.Core.Library.CollectionFolderResolver(lookup, rootProvider);
         fixture.Register<ICollectionFolderResolver>(() => resolver);
 
+        Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
+
         var manager = _manager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 Array.Empty<IResolverIgnoreRule>(),
                 Array.Empty<IItemResolver>(),

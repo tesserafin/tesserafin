@@ -9,6 +9,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.Library;
 
@@ -20,6 +21,7 @@ internal sealed class ItemWriteCommands(
     IItemLookupService lookup,
     ILinkedChildrenService linkedChildren,
     IItemMetadataExporter metadata,
+    IFileSystem files,
     IItemChangePublisher changes,
     ActiveRecordings recordings,
     ILogger<ItemWriteCommands> logger) : IItemWriteCommands
@@ -106,7 +108,7 @@ internal sealed class ItemWriteCommands(
         {
             cancellationToken.ThrowIfCancellationRequested();
             draft.DateLastSaved = DateTime.UtcNow;
-            if (draft.IsFileProtocol)
+            if (!string.IsNullOrEmpty(draft.Path) && files.IsPathFile(draft.Path))
             {
                 await metadata.SaveAsync(draft, propagated.Contains(draft.Id) ? ItemUpdateType.MetadataDownload : reason, cancellationToken).ConfigureAwait(false);
             }

@@ -13,6 +13,7 @@ using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.IO;
 using Tesserafin.Server.Core.Library;
 using Xunit;
 
@@ -143,6 +144,21 @@ public sealed class ItemWriteCommandsTests
     }
 
     [Fact]
+    public async Task RemoteItem_UpdatesTheCatalogueWithoutExportingFileMetadata()
+    {
+        var context = new Context();
+        var item = context.Movie();
+        item.Path = "https://example.test/movie.mkv";
+        context.Files.Setup(f => f.IsPathFile(item.Path)).Returns(false);
+
+        await context.Commands.UpdateItemAsync(item, null, ItemUpdateType.MetadataEdit, TestContext.Current.CancellationToken);
+
+        context.Metadata.Verify(m => m.SaveAsync(It.IsAny<BaseItem>(), It.IsAny<ItemUpdateType>(), It.IsAny<CancellationToken>(), It.IsAny<IEnumerable<string>>()), Times.Never);
+        context.Persistence.Verify(p => p.SaveItems(It.Is<IReadOnlyList<BaseItem>>(graph => graph.Count == 1), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Single(context.Cache.Registered);
+    }
+
+    [Fact]
     public void CacheFailure_EvictsTheSavedGraph_WithoutNotification()
     {
         var context = new Context();
@@ -200,9 +216,10 @@ public sealed class ItemWriteCommandsTests
     {
         public Context()
         {
+            Files.Setup(f => f.IsPathFile(It.IsAny<string>())).Returns(true);
             Linked.Setup(l => l.GetLinkedChildrenIds(It.IsAny<Guid>(), It.IsAny<int?>())).Returns([]);
             Metadata.Setup(m => m.SaveAsync(It.IsAny<BaseItem>(), It.IsAny<ItemUpdateType>(), It.IsAny<CancellationToken>(), It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
-            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, Mock.Of<ILibraryItemOptions>(), Lookup.Object), Persistence.Object, Cache, Lookup.Object, Linked.Object, Metadata.Object, Events, new ActiveRecordings(), NullLogger<ItemWriteCommands>.Instance);
+            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, Mock.Of<ILibraryItemOptions>(), Lookup.Object), Persistence.Object, Cache, Lookup.Object, Linked.Object, Metadata.Object, Files.Object, Events, new ActiveRecordings(), NullLogger<ItemWriteCommands>.Instance);
         }
 
         public Mock<IItemResolutionService> Resolution { get; } = new();
@@ -214,6 +231,8 @@ public sealed class ItemWriteCommandsTests
         public Mock<IItemPersistenceService> Persistence { get; } = new();
 
         public Mock<IItemMetadataExporter> Metadata { get; } = new();
+
+        public Mock<IFileSystem> Files { get; } = new();
 
         public RecordingCache Cache { get; } = new();
 

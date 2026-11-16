@@ -62,6 +62,8 @@ public sealed class CollectionFolderMembershipTests
         _resolver = new Tesserafin.Server.Core.Library.CollectionFolderResolver(lookup, rootProvider);
         fixture.Register<ICollectionFolderResolver>(() => _resolver);
 
+        Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
+
         var manager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 Array.Empty<IResolverIgnoreRule>(),
                 Array.Empty<IItemResolver>(),
