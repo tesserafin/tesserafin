@@ -67,7 +67,7 @@ namespace Tesserafin.Controller.Channels
             }
         }
 
-        protected override string GetInternalMetadataPath(string basePath)
+        public override string GetInternalMetadataPath(string basePath)
         {
             return GetInternalMetadataPath(basePath, Id);
         }

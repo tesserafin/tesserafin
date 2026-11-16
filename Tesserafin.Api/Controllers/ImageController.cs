@@ -42,6 +42,7 @@ namespace Tesserafin.Api.Controllers;
 [Route("")]
 public class ImageController : BaseTesserafinApiController
 {
+    private readonly IItemImageService _images;
     private readonly IUserManager _userManager;
     private readonly ILibraryManager _libraryManager;
     private readonly IProviderManager _providerManager;
@@ -54,6 +55,7 @@ public class ImageController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="ImageController"/> class.
     /// </summary>
+    /// <param name="images">Explicit image preparation and commit lifecycle.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -63,6 +65,7 @@ public class ImageController : BaseTesserafinApiController
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
     /// <param name="appPaths">Instance of the <see cref="IApplicationPaths"/> interface.</param>
     public ImageController(
+        IItemImageService images,
         IUserManager userManager,
         ILibraryManager libraryManager,
         IProviderManager providerManager,
@@ -72,6 +75,7 @@ public class ImageController : BaseTesserafinApiController
         IServerConfigurationManager serverConfigurationManager,
         IApplicationPaths appPaths)
     {
+        _images = images;
         _userManager = userManager;
         _libraryManager = libraryManager;
         _providerManager = providerManager;
@@ -479,7 +483,13 @@ public class ImageController : BaseTesserafinApiController
             return list;
         }
 
-        await _libraryManager.UpdateImagesAsync(item).ConfigureAwait(false); // this makes sure dimensions and hashes are correct
+        var images = await _images.PrepareRefreshAsync(item, false, true, HttpContext.RequestAborted).ConfigureAwait(false);
+        await using (images.ConfigureAwait(false))
+        {
+            await images.CommitAsync(HttpContext.RequestAborted).ConfigureAwait(false);
+        }
+
+        itemImages = item.ImageInfos;
 
         foreach (var image in itemImages)
         {
@@ -1887,7 +1897,12 @@ public class ImageController : BaseTesserafinApiController
 
         if (!imageInfo.IsLocalFile && item is not null)
         {
-            imageInfo = await _libraryManager.ConvertImageToLocal(item, imageInfo, imageIndex ?? 0).ConfigureAwait(false);
+            var images = await _images.PrepareLocalImageAsync(item, imageInfo, imageIndex ?? 0, true, HttpContext.RequestAborted).ConfigureAwait(false);
+            await using (images.ConfigureAwait(false))
+            {
+                await images.CommitAsync(HttpContext.RequestAborted).ConfigureAwait(false);
+                imageInfo = images.Image ?? throw new InvalidOperationException("The requested image is unavailable.");
+            }
         }
 
         var options = new ImageProcessingOptions

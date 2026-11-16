@@ -13,6 +13,7 @@ using Tesserafin.Model.IO;
 namespace Tesserafin.Server.Core.Library;
 
 internal sealed class LibraryScanTraversal(
+    IItemImageService images,
     IItemDeletionCommands deletions,
     ILibraryRootFolderProvider roots,
     IUserRootFolderProvider userRoots,
@@ -21,6 +22,8 @@ internal sealed class LibraryScanTraversal(
     IItemCacheStore cache,
     DotIgnoreIgnoreRule ignore) : ILibraryScanTraversal
 {
+    private readonly IItemImageService _images = images;
+
     private readonly IItemDeletionCommands _deletions = deletions;
 
     public async Task RefreshTopFoldersAsync(CancellationToken cancellationToken, bool removeRoot)
@@ -29,12 +32,12 @@ internal sealed class LibraryScanTraversal(
         var root = roots.GetRootFolder();
         root.Children = null;
         await root.RefreshMetadata(_deletions, cancellationToken).ConfigureAwait(false);
-        await root.ValidateChildren(_deletions, new Progress<double>(), new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
+        await root.ValidateChildren(_deletions, _images, new Progress<double>(), new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         var userRoot = userRoots.GetUserRootFolder();
         userRoot.Children = null;
         await userRoot.RefreshMetadata(_deletions, cancellationToken).ConfigureAwait(false);
-        await userRoot.ValidateChildren(_deletions, new Progress<double>(), new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
+        await userRoot.ValidateChildren(_deletions, _images, new Progress<double>(), new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         var deleted = new List<Guid>();
         foreach (var child in userRoot.Children!.OfType<Folder>())
@@ -59,7 +62,7 @@ internal sealed class LibraryScanTraversal(
     }
 
     public Task RefreshAllAsync(IProgress<double> progress, CancellationToken cancellationToken)
-        => roots.GetRootFolder().ValidateChildren(_deletions, progress, new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: true, cancellationToken: cancellationToken);
+        => roots.GetRootFolder().ValidateChildren(_deletions, _images, progress, new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: true, cancellationToken: cancellationToken);
 
     public void ClearIgnoreRuleCache() => ignore.ClearDirectoryCache();
 

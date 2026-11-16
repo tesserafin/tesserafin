@@ -51,10 +51,11 @@ namespace Tesserafin.Providers.Manager
     /// </summary>
     public class ProviderManager : IProviderManager, IDisposable
     {
+        private readonly IItemImageService _images;
+        private readonly IRemoteImageSource _remoteImages;
         private readonly IItemDeletionCommands _deletions;
         private readonly Lock _refreshQueueLock = new();
         private readonly ILogger<ProviderManager> _logger;
-        private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILibraryMonitor _libraryMonitor;
         private readonly IFileSystem _fileSystem;
         private readonly IServerApplicationPaths _appPaths;
@@ -67,14 +68,8 @@ namespace Tesserafin.Providers.Manager
         private readonly ConcurrentDictionary<Guid, double> _activeRefreshes = new();
         private readonly CancellationTokenSource _disposeCancellationTokenSource = new();
         private readonly PriorityQueue<(Guid ItemId, MetadataRefreshOptions RefreshOptions), RefreshPriority> _refreshQueue = new();
-        private readonly IMemoryCache _memoryCache;
         private readonly IMediaSegmentManager _mediaSegmentManager;
         private readonly ISimilarItemsManager _similarItemsManager;
-        private readonly AsyncKeyedLocker<string> _imageSaveLock = new(o =>
-        {
-            o.PoolSize = 20;
-            o.PoolInitialFill = 1;
-        });
 
         /// <summary>
         /// Cache for ordered metadata providers per library/item type combination.
@@ -95,8 +90,8 @@ namespace Tesserafin.Providers.Manager
         /// <summary>
         /// Initializes a new instance of the <see cref="ProviderManager"/> class.
         /// </summary>
+        /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="deletions">Item deletion operations.</param>
-        /// <param name="httpClientFactory">The Http client factory.</param>
         /// <param name="subtitleManager">The subtitle manager.</param>
         /// <param name="configurationManager">The configuration manager.</param>
         /// <param name="libraryMonitor">The library monitor.</param>
@@ -107,12 +102,12 @@ namespace Tesserafin.Providers.Manager
         /// <param name="libraryManager">The library manager.</param>
         /// <param name="baseItemManager">The BaseItem manager.</param>
         /// <param name="lyricManager">The lyric manager.</param>
-        /// <param name="memoryCache">The memory cache.</param>
+        /// <param name="remoteImages">The image-only HTTP source.</param>
         /// <param name="mediaSegmentManager">The media segment manager.</param>
         /// <param name="similarItemsManager">The similar items manager.</param>
         public ProviderManager(
+            IItemImageService images,
             IItemDeletionCommands deletions,
-            IHttpClientFactory httpClientFactory,
             ISubtitleManager subtitleManager,
             IServerConfigurationManager configurationManager,
             ILibraryMonitor libraryMonitor,
@@ -123,13 +118,13 @@ namespace Tesserafin.Providers.Manager
             ILibraryScanCoordinator scans,
             IBaseItemManager baseItemManager,
             ILyricManager lyricManager,
-            IMemoryCache memoryCache,
+            IRemoteImageSource remoteImages,
             IMediaSegmentManager mediaSegmentManager,
             ISimilarItemsManager similarItemsManager)
         {
+            _images = images;
             _deletions = deletions;
             _logger = logger;
-            _httpClientFactory = httpClientFactory;
             _configurationManager = configurationManager;
             _libraryMonitor = libraryMonitor;
             _fileSystem = fileSystem;
@@ -139,7 +134,7 @@ namespace Tesserafin.Providers.Manager
             _subtitleManager = subtitleManager;
             _baseItemManager = baseItemManager;
             _lyricManager = lyricManager;
-            _memoryCache = memoryCache;
+            _remoteImages = remoteImages;
             _mediaSegmentManager = mediaSegmentManager;
             _similarItemsManager = similarItemsManager;
 
@@ -174,8 +169,17 @@ namespace Tesserafin.Providers.Manager
         }
 
         /// <inheritdoc/>
-        public Task<ItemUpdateType> RefreshSingleItem(BaseItem item, MetadataRefreshOptions options, CancellationToken cancellationToken)
+        public async Task<ItemUpdateType> RefreshSingleItem(BaseItem item, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
+            if (item.ImageInfos.Length > 0)
+            {
+                var images = await _images.PrepareRefreshAsync(item, false, true, cancellationToken).ConfigureAwait(false);
+                await using (images.ConfigureAwait(false))
+                {
+                    await images.CommitAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
+
             var type = item.GetType();
 
             var service = _metadataServices.FirstOrDefault(current => current.CanRefreshPrimary(type))
@@ -184,80 +188,18 @@ namespace Tesserafin.Providers.Manager
             if (service is null)
             {
                 _logger.LogError("Unable to find a metadata service for item of type {TypeName}", type.Name);
-                return Task.FromResult(ItemUpdateType.None);
+                return ItemUpdateType.None;
             }
 
-            return service.RefreshMetadata(item, options, cancellationToken);
+            return await service.RefreshMetadata(item, options, cancellationToken).ConfigureAwait(false);
         }
 
         /// <inheritdoc/>
         public async Task SaveImage(BaseItem item, string url, ImageType type, int? imageIndex, CancellationToken cancellationToken)
         {
-            using (await _imageSaveLock.LockAsync(url, cancellationToken).ConfigureAwait(false))
-            {
-                if (_memoryCache.TryGetValue(url, out (string ContentType, byte[] ImageContents)? cachedValue)
-                    && cachedValue is not null)
-                {
-                    var imageContents = cachedValue.Value.ImageContents;
-                    var cacheStream = new MemoryStream(imageContents, 0, imageContents.Length, false);
-                    await using (cacheStream.ConfigureAwait(false))
-                    {
-                        await SaveImage(
-                            item,
-                            cacheStream,
-                            cachedValue.Value.ContentType,
-                            type,
-                            imageIndex,
-                            cancellationToken).ConfigureAwait(false);
-                        return;
-                    }
-                }
-
-                var httpClient = _httpClientFactory.CreateClient(NamedClient.Default);
-                using var response = await httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
-
-                response.EnsureSuccessStatusCode();
-
-                var contentType = response.Content.Headers.ContentType?.MediaType;
-
-                // Workaround for tvheadend channel icons
-                // TODO: Isolate this hack into the tvh plugin
-                if (string.IsNullOrEmpty(contentType))
-                {
-                    // Special case for imagecache
-                    if (url.Contains("/imagecache/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        contentType = MediaTypeNames.Image.Png;
-                    }
-                }
-
-                // some providers don't correctly report media type, extract from url if no extension found
-                if (contentType is null || contentType.Equals(MediaTypeNames.Application.Octet, StringComparison.OrdinalIgnoreCase))
-                {
-                    // Strip query parameters from url to get actual path.
-                    contentType = MimeTypes.GetMimeType(new Uri(url).GetLeftPart(UriPartial.Path));
-                }
-
-                if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new HttpRequestException($"Request returned '{contentType}' instead of an image type", null, HttpStatusCode.NotFound);
-                }
-
-                var responseBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-                var stream = new MemoryStream(responseBytes, 0, responseBytes.Length, false);
-                await using (stream.ConfigureAwait(false))
-                {
-                    _memoryCache.Set(url, (contentType, responseBytes), TimeSpan.FromSeconds(10));
-
-                    await SaveImage(
-                        item,
-                        stream,
-                        contentType,
-                        type,
-                        imageIndex,
-                        cancellationToken).ConfigureAwait(false);
-                }
-            }
+            var image = await _remoteImages.GetAsync(url, cancellationToken).ConfigureAwait(false);
+            using var stream = new MemoryStream(image.Bytes.ToArray(), false);
+            await SaveImage(item, stream, image.ContentType, type, imageIndex, cancellationToken).ConfigureAwait(false);
         }
 
         /// <inheritdoc/>
@@ -1206,7 +1148,7 @@ namespace Tesserafin.Providers.Manager
                     await RefreshCollectionFolderChildren(options, collectionFolder, cancellationToken).ConfigureAwait(false);
                     break;
                 case Folder folder:
-                    await folder.ValidateChildren(_deletions, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await folder.ValidateChildren(_deletions, _images, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
                     break;
             }
         }
@@ -1217,7 +1159,7 @@ namespace Tesserafin.Providers.Manager
             {
                 await child.RefreshMetadata(_deletions, options, cancellationToken).ConfigureAwait(false);
 
-                await child.ValidateChildren(_deletions, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                await child.ValidateChildren(_deletions, _images, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -1240,7 +1182,7 @@ namespace Tesserafin.Providers.Manager
                 .Where(i => i is not null)
                 .Distinct();
 
-            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_deletions, new Progress<double>(), options, true, false, cancellationToken));
+            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_deletions, _images, new Progress<double>(), options, true, false, cancellationToken));
 
             await Task.WhenAll(musicArtistRefreshTasks).ConfigureAwait(false);
 
@@ -1288,7 +1230,6 @@ namespace Tesserafin.Providers.Manager
                 }
 
                 _disposeCancellationTokenSource.Dispose();
-                _imageSaveLock.Dispose();
             }
 
             _disposed = true;

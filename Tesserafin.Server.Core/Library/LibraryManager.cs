@@ -61,14 +61,13 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     internal class LibraryManager : ILibraryManager, IItemLookupService
     {
+        private readonly IItemImageService _images;
         private readonly ILogger<LibraryManager> _logger;
         private readonly IUserManager _userManager;
-        private readonly IUserDataManager _userDataManager;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly Lazy<IProviderManager> _providerManagerFactory;
         private readonly IUserViewCatalog _userViewCatalog;
         private readonly IServerApplicationHost _appHost;
-        private readonly IMediaEncoder _mediaEncoder;
         private readonly IFileSystem _fileSystem;
         private readonly IItemRepository _itemRepository;
         private readonly IItemPersistenceService _persistenceService;
@@ -78,7 +77,6 @@ namespace Tesserafin.Server.Core.Library
         private readonly IItemSortService _itemSortService;
         private readonly IItemNamingService _itemNamingService;
         private readonly IItemPeopleService _itemPeopleService;
-        private readonly IImageProcessor _imageProcessor;
         private readonly NamingOptions _namingOptions;
         private readonly IPeopleRepository _peopleRepository;
         private readonly ExtraResolver _extraResolver;
@@ -97,11 +95,11 @@ namespace Tesserafin.Server.Core.Library
         /// <summary>
         /// Initializes a new instance of the <see cref="LibraryManager" /> class.
         /// </summary>
+        /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="appHost">The application host.</param>
         /// <param name="loggerFactory">The logger factory.</param>
         /// <param name="userManager">The user manager.</param>
         /// <param name="configurationManager">The configuration manager.</param>
-        /// <param name="userDataManager">The user data manager.</param>
         /// <param name="fileSystem">The file system.</param>
         /// <param name="providerManagerFactory">The provider manager.</param>
         /// <param name="userViewCatalog">
@@ -113,7 +111,6 @@ namespace Tesserafin.Server.Core.Library
         /// eager construction graph (RFC <c>docs/rfc-di-query-user-views-v2.md</c> §9/§10.7, PR110) -
         /// this is the edge whose removal breaks the SCC.
         /// </param>
-        /// <param name="mediaEncoder">The media encoder.</param>
         /// <param name="itemRepository">The item repository.</param>
         /// <param name="persistenceService">The item persistence service.</param>
         /// <param name="nextUpService">The next up service.</param>
@@ -122,7 +119,6 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="itemSortService">The item sort service.</param>
         /// <param name="itemNamingService">The item naming service.</param>
         /// <param name="itemPeopleService">The item people service.</param>
-        /// <param name="imageProcessor">The image processor.</param>
         /// <param name="namingOptions">The naming options.</param>
         /// <param name="directoryService">The directory service.</param>
         /// <param name="peopleRepository">The people repository.</param>
@@ -137,15 +133,14 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="dotIgnoreIgnoreRule">The ignore rules.</param>
         /// <param name="roots">Application aggregate root ownership.</param>
         public LibraryManager(
+            IItemImageService images,
             IServerApplicationHost appHost,
             ILoggerFactory loggerFactory,
             IUserManager userManager,
             IServerConfigurationManager configurationManager,
-            IUserDataManager userDataManager,
             IFileSystem fileSystem,
             Lazy<IProviderManager> providerManagerFactory,
             IUserViewCatalog userViewCatalog,
-            IMediaEncoder mediaEncoder,
             IItemRepository itemRepository,
             IItemPersistenceService persistenceService,
             INextUpService nextUpService,
@@ -154,7 +149,6 @@ namespace Tesserafin.Server.Core.Library
             IItemSortService itemSortService,
             IItemNamingService itemNamingService,
             IItemPeopleService itemPeopleService,
-            IImageProcessor imageProcessor,
             NamingOptions namingOptions,
             IDirectoryService directoryService,
             IPeopleRepository peopleRepository,
@@ -169,15 +163,25 @@ namespace Tesserafin.Server.Core.Library
             DotIgnoreIgnoreRule dotIgnoreIgnoreRule,
             ILibraryRootFolderProvider roots)
         {
+            _images = images;
             _appHost = appHost;
             _logger = loggerFactory.CreateLogger<LibraryManager>();
+            _images.ImagesChanged += (_, args) =>
+            {
+                try
+                {
+                    ItemUpdated?.Invoke(this, args);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error in image update event handler");
+                }
+            };
             _userManager = userManager;
             _configurationManager = configurationManager;
-            _userDataManager = userDataManager;
             _fileSystem = fileSystem;
             _providerManagerFactory = providerManagerFactory;
             _userViewCatalog = userViewCatalog;
-            _mediaEncoder = mediaEncoder;
             _itemRepository = itemRepository;
             _persistenceService = persistenceService;
             _nextUpService = nextUpService;
@@ -186,7 +190,6 @@ namespace Tesserafin.Server.Core.Library
             _itemSortService = itemSortService;
             _itemNamingService = itemNamingService;
             _itemPeopleService = itemPeopleService;
-            _imageProcessor = imageProcessor;
 
             _itemLookupService = itemLookupService;
             _itemCacheStore = itemCacheStore;
@@ -1665,134 +1668,13 @@ namespace Tesserafin.Server.Core.Library
             }
         }
 
-        private bool ImageNeedsRefresh(ItemImageInfo image)
-        {
-            if (image.Path is not null && image.IsLocalFile)
-            {
-                if (image.Width == 0 || image.Height == 0 || string.IsNullOrEmpty(image.BlurHash))
-                {
-                    return true;
-                }
-
-                try
-                {
-                    return image.DateModified.Subtract(_fileSystem.GetLastWriteTimeUtc(image.Path)).Duration().TotalSeconds > 1;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Cannot get file info for {0}", image.Path);
-                    return false;
-                }
-            }
-
-            return image.Path is not null && !image.IsLocalFile;
-        }
-
-        /// <inheritdoc />
-        public async Task UpdateImagesAsync(BaseItem item, bool forceUpdate = false)
-        {
-            ArgumentNullException.ThrowIfNull(item);
-
-            var outdated = forceUpdate
-                ? item.ImageInfos.Where(i => i.Path is not null).ToArray()
-                : item.ImageInfos.Where(ImageNeedsRefresh).ToArray();
-
-            var parentItem = item.GetParent(this);
-            var isLiveTvShow = item.SourceType != SourceType.Library &&
-                               parentItem is not null &&
-                               parentItem.SourceType != SourceType.Library; // not a channel
-
-            // Skip image processing if current or live tv show
-            if (outdated.Length == 0 || isLiveTvShow)
-            {
-                RegisterItem(item);
-                return;
-            }
-
-            foreach (var img in outdated)
-            {
-                var image = img;
-                if (!img.IsLocalFile)
-                {
-                    try
-                    {
-                        var index = item.GetImageIndex(img);
-                        image = await ConvertImageToLocal(item, img, index, true).ConfigureAwait(false);
-                    }
-                    catch (ArgumentException)
-                    {
-                        _logger.LogWarning("Cannot get image index for {ImagePath}", img.Path);
-                        continue;
-                    }
-                    catch (Exception ex) when (ex is InvalidOperationException or IOException)
-                    {
-                        _logger.LogWarning(ex, "Cannot fetch image from {ImagePath}", img.Path);
-                        continue;
-                    }
-                    catch (HttpRequestException ex)
-                    {
-                        _logger.LogWarning(ex, "Cannot fetch image from {ImagePath}. Http status code: {HttpStatus}", img.Path, ex.StatusCode);
-                        continue;
-                    }
-                }
-
-                if (!File.Exists(image.Path))
-                {
-                    _logger.LogWarning("Image not found at {ImagePath}", image.Path);
-                    continue;
-                }
-
-                ImageDimensions size;
-                try
-                {
-                    size = _imageProcessor.GetImageDimensions(item, image);
-                    image.Width = size.Width;
-                    image.Height = size.Height;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Cannot get image dimensions for {ImagePath}", image.Path);
-                    size = default;
-                    image.Width = 0;
-                    image.Height = 0;
-                }
-
-                try
-                {
-                    var blurhash = _imageProcessor.GetImageBlurHash(image.Path, size);
-                    image.BlurHash = blurhash;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Cannot compute blurhash for {ImagePath}", image.Path);
-                    image.BlurHash = string.Empty;
-                }
-
-                try
-                {
-                    var modifiedDate = _fileSystem.GetLastWriteTimeUtc(image.Path);
-                    image.DateModified = modifiedDate;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Cannot update DateModified for {ImagePath}", image.Path);
-                }
-            }
-
-            item.ValidateImages();
-
-            await _persistenceService.SaveImagesAsync(item).ConfigureAwait(false);
-
-            RegisterItem(item);
-        }
-
         /// <inheritdoc />
         public async Task UpdateItemsAsync(IReadOnlyList<BaseItem> items, BaseItem parent, ItemUpdateType updateReason, CancellationToken cancellationToken)
         {
             foreach (var item in items)
             {
                 item.DateLastSaved = DateTime.UtcNow;
-                await RunMetadataSavers(item, updateReason).ConfigureAwait(false);
+                await RunMetadataSavers(item, updateReason, cancellationToken).ConfigureAwait(false);
 
                 // Modify again, so saved value is after write time of externally saved metadata
                 item.DateLastSaved = DateTime.UtcNow;
@@ -1892,14 +1774,21 @@ namespace Tesserafin.Server.Core.Library
             await _persistenceService.ReattachUserDataAsync(item, cancellationToken).ConfigureAwait(false);
         }
 
-        public async Task RunMetadataSavers(BaseItem item, ItemUpdateType updateReason)
+        private async Task RunMetadataSavers(BaseItem item, ItemUpdateType updateReason, CancellationToken cancellationToken)
         {
             if (item.IsFileProtocol)
             {
                 await ProviderManager.SaveMetadataAsync(item, updateReason).ConfigureAwait(false);
             }
 
-            await UpdateImagesAsync(item, updateReason >= ItemUpdateType.ImageUpdate).ConfigureAwait(false);
+            if (item.ImageInfos.Length > 0)
+            {
+                var images = await _images.PrepareRefreshAsync(item, updateReason >= ItemUpdateType.ImageUpdate, false, cancellationToken).ConfigureAwait(false);
+                await using (images.ConfigureAwait(false))
+                {
+                    await images.CommitAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
         }
 
         /// <summary>
@@ -2328,43 +2217,6 @@ namespace Tesserafin.Server.Core.Library
             }
         }
 
-        public async Task<ItemImageInfo> ConvertImageToLocal(BaseItem item, ItemImageInfo image, int imageIndex, bool removeOnFailure)
-        {
-            foreach (var url in image.Path.Split('|'))
-            {
-                try
-                {
-                    _logger.LogDebug("ConvertImageToLocal item {0} - image url: {1}", item.Id, url);
-
-                    await ProviderManager.SaveImage(item, url, image.Type, imageIndex, CancellationToken.None).ConfigureAwait(false);
-
-                    await item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
-
-                    return item.GetImageInfo(image.Type, imageIndex);
-                }
-                catch (HttpRequestException ex)
-                {
-                    if (ex.StatusCode.HasValue
-                        && (ex.StatusCode.Value == HttpStatusCode.NotFound || ex.StatusCode.Value == HttpStatusCode.Forbidden))
-                    {
-                        _logger.LogDebug(ex, "Error downloading image {Url}", url);
-                        continue;
-                    }
-
-                    throw;
-                }
-            }
-
-            if (removeOnFailure)
-            {
-                // Remove this image to prevent it from retrying over and over
-                item.RemoveImage(image);
-                await item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
-            }
-
-            throw new InvalidOperationException("Unable to convert any images to local");
-        }
-
         private async Task SavePeopleMetadataAsync(IEnumerable<PersonInfo> people, CancellationToken cancellationToken)
         {
             foreach (var person in people)
@@ -2432,7 +2284,7 @@ namespace Tesserafin.Server.Core.Library
                         CreateItems([personEntity], null, CancellationToken.None);
                     }
 
-                    await RunMetadataSavers(personEntity, itemUpdateType).ConfigureAwait(false);
+                    await RunMetadataSavers(personEntity, itemUpdateType, cancellationToken).ConfigureAwait(false);
                     personEntity.DateLastSaved = DateTime.UtcNow;
 
                     CreateItems([personEntity], null, CancellationToken.None);
@@ -2458,7 +2310,7 @@ namespace Tesserafin.Server.Core.Library
                         }
                     }
 
-                    await RunMetadataSavers(parent, ItemUpdateType.MetadataEdit).ConfigureAwait(false);
+                    await RunMetadataSavers(parent, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
                 }
             }
         }

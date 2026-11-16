@@ -181,6 +181,18 @@ libraries. Every project has a matching `*.Tests` project in `tests/`.
   not a distributed transaction: later failures can leave an already deleted source. UserData
   retention stays in `ItemPersistenceService`. The typed alternate resolver is now free of
   deletion side effects; obsolete generic-version cleanup is explicit in async video refresh.
+- **Image updates.** `IItemImageService` prepares detached image snapshots and returns an
+  `IItemImageUpdate` admission handle. Callers explicitly commit or discard it. Only image rows
+  are replaced, in a transaction, before publishing the item/cache and one notification; image
+  preparation never calls whole-item writes or metadata savers. Disposing the update handle drains an in-flight
+  commit and removes uncommitted managed files. `LibraryManager` no longer owns image refresh
+  or localization and has 29 constructor parameters (previously 31).
+  `IRemoteImageSource` shares HTTP acquisition, MIME validation and request caching with provider
+  image saves. Remote localization uses unique atomic files under the item's internal metadata
+  directory; provider-driven artwork saves retain `ImageSaver`'s configured media-side paths.
+  Local media/artwork files are never overwritten by localization. Folder traversal receives
+  the image port explicitly; item metadata refresh invokes it through the existing provider
+  refresh entry point. No image-service static is added to entities.
 - **Resolution.** `LibraryManager.ResolvePath(s)` dispatches to ordered
   `IItemResolver` implementations (`MovieResolver`, `EpisodeResolver`,
   `SeriesResolver`, `AudioResolver`, `PhotoResolver`, …) that turn paths into the

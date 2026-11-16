@@ -30,6 +30,7 @@ public class GuideManager : IGuideManager
 
     private static readonly ParallelOptions _cacheParallelOptions = new() { MaxDegreeOfParallelism = Math.Min(Environment.ProcessorCount, 10) };
 
+    private readonly IItemImageService _images;
     private readonly IItemDeletionCommands _deletions;
     private readonly ILogger<GuideManager> _logger;
     private readonly IConfigurationManager _config;
@@ -50,6 +51,7 @@ public class GuideManager : IGuideManager
     /// <summary>
     /// Initializes a new instance of the <see cref="GuideManager"/> class.
     /// </summary>
+    /// <param name="images">Explicit image preparation and commit lifecycle.</param>
     /// <param name="deletions">Item deletion operations.</param>
     /// <param name="logger">The <see cref="ILogger{TCategoryName}"/>.</param>
     /// <param name="config">The <see cref="IConfigurationManager"/>.</param>
@@ -62,6 +64,7 @@ public class GuideManager : IGuideManager
     /// <param name="schedulesDirectService">The <see cref="ISchedulesDirectService"/>.</param>
     /// <param name="tvDtoService">The <see cref="LiveTvDtoService"/>.</param>
     public GuideManager(
+        IItemImageService images,
         IItemDeletionCommands deletions,
         ILogger<GuideManager> logger,
         IConfigurationManager config,
@@ -74,6 +77,7 @@ public class GuideManager : IGuideManager
         ISchedulesDirectService schedulesDirectService,
         LiveTvDtoService tvDtoService)
     {
+        _images = images;
         _deletions = deletions;
         _logger = logger;
         _config = config;
@@ -766,12 +770,11 @@ public class GuideManager : IGuideManager
                     _logger.LogDebug("Caching image locally: {Url}", imageInfo.Path);
                     try
                     {
-                        program.ImageInfos[i] = await _libraryManager.ConvertImageToLocal(
-                                program,
-                                imageInfo,
-                                imageIndex: 0,
-                                removeOnFailure: false)
-                            .ConfigureAwait(false);
+                        var images = await _images.PrepareLocalImageAsync(program, imageInfo, 0, false, cancellationToken).ConfigureAwait(false);
+                        await using (images.ConfigureAwait(false))
+                        {
+                            await images.CommitAsync(cancellationToken).ConfigureAwait(false);
+                        }
                     }
                     catch (Exception ex)
                     {

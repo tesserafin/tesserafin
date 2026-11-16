@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using Microsoft.Extensions.Logging;
@@ -27,6 +28,7 @@ public class RecordingsMetadataManager
 {
     private const string DateAddedFormat = "yyyy-MM-dd HH:mm:ss";
 
+    private readonly IItemImageService _images;
     private readonly ILogger<RecordingsMetadataManager> _logger;
     private readonly IConfigurationManager _config;
     private readonly ILibraryManager _libraryManager;
@@ -35,16 +37,19 @@ public class RecordingsMetadataManager
     /// <summary>
     /// Initializes a new instance of the <see cref="RecordingsMetadataManager"/> class.
     /// </summary>
+    /// <param name="images">Explicit image preparation and commit lifecycle.</param>
     /// <param name="logger">The <see cref="ILogger"/>.</param>
     /// <param name="config">The <see cref="IConfigurationManager"/>.</param>
     /// <param name="libraryManager">The <see cref="ILibraryManager"/>.</param>
     /// <param name="itemPeopleService">The <see cref="IItemPeopleService"/>.</param>
     public RecordingsMetadataManager(
+        IItemImageService images,
         ILogger<RecordingsMetadataManager> logger,
         IConfigurationManager config,
         ILibraryManager libraryManager,
         IItemPeopleService itemPeopleService)
     {
+        _images = images;
         _logger = logger;
         _config = config;
         _libraryManager = libraryManager;
@@ -473,7 +478,12 @@ public class RecordingsMetadataManager
     {
         if (!image.IsLocalFile)
         {
-            image = await _libraryManager.ConvertImageToLocal(program, image, 0).ConfigureAwait(false);
+            var images = await _images.PrepareLocalImageAsync(program, image, 0, true, CancellationToken.None).ConfigureAwait(false);
+            await using (images.ConfigureAwait(false))
+            {
+                await images.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+                image = images.Image ?? throw new InvalidOperationException("The recording image is unavailable.");
+            }
         }
 
         var imageSaveFilenameWithoutExtension = image.Type switch

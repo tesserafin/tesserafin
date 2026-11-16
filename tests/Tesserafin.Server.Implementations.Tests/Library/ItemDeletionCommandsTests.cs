@@ -194,7 +194,7 @@ public sealed class ItemDeletionCommandsTests
         }
 
         var dependencies = manager.GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToArray();
-        Assert.Equal(31, dependencies.Length);
+        Assert.Equal(29, dependencies.Length);
         Assert.DoesNotContain(typeof(IItemDeletionCommands), dependencies);
         Assert.DoesNotContain(typeof(Lazy<IExternalDataManager>), dependencies);
         Assert.DoesNotContain(typeof(Tesserafin.Controller.IO.IPathManager), dependencies);

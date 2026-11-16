@@ -162,7 +162,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return id;
         }
 
-        public async Task RefreshAllMetadata(IItemDeletionCommands deletions, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
+        public async Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
             var items = GetRecursiveChildren();
 

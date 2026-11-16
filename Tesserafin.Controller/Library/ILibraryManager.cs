@@ -161,8 +161,6 @@ namespace Tesserafin.Controller.Library
         /// <returns>Task.</returns>
         Task ValidatePeopleAsync(IItemDeletionCommands deletions, IProgress<double> progress, CancellationToken cancellationToken);
 
-        Task UpdateImagesAsync(BaseItem item, bool forceUpdate = false);
-
         /// <summary>
         /// Gets the default view.
         /// </summary>
@@ -560,16 +558,6 @@ namespace Tesserafin.Controller.Library
         string GetPathAfterNetworkSubstitution(string path, BaseItem? ownerItem = null);
 
         /// <summary>
-        /// Converts the image to local.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        /// <param name="image">The image.</param>
-        /// <param name="imageIndex">Index of the image.</param>
-        /// <param name="removeOnFailure">Whether to remove the image from the item on failure.</param>
-        /// <returns>Task.</returns>
-        Task<ItemImageInfo> ConvertImageToLocal(BaseItem item, ItemImageInfo image, int imageIndex, bool removeOnFailure = true);
-
-        /// <summary>
         /// Gets the items.
         /// </summary>
         /// <param name="query">The query.</param>
@@ -692,8 +680,6 @@ namespace Tesserafin.Controller.Library
         /// <param name="query">The query to configure.</param>
         /// <param name="user">The user to configure access for.</param>
         void ConfigureUserAccess(InternalItemsQuery query, User user);
-
-        Task RunMetadataSavers(BaseItem item, ItemUpdateType updateReason);
 
         BaseItem GetParentItem(Guid? parentId, Guid? userId);
 

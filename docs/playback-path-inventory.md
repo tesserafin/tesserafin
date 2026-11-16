@@ -807,3 +807,39 @@ Alternate resolution no longer secretly deletes an older generic Video. Async ve
 explicitly requests obsolete-entry cleanup before resolving the typed version; synchronous item
 creation/update only resolves and persists the typed graph. No legacy compatibility promise is
 made for old .NET manager or refresh signatures. HTTP operations and OpenAPI shapes are unchanged.
+
+
+## 25. Image preparation and explicit publication
+
+`IItemImageService` owns refresh/localization preparation and returns `IItemImageUpdate`.
+`UpdateImagesAsync` and `ConvertImageToLocal` are removed from both manager and interface, with
+no forwarders. The remaining metadata-save helper is private. The manager loses IImageProcessor,
+unused IMediaEncoder and unused IUserDataManager, and consumes the image port (31 → 29 parameters).
+
+Preparation copies image metadata without changing the published entity. Remote bytes are
+written to unique temporary files and atomically renamed beneath the item's internal metadata
+root. The root-taking path overload is explicit and channel identity is stable; it does not
+consult the global recording manager. A shared IRemoteImageSource acquires and caches HTTP
+payloads for both localization and existing provider artwork saves. The latter still use
+ImageSaver's configured paths; localization itself is a managed cache, not a write beside media.
+
+The caller explicitly commits. A transaction replaces only the image rows; cancellation can
+refuse admission but, once replacement begins, the database completes before cache publication.
+A failed SQL write leaves the original image rows, published objects and cache unchanged.
+A missing item is rejected and evicted rather than reinserted. No whole-item save, metadata
+provider invocation, recursive image processing or DateLastSaved update is performed by this owner.
+The existing manager event is relayed after publication; surrounding full-item metadata saves
+suppress the extra image notification. Live TV programs keep their notification filter.
+
+Per-item admission spans preparation through commit/disposal. Disposing the handle drains a running commit
+before releasing admission and removes uncommitted temporary/final files. A changed image
+snapshot is rejected before writing. This serializes this pipeline, not every provider/item
+writer, and does not promise a distributed filesystem/database transaction or crash recovery for
+abandoned files. Old media-side artwork is retained; managed files live under the metadata root
+already cleaned by item deletion. Existing item/provider globals outside this path remain work.
+
+Folder validation carries the image port explicitly. BaseItem no longer refreshes images through
+the manager; ProviderManager's existing item-refresh entry point prepares and commits them.
+ImageController, Live TV precaching and recording-image copying likewise commit explicit results.
+HTTP routes, response shapes, OpenAPI and SDK remain unchanged. The six image integration method
+names are required by CI, including both rows of the permanent-rejection theory.

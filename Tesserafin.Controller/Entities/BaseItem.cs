@@ -941,9 +941,12 @@ namespace Tesserafin.Controller.Entities
             return GetInternalMetadataPath(basePath);
         }
 
-        protected virtual string GetInternalMetadataPath(string basePath)
+        /// <summary>Builds the item's stable metadata path using an explicitly supplied root.</summary>
+        /// <param name="basePath">The internal metadata root.</param>
+        /// <returns>The item-owned metadata directory.</returns>
+        public virtual string GetInternalMetadataPath(string basePath)
         {
-            if (SourceType == SourceType.Channel)
+            if (!ChannelId.Equals(Guid.Empty))
             {
                 return System.IO.Path.Join(basePath, "channels", ChannelId.ToString("N", CultureInfo.InvariantCulture), Id.ToString("N", CultureInfo.InvariantCulture));
             }
@@ -1541,8 +1544,6 @@ namespace Tesserafin.Controller.Entities
                     {
                         requiresSave = await RefreshedOwnedItems(deletions, options, GetFileSystemChildren(options.DirectoryService), cancellationToken).ConfigureAwait(false);
                     }
-
-                    await LibraryManager.UpdateImagesAsync(this).ConfigureAwait(false); // ensure all image properties in DB are fresh
                 }
                 catch (Exception ex)
                 {

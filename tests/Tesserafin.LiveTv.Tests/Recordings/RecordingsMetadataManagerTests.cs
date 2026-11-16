@@ -43,6 +43,7 @@ public sealed class RecordingsMetadataManagerTests
         var itemPeopleService = new Mock<IItemPeopleService>();
 
         var manager = new RecordingsMetadataManager(
+            Mock.Of<IItemImageService>(),
             NullLogger<RecordingsMetadataManager>.Instance,
             config.Object,
             libraryManager.Object,

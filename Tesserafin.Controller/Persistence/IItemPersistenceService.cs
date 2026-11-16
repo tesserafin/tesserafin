@@ -27,10 +27,11 @@ public interface IItemPersistenceService
     /// <summary>
     /// Saves image info for an item.
     /// </summary>
-    /// <param name="item">The item.</param>
+    /// <param name="itemId">The persisted item id.</param>
+    /// <param name="imageInfos">The detached image snapshot.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    Task SaveImagesAsync(BaseItem item, CancellationToken cancellationToken = default);
+    /// <returns>Whether the item still exists and its images were saved.</returns>
+    Task<bool> SaveImagesAsync(Guid itemId, IReadOnlyList<ItemImageInfo> imageInfos, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Reattaches user data entries to the correct item.

@@ -594,6 +594,8 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<ILibraryScanTraversal, LibraryScanTraversal>();
             serviceCollection.AddSingleton<ILibraryStructureCommands, LibraryStructureCommands>();
             serviceCollection.AddSingleton<IItemDeletionCommands, ItemDeletionCommands>();
+            serviceCollection.AddSingleton<IItemImageService, ItemImageService>();
+            serviceCollection.AddSingleton<IRemoteImageSource, RemoteImageSource>();
             serviceCollection.AddSingleton<LibraryScanCoordinator>();
             serviceCollection.AddSingleton<ILibraryScanCoordinator>(sp => sp.GetRequiredService<LibraryScanCoordinator>());
             serviceCollection.AddSingleton<Microsoft.Extensions.Hosting.IHostedService>(sp => sp.GetRequiredService<LibraryScanCoordinator>());

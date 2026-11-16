@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller;
@@ -132,15 +134,25 @@ public abstract class ReplaceSetRepositoryTests : IDisposable
     {
         AssertReplaceIsAtomic(
             (factory, item, paths) => new ItemPersistenceService(factory, Mock.Of<IServerApplicationHost>(), NullLogger<ItemPersistenceService>.Instance)
-                .SaveImagesAsync(new Video
-                {
-                    Id = item,
-                    ImageInfos = paths.Select(path => new ItemImageInfo { Path = path, Type = ImageType.Primary, DateModified = DateTime.UnixEpoch }).ToArray(),
-                })
+                .SaveImagesAsync(item, paths.Select(path => new ItemImageInfo { Path = path, Type = ImageType.Primary, DateModified = DateTime.UnixEpoch }).ToArray())
                 .GetAwaiter().GetResult(),
             (context, item) => context.BaseItemImageInfos.Where(e => e.ItemId.Equals(item)).Select(e => e.Path).OrderBy(path => path).ToArray(),
             previous: ["/images/a.jpg", "/images/b.jpg"],
             next: ["/images/c.jpg"]);
+    }
+
+    [Fact]
+    public async Task SaveImagesAsync_CancellationAfterTheDelete_CompletesTheReplacement()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var interceptor = new CancelAfterImageDelete(cancellation);
+        var service = new ItemPersistenceService(_database.Factory(interceptor), Mock.Of<IServerApplicationHost>(), NullLogger<ItemPersistenceService>.Instance);
+        var images = new[] { new ItemImageInfo { Path = "next.png", Type = ImageType.Primary, DateModified = DateTime.UnixEpoch } };
+        Assert.True(await service.SaveImagesAsync(_itemId, images, cancellation.Token));
+        Assert.True(interceptor.Cancelled);
+        Assert.True(cancellation.IsCancellationRequested);
+        using var context = _database.CreateDbContext();
+        Assert.Equal("next.png", context.BaseItemImageInfos.Single(row => row.ItemId.Equals(_itemId)).Path);
     }
 
     private void AssertReplaceIsAtomic(
@@ -220,6 +232,22 @@ public abstract class ReplaceSetRepositoryTests : IDisposable
         public Optimistic()
             : base(new OptimisticLockBehavior(NullLogger<OptimisticLockBehavior>.Instance))
         {
+        }
+    }
+
+    private sealed class CancelAfterImageDelete(CancellationTokenSource cancellation) : DbCommandInterceptor
+    {
+        public bool Cancelled { get; private set; }
+
+        public override async ValueTask<int> NonQueryExecutedAsync(DbCommand command, CommandExecutedEventData eventData, int result, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.StartsWith("DELETE", StringComparison.Ordinal) && command.CommandText.Contains("BaseItemImageInfos", StringComparison.Ordinal))
+            {
+                Cancelled = true;
+                await cancellation.CancelAsync().ConfigureAwait(false);
+            }
+
+            return result;
         }
     }
 

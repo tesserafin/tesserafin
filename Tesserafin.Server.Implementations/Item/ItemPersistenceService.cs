@@ -81,21 +81,21 @@ public class ItemPersistenceService : IItemPersistenceService
     }
 
     /// <inheritdoc />
-    public async Task SaveImagesAsync(BaseItem item, CancellationToken cancellationToken = default)
+    public async Task<bool> SaveImagesAsync(Guid itemId, IReadOnlyList<ItemImageInfo> imageInfos, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(imageInfos);
 
-        var images = item.ImageInfos.Select(e => BaseItemMapper.MapImageToEntity(item.Id, e)).ToArray();
+        var images = imageInfos.Select(e => BaseItemMapper.MapImageToEntity(itemId, e)).ToArray();
 
         var context = await _dbProvider.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         await using (context.ConfigureAwait(false))
         {
             if (!await context.BaseItems
-                .AnyAsync(bi => bi.Id == item.Id, cancellationToken)
+                .AnyAsync(bi => bi.Id == itemId, cancellationToken)
                 .ConfigureAwait(false))
             {
                 _logger.LogWarning("Unable to save ImageInfo for non existing BaseItem");
-                return;
+                return false;
             }
 
             // The delete runs at once; without the transaction, a failed save of the new images would
@@ -103,19 +103,24 @@ public class ItemPersistenceService : IItemPersistenceService
             var transaction = await context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
             await using (transaction.ConfigureAwait(false))
             {
+                // Cancellation may refuse admission; once rows are replaced, finish the transaction
+                // so a committed database row can never outlive a cancelled caller's staged image.
+                cancellationToken.ThrowIfCancellationRequested();
                 await context.BaseItemImageInfos
-                    .Where(e => e.ItemId == item.Id)
-                    .ExecuteDeleteAsync(cancellationToken)
+                    .Where(e => e.ItemId == itemId)
+                    .ExecuteDeleteAsync(CancellationToken.None)
                     .ConfigureAwait(false);
 
                 await context.BaseItemImageInfos
-                    .AddRangeAsync(images, cancellationToken)
+                    .AddRangeAsync(images, CancellationToken.None)
                     .ConfigureAwait(false);
 
-                await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                await context.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+                await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
             }
         }
+
+        return true;
     }
 
     /// <inheritdoc />

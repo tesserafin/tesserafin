@@ -147,7 +147,7 @@ namespace Tesserafin.Controller.LiveTv
             return [];
         }
 
-        protected override string GetInternalMetadataPath(string basePath)
+        public override string GetInternalMetadataPath(string basePath)
         {
             return System.IO.Path.Combine(basePath, "livetv", Id.ToString("N", CultureInfo.InvariantCulture), "metadata");
         }

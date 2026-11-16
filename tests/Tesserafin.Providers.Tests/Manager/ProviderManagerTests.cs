@@ -565,8 +565,8 @@ namespace Tesserafin.Providers.Tests.Manager
                 .Returns(libraryOptions ?? new LibraryOptions());
 
             var providerManager = new ProviderManager(
+                Mock.Of<IItemImageService>(),
                 Mock.Of<IItemDeletionCommands>(),
-                Mock.Of<IHttpClientFactory>(),
                 Mock.Of<ISubtitleManager>(),
                 serverConfigurationManager.Object,
                 Mock.Of<ILibraryMonitor>(),
@@ -577,7 +577,7 @@ namespace Tesserafin.Providers.Tests.Manager
                 Mock.Of<ILibraryScanCoordinator>(),
                 baseItemManager!,
                 Mock.Of<ILyricManager>(),
-                Mock.Of<IMemoryCache>(),
+                Mock.Of<IRemoteImageSource>(),
                 Mock.Of<IMediaSegmentManager>(),
                 Mock.Of<ISimilarItemsManager>());
 
