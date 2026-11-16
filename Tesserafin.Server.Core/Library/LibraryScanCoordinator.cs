@@ -96,7 +96,10 @@ internal sealed class LibraryScanCoordinator : ILibraryScanCoordinator, IHostedS
 
                 try
                 {
-                    await _traversal.RefreshTopFoldersAsync(token, removeRoot).ConfigureAwait(false);
+                    // Once an edit has started, request cancellation must not skip reconciliation.
+                    // Give reconciliation a cooperative budget independent of the cancelled request.
+                    using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    await _traversal.RefreshTopFoldersAsync(cleanup.Token, removeRoot).ConfigureAwait(false);
                     if (!refreshLibrary)
                     {
                         // Let filesystem notifications from the structure edit settle before restart.
@@ -112,6 +115,8 @@ internal sealed class LibraryScanCoordinator : ILibraryScanCoordinator, IHostedS
                 {
                     ExceptionDispatchInfo.Capture(failure).Throw();
                 }
+
+                token.ThrowIfCancellationRequested();
             },
             fullScan: false,
             cancellationToken).ConfigureAwait(false);

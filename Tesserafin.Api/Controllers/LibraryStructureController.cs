@@ -1,23 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Tesserafin.Api.Auth.FirstTimeSetupPolicy;
-using Tesserafin.Api.Extensions;
-using Tesserafin.Api.Helpers;
 using Tesserafin.Api.ModelBinders;
 using Tesserafin.Api.Models.LibraryStructureDto;
 using Tesserafin.Common.Api;
-using Tesserafin.Controller;
-using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
@@ -32,24 +23,20 @@ namespace Tesserafin.Api.Controllers;
 [FirstTimeSetupEndpoint]
 public class LibraryStructureController : BaseTesserafinApiController
 {
-    private readonly IServerApplicationPaths _appPaths;
     private readonly ILibraryManager _libraryManager;
-    private readonly ILibraryScanCoordinator _scans;
+    private readonly ILibraryStructureCommands _commands;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LibraryStructureController"/> class.
     /// </summary>
-    /// <param name="serverConfigurationManager">Instance of <see cref="IServerConfigurationManager"/> interface.</param>
-    /// <param name="scans">Library scan scheduling and state.</param>
+    /// <param name="commands">Library structure commands.</param>
     /// <param name="libraryManager">Instance of <see cref="ILibraryManager"/> interface.</param>
     public LibraryStructureController(
-        IServerConfigurationManager serverConfigurationManager,
         ILibraryManager libraryManager,
-        ILibraryScanCoordinator scans)
+        ILibraryStructureCommands commands)
     {
-        _appPaths = serverConfigurationManager.ApplicationPaths;
         _libraryManager = libraryManager;
-        _scans = scans;
+        _commands = commands;
     }
 
     /// <summary>
@@ -92,7 +79,7 @@ public class LibraryStructureController : BaseTesserafinApiController
             libraryOptions.PathInfos = Array.ConvertAll(paths, i => new MediaPathInfo(i));
         }
 
-        await _libraryManager.AddVirtualFolder(name, collectionType, libraryOptions, refreshLibrary).ConfigureAwait(false);
+        await _commands.AddVirtualFolderAsync(name, collectionType, libraryOptions, refreshLibrary, HttpContext.RequestAborted).ConfigureAwait(false);
 
         return NoContent();
     }
@@ -112,7 +99,7 @@ public class LibraryStructureController : BaseTesserafinApiController
         [FromQuery] bool refreshLibrary = false)
     {
         // TODO: refactor! this relies on an FileNotFound exception to return NotFound when attempting to remove a library that does not exist.
-        await _libraryManager.RemoveVirtualFolder(name, refreshLibrary).ConfigureAwait(false);
+        await _commands.RemoveVirtualFolderAsync(name, refreshLibrary, HttpContext.RequestAborted).ConfigureAwait(false);
 
         return NoContent();
     }
@@ -137,58 +124,13 @@ public class LibraryStructureController : BaseTesserafinApiController
         [FromQuery] string? newName,
         [FromQuery] bool refreshLibrary = false)
     {
-        if (string.IsNullOrWhiteSpace(name))
+        var result = await _commands.RenameVirtualFolderAsync(name!, newName!, refreshLibrary, HttpContext.RequestAborted).ConfigureAwait(false);
+        return result switch
         {
-            throw new ArgumentNullException(nameof(name));
-        }
-
-        if (string.IsNullOrWhiteSpace(newName))
-        {
-            throw new ArgumentNullException(nameof(newName));
-        }
-
-        var rootFolderPath = _appPaths.DefaultUserViewsPath;
-
-        // Rename resolves two caller-supplied names, so it is held to the same containment rule
-        // as create, read, update and delete even though it does its own path work here.
-        var currentPath = VirtualFolderPath.Resolve(rootFolderPath, name);
-        var newPath = VirtualFolderPath.Resolve(rootFolderPath, newName);
-
-        if (!Directory.Exists(currentPath))
-        {
-            return NotFound("The media collection does not exist.");
-        }
-
-        if (!string.Equals(currentPath, newPath, StringComparison.OrdinalIgnoreCase) && Directory.Exists(newPath))
-        {
-            // Reported by name, never by host path.
-            return Conflict($"The media library {newName} already exists.");
-        }
-
-        await _scans.ApplyLibraryChangeAsync(
-            () =>
-            {
-                try
-                {
-                    if (string.Equals(currentPath, newPath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        var tempPath = VirtualFolderPath.Resolve(_appPaths.DefaultUserViewsPath, Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture));
-                        Directory.Move(currentPath, tempPath);
-                        currentPath = tempPath;
-                    }
-
-                    Directory.Move(currentPath, newPath);
-                }
-                finally
-                {
-                    CollectionFolder.OnCollectionFolderChange();
-                }
-            },
-            refreshLibrary,
-            removeRoot: true,
-            CancellationToken.None).ConfigureAwait(false);
-
-        return NoContent();
+            LibraryRenameResult.NotFound => NotFound("The media collection does not exist."),
+            LibraryRenameResult.Conflict => Conflict($"The media library {newName} already exists."),
+            _ => NoContent()
+        };
     }
 
     /// <summary>
@@ -206,7 +148,7 @@ public class LibraryStructureController : BaseTesserafinApiController
         [FromQuery] bool refreshLibrary = false)
     {
         var mediaPath = mediaPathDto.PathInfo ?? new MediaPathInfo(mediaPathDto.Path ?? throw new ArgumentException("PathInfo and Path can't both be null."));
-        await _scans.ApplyLibraryChangeAsync(() => _libraryManager.AddMediaPath(mediaPathDto.Name, mediaPath), refreshLibrary, removeRoot: false, CancellationToken.None).ConfigureAwait(false);
+        await _commands.AddMediaPathAsync(mediaPathDto.Name, mediaPath, refreshLibrary, HttpContext.RequestAborted).ConfigureAwait(false);
 
         return NoContent();
     }
@@ -220,14 +162,14 @@ public class LibraryStructureController : BaseTesserafinApiController
     /// <exception cref="ArgumentNullException">The name of the library may not be empty.</exception>
     [HttpPost("Paths/Update")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public ActionResult UpdateMediaPath([FromBody, Required] UpdateMediaPathRequestDto mediaPathRequestDto)
+    public async Task<ActionResult> UpdateMediaPath([FromBody, Required] UpdateMediaPathRequestDto mediaPathRequestDto)
     {
         if (string.IsNullOrWhiteSpace(mediaPathRequestDto.Name))
         {
             throw new ArgumentNullException(nameof(mediaPathRequestDto), "Name must not be null or empty");
         }
 
-        _libraryManager.UpdateMediaPath(mediaPathRequestDto.Name, mediaPathRequestDto.PathInfo);
+        await _commands.UpdateMediaPathAsync(mediaPathRequestDto.Name, mediaPathRequestDto.PathInfo, HttpContext.RequestAborted).ConfigureAwait(false);
         return NoContent();
     }
 
@@ -250,7 +192,7 @@ public class LibraryStructureController : BaseTesserafinApiController
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        await _scans.ApplyLibraryChangeAsync(() => _libraryManager.RemoveMediaPath(name, path), refreshLibrary, removeRoot: true, CancellationToken.None).ConfigureAwait(false);
+        await _commands.RemoveMediaPathAsync(name, path, refreshLibrary, HttpContext.RequestAborted).ConfigureAwait(false);
 
         return NoContent();
     }
@@ -265,27 +207,10 @@ public class LibraryStructureController : BaseTesserafinApiController
     [HttpPost("LibraryOptions")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult UpdateLibraryOptions(
+    public async Task<ActionResult> UpdateLibraryOptions(
         [FromBody] UpdateLibraryOptionsDto request)
     {
-        var item = _libraryManager.GetItemById<CollectionFolder>(request.Id);
-        if (item is null)
-        {
-            return NotFound();
-        }
-
-        LibraryOptions options = item.GetLibraryOptions();
-        foreach (var mediaPath in request.LibraryOptions!.PathInfos)
-        {
-            if (options.PathInfos.Any(i => i.Path == mediaPath.Path))
-            {
-                continue;
-            }
-
-            _libraryManager.CreateShortcut(item.Path, mediaPath);
-        }
-
-        item.UpdateLibraryOptions(request.LibraryOptions);
-        return NoContent();
+        var found = await _commands.UpdateLibraryOptionsAsync(request.Id, request.LibraryOptions!, HttpContext.RequestAborted).ConfigureAwait(false);
+        return found ? NoContent() : NotFound();
     }
 }

@@ -587,6 +587,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IUserViewCatalog, UserViewCatalog>();
             serviceCollection.AddSingleton<ILibraryRootFolderProvider, LibraryRootFolderProvider>();
             serviceCollection.AddSingleton<ILibraryScanTraversal, LibraryScanTraversal>();
+            serviceCollection.AddSingleton<ILibraryStructureCommands, LibraryStructureCommands>();
             serviceCollection.AddSingleton<LibraryScanCoordinator>();
             serviceCollection.AddSingleton<ILibraryScanCoordinator>(sp => sp.GetRequiredService<LibraryScanCoordinator>());
             serviceCollection.AddSingleton<Microsoft.Extensions.Hosting.IHostedService>(sp => sp.GetRequiredService<LibraryScanCoordinator>());

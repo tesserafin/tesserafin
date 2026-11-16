@@ -61,8 +61,6 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     internal class LibraryManager : ILibraryManager, IItemLookupService
     {
-        private const string ShortcutFileExtension = ".mblink";
-
         private readonly ILogger<LibraryManager> _logger;
         private readonly IUserManager _userManager;
         private readonly IUserDataManager _userDataManager;
@@ -96,7 +94,6 @@ namespace Tesserafin.Server.Core.Library
         private readonly Lazy<IExternalDataManager> _externalDataManagerFactory;
 
         private readonly DotIgnoreIgnoreRule _dotIgnoreIgnoreRule;
-        private readonly ILibraryScanCoordinator _scans;
         private readonly ILibraryRootFolderProvider _roots;
 
         /// <summary>
@@ -142,7 +139,6 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="userRootFolderProvider">The user root folder provider leaf (construction/cache of the per-server <see cref="UserRootFolder"/>; see PR107). <see cref="GetUserRootFolder"/> and this class's internal callers delegate to it - a leaf dependency, not a cycle: <c>UserRootFolderProvider</c> never references <see cref="ILibraryManager"/>. <see cref="LibraryManager"/> no longer implements <see cref="IUserRootFolderProvider"/> itself (it used to be aliased onto it via a DI factory cast - RFC <c>docs/rfc-di-query-user-views-v2.md</c> §0/§1's "piège n°1").</param>
         /// <param name="collectionFolderResolver">The library membership leaf (<see cref="GetCollectionFolders(BaseItem)"/> and its overload delegate to it; see DEBT-SERVER-2) - a leaf dependency, not a cycle: <c>CollectionFolderResolver</c> never references <see cref="ILibraryManager"/>.</param>
         /// <param name="dotIgnoreIgnoreRule">The ignore rules.</param>
-        /// <param name="scans">Scan scheduling and lifecycle.</param>
         /// <param name="roots">Application aggregate root ownership.</param>
         public LibraryManager(
             IServerApplicationHost appHost,
@@ -177,7 +173,6 @@ namespace Tesserafin.Server.Core.Library
             IUserRootFolderProvider userRootFolderProvider,
             ICollectionFolderResolver collectionFolderResolver,
             DotIgnoreIgnoreRule dotIgnoreIgnoreRule,
-            ILibraryScanCoordinator scans,
             ILibraryRootFolderProvider roots)
         {
             _appHost = appHost;
@@ -209,7 +204,6 @@ namespace Tesserafin.Server.Core.Library
             _userRootFolderProvider = userRootFolderProvider;
             _collectionFolderResolver = collectionFolderResolver;
             _dotIgnoreIgnoreRule = dotIgnoreIgnoreRule;
-            _scans = scans;
             _roots = roots;
 
             _namingOptions = namingOptions;
@@ -1254,23 +1248,7 @@ namespace Tesserafin.Server.Core.Library
             {
                 Name = Path.GetFileName(dir),
 
-                Locations = _fileSystem.GetFilePaths(dir, false)
-                .Where(i => Path.GetExtension(i.AsSpan()).Equals(ShortcutFileExtension, StringComparison.OrdinalIgnoreCase))
-                    .Select(i =>
-                    {
-                        try
-                        {
-                            return _appHost.ExpandVirtualPath(_fileSystem.ResolveShortcut(i));
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Error resolving shortcut file {File}", i);
-                            return null;
-                        }
-                    })
-                    .Where(i => i is not null)
-                    .Order()
-                    .ToArray(),
+                Locations = LibraryPathReader.ReadLocations(dir, _fileSystem, _appHost, _logger),
 
                 CollectionType = GetCollectionType(dir)
             };
@@ -2811,65 +2789,6 @@ namespace Tesserafin.Server.Core.Library
             throw new InvalidOperationException("Unable to convert any images to local");
         }
 
-        public async Task AddVirtualFolder(string name, CollectionTypeOptions? collectionType, LibraryOptions options, bool refreshLibrary)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            var rootFolderPath = _configurationManager.ApplicationPaths.DefaultUserViewsPath;
-
-            // Check the caller's name before GetValidFilename, which replaces invalid characters
-            // rather than refusing them and would otherwise turn a hostile name into a different
-            // valid target.
-            VirtualFolderPath.Resolve(rootFolderPath, name.Trim());
-
-            name = _fileSystem.GetValidFilename(name.Trim());
-
-            var existingNameCount = 1; // first numbered name will be 2
-            var virtualFolderPath = VirtualFolderPath.Resolve(rootFolderPath, name);
-            var originalName = name;
-            while (Directory.Exists(virtualFolderPath))
-            {
-                existingNameCount++;
-                name = originalName + existingNameCount;
-                virtualFolderPath = VirtualFolderPath.Resolve(rootFolderPath, name);
-            }
-
-            var mediaPathInfos = options.PathInfos;
-            if (mediaPathInfos is not null)
-            {
-                var invalidpath = mediaPathInfos.FirstOrDefault(i => !Directory.Exists(i.Path));
-                if (invalidpath is not null)
-                {
-                    throw new ArgumentException("The specified path does not exist: " + invalidpath.Path + ".");
-                }
-            }
-
-            await _scans.ApplyLibraryChangeAsync(
-                () =>
-                {
-                    Directory.CreateDirectory(virtualFolderPath);
-                    if (collectionType is not null)
-                    {
-                        FileHelper.CreateEmpty(Path.Combine(virtualFolderPath, collectionType.ToString()!.ToLowerInvariant() + ".collection"));
-                    }
-
-                    CollectionFolder.SaveLibraryOptions(virtualFolderPath, options);
-                    if (mediaPathInfos is not null)
-                    {
-                        foreach (var path in mediaPathInfos)
-                        {
-                            AddMediaPathInternal(name, path, false);
-                        }
-                    }
-                },
-                refreshLibrary,
-                removeRoot: false,
-                CancellationToken.None).ConfigureAwait(false);
-        }
-
         private async Task SavePeopleMetadataAsync(IEnumerable<PersonInfo> people, CancellationToken cancellationToken)
         {
             foreach (var person in people)
@@ -2943,197 +2862,6 @@ namespace Tesserafin.Server.Core.Library
                     CreateItems([personEntity], null, CancellationToken.None);
                 }
             }
-        }
-
-        public void AddMediaPath(string virtualFolderName, MediaPathInfo mediaPath)
-        {
-            AddMediaPathInternal(virtualFolderName, mediaPath, true);
-        }
-
-        private void AddMediaPathInternal(string virtualFolderName, MediaPathInfo pathInfo, bool saveLibraryOptions)
-        {
-            ArgumentNullException.ThrowIfNull(pathInfo);
-
-            var path = pathInfo.Path;
-
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                throw new ArgumentException(nameof(path));
-            }
-
-            if (!Directory.Exists(path))
-            {
-                throw new FileNotFoundException("The path does not exist.");
-            }
-
-            var rootFolderPath = _configurationManager.ApplicationPaths.DefaultUserViewsPath;
-            var virtualFolderPath = VirtualFolderPath.Resolve(rootFolderPath, virtualFolderName);
-
-            CreateShortcut(virtualFolderPath, pathInfo);
-
-            if (saveLibraryOptions)
-            {
-                var libraryOptions = CollectionFolder.GetLibraryOptions(virtualFolderPath);
-
-                libraryOptions.PathInfos = [.. libraryOptions.PathInfos, pathInfo];
-
-                SyncLibraryOptionsToLocations(virtualFolderPath, libraryOptions);
-
-                CollectionFolder.SaveLibraryOptions(virtualFolderPath, libraryOptions);
-            }
-        }
-
-        public void UpdateMediaPath(string virtualFolderName, MediaPathInfo mediaPath)
-        {
-            ArgumentNullException.ThrowIfNull(mediaPath);
-
-            var rootFolderPath = _configurationManager.ApplicationPaths.DefaultUserViewsPath;
-            var virtualFolderPath = VirtualFolderPath.Resolve(rootFolderPath, virtualFolderName);
-
-            var libraryOptions = CollectionFolder.GetLibraryOptions(virtualFolderPath);
-
-            SyncLibraryOptionsToLocations(virtualFolderPath, libraryOptions);
-
-            CollectionFolder.SaveLibraryOptions(virtualFolderPath, libraryOptions);
-        }
-
-        private void SyncLibraryOptionsToLocations(string virtualFolderPath, LibraryOptions options)
-        {
-            var topLibraryFolders = GetUserRootFolder().Children.ToList();
-            var info = GetVirtualFolderInfo(virtualFolderPath, topLibraryFolders, null);
-
-            if (info.Locations.Length > 0 && info.Locations.Length != options.PathInfos.Length)
-            {
-                var list = options.PathInfos.ToList();
-
-                foreach (var location in info.Locations)
-                {
-                    if (!list.Any(i => string.Equals(i.Path, location, StringComparison.Ordinal)))
-                    {
-                        list.Add(new MediaPathInfo(location));
-                    }
-                }
-
-                options.PathInfos = list.ToArray();
-            }
-        }
-
-        public async Task RemoveVirtualFolder(string name, bool refreshLibrary)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            var rootFolderPath = _configurationManager.ApplicationPaths.DefaultUserViewsPath;
-
-            var path = VirtualFolderPath.Resolve(rootFolderPath, name);
-
-            if (!Directory.Exists(path))
-            {
-                throw new FileNotFoundException("The media folder does not exist");
-            }
-
-            await _scans.ApplyLibraryChangeAsync(
-                () =>
-                {
-                    try
-                    {
-                        Directory.Delete(path, true);
-                    }
-                    finally
-                    {
-                        CollectionFolder.OnCollectionFolderChange();
-                    }
-                },
-                refreshLibrary,
-                removeRoot: true,
-                CancellationToken.None).ConfigureAwait(false);
-        }
-
-        private void RemoveContentTypeOverrides(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                throw new ArgumentNullException(nameof(path));
-            }
-
-            List<NameValuePair>? removeList = null;
-
-            foreach (var contentType in _configurationManager.Configuration.ContentTypes)
-            {
-                if (string.IsNullOrWhiteSpace(contentType.Name)
-                    || _fileSystem.AreEqual(path, contentType.Name)
-                    || _fileSystem.ContainsSubPath(path, contentType.Name))
-                {
-                    (removeList ??= new()).Add(contentType);
-                }
-            }
-
-            if (removeList is not null)
-            {
-                _configurationManager.Configuration.ContentTypes = _configurationManager.Configuration.ContentTypes
-                    .Except(removeList)
-                    .ToArray();
-
-                _configurationManager.SaveConfiguration();
-            }
-        }
-
-        public void RemoveMediaPath(string virtualFolderName, string mediaPath)
-        {
-            ArgumentException.ThrowIfNullOrEmpty(mediaPath);
-
-            var rootFolderPath = _configurationManager.ApplicationPaths.DefaultUserViewsPath;
-            var virtualFolderPath = VirtualFolderPath.Resolve(rootFolderPath, virtualFolderName);
-
-            if (!Directory.Exists(virtualFolderPath))
-            {
-                throw new FileNotFoundException(
-                    string.Format(CultureInfo.InvariantCulture, "The media collection {0} does not exist", virtualFolderName));
-            }
-
-            var shortcut = _fileSystem.GetFilePaths(virtualFolderPath, true)
-                .Where(i => Path.GetExtension(i.AsSpan()).Equals(ShortcutFileExtension, StringComparison.OrdinalIgnoreCase))
-                .FirstOrDefault(f => _appHost.ExpandVirtualPath(_fileSystem.ResolveShortcut(f)).Equals(mediaPath, StringComparison.OrdinalIgnoreCase));
-
-            if (!string.IsNullOrEmpty(shortcut))
-            {
-                _fileSystem.DeleteFile(shortcut);
-            }
-
-            var libraryOptions = CollectionFolder.GetLibraryOptions(virtualFolderPath);
-
-            libraryOptions.PathInfos = libraryOptions
-                .PathInfos
-                .Where(i => !string.Equals(i.Path, mediaPath, StringComparison.Ordinal))
-                .ToArray();
-
-            CollectionFolder.SaveLibraryOptions(virtualFolderPath, libraryOptions);
-        }
-
-        public void CreateShortcut(string virtualFolderPath, MediaPathInfo pathInfo)
-        {
-            var path = pathInfo.Path;
-            var rootFolderPath = _configurationManager.ApplicationPaths.DefaultUserViewsPath;
-
-            var shortcutFilename = Path.GetFileNameWithoutExtension(path);
-
-            // The shortcut's leaf name is derived from the caller-supplied media path.
-            // GetFileNameWithoutExtension drops any directory structure, but dropping structure
-            // is not the same as guaranteeing containment, so the result is resolved through the
-            // same rule the virtual folder root uses. The link is then provably a direct child of
-            // this library, whatever the media path looked like.
-            var lnk = VirtualFolderPath.Resolve(virtualFolderPath, shortcutFilename + ShortcutFileExtension);
-
-            while (File.Exists(lnk))
-            {
-                shortcutFilename += "1";
-                lnk = VirtualFolderPath.Resolve(virtualFolderPath, shortcutFilename + ShortcutFileExtension);
-            }
-
-            _fileSystem.CreateShortcut(lnk, _appHost.ReverseVirtualPath(path));
-            RemoveContentTypeOverrides(path);
         }
 
         /// <inheritdoc />

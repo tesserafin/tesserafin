@@ -665,16 +665,6 @@ namespace Tesserafin.Controller.Library
 
         Guid GetMusicGenreId(string name);
 
-        Task AddVirtualFolder(string name, CollectionTypeOptions? collectionType, LibraryOptions options, bool refreshLibrary);
-
-        Task RemoveVirtualFolder(string name, bool refreshLibrary);
-
-        void AddMediaPath(string virtualFolderName, MediaPathInfo mediaPath);
-
-        void UpdateMediaPath(string virtualFolderName, MediaPathInfo mediaPath);
-
-        void RemoveMediaPath(string virtualFolderName, string mediaPath);
-
         QueryResult<(BaseItem Item, ItemCounts ItemCounts)> GetGenres(InternalItemsQuery query);
 
         QueryResult<(BaseItem Item, ItemCounts ItemCounts)> GetMusicGenres(InternalItemsQuery query);
@@ -732,13 +722,6 @@ namespace Tesserafin.Controller.Library
         Task RunMetadataSavers(BaseItem item, ItemUpdateType updateReason);
 
         BaseItem GetParentItem(Guid? parentId, Guid? userId);
-
-        /// <summary>
-        /// Add mblink file for a media path.
-        /// </summary>
-        /// <param name="virtualFolderPath">The path to the virtualfolder.</param>
-        /// <param name="pathInfo">The new virtualfolder.</param>
-        public void CreateShortcut(string virtualFolderPath, MediaPathInfo pathInfo);
 
         /// <summary>
         /// Re-routes LinkedChildren references from one child to another.

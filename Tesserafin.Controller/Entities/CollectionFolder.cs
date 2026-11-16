@@ -174,8 +174,6 @@ namespace Tesserafin.Controller.Entities
 
         public static void SaveLibraryOptions(string path, LibraryOptions options)
         {
-            _libraryOptions[path] = options;
-
             var clone = JsonSerializer.Deserialize<LibraryOptions>(JsonSerializer.SerializeToUtf8Bytes(options, _jsonOptions), _jsonOptions);
             foreach (var mediaPath in clone.PathInfos)
             {
@@ -186,6 +184,7 @@ namespace Tesserafin.Controller.Entities
             }
 
             XmlSerializer.SerializeToFile(clone, GetLibraryOptionsPath(path));
+            _libraryOptions[path] = options;
 
             LibraryOptionsUpdated?.Invoke(null, new LibraryOptionsUpdatedEventArgs(path, options));
         }

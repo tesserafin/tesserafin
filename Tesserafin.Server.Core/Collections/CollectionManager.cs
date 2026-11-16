@@ -30,6 +30,7 @@ namespace Tesserafin.Server.Core.Collections
     public class CollectionManager : ICollectionManager
     {
         private readonly ILibraryManager _libraryManager;
+        private readonly ILibraryStructureCommands _structure;
         private readonly IFileSystem _fileSystem;
         private readonly ILibraryMonitor _iLibraryMonitor;
         private readonly ILogger<CollectionManager> _logger;
@@ -42,6 +43,7 @@ namespace Tesserafin.Server.Core.Collections
         /// <summary>
         /// Initializes a new instance of the <see cref="CollectionManager"/> class.
         /// </summary>
+        /// <param name="structure">Library structure commands.</param>
         /// <param name="libraryManager">The library manager.</param>
         /// <param name="appPaths">The application paths.</param>
         /// <param name="localizationManager">The localization manager.</param>
@@ -53,6 +55,7 @@ namespace Tesserafin.Server.Core.Collections
         /// <param name="itemSortService">The item sort service.</param>
         public CollectionManager(
             ILibraryManager libraryManager,
+            ILibraryStructureCommands structure,
             IApplicationPaths appPaths,
             ILocalizationManager localizationManager,
             IFileSystem fileSystem,
@@ -63,6 +66,7 @@ namespace Tesserafin.Server.Core.Collections
             IItemSortService itemSortService)
         {
             _libraryManager = libraryManager;
+            _structure = structure;
             _fileSystem = fileSystem;
             _iLibraryMonitor = iLibraryMonitor;
             _logger = loggerFactory.CreateLogger<CollectionManager>();
@@ -115,7 +119,7 @@ namespace Tesserafin.Server.Core.Collections
 
             var name = _localizationManager.GetLocalizedString("Collections");
 
-            await _libraryManager.AddVirtualFolder(name, CollectionTypeOptions.boxsets, libraryOptions, true).ConfigureAwait(false);
+            await _structure.AddVirtualFolderAsync(name, CollectionTypeOptions.boxsets, libraryOptions, true, CancellationToken.None).ConfigureAwait(false);
 
             _libraryManager.RootFolder.Children = null;
 

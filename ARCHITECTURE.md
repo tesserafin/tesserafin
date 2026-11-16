@@ -155,6 +155,22 @@ libraries. Every project has a matching `*.Tests` project in `tests/`.
   invalidate missing collection folders in the repository and cache, then walk the full tree.
   Entity refresh/validation still uses the existing `Folder`/`BaseItem` implementation; removing
   its remaining static service access is further consolidation work.
+- **Structure commands.** `ILibraryStructureCommands` / `LibraryStructureCommands` own library definition and source-path
+  mutations. The API controller binds requests and maps outcomes; collections and recordings use
+  the same port. `LibraryManager` retains the read catalogue but has no structure mutation facade
+  and no scan-coordinator dependency (33 constructor parameters, down from 34).
+  Every command enters `ILibraryScanCoordinator.ApplyLibraryChangeAsync` before filesystem
+  validation, name allocation or options reads. This closes the former check-before-admission
+  window and gives path/options edits the same exclusion as scans. Commands invalidate cached
+  options, await root reconciliation and monitor restoration, then request a full scan when asked.
+  Request cancellation is used for admission; after an edit begins, reconciliation has an independent
+  30-second cooperative cleanup deadline before the cancellation is reported. Shutdown still joins admitted work.
+  CollectionFolder's existing options cache, XML serializer and update event remain shared with
+  readers outside this slice. Saving publishes the cache only after serialization succeeds; commands
+  clone cached options before edits. This is serialized orchestration, not a filesystem transaction:
+  a failure after creating some shortcuts or writing a definition may leave partial configuration.
+  Reconciliation is attempted and the primary error retained. Referenced media directories are never
+  deleted by removing their library definition or path reference.
 - **Resolution.** `LibraryManager.ResolvePath(s)` dispatches to ordered
   `IItemResolver` implementations (`MovieResolver`, `EpisodeResolver`,
   `SeriesResolver`, `AudioResolver`, `PhotoResolver`, …) that turn paths into the

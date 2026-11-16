@@ -351,6 +351,9 @@ jobs:
           "$(command -v python3 || command -v python)" ci/summarize-test-results.py artifacts/test-results/integration
           --require Tesserafin.Server.Integration.Tests.OpenApiContractTests.CommittedContract_MatchesRunningServer
           --require Tesserafin.Server.Integration.Tests.OpenApiContractTests.Contract_IsByteIdentical_AcrossColdGenerations
+          --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.CompleteJourney_ChangesDefinitionAndPaths_ButNeverDeletesSourceMedia
+          --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.ConcurrentCreates_ChooseDistinctNamesAfterAdmission_AndCanBeRemovedIndependently
+          --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.FailedOptionWrite_KeepsPreviouslyPublishedOptions_AndReleasesTheMutationSlot
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_StartAndSeek_ServesRangesFromTheSessionFile
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_ParametersThatDoNotMatchTheSession_AreNotServed
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_Stop_DeletesTheSessionAndRevokesItsCapability

@@ -759,3 +759,20 @@ The backup roundtrips use a temporary directory on the workspace filesystem beca
 container's /tmp volume is smaller than the existing 5-GiB backup requirement; the requirement
 and assertions remain unchanged. The scan fixture uses an empty disabled library, not a large
 media-library performance benchmark or a native Windows acceptance run. Hosted CI is unclaimed.
+
+
+## 23. Library structure mutation ownership
+
+The follow-up to scan extraction moves add/remove library, rename, add/update/remove source path,
+and options updates to `ILibraryStructureCommands`. `LibraryStructureController`, collections and
+recordings call that port. The six old structure methods, including public `CreateShortcut`, are
+removed from `ILibraryManager` and `LibraryManager`; no forwarding methods remain. The manager
+also loses its coordinator dependency. The shared read-only shortcut reader is used by the read
+catalogue and command-side options synchronization.
+
+The command service owns filesystem containment checks, collision allocation and configuration
+writes inside the scan coordinator's exclusive slot. HTTP cancellation reaches admission. Once
+an edit begins, reconciliation uses an independent 30-second cooperative cleanup deadline, with monitor
+restoration and primary-error preservation. Options caching is published after successful XML
+serialization. This does not promise rollback of a batch of filesystem changes, and it does not
+remove the remaining CollectionFolder options-store statics or LibraryManager responsibilities.
