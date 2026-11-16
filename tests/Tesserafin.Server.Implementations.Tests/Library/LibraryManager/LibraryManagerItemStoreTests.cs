@@ -1,8 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
-using System;
-using AutoFixture.AutoMoq;
 using AutoFixture;
+using AutoFixture.AutoMoq;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.Configuration;

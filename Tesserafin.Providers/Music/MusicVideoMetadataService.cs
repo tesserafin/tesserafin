@@ -1,5 +1,5 @@
-using System.Linq;
 using System;
+using System.Linq;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;

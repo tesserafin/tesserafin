@@ -2,9 +2,9 @@
 
 #pragma warning disable CS1591
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Configuration;

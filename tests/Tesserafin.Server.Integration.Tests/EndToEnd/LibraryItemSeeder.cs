@@ -1,9 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using System;
-using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Model.Entities;

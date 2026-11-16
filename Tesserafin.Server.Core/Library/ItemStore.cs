@@ -1,8 +1,8 @@
 #pragma warning disable CS1591
 
+using System;
 using System.Collections.Generic;
 using System.Threading;
-using System;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;

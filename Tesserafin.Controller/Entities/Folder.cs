@@ -2,15 +2,15 @@
 
 #pragma warning disable CA1002, CA1721, CA1819, CS1591
 
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Security;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 using System.Threading;
-using System;
+using System.Threading.Tasks;
 using J2N.Collections.Generic.Extensions;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Channels;
@@ -25,9 +25,9 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
+using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Data;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.IO;

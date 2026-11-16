@@ -1,11 +1,11 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Threading;
-using System;
-using AutoFixture.AutoMoq;
+using System.Threading.Tasks;
 using AutoFixture;
+using AutoFixture.AutoMoq;
 using Moq;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;

@@ -1,12 +1,12 @@
 using AutoFixture;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
-using Tesserafin.Controller;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.IO;
 using Tesserafin.Naming.Common;

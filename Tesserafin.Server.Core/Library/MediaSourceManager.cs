@@ -2,6 +2,7 @@
 
 #pragma warning disable CS1591
 
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -9,15 +10,15 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using System.Threading.Tasks;
 using System.Threading;
-using System;
+using System.Threading.Tasks;
 using AsyncKeyedLock;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Common.Extensions;
-using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
@@ -25,12 +26,11 @@ using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
-using Tesserafin.Controller;
+using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Data;
-using Tesserafin.Extensions.Json;
 using Tesserafin.Extensions;
+using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;

@@ -1,6 +1,6 @@
+using System;
 using System.Linq;
 using System.Reflection;
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Tesserafin.Controller.Channels;

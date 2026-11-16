@@ -1,10 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Threading;
-using System;
-using AutoFixture.AutoMoq;
 using AutoFixture;
+using AutoFixture.AutoMoq;
 using Moq;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
