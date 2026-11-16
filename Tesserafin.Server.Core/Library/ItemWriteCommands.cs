@@ -32,7 +32,7 @@ internal sealed class ItemWriteCommands(
     {
         var graph = versions.Prepare(items, parent, cancellationToken);
         persistence.SaveItems(graph, cancellationToken);
-        PublishCache(graph, parent);
+        PublishCache(graph, [parent]);
         foreach (var item in items)
         {
             if (IsLibraryItem(item))
@@ -128,7 +128,7 @@ internal sealed class ItemWriteCommands(
             }
         }
 
-        PublishCache(originals.Values.ToArray(), parent);
+        PublishCache(originals.Values.ToArray(), parents.Values);
         foreach (var item in originals.Values)
         {
             if (IsLibraryItem(item))
@@ -153,9 +153,9 @@ internal sealed class ItemWriteCommands(
         target.ProviderIds = source.ProviderIds;
     }
 
-    private void PublishCache(IReadOnlyCollection<BaseItem> graph, BaseItem? parent)
+    private void PublishCache(IReadOnlyCollection<BaseItem> graph, IEnumerable<BaseItem?> parents)
     {
-        if (parent is Folder folder)
+        foreach (var folder in parents.OfType<Folder>())
         {
             folder.Children = null;
             folder.UserData = null;

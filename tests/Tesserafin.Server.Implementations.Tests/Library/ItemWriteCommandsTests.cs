@@ -144,6 +144,27 @@ public sealed class ItemWriteCommandsTests
     }
 
     [Fact]
+    public async Task Update_InvalidatesTheResolvedParentOfEachVersion()
+    {
+        var context = new Context();
+        var primary = context.Movie();
+        var alternate = context.Movie();
+        var primaryFolder = new Folder { Id = Guid.NewGuid(), Name = "primary folder" };
+        var alternateFolder = new Folder { Id = Guid.NewGuid(), Name = "alternate folder" };
+        primary.ParentId = primaryFolder.Id;
+        alternate.ParentId = alternateFolder.Id;
+        context.Lookup.Setup(l => l.GetItemById(primaryFolder.Id)).Returns(primaryFolder);
+        context.Lookup.Setup(l => l.GetItemById(alternateFolder.Id)).Returns(alternateFolder);
+        context.Lookup.Setup(l => l.GetItemById(alternate.Id)).Returns(alternate);
+        context.Linked.Setup(l => l.GetLinkedChildrenIds(primary.Id, (int)Tesserafin.Controller.Entities.LinkedChildType.LocalAlternateVersion)).Returns([alternate.Id]);
+
+        await context.Commands.UpdateItemAsync(primary, null, ItemUpdateType.MetadataEdit, TestContext.Current.CancellationToken);
+
+        Assert.Null(primaryFolder.UserData);
+        Assert.Null(alternateFolder.UserData);
+    }
+
+    [Fact]
     public async Task RemoteItem_UpdatesTheCatalogueWithoutExportingFileMetadata()
     {
         var context = new Context();
