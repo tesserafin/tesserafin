@@ -55,7 +55,9 @@ internal sealed class ItemResolutionService(
 
     public BaseItem? GetItemById(Guid id) => lookup.GetItemById(id);
 
-    public T? GetItemById<T>(Guid id) where T : BaseItem => lookup.GetItemById<T>(id);
+    public T? GetItemById<T>(Guid id)
+        where T : BaseItem
+        => lookup.GetItemById<T>(id);
 
     public bool AreEqualPaths(string first, string second) => _fileSystem.AreEqual(first, second);
 
