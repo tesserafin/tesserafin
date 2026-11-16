@@ -26,6 +26,7 @@ namespace Tesserafin.Server.Core.Library.Search;
 /// </summary>
 public class SearchManager : ISearchManager
 {
+    private readonly IStandaloneVisibilityService _visibility;
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
     private readonly IDbContextFactory<TesserafinDbContext> _dbProvider;
@@ -42,13 +43,16 @@ public class SearchManager : ISearchManager
     /// <param name="dbProvider">The database context factory.</param>
     /// <param name="queryHelpers">The shared item query helpers.</param>
     /// <param name="logger">The logger.</param>
+    /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
     public SearchManager(
         ILibraryManager libraryManager,
         IUserManager userManager,
         IDbContextFactory<TesserafinDbContext> dbProvider,
         IItemQueryHelpers queryHelpers,
-        ILogger<SearchManager> logger)
+        ILogger<SearchManager> logger,
+        IStandaloneVisibilityService visibility)
     {
+        _visibility = visibility;
         _libraryManager = libraryManager;
         _userManager = userManager;
         _dbProvider = dbProvider;
@@ -247,7 +251,7 @@ public class SearchManager : ISearchManager
         // the libraries (GHSA-c5pr-6h39-jp86). Before the total and the paging below.
         if (user is not null)
         {
-            items = items.Where(i => i is not (BoxSet or Playlist) || i.IsVisibleStandalone(user)).ToList();
+            items = items.Where(i => i is not (BoxSet or Playlist) || i.IsVisibleStandalone(user, _visibility)).ToList();
         }
 
         var orderedResults = items

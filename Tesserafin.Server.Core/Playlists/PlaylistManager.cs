@@ -36,6 +36,7 @@ namespace Tesserafin.Server.Core.Playlists
     public class PlaylistManager : IPlaylistManager
     {
         private readonly IItemWriteCommands _writes;
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly IItemDeletionCommands _deletions;
         private readonly ILibraryManager _libraryManager;
         private readonly IFileSystem _fileSystem;
@@ -58,9 +59,11 @@ namespace Tesserafin.Server.Core.Playlists
             IProviderManager providerManager,
             IConfiguration appConfig,
             IItemQueryService itemQueryService,
-            IItemSortService itemSortService)
+            IItemSortService itemSortService,
+            IStandaloneVisibilityService visibility)
         {
             _writes = writes;
+            _visibility = visibility;
             _deletions = deletions;
             _libraryManager = libraryManager;
             _fileSystem = fileSystem;
@@ -88,7 +91,7 @@ namespace Tesserafin.Server.Core.Playlists
                 DtoOptions = new DtoOptions(false)
             })
             .Cast<Playlist>()
-            .Where(p => p.IsVisible(user));
+            .Where(p => p.IsVisible(user, false, _visibility));
         }
 
         public async Task<PlaylistCreationResult> CreatePlaylist(PlaylistCreationRequest request)
@@ -349,7 +352,7 @@ namespace Tesserafin.Server.Core.Playlists
 
             var user = _userManager.GetUserById(callingUserId);
             var children = playlist.GetManageableItems().ToList();
-            var accessibleChildren = children.Where(c => c.Item2.IsVisibleStandalone(user)).ToArray();
+            var accessibleChildren = children.Where(c => c.Item2.IsVisibleStandalone(user, _visibility)).ToArray();
 
             var oldIndexAll = children.FindIndex(i => string.Equals(entryId, i.Item1.ItemId?.ToString("N", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase));
             var oldIndexAccessible = accessibleChildren.FindIndex(i => string.Equals(entryId, i.Item1.ItemId?.ToString("N", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase));

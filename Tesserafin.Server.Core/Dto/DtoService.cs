@@ -112,6 +112,8 @@ namespace Tesserafin.Server.Core.Dto
             }
         }.ToFrozenDictionary();
 
+        private readonly IStandaloneVisibilityService _visibility;
+
         private readonly ILogger<DtoService> _logger;
         private readonly ILibraryManager _libraryManager;
         private readonly IItemPeopleService _itemPeopleService;
@@ -144,8 +146,10 @@ namespace Tesserafin.Server.Core.Dto
             Lazy<IChannelManager> channelManagerFactory,
             ITrickplayManager trickplayManager,
             IChapterManager chapterManager,
-            IItemCountService itemCountService)
+            IItemCountService itemCountService,
+            IStandaloneVisibilityService visibility)
         {
+            _visibility = visibility;
             _logger = logger;
             _libraryManager = libraryManager;
             _itemPeopleService = itemPeopleService;
@@ -172,7 +176,7 @@ namespace Tesserafin.Server.Core.Dto
             BaseItem? owner = null,
             bool skipVisibilityCheck = false)
         {
-            var accessibleItems = skipVisibilityCheck || user is null ? items : items.Where(x => x.IsVisible(user)).ToList();
+            var accessibleItems = skipVisibilityCheck || user is null ? items : items.Where(x => x.IsVisible(user, false, _visibility)).ToList();
             var returnItems = new BaseItemDto[accessibleItems.Count];
             List<(BaseItem, BaseItemDto)>? programTuples = null;
             List<(BaseItemDto, LiveTvChannel)>? channelTuples = null;
@@ -809,7 +813,7 @@ namespace Tesserafin.Server.Core.Dto
                         return null;
                     }
                 }).Where(i => i is not null)
-                .Where(i => user is null || i!.IsVisible(user))
+                .Where(i => user is null || i!.IsVisible(user, false, _visibility))
                 .DistinctBy(x => x!.Name, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(i => i!.Name, StringComparer.OrdinalIgnoreCase)!; // null values got filtered out
 
@@ -1287,7 +1291,7 @@ namespace Tesserafin.Server.Core.Dto
                     var mediaSourceCount = user is null
                         || (!video.PrimaryVersionId.HasValue && video.LinkedAlternateVersions.Length == 0 && !video.HasLocalAlternateVersions)
                             ? video.MediaSourceCount
-                            : video.GetAllVersions().Count(v => v.Id.Equals(video.Id) || v.IsVisibleStandalone(user));
+                            : video.GetAllVersions().Count(v => v.Id.Equals(video.Id) || v.IsVisibleStandalone(user, _visibility));
                     if (mediaSourceCount != 1)
                     {
                         dto.MediaSourceCount = mediaSourceCount;

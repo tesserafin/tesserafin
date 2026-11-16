@@ -56,7 +56,8 @@ public class DtoServiceTests
             new Lazy<IChannelManager>(Mock.Of<IChannelManager>),
             new Mock<ITrickplayManager>().Object,
             new Mock<IChapterManager>().Object,
-            new Mock<IItemCountService>().Object);
+            new Mock<IItemCountService>().Object,
+            Mock.Of<IStandaloneVisibilityService>());
 
         // Episode.Series / Episode.Season resolve through the static BaseItem.LibraryManager.
         BaseItem.LibraryManager = _libraryManagerMock.Object;

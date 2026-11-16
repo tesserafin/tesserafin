@@ -59,6 +59,7 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     internal sealed class ChannelCatalog : IChannelCatalog
     {
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly IChannel[] _channels;
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemStore _itemStore;
@@ -71,12 +72,15 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="itemLookupService">The item lookup service (read side; see PR75/PR76).</param>
         /// <param name="itemStore">The item store leaf (deterministic id generation; see PR106a).</param>
         /// <param name="userManager">The user manager (optional user-scoped filtering).</param>
+        /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
         public ChannelCatalog(
             IEnumerable<IChannel> channels,
             IItemLookupService itemLookupService,
             IItemStore itemStore,
-            IUserManager userManager)
+            IUserManager userManager,
+            IStandaloneVisibilityService visibility)
         {
+            _visibility = visibility;
             _channels = channels.ToArray();
             _itemLookupService = itemLookupService;
             _itemStore = itemStore;
@@ -162,7 +166,7 @@ namespace Tesserafin.Server.Core.Library
                 var userId = user.Id.ToString("N", CultureInfo.InvariantCulture);
                 channels = channels.Where(i =>
                 {
-                    if (!i.IsVisible(user))
+                    if (!i.IsVisible(user, false, _visibility))
                     {
                         return false;
                     }

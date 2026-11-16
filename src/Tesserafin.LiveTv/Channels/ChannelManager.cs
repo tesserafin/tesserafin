@@ -44,6 +44,7 @@ namespace Tesserafin.LiveTv.Channels
     {
         private readonly IItemPeopleCommands _peopleCommands;
         private readonly IItemWriteCommands _writes;
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly IItemDeletionCommands _deletions;
         private readonly IUserManager _userManager;
         private readonly IUserDataManager _userDataManager;
@@ -74,6 +75,7 @@ namespace Tesserafin.LiveTv.Channels
         /// <param name="providerManager">The provider manager.</param>
         /// <param name="memoryCache">The memory cache.</param>
         /// <param name="channels">The channels.</param>
+        /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
         public ChannelManager(
             IItemPeopleCommands peopleCommands,
             IItemWriteCommands writes,
@@ -87,10 +89,12 @@ namespace Tesserafin.LiveTv.Channels
             IUserDataManager userDataManager,
             IProviderManager providerManager,
             IMemoryCache memoryCache,
-            IEnumerable<IChannel> channels)
+            IEnumerable<IChannel> channels,
+            IStandaloneVisibilityService visibility)
         {
             _peopleCommands = peopleCommands;
             _writes = writes;
+            _visibility = visibility;
             _deletions = deletions;
             _userManager = userManager;
             _dtoService = dtoService;
@@ -233,7 +237,7 @@ namespace Tesserafin.LiveTv.Channels
                 var userId = user.Id.ToString("N", CultureInfo.InvariantCulture);
                 channels = channels.Where(i =>
                 {
-                    if (!i.IsVisible(user))
+                    if (!i.IsVisible(user, false, _visibility))
                     {
                         return false;
                     }

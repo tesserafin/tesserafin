@@ -976,7 +976,7 @@ namespace Tesserafin.Server.Core.Library
                 Recursive = true,
                 DtoOptions = new DtoOptions(false) { EnableImages = false }
             })
-                .Where(i => !i.IsVisibleStandalone(user))
+                .Where(i => !_itemAccessService.IsVisibleStandalone(i, user))
                 .Select(i => i.Id)
                 .ToArray();
 
@@ -1429,7 +1429,7 @@ namespace Tesserafin.Server.Core.Library
                     }
                 })
                 .Where(i => i is not null)
-                .Where(i => query.User is null || i!.IsVisible(query.User))
+                .Where(i => query.User is null || _itemAccessService.IsVisible(i!, query.User))
                 .OfType<BaseItem>()
                 .ToList()
                 .AsReadOnly();

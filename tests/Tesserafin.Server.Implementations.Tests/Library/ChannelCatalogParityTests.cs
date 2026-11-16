@@ -155,7 +155,7 @@ public sealed class ChannelCatalogParityTests
             itemLookupServiceMock.Setup(l => l.GetItemById<Channel>(It.IsAny<Guid>()))
                 .Returns((Guid id) => Registry.GetValueOrDefault(id));
 
-            return new ChannelCatalog(Plugins, itemLookupServiceMock.Object, itemStoreMock.Object, userManager);
+            return new ChannelCatalog(Plugins, itemLookupServiceMock.Object, itemStoreMock.Object, userManager, Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<Tesserafin.Controller.Entities.BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())));
         }
 
         public ChannelManager BuildChannelManager(IUserManager userManager)
@@ -179,7 +179,8 @@ public sealed class ChannelCatalogParityTests
                 Mock.Of<IUserDataManager>(),
                 Mock.Of<IProviderManager>(),
                 new MemoryCache(new MemoryCacheOptions()),
-                Plugins);
+                Plugins,
+                Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<Tesserafin.Controller.Entities.BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())));
         }
 
         public Channel AddMaterializedChannel(string name)

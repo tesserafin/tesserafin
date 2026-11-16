@@ -54,6 +54,12 @@ namespace Tesserafin.Server.Core.Library
         /// <see cref="UserRootFolder"/> is always visible regardless of a user's tag/parental
         /// restrictions.
         /// </summary>
+        /// <inheritdoc />
+        public bool IsVisible(BaseItem item, User user) => item.IsVisible(user, false, _tagVisibility);
+
+        /// <inheritdoc />
+        public bool IsVisibleStandalone(BaseItem item, User user) => item.IsVisibleStandalone(user, _tagVisibility);
+
         private bool ItemIsVisible(BaseItem? item, User user)
         {
             if (item is null)

@@ -389,7 +389,19 @@ public sealed class VisibleContentProbeTests
             BackRepository(injectedRepository);
             var lookup = new Mock<IItemLookupService>();
             lookup.Setup(l => l.GetItemById(It.IsAny<Guid>())).Returns((Guid id) => Find(id));
-            Probe = new VisibleContentProbe(lookup.Object, injectedRepository.Object);
+            // The probe's scope sees the same world the legacy static path sees: no libraries, default options.
+            var emptyRoot = new Folder { Children = [] };
+            var rootProvider = Mock.Of<IUserRootFolderProvider>(p => p.GetUserRootFolder() == emptyRoot);
+            var scope = new TagVisibilityService(
+                lookup.Object,
+                new CollectionFolderResolver(lookup.Object, rootProvider),
+                rootProvider,
+                injectedRepository.Object,
+                localization.Object,
+                _config.Object,
+                new Tesserafin.Controller.LiveTv.ActiveRecordings(),
+                Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(It.IsAny<BaseItem>()) == new LibraryOptions()));
+            Probe = new VisibleContentProbe(lookup.Object, injectedRepository.Object, scope);
 
             _libraryManager.Setup(l => l.GetItemById(It.IsAny<Guid>())).Callback(RecordLibraryManagerCall).Returns((Guid id) => Find(id));
             _libraryManager

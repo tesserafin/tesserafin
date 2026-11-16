@@ -49,6 +49,7 @@ namespace Tesserafin.Server.Core.Session
     /// </summary>
     public sealed class SessionManager : ISessionManager, IDeviceLoggedOutSource, IAsyncDisposable
     {
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly IUserDataManager _userDataManager;
         private readonly IServerConfigurationManager _config;
         private readonly ILogger<SessionManager> _logger;
@@ -99,6 +100,7 @@ namespace Tesserafin.Server.Core.Session
         /// <param name="itemSortService">Instance of <see cref="IItemSortService"/> interface.</param>
         /// <param name="credentialService">Instance of the <see cref="IPlaybackCredentialService"/> interface.</param>
         /// <param name="playedStateService">Marks the other versions of a video played to completion.</param>
+        /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
         public SessionManager(
             ILogger<SessionManager> logger,
             IEventManager eventManager,
@@ -116,8 +118,10 @@ namespace Tesserafin.Server.Core.Session
             IItemQueryService itemQueryService,
             IItemSortService itemSortService,
             IPlaybackCredentialService credentialService,
-            IItemPlayedStateService playedStateService)
+            IItemPlayedStateService playedStateService,
+            IStandaloneVisibilityService visibility)
         {
+            _visibility = visibility;
             _logger = logger;
             _eventManager = eventManager;
             _userDataManager = userDataManager;
@@ -771,7 +775,7 @@ namespace Tesserafin.Server.Core.Session
             }
 
             var user = _userManager.GetUserById(session.UserId);
-            return user is not null && (item is UserRootFolder || item.IsVisibleStandalone(user)) ? item : null;
+            return user is not null && (item is UserRootFolder || item.IsVisibleStandalone(user, _visibility)) ? item : null;
         }
 
         /// <summary>

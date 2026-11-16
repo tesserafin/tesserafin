@@ -456,6 +456,7 @@ public sealed class UserViewCatalogTests
         services.AddSingleton(Mock.Of<ILocalizationManager>());
         services.AddSingleton(Mock.Of<IItemLookupService>());
         services.AddSingleton(Mock.Of<IItemRepository>());
+        services.AddSingleton(Mock.Of<IStandaloneVisibilityService>());
         services.AddSingleton<IVisibleContentProbe, VisibleContentProbe>();
         services.AddSingleton<IUserViewCatalog, UserViewCatalog>();
 

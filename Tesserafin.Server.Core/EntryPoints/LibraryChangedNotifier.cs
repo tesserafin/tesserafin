@@ -28,6 +28,7 @@ namespace Tesserafin.Server.Core.EntryPoints;
 /// </summary>
 public sealed class LibraryChangedNotifier : IHostedService, IDisposable
 {
+    private readonly IStandaloneVisibilityService _visibility;
     private readonly ILibraryManager _libraryManager;
     private readonly IItemChangeEvents _changes;
     private readonly IServerConfigurationManager _configurationManager;
@@ -58,6 +59,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     /// <param name="logger">The <see cref="ILogger"/>.</param>
     /// <param name="providerManager">The <see cref="IProviderManager"/>.</param>
     /// <param name="itemSortService">The <see cref="IItemSortService"/>.</param>
+    /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
     public LibraryChangedNotifier(
         ILibraryManager libraryManager,
         IItemChangeEvents changes,
@@ -66,8 +68,10 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         IUserManager userManager,
         ILogger<LibraryChangedNotifier> logger,
         IProviderManager providerManager,
-        IItemSortService itemSortService)
+        IItemSortService itemSortService,
+        IStandaloneVisibilityService visibility)
     {
+        _visibility = visibility;
         _libraryManager = libraryManager;
         _changes = changes;
         _configurationManager = configurationManager;
@@ -394,7 +398,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         }
 
         // Return it only if it's in the user's library
-        if (includeIfNotFound || item.IsVisibleStandalone(user))
+        if (includeIfNotFound || item.IsVisibleStandalone(user, _visibility))
         {
             return new[] { item };
         }

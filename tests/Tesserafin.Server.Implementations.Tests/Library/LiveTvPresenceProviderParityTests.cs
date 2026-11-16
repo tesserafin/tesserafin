@@ -117,7 +117,8 @@ public sealed class LiveTvPresenceProviderParityTests
             Mock.Of<IRecordingsManager>(),
             liveTvDtoService,
             services,
-            Mock.Of<IUserViewFactory>());
+            Mock.Of<IUserViewFactory>(),
+            Mock.Of<IStandaloneVisibilityService>());
 
         var providerResult = provider.GetEnabledUsers().Select(u => u.Id).ToArray();
         var managerResult = manager.GetEnabledUsers().Select(u => u.Id).ToArray();
@@ -162,7 +163,8 @@ public sealed class LiveTvPresenceProviderParityTests
             Mock.Of<IRecordingsManager>(),
             liveTvDtoService,
             services,
-            userViewFactoryMock.Object);
+            userViewFactoryMock.Object,
+            Mock.Of<IStandaloneVisibilityService>());
 
         var providerResult = provider.GetLiveTvFolder(CancellationToken.None);
         var managerResult = manager.GetInternalLiveTvFolder(CancellationToken.None);

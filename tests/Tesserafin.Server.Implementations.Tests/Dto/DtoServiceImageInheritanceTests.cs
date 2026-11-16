@@ -139,6 +139,7 @@ public class DtoServiceImageInheritanceTests
             new Lazy<IChannelManager>(Mock.Of<IChannelManager>),
             trickplayManager.Object,
             chapterManager.Object,
-            itemCountService.Object);
+            itemCountService.Object,
+            Mock.Of<IStandaloneVisibilityService>());
     }
 }

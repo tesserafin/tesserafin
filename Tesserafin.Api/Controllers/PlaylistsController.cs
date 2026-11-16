@@ -32,6 +32,7 @@ namespace Tesserafin.Api.Controllers;
 [Tags("Playlist")]
 public class PlaylistsController : BaseTesserafinApiController
 {
+    private readonly IStandaloneVisibilityService _visibility;
     private readonly IPlaylistManager _playlistManager;
     private readonly IDtoService _dtoService;
     private readonly IUserManager _userManager;
@@ -42,11 +43,14 @@ public class PlaylistsController : BaseTesserafinApiController
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
     /// <param name="playlistManager">Instance of the <see cref="IPlaylistManager"/> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
+    /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
     public PlaylistsController(
         IDtoService dtoService,
         IPlaylistManager playlistManager,
-        IUserManager userManager)
+        IUserManager userManager,
+        IStandaloneVisibilityService visibility)
     {
+        _visibility = visibility;
         _dtoService = dtoService;
         _playlistManager = playlistManager;
         _userManager = userManager;
@@ -176,7 +180,7 @@ public class PlaylistsController : BaseTesserafinApiController
         {
             Shares = playlist.Shares,
             OpenAccess = playlist.OpenAccess,
-            ItemIds = playlist.GetManageableItems().Where(t => user is null || t.Item2.IsVisibleStandalone(user)).Select(t => t.Item2.Id).ToList()
+            ItemIds = playlist.GetManageableItems().Where(t => user is null || t.Item2.IsVisibleStandalone(user, _visibility)).Select(t => t.Item2.Id).ToList()
         };
     }
 
@@ -536,7 +540,7 @@ public class PlaylistsController : BaseTesserafinApiController
         }
 
         var user = _userManager.GetUserById(callingUserId);
-        var items = playlist.GetManageableItems().Where(i => i.Item2.IsVisibleStandalone(user)).ToArray();
+        var items = playlist.GetManageableItems().Where(i => i.Item2.IsVisibleStandalone(user, _visibility)).ToArray();
         var count = items.Length;
         if (startIndex.HasValue)
         {
