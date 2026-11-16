@@ -40,6 +40,7 @@ public class LibraryManagerItemLookupTests
 {
     private readonly Tesserafin.Server.Core.Library.LibraryManager _libraryManager;
     private readonly Tesserafin.Server.Core.Library.ItemDeletionCommands _deletions;
+    private readonly Tesserafin.Server.Core.Library.ItemChangeEvents _changes = new(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.ItemChangeEvents>.Instance);
     private readonly Tesserafin.Server.Core.Library.ItemLookupService _itemLookupService;
     private readonly Tesserafin.Server.Core.Library.ItemAccessService _itemAccessService;
     private readonly Mock<IItemRepository> _itemRepositoryMock;
@@ -51,6 +52,7 @@ public class LibraryManagerItemLookupTests
     public LibraryManagerItemLookupTests()
     {
         var fixture = new Fixture().Customize(new AutoMoqCustomization());
+        fixture.Register<IItemChangePublisher>(() => _changes);
         fixture.Register(() => new NamingOptions());
 
         _configurationManagerMock = fixture.Freeze<Mock<IServerConfigurationManager>>();
@@ -399,7 +401,7 @@ public class LibraryManagerItemLookupTests
         _libraryManager.RegisterItem(channel);
 
         ItemChangeEventArgs? raisedArgs = null;
-        _libraryManager.ItemRemoved += (_, args) => raisedArgs = args;
+        _changes.ItemRemoved += (_, args) => raisedArgs = args;
 
         await _deletions.DeleteAsync(channel, new DeleteOptions { DeleteFileLocation = false }, TestContext.Current.CancellationToken);
 

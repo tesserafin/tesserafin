@@ -5,7 +5,6 @@ using System.IO;
 using System.Threading;
 using AutoFixture;
 using AutoFixture.AutoMoq;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
@@ -95,7 +94,7 @@ public class LibraryManagerUserViewFactoryTests
             _persistenceServiceMock.Object,
             _itemLookupService,
             _configurationManagerMock.Object,
-            NullLogger<Tesserafin.Server.Core.Library.ItemStore>.Instance);
+            Mock.Of<IItemChangePublisher>());
         fixture.Register(() => _itemStore);
         fixture.Register<IItemStore>(() => _itemStore);
 
@@ -305,7 +304,7 @@ public class LibraryManagerUserViewFactoryTests
             persistenceMock.Object,
             cacheStore,
             _configurationManagerMock.Object,
-            NullLogger<Tesserafin.Server.Core.Library.ItemStore>.Instance);
+            Mock.Of<IItemChangePublisher>());
 
         var lookupServiceMock = new Mock<IItemLookupService>();
         lookupServiceMock.Setup(l => l.GetItemById(It.IsAny<Guid>())).Returns((BaseItem?)null);

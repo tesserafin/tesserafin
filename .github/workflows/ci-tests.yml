@@ -356,6 +356,7 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.FailedOptionWrite_KeepsPreviouslyPublishedOptions_AndReleasesTheMutationSlot
           --require Tesserafin.Server.Integration.Tests.ItemDeletionCommandsEndToEndTests.HttpDeletion_RemovesSourceAndCachedItem_ButConservesUserHistory
           --require Tesserafin.Server.Integration.Tests.ItemDeletionCommandsEndToEndTests.CatalogueOnlyDeletion_PromotesAlternateAndReroutesPlaylist_WithoutDeletingEitherSource
+          --require Tesserafin.Server.Integration.Tests.ItemDeletionCommandsEndToEndTests.ItemChanges_AreSharedAndFollowCatalogueAndCachePublication
           --require Tesserafin.Server.Integration.Tests.ItemImageProcessingEndToEndTests.ImageInfos_LocalizesAndPersistsDimensionsAndBlurHash_WithoutSavingTheWholeItem
           --require Tesserafin.Server.Integration.Tests.ItemImageProcessingEndToEndTests.ImageGet_UsesThePreparedImage_AndConcurrentRequestsPublishOneManagedFile
           --require Tesserafin.Server.Integration.Tests.ItemImageProcessingEndToEndTests.DatabaseFailure_RollsBackRows_LeavesCacheUnchanged_CleansStagedFiles_AndAllowsRetry

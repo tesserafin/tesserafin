@@ -32,15 +32,15 @@ internal sealed class ItemImageService(
     ActiveRecordings recordings,
     IItemPersistenceService persistence,
     IItemCacheStore cache,
-    ILogger<ItemImageService> logger) : IItemImageService, IDisposable
+    ILogger<ItemImageService> logger,
+    IItemChangePublisher changes) : IItemImageService, IDisposable
 {
     private readonly AsyncKeyedLocker<Guid> _updates = new();
     private readonly IItemPersistenceService _persistence = persistence;
     private readonly IItemCacheStore _cache = cache;
     private readonly IItemLookupService _lookup = lookup;
     private readonly ILogger<ItemImageService> _logger = logger;
-
-    public event EventHandler<ItemChangeEventArgs>? ImagesChanged;
+    private readonly IItemChangePublisher _changes = changes;
 
     public async Task<IItemImageUpdate> PrepareRefreshAsync(BaseItem item, bool forceUpdate, bool notify, CancellationToken cancellationToken)
     {
@@ -351,11 +351,11 @@ internal sealed class ItemImageService(
             {
                 try
                 {
-                    owner.ImagesChanged?.Invoke(owner, new ItemChangeEventArgs { Item = item, Parent = item.GetParent(owner._lookup), UpdateReason = ItemUpdateType.ImageUpdate });
+                    owner._changes.Updated(item, item.GetParent(owner._lookup), ItemUpdateType.ImageUpdate);
                 }
                 catch (Exception ex)
                 {
-                    owner._logger.LogError(ex, "Error in image change event handler");
+                    owner._logger.LogError(ex, "Unable to prepare image notification for item {ItemId}", item.Id);
                 }
             }
 

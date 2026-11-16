@@ -19,6 +19,7 @@ namespace Tesserafin.Server.Core.IO
     {
         private readonly ILogger<LibraryMonitor> _logger;
         private readonly ILibraryManager _libraryManager;
+        private readonly IItemChangeEvents _changes;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly IFileSystem _fileSystem;
         private readonly DotIgnoreIgnoreRule _dotIgnoreIgnoreRule;
@@ -45,6 +46,7 @@ namespace Tesserafin.Server.Core.IO
         /// </summary>
         /// <param name="logger">The logger.</param>
         /// <param name="libraryManager">The library manager.</param>
+        /// <param name="changes">The completed item change feed.</param>
         /// <param name="configurationManager">The configuration manager.</param>
         /// <param name="fileSystem">The filesystem.</param>
         /// <param name="appLifetime">The <see cref="IHostApplicationLifetime"/>.</param>
@@ -52,12 +54,14 @@ namespace Tesserafin.Server.Core.IO
         public LibraryMonitor(
             ILogger<LibraryMonitor> logger,
             ILibraryManager libraryManager,
+            IItemChangeEvents changes,
             IServerConfigurationManager configurationManager,
             IFileSystem fileSystem,
             IHostApplicationLifetime appLifetime,
             DotIgnoreIgnoreRule dotIgnoreIgnoreRule)
         {
             _libraryManager = libraryManager;
+            _changes = changes;
             _logger = logger;
             _configurationManager = configurationManager;
             _fileSystem = fileSystem;
@@ -115,8 +119,8 @@ namespace Tesserafin.Server.Core.IO
         /// <inheritdoc />
         public void Start()
         {
-            _libraryManager.ItemAdded += OnLibraryManagerItemAdded;
-            _libraryManager.ItemRemoved += OnLibraryManagerItemRemoved;
+            _changes.ItemAdded += OnItemAdded;
+            _changes.ItemRemoved += OnItemRemoved;
 
             var pathsToWatch = new List<string>();
 
@@ -156,7 +160,7 @@ namespace Tesserafin.Server.Core.IO
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="e">The <see cref="ItemChangeEventArgs"/> instance containing the event data.</param>
-        private void OnLibraryManagerItemRemoved(object? sender, ItemChangeEventArgs e)
+        private void OnItemRemoved(object? sender, ItemChangeEventArgs e)
         {
             if (e.Parent is AggregateFolder)
             {
@@ -169,7 +173,7 @@ namespace Tesserafin.Server.Core.IO
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="e">The <see cref="ItemChangeEventArgs"/> instance containing the event data.</param>
-        private void OnLibraryManagerItemAdded(object? sender, ItemChangeEventArgs e)
+        private void OnItemAdded(object? sender, ItemChangeEventArgs e)
         {
             if (e.Parent is AggregateFolder)
             {
@@ -445,8 +449,8 @@ namespace Tesserafin.Server.Core.IO
         /// </summary>
         public void Stop()
         {
-            _libraryManager.ItemAdded -= OnLibraryManagerItemAdded;
-            _libraryManager.ItemRemoved -= OnLibraryManagerItemRemoved;
+            _changes.ItemAdded -= OnItemAdded;
+            _changes.ItemRemoved -= OnItemRemoved;
 
             foreach (var watcher in _fileSystemWatchers.Values.ToList())
             {

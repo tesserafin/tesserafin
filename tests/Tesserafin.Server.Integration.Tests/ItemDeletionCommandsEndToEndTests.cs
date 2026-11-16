@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -89,6 +90,76 @@ public sealed class ItemDeletionCommandsEndToEndTests(TesserafinApplicationFacto
         }
 
         await AssertDetachedHistoryAsync(key, userId);
+    }
+
+    [Fact]
+    public async Task ItemChanges_AreSharedAndFollowCatalogueAndCachePublication()
+    {
+        using var client = await ClientAsync();
+        var changes = factory.Services.GetRequiredService<IItemChangeEvents>();
+        Assert.Same(changes, factory.Services.GetRequiredService<IItemChangePublisher>());
+        var library = factory.Services.GetRequiredService<ILibraryManager>();
+        var store = factory.Services.GetRequiredService<IItemStore>();
+        var deletions = factory.Services.GetRequiredService<IItemDeletionCommands>();
+        var lookup = factory.Services.GetRequiredService<IItemLookupService>();
+        var databases = factory.Services.GetRequiredService<IDbContextFactory<TesserafinDbContext>>();
+        var stored = new UserView { Id = Guid.NewGuid(), Name = "event-store" };
+        var general = new UserView { Id = Guid.NewGuid(), Name = "event-general" };
+        var observations = new List<(Guid Id, string Kind, bool InDatabase, bool InCache, ItemUpdateType Reason)>();
+        EventHandler<ItemChangeEventArgs> broken = (_, args) =>
+        {
+            if (args.Item.Id.Equals(stored.Id) || args.Item.Id.Equals(general.Id))
+            {
+                throw new InvalidOperationException("observer failure must not affect writes or other observers");
+            }
+        };
+        changes.ItemAdded += broken;
+        changes.ItemUpdated += broken;
+        changes.ItemRemoved += broken;
+        changes.ItemAdded += Added;
+        changes.ItemUpdated += Updated;
+        changes.ItemRemoved += Removed;
+        try
+        {
+            store.CreateItem(stored, null);
+            library.CreateItem(general, null);
+            general.Name = "event-updated";
+            await library.UpdateItemAsync(general, library.RootFolder, ItemUpdateType.MetadataEdit, TestContext.Current.CancellationToken);
+            await deletions.DeleteAsync(general, new DeleteOptions { DeleteFileLocation = false }, TestContext.Current.CancellationToken);
+            await deletions.DeleteAsync(stored, new DeleteOptions { DeleteFileLocation = false }, TestContext.Current.CancellationToken);
+
+            Assert.Equal(
+                new[]
+                {
+                    (stored.Id, "added", true, true, default(ItemUpdateType)),
+                    (general.Id, "added", true, true, default(ItemUpdateType)),
+                    (general.Id, "updated", true, true, ItemUpdateType.MetadataEdit),
+                    (general.Id, "removed", false, false, default(ItemUpdateType)),
+                    (stored.Id, "removed", false, false, default(ItemUpdateType))
+                },
+                observations);
+        }
+        finally
+        {
+            changes.ItemAdded -= broken;
+            changes.ItemUpdated -= broken;
+            changes.ItemRemoved -= broken;
+            changes.ItemAdded -= Added;
+            changes.ItemUpdated -= Updated;
+            changes.ItemRemoved -= Removed;
+        }
+
+        void Added(object? sender, ItemChangeEventArgs args) => Observe("added", args);
+        void Updated(object? sender, ItemChangeEventArgs args) => Observe("updated", args);
+        void Removed(object? sender, ItemChangeEventArgs args) => Observe("removed", args);
+        void Observe(string kind, ItemChangeEventArgs args)
+        {
+            if (args.Item.Id.Equals(stored.Id) || args.Item.Id.Equals(general.Id))
+            {
+                using var database = databases.CreateDbContext();
+                observations.Add((args.Item.Id, kind, database.BaseItems.Any(row => row.Id.Equals(args.Item.Id)), ReferenceEquals(args.Item, lookup.GetItemById(args.Item.Id)), args.UpdateReason));
+            }
+        }
     }
 
     private async Task<HttpClient> ClientAsync()

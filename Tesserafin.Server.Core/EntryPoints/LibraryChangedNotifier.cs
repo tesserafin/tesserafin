@@ -29,6 +29,7 @@ namespace Tesserafin.Server.Core.EntryPoints;
 public sealed class LibraryChangedNotifier : IHostedService, IDisposable
 {
     private readonly ILibraryManager _libraryManager;
+    private readonly IItemChangeEvents _changes;
     private readonly IServerConfigurationManager _configurationManager;
     private readonly IProviderManager _providerManager;
     private readonly ISessionManager _sessionManager;
@@ -50,6 +51,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     /// Initializes a new instance of the <see cref="LibraryChangedNotifier"/> class.
     /// </summary>
     /// <param name="libraryManager">The <see cref="ILibraryManager"/>.</param>
+    /// <param name="changes">The completed item change feed.</param>
     /// <param name="configurationManager">The <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="sessionManager">The <see cref="ISessionManager"/>.</param>
     /// <param name="userManager">The <see cref="IUserManager"/>.</param>
@@ -58,6 +60,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     /// <param name="itemSortService">The <see cref="IItemSortService"/>.</param>
     public LibraryChangedNotifier(
         ILibraryManager libraryManager,
+        IItemChangeEvents changes,
         IServerConfigurationManager configurationManager,
         ISessionManager sessionManager,
         IUserManager userManager,
@@ -66,6 +69,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         IItemSortService itemSortService)
     {
         _libraryManager = libraryManager;
+        _changes = changes;
         _configurationManager = configurationManager;
         _sessionManager = sessionManager;
         _userManager = userManager;
@@ -77,9 +81,9 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     /// <inheritdoc />
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _libraryManager.ItemAdded += OnLibraryItemAdded;
-        _libraryManager.ItemUpdated += OnLibraryItemUpdated;
-        _libraryManager.ItemRemoved += OnLibraryItemRemoved;
+        _changes.ItemAdded += OnLibraryItemAdded;
+        _changes.ItemUpdated += OnLibraryItemUpdated;
+        _changes.ItemRemoved += OnLibraryItemRemoved;
 
         _providerManager.RefreshCompleted += OnProviderRefreshCompleted;
         _providerManager.RefreshStarted += OnProviderRefreshStarted;
@@ -91,9 +95,9 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     /// <inheritdoc />
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _libraryManager.ItemAdded -= OnLibraryItemAdded;
-        _libraryManager.ItemUpdated -= OnLibraryItemUpdated;
-        _libraryManager.ItemRemoved -= OnLibraryItemRemoved;
+        _changes.ItemAdded -= OnLibraryItemAdded;
+        _changes.ItemUpdated -= OnLibraryItemUpdated;
+        _changes.ItemRemoved -= OnLibraryItemRemoved;
 
         _providerManager.RefreshCompleted -= OnProviderRefreshCompleted;
         _providerManager.RefreshStarted -= OnProviderRefreshStarted;

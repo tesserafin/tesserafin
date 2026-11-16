@@ -30,6 +30,8 @@ public sealed class ItemDeletionCommandsTests
     {
         using var context = new Context();
         var item = context.Video();
+        var notifications = 0;
+        context.Changes.ItemRemoved += (_, _) => notifications++;
         var alternate = context.Video();
         alternate.SetPrimaryVersionId(item.Id);
         context.Library.Setup(l => l.GetLocalAlternateVersionIds(item)).Returns([alternate.Id]);
@@ -42,6 +44,7 @@ public sealed class ItemDeletionCommandsTests
         Assert.Equal(parent.Id, item.ParentId);
         Assert.Equal(item.Id, alternate.PrimaryVersionId);
         Assert.False(alternate.Saved);
+        Assert.Equal(0, notifications);
         context.Persistence.Verify(p => p.DeleteItem(It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
         Assert.Empty(context.Cache.Removed);
         context.Library.Verify(l => l.RerouteLinkedChildReferencesAsync(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
@@ -51,6 +54,7 @@ public sealed class ItemDeletionCommandsTests
         Assert.True(File.Exists(alternate.Path));
         Assert.Null(alternate.PrimaryVersionId);
         Assert.True(alternate.Saved);
+        Assert.Equal(1, notifications);
         context.Library.Verify(l => l.RerouteLinkedChildReferencesAsync(item.Id, alternate.Id), Times.Once);
         context.Persistence.Verify(p => p.DeleteItem(It.Is<IReadOnlyList<Guid>>(ids => ids.Contains(item.Id))), Times.Once);
     }
@@ -66,6 +70,14 @@ public sealed class ItemDeletionCommandsTests
         var persisted = false;
         context.Persistence.Setup(p => p.DeleteItem(It.IsAny<IReadOnlyList<Guid>>())).Callback(() => persisted = true);
         context.Cache.OnMutation = () => Assert.True(persisted);
+        var notifications = 0;
+        context.Changes.ItemRemoved += (_, _) =>
+        {
+            if (persisted && context.Cache.Removed.Contains(item.Id))
+            {
+                notifications++;
+            }
+        };
         if (bulk)
         {
             await context.Commands.DeleteUnreferencedAsync([item], false, TestContext.Current.CancellationToken);
@@ -76,6 +88,7 @@ public sealed class ItemDeletionCommandsTests
         }
 
         Assert.True(persisted);
+        Assert.Equal(bulk ? 0 : 1, notifications);
         Assert.Equal(original, await File.ReadAllBytesAsync(item.Path, TestContext.Current.CancellationToken));
         context.Files.Verify(f => f.DeleteFile(It.IsAny<string>()), Times.Never);
     }
@@ -209,6 +222,7 @@ public sealed class ItemDeletionCommandsTests
         public Context()
         {
             var fixture = new Fixture().Customize(new AutoMoqCustomization());
+            fixture.Register<IItemChangePublisher>(() => Changes);
             Configuration = fixture.Freeze<Mock<IServerConfigurationManager>>();
             Library = fixture.Freeze<Mock<ILibraryManager>>();
             Items = fixture.Freeze<Mock<IItemLookupService>>();
@@ -226,6 +240,8 @@ public sealed class ItemDeletionCommandsTests
             fixture.Inject<Microsoft.Extensions.Logging.ILogger<ItemDeletionCommands>>(Microsoft.Extensions.Logging.Abstractions.NullLogger<ItemDeletionCommands>.Instance);
             Commands = fixture.Create<ItemDeletionCommands>();
         }
+
+        public ItemChangeEvents Changes { get; } = new(Microsoft.Extensions.Logging.Abstractions.NullLogger<ItemChangeEvents>.Instance);
 
         public Mock<IServerConfigurationManager> Configuration { get; }
 

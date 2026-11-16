@@ -110,7 +110,7 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
             fixture.Create<Mock<IItemPersistenceService>>().Object,
             _itemLookupService,
             _configurationManagerMock.Object,
-            NullLogger<Tesserafin.Server.Core.Library.ItemStore>.Instance);
+            Mock.Of<IItemChangePublisher>());
         fixture.Register(() => _itemStore);
         fixture.Register<IItemStore>(() => _itemStore);
 

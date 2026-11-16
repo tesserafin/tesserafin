@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
@@ -369,7 +368,7 @@ public sealed class UserViewCatalogParityTests
                 persistenceServiceMock.Object,
                 itemLookupService,
                 ConfigMock.Object,
-                NullLogger<Tesserafin.Server.Core.Library.ItemStore>.Instance);
+                Mock.Of<IItemChangePublisher>());
 
             var fileSystemMock = new Mock<IFileSystem>();
             fileSystemMock.Setup(f => f.GetValidFilename(It.IsAny<string>())).Returns<string>(s => s);

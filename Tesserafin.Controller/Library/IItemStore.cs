@@ -24,18 +24,6 @@ namespace Tesserafin.Controller.Library
     public interface IItemStore
     {
         /// <summary>
-        /// Occurs when an item has been both persisted and registered in the item cache by
-        /// <see cref="CreateItem"/>, restricted to <see cref="SourceType.Library"/> items - the same
-        /// filter <c>LibraryManager.CreateItems</c> applies before raising its historical
-        /// <c>ItemAdded</c> event. <c>LibraryManager</c> subscribes to this event and relays it as
-        /// <c>ItemAdded</c> (RFC §2, decided contract): a given creation raises exactly one
-        /// <c>ItemAdded</c> notification, either via this relay (creation through
-        /// <see cref="CreateItem"/>) or via the historical <c>LibraryManager.CreateItems</c> path
-        /// (which does not go through this port), never both.
-        /// </summary>
-        event EventHandler<ItemChangeEventArgs>? ItemSaved;
-
-        /// <summary>
         /// Computes the deterministic id for an item from its resolve key and type. Pure function of
         /// the server configuration (program-data path normalization, case sensitivity) and an MD5
         /// hash of <paramref name="type"/>'s full name plus the (possibly normalized) key - mirrors
@@ -58,7 +46,7 @@ namespace Tesserafin.Controller.Library
         /// <param name="item">The item to create.</param>
         /// <param name="parent">
         /// The parent, if any. At the real call sites (<c>GetNamedView</c>/<c>GetShadowView</c>) this
-        /// is always <c>null</c>; <see cref="ItemSaved"/> is raised with this exact value as
+        /// is always <c>null</c>; the shared change publisher uses this exact value as
         /// <see cref="ItemChangeEventArgs.Parent"/> (no id-based parent lookup fallback - this port
         /// has no item-lookup dependency).
         /// </param>

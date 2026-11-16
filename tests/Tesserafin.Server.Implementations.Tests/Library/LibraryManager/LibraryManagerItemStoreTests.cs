@@ -20,19 +20,7 @@ using Xunit;
 namespace Tesserafin.Server.Implementations.Tests.Library.LibraryManager;
 
 /// <summary>
-/// Cross-checks between <see cref="Tesserafin.Server.Core.Library.ItemStore"/> (PR106a) and the real
-/// <see cref="Tesserafin.Server.Core.Library.LibraryManager"/> it is injected into: parity of
-/// <c>GetNewItemId</c> and the save-then-register subset of <c>CreateItem</c>, and the
-/// exactly-once <c>ItemAdded</c> contract (RFC <c>docs/rfc-di-query-user-views-v2.md</c> §2,
-/// decided in PR105b) between the new <c>ItemStore.ItemSaved</c> relay and the historical
-/// <c>LibraryManager.CreateItems</c> path. Fixture setup mirrors
-/// <see cref="LibraryManagerItemLookupTests"/>: a single, shared, real
-/// <see cref="Tesserafin.Server.Core.Library.ItemLookupService"/> instance backs both
-/// <see cref="IItemLookupService"/> and the internal <see cref="Tesserafin.Server.Core.Library.IItemCacheStore"/>
-/// port, and a single, shared, real <see cref="Tesserafin.Server.Core.Library.ItemStore"/> instance
-/// (built from that same cache plus the frozen persistence/configuration mocks) is registered for
-/// both the concrete type and <see cref="IItemStore"/>, exactly like the double/triple-singleton
-/// wiring in <c>ApplicationHost</c>.
+/// Shared cache, identity and notification contracts for user-view and general item creation.
 /// </summary>
 [Collection(LibraryManagerStaticStateFixture.Name)]
 public class LibraryManagerItemStoreTests
@@ -40,6 +28,7 @@ public class LibraryManagerItemStoreTests
     private readonly Tesserafin.Server.Core.Library.LibraryManager _libraryManager;
     private readonly Tesserafin.Server.Core.Library.ItemLookupService _itemLookupService;
     private readonly Tesserafin.Server.Core.Library.ItemStore _itemStore;
+    private readonly Tesserafin.Server.Core.Library.ItemChangeEvents _changes = new(NullLogger<Tesserafin.Server.Core.Library.ItemChangeEvents>.Instance);
     private readonly Mock<IItemRepository> _itemRepositoryMock;
     private readonly Mock<IItemPersistenceService> _persistenceServiceMock;
     private readonly Mock<IServerConfigurationManager> _configurationManagerMock;
@@ -81,7 +70,8 @@ public class LibraryManagerItemStoreTests
             _persistenceServiceMock.Object,
             _itemLookupService,
             _configurationManagerMock.Object,
-            NullLogger<Tesserafin.Server.Core.Library.ItemStore>.Instance);
+            _changes);
+        fixture.Register<IItemChangePublisher>(() => _changes);
         fixture.Register(() => _itemStore);
         fixture.Register<IItemStore>(() => _itemStore);
 
@@ -135,12 +125,12 @@ public class LibraryManagerItemStoreTests
     // ---------------------------------------------------------------
 
     [Fact]
-    public void CreateItem_ViaItemStore_RaisesExactlyOneItemAddedOnLibraryManager()
+    public void CreateItem_ViaItemStore_PublishesExactlyOneItemAdded()
     {
         var item = new UserView { Id = Guid.NewGuid(), Name = "Movies" };
         var raisedCount = 0;
         ItemChangeEventArgs? raisedArgs = null;
-        _libraryManager.ItemAdded += (_, args) =>
+        _changes.ItemAdded += (_, args) =>
         {
             raisedCount++;
             raisedArgs = args;
@@ -154,51 +144,47 @@ public class LibraryManagerItemStoreTests
     }
 
     [Fact]
-    public void CreateItems_ViaLibraryManagerHistoricalPath_RaisesExactlyOneItemAdded_NotTwo()
+    public void CreateItems_ViaLibraryManager_RaisesExactlyOneItemAdded_NotTwo()
     {
-        // LibraryManager.CreateItems does not go through IItemStore at all - it must keep raising
-        // ItemAdded directly, exactly once, with no doubling via the new ItemStore.ItemSaved relay
-        // (which is only ever triggered by ItemStore.CreateItem, never by LibraryManager.CreateItems).
+        // The two creation owners publish to one feed without a relay between them.
         var item = new UserView { Id = Guid.NewGuid(), Name = "Movies" };
         var raisedCount = 0;
-        _libraryManager.ItemAdded += (_, _) => raisedCount++;
+        _changes.ItemAdded += (_, _) => raisedCount++;
 
         _libraryManager.CreateItems(new List<BaseItem> { item }, null, CancellationToken.None);
 
         Assert.Equal(1, raisedCount);
     }
 
-    // ---------------------------------------------------------------
-    // DI wiring identity (RFC I1, §9/PR106a): the singleton LibraryManager is subscribed to must be
-    // the exact instance the container hands out under IItemStore, not merely "an" IItemStore.
-    // ---------------------------------------------------------------
+    [Fact]
+    public void CreateItems_ParentLookupFailure_DoesNotFailAnAlreadyPublishedItem()
+    {
+        var item = new UserView { Id = Guid.NewGuid(), ParentId = Guid.NewGuid(), Name = "Movies" };
+        _itemRepositoryMock.Setup(r => r.RetrieveItem(item.ParentId)).Throws(new InvalidOperationException("parent lookup unavailable"));
+        var notifications = 0;
+        _changes.ItemAdded += (_, _) => notifications++;
+
+        _libraryManager.CreateItems([item], null, CancellationToken.None);
+
+        Assert.Same(item, _libraryManager.GetItemById(item.Id));
+        _persistenceServiceMock.Verify(p => p.SaveItems(It.IsAny<IReadOnlyList<BaseItem>>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(0, notifications);
+    }
 
     [Fact]
-    public void DiWiring_LibraryManagerOnlyRelaysFromInjectedItemStoreSingleton_NotFromADifferentInstance()
+    public void IndependentItemStore_PublishesWithoutLibraryManagerRelay()
     {
-        // A second, independently-constructed ItemStore (same dependencies, different object
-        // identity) must NOT be able to trigger LibraryManager.ItemAdded - proves the subscription
-        // set up in LibraryManager's constructor is bound to the exact singleton instance injected
-        // (fixture-registered above as both the concrete type and IItemStore), matching the
-        // single-instance ApplicationHost wiring rather than "any IItemStore".
         var otherItemStore = new Tesserafin.Server.Core.Library.ItemStore(
             _persistenceServiceMock.Object,
             _itemLookupService,
             _configurationManagerMock.Object,
-            NullLogger<Tesserafin.Server.Core.Library.ItemStore>.Instance);
+            _changes);
+        var count = 0;
+        _changes.ItemAdded += (_, _) => count++;
 
-        var raised = false;
-        _libraryManager.ItemAdded += (_, _) => raised = true;
+        otherItemStore.CreateItem(new UserView { Id = Guid.NewGuid(), Name = "Movies" }, null);
+        _itemStore.CreateItem(new UserView { Id = Guid.NewGuid(), Name = "TV Shows" }, null);
 
-        var item = new UserView { Id = Guid.NewGuid(), Name = "Movies" };
-        otherItemStore.CreateItem(item, null);
-
-        Assert.False(raised);
-
-        // Sanity check: the injected singleton still works as expected.
-        var itemViaInjectedSingleton = new UserView { Id = Guid.NewGuid(), Name = "TV Shows" };
-        _itemStore.CreateItem(itemViaInjectedSingleton, null);
-
-        Assert.True(raised);
+        Assert.Equal(2, count);
     }
 }

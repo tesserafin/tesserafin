@@ -785,8 +785,8 @@ The singleton command owner serializes destructive operations. Controllers, main
 providers, Live TV and migrations await it; entity refresh/validation methods pass it explicitly
 through recursive calls. No synchronous adapter or new entity static service is introduced.
 `LibraryManager` loses deletion helpers, IPathManager and lazy external-data dependencies
-(33 → 31 constructor parameters). Its existing removal-event publisher stays available to the
-command owner, alongside alternate queries and metadata/linked-reference writes.
+(33 → 31 constructor parameters). Its removal-event publisher was subsequently removed in §26. Alternate queries and
+metadata/linked-reference writes remain dependencies of the command owner.
 
 The required source path is removed before metadata, alternate promotion or catalogue/cache
 changes; a required-file failure leaves those untouched. Optional metadata cleanup retains the
@@ -828,8 +828,8 @@ refuse admission but, once replacement begins, the database completes before cac
 A failed SQL write leaves the original image rows, published objects and cache unchanged.
 A missing item is rejected and evicted rather than reinserted. No whole-item save, metadata
 provider invocation, recursive image processing or DateLastSaved update is performed by this owner.
-The existing manager event is relayed after publication; surrounding full-item metadata saves
-suppress the extra image notification. Live TV programs keep their notification filter.
+The committed change is published after cache publication through the shared port (§26);
+surrounding full-item metadata saves suppress the extra image notification. Live TV programs keep their notification filter.
 
 Per-item admission spans preparation through commit/disposal. Disposing the handle drains a running commit
 before releasing admission and removes uncommitted temporary/final files. A changed image
@@ -843,3 +843,31 @@ the manager; ProviderManager's existing item-refresh entry point prepares and co
 ImageController, Live TV precaching and recording-image copying likewise commit explicit results.
 HTTP routes, response shapes, OpenAPI and SDK remain unchanged. The six image integration method
 names are required by CI, including both rows of the permanent-rejection theory.
+
+
+## 26. Item change notification ownership
+
+`IItemChangeEvents` and `IItemChangePublisher` share one `ItemChangeEvents` singleton.
+The feed is subscription-only; writers receive only the publication port. The owner depends on
+logging alone, never on item stores, resolvers, metadata providers or `LibraryManager`.
+`ItemStore`, general manager creation/update, committed image changes and reconciled deletion
+publish directly to it. The manager constructor no longer installs notification relays or retains
+an `IItemStore`. Its three events and `ReportItemRemoved` are deleted, as are `ItemSaved` and
+`ImagesChanged` on their former owners/interfaces. No compatibility forwarding surface remains.
+
+Monitor and client-notifier lifecycle subscriptions use the common feed. Producer filtering,
+parent/reason information and the persistence → cache → notification order are retained.
+Failure to save/register does not publish a creation; deletion does not publish before cache
+invalidation; bulk unreferenced deletion retains its no-event policy. Full-item image preparation
+still suppresses an extra notification. One observer throwing is logged independently, so it
+cannot prevent later observers from receiving a completed write or make that write appear failed.
+Delivery is synchronous with the invocation-list snapshot captured for that publication.
+A failed late parent lookup is still logged and suppresses that notification without failing
+an already persisted creation or image update.
+
+This is a process-local best-effort feed, not a durable outbox or background delivery queue.
+It references live entities, does not serialize concurrent writers or replay past events, and
+still requires observers to subscribe before the changes they need. `LibraryManager` remains
+29 constructor parameters but shrinks by removing notification orchestration; general write and
+alternate-version planning extraction is the next dependency boundary. HTTP/OpenAPI and SDK
+shapes are unchanged; the old .NET event contracts are intentionally removed.

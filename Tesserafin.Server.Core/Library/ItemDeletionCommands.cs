@@ -27,6 +27,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
 {
     private readonly AsyncNonKeyedLocker _slot = new(1);
     private readonly ILibraryManager _library;
+    private readonly IItemChangePublisher _changes;
     private readonly IItemLookupService _items;
     private readonly IItemPersistenceService _persistenceService;
     private readonly IItemCacheStore _itemCacheStore;
@@ -41,6 +42,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
 
     public ItemDeletionCommands(
         ILibraryManager library,
+        IItemChangePublisher changes,
         IItemLookupService items,
         IItemPersistenceService persistenceService,
         IItemCacheStore itemCacheStore,
@@ -54,6 +56,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         ILogger<ItemDeletionCommands> logger)
     {
         _library = library;
+        _changes = changes;
         _items = items;
         _persistenceService = persistenceService;
         _itemCacheStore = itemCacheStore;
@@ -371,7 +374,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
             folder.UserData = null;
         }
 
-        _library.ReportItemRemoved(item, parent!);
+        _changes.Removed(item, parent);
     }
 
     private void DeleteItemPath(BaseItem item, bool isRequiredForDelete, FileSystemMetadata fileSystemInfo)

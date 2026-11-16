@@ -45,7 +45,7 @@ public sealed class ItemImageServiceTests
             Assert.True(saved);
             Assert.Equal(20, value.ImageInfos[0].Width);
         };
-        context.Service.ImagesChanged += (_, _) => notified++;
+        context.Changes.ItemUpdated += (_, _) => notified++;
         await using var update = await context.Service.PrepareRefreshAsync(item, false, true, TestContext.Current.CancellationToken);
         Assert.Same(original, item.ImageInfos);
         Assert.Equal(0, original[0].Width);
@@ -57,6 +57,24 @@ public sealed class ItemImageServiceTests
         Assert.Equal(1, context.Cache.Registered);
         Assert.Equal(1, notified);
         Assert.True(File.Exists(context.Media));
+    }
+
+    [Fact]
+    public async Task Commit_ParentLookupFailure_DoesNotFailCommittedImages()
+    {
+        using var context = new Context();
+        var item = context.LocalItem();
+        await using var update = await context.Service.PrepareRefreshAsync(item, false, true, TestContext.Current.CancellationToken);
+        item.ParentId = Guid.NewGuid();
+        context.Lookup.Setup(l => l.GetItemById(item.ParentId)).Throws(new InvalidOperationException("parent lookup unavailable"));
+        var notifications = 0;
+        context.Changes.ItemUpdated += (_, _) => notifications++;
+
+        await update.CommitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(20, item.ImageInfos[0].Width);
+        Assert.Equal(1, context.Cache.Registered);
+        Assert.Equal(0, notifications);
     }
 
     [Fact]
@@ -319,7 +337,7 @@ public sealed class ItemImageServiceTests
             Processor.Setup(p => p.GetImageBlurHash(It.IsAny<string>(), It.IsAny<ImageDimensions>())).Returns("blur");
             Persistence.Setup(p => p.SaveImagesAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<ItemImageInfo>>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
             SetDownload();
-            Service = new ItemImageService(Processor.Object, Remote.Object, configuration.Object, files.Object, Mock.Of<IItemLookupService>(), new ActiveRecordings(), Persistence.Object, Cache, NullLogger<ItemImageService>.Instance);
+            Service = new ItemImageService(Processor.Object, Remote.Object, configuration.Object, files.Object, Lookup.Object, new ActiveRecordings(), Persistence.Object, Cache, NullLogger<ItemImageService>.Instance, Changes);
         }
 
         public string Root { get; } = Directory.CreateTempSubdirectory("image-unit-").FullName;
@@ -328,6 +346,8 @@ public sealed class ItemImageServiceTests
 
         public string Media { get; }
 
+        public Mock<IItemLookupService> Lookup { get; } = new();
+
         public Mock<IImageProcessor> Processor { get; } = new();
 
         public Mock<IRemoteImageSource> Remote { get; } = new();
@@ -335,6 +355,8 @@ public sealed class ItemImageServiceTests
         public Mock<IItemPersistenceService> Persistence { get; } = new();
 
         public RecordingCache Cache { get; } = new();
+
+        public ItemChangeEvents Changes { get; } = new(NullLogger<ItemChangeEvents>.Instance);
 
         public ItemImageService Service { get; }
 

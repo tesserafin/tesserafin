@@ -1,7 +1,5 @@
 #pragma warning disable CS1591
 
-using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Tesserafin.Controller.Entities;
@@ -11,9 +9,6 @@ namespace Tesserafin.Controller.Library;
 /// <summary>Prepares detached image changes; callers explicitly commit or discard each update.</summary>
 public interface IItemImageService
 {
-    /// <summary>Raised after a changed image snapshot is saved and published.</summary>
-    event EventHandler<ItemChangeEventArgs>? ImagesChanged;
-
     /// <summary>Prepares image localization, validation, dimensions and BlurHash.</summary>
     /// <param name="item">The item whose published image snapshot is captured after admission.</param>
     /// <param name="forceUpdate">Whether to reread current local image properties.</param>

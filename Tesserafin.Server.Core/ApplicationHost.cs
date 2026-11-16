@@ -579,6 +579,9 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemLookupService>(sp => sp.GetRequiredService<ItemLookupService>());
             serviceCollection.AddSingleton<IItemCacheStore>(sp => sp.GetRequiredService<ItemLookupService>());
             serviceCollection.AddSingleton<IItemAccessService, ItemAccessService>();
+            serviceCollection.AddSingleton<ItemChangeEvents>();
+            serviceCollection.AddSingleton<IItemChangeEvents>(s => s.GetRequiredService<ItemChangeEvents>());
+            serviceCollection.AddSingleton<IItemChangePublisher>(s => s.GetRequiredService<ItemChangeEvents>());
             serviceCollection.AddSingleton<IItemStore, ItemStore>();
             serviceCollection.AddSingleton<IUserViewFactory, UserViewFactory>();
             serviceCollection.AddSingleton<IUserRootFolderProvider, UserRootFolderProvider>();

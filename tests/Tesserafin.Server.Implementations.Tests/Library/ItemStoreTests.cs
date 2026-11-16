@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.Configuration;
@@ -25,9 +24,8 @@ namespace Tesserafin.Server.Implementations.Tests.Library;
 /// which this repo does not do - a plain implementing class works fine instead, since
 /// <c>InternalsVisibleTo("Tesserafin.Server.Implementations.Tests")</c> already lets this project
 /// implement the interface directly), and a mocked <see cref="IServerConfigurationManager"/>.
-/// Cross-checks against the real <c>LibraryManager</c> (parity, exactly-once <c>ItemAdded</c> relay)
-/// live in <c>LibraryManager/LibraryManagerItemStoreTests.cs</c>, since those need a real
-/// <c>LibraryManager</c> instance wired to this same <see cref="ItemStore"/>.
+/// Cross-checks against the real <c>LibraryManager</c> (parity, shared <c>ItemAdded</c> publication)
+/// live in <c>LibraryManager/LibraryManagerItemStoreTests.cs</c>, since those need both producers using the same notification owner.
 /// </summary>
 public class ItemStoreTests
 {
@@ -35,6 +33,7 @@ public class ItemStoreTests
     private readonly FakeItemCacheStore _itemCacheStore;
     private readonly Mock<IServerConfigurationManager> _configurationManagerMock;
     private readonly ItemStore _itemStore;
+    private readonly ItemChangeEvents _changes = new(NullLogger<ItemChangeEvents>.Instance);
 
     public ItemStoreTests()
     {
@@ -49,7 +48,7 @@ public class ItemStoreTests
             _persistenceServiceMock.Object,
             _itemCacheStore,
             _configurationManagerMock.Object,
-            NullLogger<ItemStore>.Instance);
+            _changes);
     }
 
     // ---------------------------------------------------------------
@@ -147,6 +146,8 @@ public class ItemStoreTests
     public void CreateItem_SaveItemsThrows_NothingRegisteredAndExceptionPropagates()
     {
         var item = new UserView { Id = Guid.NewGuid(), Name = "Movies" };
+        var notifications = 0;
+        _changes.ItemAdded += (_, _) => notifications++;
         var saveException = new InvalidOperationException("save failed");
         _persistenceServiceMock
             .Setup(p => p.SaveItems(It.IsAny<IReadOnlyList<BaseItem>>(), It.IsAny<CancellationToken>()))
@@ -155,6 +156,7 @@ public class ItemStoreTests
         var thrown = Assert.Throws<InvalidOperationException>(() => _itemStore.CreateItem(item, null));
 
         Assert.Same(saveException, thrown);
+        Assert.Equal(0, notifications);
         Assert.Empty(_itemCacheStore.Registered);
     }
 
@@ -166,29 +168,32 @@ public class ItemStoreTests
         // did not throw) but absent from the cache, with the register exception propagating
         // unchanged - exactly LibraryManager.CreateItems' current behavior (no compensating delete).
         var item = new UserView { Id = Guid.NewGuid(), Name = "Movies" };
+        var notifications = 0;
+        _changes.ItemAdded += (_, _) => notifications++;
         var registerException = new InvalidOperationException("register failed");
         _itemCacheStore.ThrowOnRegister = registerException;
 
         var thrown = Assert.Throws<InvalidOperationException>(() => _itemStore.CreateItem(item, null));
 
         Assert.Same(registerException, thrown);
+        Assert.Equal(0, notifications);
         _persistenceServiceMock.Verify(p => p.SaveItems(It.Is<IReadOnlyList<BaseItem>>(items => items.Count == 1 && items[0] == item), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Empty(_itemCacheStore.Registered);
     }
 
     // ---------------------------------------------------------------
-    // ItemSaved - SourceType.Library filter, same as LibraryManager.CreateItems (LibraryManager.cs:2303-2328).
+    // ItemAdded - SourceType.Library filter, same as LibraryManager.CreateItems (LibraryManager.cs:2303-2328).
     // ---------------------------------------------------------------
 
     [Fact]
-    public void CreateItem_LibrarySourceTypeItem_RaisesItemSavedOnce()
+    public void CreateItem_LibrarySourceTypeItem_RaisesItemAddedOnce()
     {
         var item = new UserView { Id = Guid.NewGuid(), Name = "Movies" };
         Assert.Equal(SourceType.Library, item.SourceType);
 
         var raisedCount = 0;
         ItemChangeEventArgs? raisedArgs = null;
-        _itemStore.ItemSaved += (_, args) =>
+        _changes.ItemAdded += (_, args) =>
         {
             raisedCount++;
             raisedArgs = args;
@@ -203,7 +208,7 @@ public class ItemStoreTests
     }
 
     [Fact]
-    public void CreateItem_NonLibrarySourceTypeItem_DoesNotRaiseItemSaved()
+    public void CreateItem_NonLibrarySourceTypeItem_DoesNotRaiseItemAdded()
     {
         // A non-empty ChannelId makes BaseItem.SourceType return Channel rather than Library
         // (BaseItem.cs:269-280) - mirrors the "too much noise" exclusion CreateItems applies for
@@ -214,7 +219,7 @@ public class ItemStoreTests
         Assert.Equal(SourceType.Channel, item.SourceType);
 
         var raised = false;
-        _itemStore.ItemSaved += (_, _) => raised = true;
+        _changes.ItemAdded += (_, _) => raised = true;
 
         _itemStore.CreateItem(item, null);
 
@@ -222,7 +227,7 @@ public class ItemStoreTests
     }
 
     [Fact]
-    public void CreateItem_NoItemSavedSubscribers_DoesNotThrow()
+    public void CreateItem_NoItemAddedSubscribers_DoesNotThrow()
     {
         var item = new UserView { Id = Guid.NewGuid(), Name = "Movies" };
 
@@ -232,13 +237,13 @@ public class ItemStoreTests
     }
 
     [Fact]
-    public void CreateItem_ItemSavedHandlerThrows_ExceptionIsSwallowedAndLogged()
+    public void CreateItem_ItemAddedHandlerThrows_ExceptionIsSwallowedAndLogged()
     {
         // Mirrors CreateItems' own try/catch-and-log around each ItemAdded invocation
         // (LibraryManager.cs:2313-2326): a misbehaving subscriber must not prevent CreateItem from
         // returning normally, nor mask that save+register already succeeded.
         var item = new UserView { Id = Guid.NewGuid(), Name = "Movies" };
-        _itemStore.ItemSaved += (_, _) => throw new InvalidOperationException("subscriber exploded");
+        _changes.ItemAdded += (_, _) => throw new InvalidOperationException("subscriber exploded");
 
         var exception = Record.Exception(() => _itemStore.CreateItem(item, null));
 
@@ -281,7 +286,7 @@ public class ItemStoreTests
         services.AddSingleton(_persistenceServiceMock.Object);
         services.AddSingleton<IItemCacheStore>(_itemCacheStore);
         services.AddSingleton(_configurationManagerMock.Object);
-        services.AddSingleton<ILogger<ItemStore>>(NullLogger<ItemStore>.Instance);
+        services.AddSingleton<IItemChangePublisher>(_changes);
         services.AddSingleton<IItemStore, ItemStore>();
 
         using var provider = services.BuildServiceProvider();
@@ -298,7 +303,7 @@ public class ItemStoreTests
         services.AddSingleton(_persistenceServiceMock.Object);
         services.AddSingleton<IItemCacheStore>(_itemCacheStore);
         services.AddSingleton(_configurationManagerMock.Object);
-        services.AddSingleton<ILogger<ItemStore>>(NullLogger<ItemStore>.Instance);
+        services.AddSingleton<IItemChangePublisher>(_changes);
         services.AddSingleton<IItemStore, ItemStore>();
 
         using var provider = services.BuildServiceProvider();

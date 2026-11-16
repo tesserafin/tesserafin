@@ -36,9 +36,9 @@ public sealed class ItemImageProcessingEndToEndTests(ItemImageProcessingEndToEnd
         using var client = await ClientAsync();
         using var source = new Source();
         var item = await SeedAsync(source.Path);
-        var library = factory.Services.GetRequiredService<ILibraryManager>();
+        var changes = factory.Services.GetRequiredService<IItemChangeEvents>();
         var notifications = 0;
-        library.ItemUpdated += Updated;
+        changes.ItemUpdated += Updated;
         try
         {
             using var response = await client.GetAsync($"Items/{item.Id}/Images", TestContext.Current.CancellationToken);
@@ -63,7 +63,7 @@ public sealed class ItemImageProcessingEndToEndTests(ItemImageProcessingEndToEnd
         }
         finally
         {
-            library.ItemUpdated -= Updated;
+            changes.ItemUpdated -= Updated;
         }
 
         void Updated(object? sender, ItemChangeEventArgs args)

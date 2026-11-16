@@ -83,7 +83,7 @@ namespace Tesserafin.Server.Core.Library
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemCacheStore _itemCacheStore;
         private readonly IItemAccessService _itemAccessService;
-        private readonly IItemStore _itemStore;
+        private readonly IItemChangePublisher _changes;
         private readonly IUserViewFactory _userViewFactory;
         private readonly IUserRootFolderProvider _userRootFolderProvider;
         private readonly ICollectionFolderResolver _collectionFolderResolver;
@@ -126,7 +126,7 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="itemLookupService">The item lookup service (read side of the item lookup cache; see PR75/PR76).</param>
         /// <param name="itemCacheStore">The item cache lifecycle port (register/invalidate side of the same cache; see PR76).</param>
         /// <param name="itemAccessService">The item access service (user visibility on top of the item lookup service; see PR77).</param>
-        /// <param name="itemStore">The item store leaf (id generation, save+register; see PR106a). <see cref="LibraryManager"/> subscribes to its <see cref="IItemStore.ItemSaved"/> event and relays it as <see cref="ItemAdded"/> - a leaf dependency, not a cycle: <c>ItemStore</c> never references <see cref="ILibraryManager"/>.</param>
+        /// <param name="changes">Completed item change publication.</param>
         /// <param name="userViewFactory">The user-view factory leaf (named/shadow view creation; see PR106b). <see cref="GetNamedView(User, string, CollectionType?, string)"/> and the other overloads delegate to it - a leaf dependency, not a cycle: <c>UserViewFactory</c> never references <see cref="ILibraryManager"/>.</param>
         /// <param name="userRootFolderProvider">The user root folder provider leaf (construction/cache of the per-server <see cref="UserRootFolder"/>; see PR107). <see cref="GetUserRootFolder"/> and this class's internal callers delegate to it - a leaf dependency, not a cycle: <c>UserRootFolderProvider</c> never references <see cref="ILibraryManager"/>. <see cref="LibraryManager"/> no longer implements <see cref="IUserRootFolderProvider"/> itself (it used to be aliased onto it via a DI factory cast - RFC <c>docs/rfc-di-query-user-views-v2.md</c> §0/§1's "piège n°1").</param>
         /// <param name="collectionFolderResolver">The library membership leaf (<see cref="GetCollectionFolders(BaseItem)"/> and its overload delegate to it; see DEBT-SERVER-2) - a leaf dependency, not a cycle: <c>CollectionFolderResolver</c> never references <see cref="ILibraryManager"/>.</param>
@@ -156,7 +156,7 @@ namespace Tesserafin.Server.Core.Library
             IItemLookupService itemLookupService,
             IItemCacheStore itemCacheStore,
             IItemAccessService itemAccessService,
-            IItemStore itemStore,
+            IItemChangePublisher changes,
             IUserViewFactory userViewFactory,
             IUserRootFolderProvider userRootFolderProvider,
             ICollectionFolderResolver collectionFolderResolver,
@@ -166,17 +166,6 @@ namespace Tesserafin.Server.Core.Library
             _images = images;
             _appHost = appHost;
             _logger = loggerFactory.CreateLogger<LibraryManager>();
-            _images.ImagesChanged += (_, args) =>
-            {
-                try
-                {
-                    ItemUpdated?.Invoke(this, args);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error in image update event handler");
-                }
-            };
             _userManager = userManager;
             _configurationManager = configurationManager;
             _fileSystem = fileSystem;
@@ -195,8 +184,7 @@ namespace Tesserafin.Server.Core.Library
             _itemCacheStore = itemCacheStore;
             _itemAccessService = itemAccessService;
 
-            _itemStore = itemStore;
-            _itemStore.ItemSaved += OnItemStoreItemSaved;
+            _changes = changes;
             _userViewFactory = userViewFactory;
             _userRootFolderProvider = userRootFolderProvider;
             _collectionFolderResolver = collectionFolderResolver;
@@ -209,21 +197,6 @@ namespace Tesserafin.Server.Core.Library
 
             _mediaStreamLanguageService = mediaStreamLanguageService;
         }
-
-        /// <summary>
-        /// Occurs when [item added].
-        /// </summary>
-        public event EventHandler<ItemChangeEventArgs>? ItemAdded;
-
-        /// <summary>
-        /// Occurs when [item updated].
-        /// </summary>
-        public event EventHandler<ItemChangeEventArgs>? ItemUpdated;
-
-        /// <summary>
-        /// Occurs when [item removed].
-        /// </summary>
-        public event EventHandler<ItemChangeEventArgs>? ItemRemoved;
 
         /// <summary>
         /// Gets the root folder.
@@ -278,36 +251,6 @@ namespace Tesserafin.Server.Core.Library
             ArgumentNullException.ThrowIfNull(item);
 
             _itemCacheStore.Register(item);
-        }
-
-        /// <summary>
-        /// Relays <see cref="IItemStore.ItemSaved"/> as the historical <see cref="ItemAdded"/> event
-        /// (RFC <c>docs/rfc-di-query-user-views-v2.md</c> §2, decided contract, PR106a/PR105b).
-        /// <c>ItemStore.CreateItem</c> does not - and must not - raise <see cref="ItemAdded"/> itself,
-        /// since <c>ItemStore</c> is a separate class from <see cref="LibraryManager"/>: this relay is
-        /// the only way legacy subscribers (<c>LibraryMonitor</c>, <c>LibraryChangedNotifier</c>) still
-        /// see notifications for items created through <see cref="IItemStore"/>. This is additive: the
-        /// historical <see cref="CreateItems"/> path below still raises <see cref="ItemAdded"/> directly
-        /// and does not go through <see cref="IItemStore"/> at all, so a given creation raises
-        /// <see cref="ItemAdded"/> exactly once either way, never twice.
-        /// </summary>
-        /// <param name="sender">The <see cref="IItemStore"/> raising the event (unused; re-raised with <c>this</c> as sender, matching <see cref="CreateItems"/>'s own <c>ItemAdded(this, ...)</c> call).</param>
-        /// <param name="e">The event args to relay unchanged.</param>
-        private void OnItemStoreItemSaved(object? sender, ItemChangeEventArgs e)
-        {
-            if (ItemAdded is null)
-            {
-                return;
-            }
-
-            try
-            {
-                ItemAdded(this, e);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in ItemAdded event handler");
-            }
         }
 
         /// <summary>
@@ -1640,29 +1583,18 @@ namespace Tesserafin.Server.Core.Library
                 folder.UserData = null;
             }
 
-            if (ItemAdded is not null)
+            foreach (var item in items)
             {
-                foreach (var item in items)
+                // Exclude live TV guide noise.
+                if (item.SourceType == SourceType.Library)
                 {
-                    // With the live tv guide this just creates too much noise
-                    if (item.SourceType != SourceType.Library)
-                    {
-                        continue;
-                    }
-
                     try
                     {
-                        ItemAdded(
-                            this,
-                            new ItemChangeEventArgs
-                            {
-                                Item = item,
-                                Parent = parent ?? item.GetParent(this)
-                            });
+                        _changes.Added(item, parent ?? item.GetParent(this));
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error in ItemAdded event handler");
+                        _logger.LogError(ex, "Unable to prepare creation notification for item {ItemId}", item.Id);
                     }
                 }
             }
@@ -1735,31 +1667,11 @@ namespace Tesserafin.Server.Core.Library
                 folder.UserData = null;
             }
 
-            if (ItemUpdated is not null)
+            foreach (var item in items)
             {
-                foreach (var item in items)
+                if (item.SourceType == SourceType.Library)
                 {
-                    // With the live tv guide this just creates too much noise
-                    if (item.SourceType != SourceType.Library)
-                    {
-                        continue;
-                    }
-
-                    try
-                    {
-                        ItemUpdated(
-                            this,
-                            new ItemChangeEventArgs
-                            {
-                                Item = item,
-                                Parent = parent,
-                                UpdateReason = updateReason
-                            });
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error in ItemUpdated event handler");
-                    }
+                    _changes.Updated(item, parent, updateReason);
                 }
             }
         }
@@ -1787,32 +1699,6 @@ namespace Tesserafin.Server.Core.Library
                 await using (images.ConfigureAwait(false))
                 {
                     await images.CommitAsync(cancellationToken).ConfigureAwait(false);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Reports the item removed.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        /// <param name="parent">The parent item.</param>
-        public void ReportItemRemoved(BaseItem item, BaseItem? parent)
-        {
-            if (ItemRemoved is not null)
-            {
-                try
-                {
-                    ItemRemoved(
-                        this,
-                        new ItemChangeEventArgs
-                        {
-                            Item = item,
-                            Parent = parent
-                        });
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error in ItemRemoved event handler");
                 }
             }
         }

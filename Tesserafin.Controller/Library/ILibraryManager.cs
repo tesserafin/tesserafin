@@ -29,21 +29,6 @@ namespace Tesserafin.Controller.Library
     /// </summary>
     public interface ILibraryManager
     {
-        /// <summary>
-        /// Occurs when [item added].
-        /// </summary>
-        event EventHandler<ItemChangeEventArgs>? ItemAdded;
-
-        /// <summary>
-        /// Occurs when [item updated].
-        /// </summary>
-        event EventHandler<ItemChangeEventArgs>? ItemUpdated;
-
-        /// <summary>
-        /// Occurs when [item removed].
-        /// </summary>
-        event EventHandler<ItemChangeEventArgs>? ItemRemoved;
-
         /// <summary>Gets the shared application root.</summary>
         AggregateFolder RootFolder { get; }
 
@@ -145,11 +130,6 @@ namespace Tesserafin.Controller.Library
         /// <returns>Task{Year}.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Throws if year is invalid.</exception>
         Year GetYear(int value);
-
-        /// <summary>Publishes removal after catalogue and cache reconciliation.</summary>
-        /// <param name="item">Removed item.</param>
-        /// <param name="parent">Previous parent.</param>
-        void ReportItemRemoved(BaseItem item, BaseItem? parent);
 
         /// <summary>
         /// Validate and refresh the People sub-set of the IBN.

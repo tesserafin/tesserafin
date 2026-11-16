@@ -193,6 +193,19 @@ libraries. Every project has a matching `*.Tests` project in `tests/`.
   Local media/artwork files are never overwritten by localization. Folder traversal receives
   the image port explicitly; item metadata refresh invokes it through the existing provider
   refresh entry point. No image-service static is added to entities.
+- **Item notifications.** One process-local `ItemChangeEvents` singleton implements the
+  subscription-only `IItemChangeEvents` feed and command-side `IItemChangePublisher` port.
+  Creation, committed image updates and reconciled deletions publish directly after persistence
+  and cache publication/invalidation. `LibraryMonitor` and `LibraryChangedNotifier` subscribe to
+  the feed during startup and unsubscribe during shutdown; neither receives events through
+  `LibraryManager`. Its three events, `ReportItemRemoved`, the `ItemStore.ItemSaved` relay and
+  `IItemImageService.ImagesChanged` are removed without forwarding members. The manager also
+  loses its otherwise-unused `IItemStore` dependency (replaced by the publication port).
+  Delivery is synchronous over a subscriber snapshot. Each observer failure is logged separately
+  so it cannot fail an already completed write or suppress later observers. Producers retain
+  guide/channel filtering, reasons and parent resolution. Notifications reference live entities;
+  this is not an immutable snapshot, durable outbox, replay mechanism or ordering guarantee
+  across concurrent producers. General item writes/version preparation remain in the manager.
 - **Resolution.** `LibraryManager.ResolvePath(s)` dispatches to ordered
   `IItemResolver` implementations (`MovieResolver`, `EpisodeResolver`,
   `SeriesResolver`, `AudioResolver`, `PhotoResolver`, …) that turn paths into the

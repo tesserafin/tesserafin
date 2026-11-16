@@ -8,6 +8,12 @@
 - **HEAD au moment de la rédaction** : `c7ed2b36d8` (PR104)
 - **Processus** : à partir de PR106a, chaque PR de cette séquence passe par une vraie branche Git + PR GitHub (le graphe DI central est touché ; revue par objet PR, plus de commit direct sur `master` pour cette tranche)
 
+> État courant (2026-11-16) : le contrat de relais `ItemStore.ItemSaved` →
+> `LibraryManager.ItemAdded` décrit ici est remplacé par la publication directe vers
+> `IItemChangePublisher`, observée via `IItemChangeEvents`. Les anciens événements sont supprimés.
+> Voir [l’inventaire, §26](playback-path-inventory.md#26-item-change-notification-ownership).
+> L’invariant de construction sans dépendance vers les gestionnaires reste applicable.
+
 Aucun code ici. Toutes les références fichier:ligne ci-dessous ont été vérifiées directement dans le code à HEAD, avec confirmation croisée `graphify path` pour chaque arête de la SCC (dans les deux sens).
 
 ---
