@@ -1,6 +1,7 @@
 using System;
 using Moq;
 using Tesserafin.Common;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Chapters;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Dto;
@@ -135,6 +136,7 @@ public class DtoServiceImageInheritanceTests
             appHost.Object,
             mediaSourceManager.Object,
             new Lazy<ILiveTvManager>(() => liveTvManager.Object),
+            new Lazy<IChannelManager>(Mock.Of<IChannelManager>),
             trickplayManager.Object,
             chapterManager.Object,
             itemCountService.Object);

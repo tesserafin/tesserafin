@@ -30,6 +30,7 @@ public class LyricManager : ILyricManager
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly ILibraryItemOptions _libraryOptions;
     private readonly ILogger<LyricManager> _logger;
     private readonly IFileSystem _fileSystem;
     private readonly ILibraryMonitor _libraryMonitor;
@@ -43,6 +44,7 @@ public class LyricManager : ILyricManager
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="libraryOptions">The library options of an item.</param>
     /// <param name="logger">Instance of the <see cref="ILogger{LyricManager}"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
     /// <param name="libraryMonitor">Instance of the <see cref="ILibraryMonitor"/> interface.</param>
@@ -52,6 +54,7 @@ public class LyricManager : ILyricManager
     public LyricManager(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
+        ILibraryItemOptions libraryOptions,
         ILogger<LyricManager> logger,
         IFileSystem fileSystem,
         ILibraryMonitor libraryMonitor,
@@ -61,6 +64,7 @@ public class LyricManager : ILyricManager
     {
         _writes = writes;
         _deletions = deletions;
+        _libraryOptions = libraryOptions;
         _logger = logger;
         _fileSystem = fileSystem;
         _libraryMonitor = libraryMonitor;
@@ -137,7 +141,7 @@ public class LyricManager : ILyricManager
         ArgumentNullException.ThrowIfNull(audio);
         ArgumentException.ThrowIfNullOrWhiteSpace(lyricId);
 
-        var libraryOptions = BaseItem.LibraryManager.GetLibraryOptions(audio);
+        var libraryOptions = _libraryOptions.GetLibraryOptions(audio);
 
         return DownloadLyricsAsync(audio, libraryOptions, lyricId, cancellationToken);
     }
@@ -209,7 +213,7 @@ public class LyricManager : ILyricManager
         ArgumentException.ThrowIfNullOrEmpty(format);
         ArgumentNullException.ThrowIfNull(lyrics);
 
-        var libraryOptions = BaseItem.LibraryManager.GetLibraryOptions(audio);
+        var libraryOptions = _libraryOptions.GetLibraryOptions(audio);
 
         var parsed = await InternalParseRemoteLyricsAsync(format, lyrics, CancellationToken.None).ConfigureAwait(false);
         if (parsed is null)

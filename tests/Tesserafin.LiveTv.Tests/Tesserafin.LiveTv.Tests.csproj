@@ -22,5 +22,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Tesserafin.LiveTv\Tesserafin.LiveTv.csproj" />
+    <ProjectReference Include="..\..\Tesserafin.Server.Core\Tesserafin.Server.Core.csproj" />
+    <ProjectReference Include="..\..\Tesserafin.Server.Implementations\Tesserafin.Server.Implementations.csproj" />
+    <ProjectReference Include="..\..\src\Tesserafin.Database\Tesserafin.Database.Implementations\Tesserafin.Database.Implementations.csproj" />
   </ItemGroup>
 </Project>

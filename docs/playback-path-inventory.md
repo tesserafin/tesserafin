@@ -1134,3 +1134,23 @@ unpersisted and nonvideo candidates, and visibility changes between requests. Un
 ordering with reversed provider completion, request registration snapshots, deferred failures,
 eager resolution and cancellation. No playback byte-serving, episode intro detection, HTTP or
 OpenAPI contract change is included in this slice.
+
+## 31. Entity static access in service consumers (consolidation step 5)
+
+Seven services read entity statics only to dodge DI cycles. They now receive dependencies:
+
+- `LyricManager`, `SubtitleManager`: library options from
+  `ICollectionFolderResolver.GetLibraryOptions`, moved from `LibraryManager` (which delegates).
+  The resolver keeps its leaf rule: no route back to `ILibraryManager`.
+- `DtoService`, `MediaSourceManager`, `TrickplayManager`, `BaseItemManager`: the registered
+  `Lazy<IChannelManager>`, resolved only for channel items. No new deferred registration.
+- `RecordingsManager`: KeepUpTo retention runs an ancestry-scoped catalogue query
+  (`CreateSeriesRecordingsQuery`) through `ILibraryManager`, instead of the obsolete five-argument
+  `Folder.GetItemList` fed by four statics. `Lazy<IItemQueryService>` remains forbidden.
+  Behaviour: every real non-folder item below the series folder, newest first. The former
+  `Series` path matched by series presentation key; ancestry is narrower when two series folders
+  share a key, which suits a per-folder retention rule.
+
+`entityStaticServiceAccessFiles` shrinks from 13 to 6: the entities (`AggregateFolder`,
+`BaseItemExtensions`, `Folder`), `ItemResolveArgs`, `ResolverHelper` (both reached from
+`LibraryManager` scan code) and the `ApplicationHost` assignments. The statics themselves remain.

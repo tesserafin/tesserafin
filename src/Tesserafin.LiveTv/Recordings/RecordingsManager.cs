@@ -693,29 +693,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
                 return;
             }
 
-            // None of these are injectable here: IChannelManager -> IDtoService -> IRecordingsManager
-            // is an existing DI edge (and IUserViewManager itself depends on IChannelManager), so
-            // IRecordingsManager -> any of them would be circular. Fine to fall back to the statics:
-            // librarySeries is a real library Series (SourceType never Channel), so none of the
-            // branches these feed are reachable in this call path.
-            // Documented legitimate caller of the obsolete 5-parameter overload (the same DI cycle
-            // blocks IItemQueryService too, via its IChannelManager/IUserViewManager dependencies)
-            // — see docs/major-rewrite-plan-v13.md § PR28/N.
-#pragma warning disable CS0618
-            var episodesToDelete = librarySeries.GetItemList(
-                    new InternalItemsQuery
-                    {
-                        OrderBy = [(ItemSortBy.DateCreated, SortOrder.Descending)],
-                        IsVirtualItem = false,
-                        IsFolder = false,
-                        Recursive = true,
-                        DtoOptions = new DtoOptions(true)
-                    },
-                    BaseItem.ChannelManager,
-                    Folder.CollectionManager,
-                    Folder.UserViewManager,
-                    UserView.TVSeriesManager)
-#pragma warning restore CS0618
+            var episodesToDelete = _libraryManager.GetItemList(CreateSeriesRecordingsQuery(librarySeries.Id))
                 .Where(i => i.IsFileProtocol && File.Exists(i.Path))
                 .Skip(seriesTimer.KeepUpTo - 1);
 
@@ -738,6 +716,26 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
             }
         }
     }
+
+    /// <summary>
+    /// Builds the retention query for a series folder: every real, non-folder item below it, newest first.
+    /// </summary>
+    /// <remarks>
+    /// A catalogue query scoped by ancestry, so it needs neither the entity's static services nor a
+    /// channel lookup; the series folder is a library folder, never a channel item.
+    /// </remarks>
+    /// <param name="seriesFolderId">The series folder id.</param>
+    /// <returns>The query.</returns>
+    internal static InternalItemsQuery CreateSeriesRecordingsQuery(Guid seriesFolderId)
+        => new()
+        {
+            AncestorIds = [seriesFolderId],
+            OrderBy = [(ItemSortBy.DateCreated, SortOrder.Descending)],
+            IsVirtualItem = false,
+            IsFolder = false,
+            Recursive = true,
+            DtoOptions = new DtoOptions(true)
+        };
 
     private async Task DeleteLibraryItemsForTimers(List<TimerInfo> timers)
     {

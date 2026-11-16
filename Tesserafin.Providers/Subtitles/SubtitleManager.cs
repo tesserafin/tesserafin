@@ -30,6 +30,7 @@ namespace Tesserafin.Providers.Subtitles
     {
         private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
+        private readonly ILibraryItemOptions _libraryOptions;
         private readonly ILogger<SubtitleManager> _logger;
         private readonly IFileSystem _fileSystem;
         private readonly ILibraryMonitor _monitor;
@@ -42,6 +43,7 @@ namespace Tesserafin.Providers.Subtitles
         public SubtitleManager(
             IItemWriteCommands writes,
             IItemDeletionCommands deletions,
+            ILibraryItemOptions libraryOptions,
             ILogger<SubtitleManager> logger,
             IFileSystem fileSystem,
             ILibraryMonitor monitor,
@@ -52,6 +54,7 @@ namespace Tesserafin.Providers.Subtitles
         {
             _writes = writes;
             _deletions = deletions;
+            _libraryOptions = libraryOptions;
             _logger = logger;
             _fileSystem = fileSystem;
             _monitor = monitor;
@@ -142,7 +145,7 @@ namespace Tesserafin.Providers.Subtitles
         /// <inheritdoc />
         public Task DownloadSubtitles(Video video, string subtitleId, CancellationToken cancellationToken)
         {
-            var libraryOptions = BaseItem.LibraryManager.GetLibraryOptions(video);
+            var libraryOptions = _libraryOptions.GetLibraryOptions(video);
 
             return DownloadSubtitles(video, libraryOptions, subtitleId, cancellationToken);
         }
@@ -189,7 +192,7 @@ namespace Tesserafin.Providers.Subtitles
                 throw new ArgumentException($"Unsupported subtitle format: '{format}'");
             }
 
-            var libraryOptions = BaseItem.LibraryManager.GetLibraryOptions(video);
+            var libraryOptions = _libraryOptions.GetLibraryOptions(video);
             return TrySaveSubtitle(video, libraryOptions, response);
         }
 
