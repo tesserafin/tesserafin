@@ -34,7 +34,7 @@ public class PlaylistMetadataService : MetadataService<Playlist, ItemLookupInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public PlaylistMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<PlaylistMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

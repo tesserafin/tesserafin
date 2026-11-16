@@ -3,50 +3,22 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Tesserafin.Common.Extensions;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Drawing;
-using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
-using Tesserafin.Controller.Entities.Audio;
-using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.LiveTv;
-using Tesserafin.Controller.MediaEncoding;
-using Tesserafin.Controller.Persistence;
-using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Resolvers;
-using Tesserafin.Controller.Sorting;
-using Tesserafin.Data;
-using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Extensions;
 using Tesserafin.Model.Configuration;
-using Tesserafin.Model.Drawing;
-using Tesserafin.Model.Dto;
-using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
-using Tesserafin.Model.Library;
-using Tesserafin.Model.Querying;
 using Tesserafin.Naming.Common;
 using Tesserafin.Naming.Video;
 using Tesserafin.Server.Core.Library.Resolvers;
-using Tesserafin.Server.Core.Library.Validators;
-using Episode = Tesserafin.Controller.Entities.TV.Episode;
-using Genre = Tesserafin.Controller.Entities.Genre;
-using Person = Tesserafin.Controller.Entities.Person;
-using VideoResolver = Tesserafin.Naming.Video.VideoResolver;
 
 namespace Tesserafin.Server.Core.Library;
 
@@ -165,9 +137,7 @@ internal sealed class ItemResolutionService(
     /// <inheritdoc />
     public Video? ResolveAlternateVersion(string path, Type expectedVideoType, Folder? parent, CollectionType? collectionType)
     {
-        // Clean up any existing item saved with wrong type (e.g. Video instead of Movie).
-        // This happens when items were previously resolved without proper type context
-        // in mixed-content libraries where collectionType is null.
+        // Identity and concrete type follow the primary, including in mixed-content libraries.
         var expectedId = GetNewItemId(path, expectedVideoType);
         var resolved = ResolvePath(
             _fileSystem.GetFileSystemInfo(path),

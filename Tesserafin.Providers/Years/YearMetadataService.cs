@@ -29,7 +29,7 @@ public class YearMetadataService : MetadataService<Year, ItemLookupInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public YearMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<YearMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

@@ -171,7 +171,6 @@ namespace Tesserafin.Providers.Manager
             _externalIds = externalIds.OrderBy(i => i.ProviderName).ToArray();
             _externalUrlProviders = externalUrlProviders.OrderBy(i => i.Name).ToArray();
 
-
         }
 
         /// <inheritdoc/>

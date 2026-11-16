@@ -216,7 +216,6 @@ namespace Tesserafin.Server.Core.Library
         /// <value>The intro providers.</value>
         private IIntroProvider[] IntroProviders { get; set; } = [];
 
-
         /// <summary>
         /// Adds the parts.
         /// </summary>
@@ -253,7 +252,6 @@ namespace Tesserafin.Server.Core.Library
             _itemCacheStore.Register(item);
         }
 
-
         public Guid GetNewItemId(string key, Type type)
         {
             return GetNewItemIdInternal(key, type, false);
@@ -269,10 +267,8 @@ namespace Tesserafin.Server.Core.Library
             CollectionType? collectionType = null)
             => _resolution.ResolvePath(fileInfo, parent, directoryService, collectionType);
 
-
         public bool IgnoreFile(FileSystemMetadata file, BaseItem? parent)
             => _resolution.IgnoreFile(file, parent);
-
 
         public IEnumerable<BaseItem> ResolvePaths(IEnumerable<FileSystemMetadata> files, IDirectoryService directoryService, Folder parent, LibraryOptions libraryOptions, CollectionType? collectionType = null)
             => _resolution.ResolvePaths(files, directoryService, parent, libraryOptions, collectionType);
@@ -285,7 +281,6 @@ namespace Tesserafin.Server.Core.Library
             CollectionType? collectionType,
             IItemResolver[] resolvers)
             => _resolution.ResolvePaths(files, directoryService, parent, libraryOptions, collectionType, resolvers);
-
 
         /// <inheritdoc />
         /// <remarks>

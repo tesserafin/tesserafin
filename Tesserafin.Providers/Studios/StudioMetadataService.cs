@@ -29,7 +29,7 @@ public class StudioMetadataService : MetadataService<Studio, ItemLookupInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public StudioMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<StudioMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

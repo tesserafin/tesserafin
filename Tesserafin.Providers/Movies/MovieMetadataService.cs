@@ -30,7 +30,7 @@ public class MovieMetadataService : MetadataService<Movie, MovieInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public MovieMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<MovieMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

@@ -32,7 +32,7 @@ public class MusicVideoMetadataService : MetadataService<MusicVideo, MusicVideoI
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public MusicVideoMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<MusicVideoMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

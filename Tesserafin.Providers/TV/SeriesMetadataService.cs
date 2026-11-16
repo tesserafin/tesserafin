@@ -48,7 +48,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     public SeriesMetadataService(
         IItemWriteCommands writes,
-            IItemDeletionCommands deletions,
+        IItemDeletionCommands deletions,
         IServerConfigurationManager serverConfigurationManager,
         ILogger<SeriesMetadataService> logger,
         IProviderManager providerManager,

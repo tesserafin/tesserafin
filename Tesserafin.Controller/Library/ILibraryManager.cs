@@ -152,7 +152,6 @@ namespace Tesserafin.Controller.Library
         List<VirtualFolderInfo> GetVirtualFolders(bool includeRefreshState);
 
 
-
         /// <summary>
         /// Gets the item by id, as T, and validates user access.
         /// </summary>
@@ -241,8 +240,6 @@ namespace Tesserafin.Controller.Library
 
 
 
-
-
         /// <summary>
         /// Retrieves the item.
         /// </summary>
@@ -270,7 +267,6 @@ namespace Tesserafin.Controller.Library
         /// <param name="item">The item.</param>
         /// <returns>System.String.</returns>
         CollectionType? GetConfiguredContentType(BaseItem item);
-
 
         /// <summary>
         /// Normalizes the root path list.
@@ -378,7 +374,6 @@ namespace Tesserafin.Controller.Library
         /// <returns>ItemInfo.</returns>
         ItemLookupInfo ParseName(string name);
 
-
         /// <summary>
         /// Finds the extras.
         /// </summary>
@@ -402,7 +397,6 @@ namespace Tesserafin.Controller.Library
         /// <param name="allUserRootChildren">The root folders to consider.</param>
         /// <returns>The folders that contain the item.</returns>
         List<Folder> GetCollectionFolders(BaseItem item, IEnumerable<Folder> allUserRootChildren);
-
 
         /// <summary>
         /// Gets the people.
@@ -527,7 +521,6 @@ namespace Tesserafin.Controller.Library
         /// <param name="query">The query.</param>
         /// <returns>QueryResult&lt;BaseItem&gt;.</returns>
         QueryResult<BaseItem> GetItemsResult(InternalItemsQuery query);
-
 
         Guid GetStudioId(string name);
 

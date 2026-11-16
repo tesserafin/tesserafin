@@ -29,7 +29,7 @@ public class MusicGenreMetadataService : MetadataService<MusicGenre, ItemLookupI
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public MusicGenreMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<MusicGenreMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

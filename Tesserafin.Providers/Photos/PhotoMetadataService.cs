@@ -29,7 +29,7 @@ public class PhotoMetadataService : MetadataService<Photo, ItemLookupInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public PhotoMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<PhotoMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

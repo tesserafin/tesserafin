@@ -31,7 +31,7 @@ public class ArtistMetadataService : MetadataService<MusicArtist, ArtistInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public ArtistMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<ArtistMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

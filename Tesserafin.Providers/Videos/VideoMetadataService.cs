@@ -29,7 +29,7 @@ public class VideoMetadataService : MetadataService<Video, ItemLookupInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public VideoMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<VideoMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

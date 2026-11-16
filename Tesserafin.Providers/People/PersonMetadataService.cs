@@ -29,7 +29,7 @@ public class PersonMetadataService : MetadataService<Person, PersonLookupInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public PersonMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<PersonMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

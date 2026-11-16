@@ -31,7 +31,7 @@ public class TrailerMetadataService : MetadataService<Trailer, TrailerInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public TrailerMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<TrailerMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

@@ -34,7 +34,7 @@ public class BoxSetMetadataService : MetadataService<BoxSet, BoxSetInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public BoxSetMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<BoxSetMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

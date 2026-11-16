@@ -29,7 +29,7 @@ public class CollectionFolderMetadataService : MetadataService<CollectionFolder,
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public CollectionFolderMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<CollectionFolderMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

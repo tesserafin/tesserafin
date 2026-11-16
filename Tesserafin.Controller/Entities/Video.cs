@@ -519,7 +519,9 @@ namespace Tesserafin.Controller.Entities
             return hasChanges;
         }
 
-        private async Task RefreshMetadataForVersions(IItemDeletionCommands deletions, IItemWriteCommands writes,
+        private async Task RefreshMetadataForVersions(
+            IItemDeletionCommands deletions,
+            IItemWriteCommands writes,
             MetadataRefreshOptions options,
             bool copyTitleMetadata,
             string path,
@@ -561,14 +563,18 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        private new Task RefreshMetadataForOwnedVideo(IItemDeletionCommands deletions, IItemWriteCommands writes,
+        private new Task RefreshMetadataForOwnedVideo(
+            IItemDeletionCommands deletions,
+            IItemWriteCommands writes,
             MetadataRefreshOptions options,
             bool copyTitleMetadata,
             string path,
             CancellationToken cancellationToken)
             => RefreshMetadataForOwnedVideo(deletions, writes, options, copyTitleMetadata, path, GetType(), cancellationToken);
 
-        private async Task RefreshMetadataForOwnedVideo(IItemDeletionCommands deletions, IItemWriteCommands writes,
+        private async Task RefreshMetadataForOwnedVideo(
+            IItemDeletionCommands deletions,
+            IItemWriteCommands writes,
             MetadataRefreshOptions options,
             bool copyTitleMetadata,
             string path,
@@ -633,7 +639,6 @@ namespace Tesserafin.Controller.Entities
 
             await RefreshMetadataForOwnedItem(deletions, writes, video, copyTitleMetadata, newOptions, cancellationToken).ConfigureAwait(false);
         }
-
 
         public override IEnumerable<FileSystemMetadata> GetDeletePaths()
         {

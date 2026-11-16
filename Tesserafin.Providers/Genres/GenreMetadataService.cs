@@ -29,7 +29,7 @@ public class GenreMetadataService : MetadataService<Genre, ItemLookupInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public GenreMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<GenreMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

@@ -39,7 +39,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     public SeasonMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<SeasonMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

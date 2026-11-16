@@ -29,7 +29,7 @@ public class ChannelMetadataService : MetadataService<Channel, ItemLookupInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public ChannelMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<ChannelMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

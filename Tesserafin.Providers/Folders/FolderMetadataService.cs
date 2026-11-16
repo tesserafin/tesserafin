@@ -29,7 +29,7 @@ public class FolderMetadataService : MetadataService<Folder, ItemLookupInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public FolderMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<FolderMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

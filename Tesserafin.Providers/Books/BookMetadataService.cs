@@ -30,7 +30,7 @@ public class BookMetadataService : MetadataService<Book, BookInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public BookMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<BookMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

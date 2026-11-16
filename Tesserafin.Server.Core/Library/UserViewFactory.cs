@@ -22,8 +22,9 @@ namespace Tesserafin.Server.Core.Library
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Depends only on <see cref="IItemLookupService"/> (item lookup), <see cref="IItemStore"/>
-    /// (id generation plus save+register, PR106a), <see cref="IServerConfigurationManager"/>,
+    /// Depends on <see cref="IItemLookupService"/> (item lookup), <see cref="IItemStore"/>
+    /// (id generation plus initial view persistence), <see cref="IItemWriteCommands"/>
+    /// (subsequent view updates), <see cref="IServerConfigurationManager"/>,
     /// <see cref="IFileSystem"/> and <see cref="Lazy{IProviderManager}"/>. None of these concrete
     /// implementations (<c>ItemLookupService</c>, <c>ItemStore</c>) reference <c>ILibraryManager</c>,
     /// <c>IUserViewManager</c>, <c>IChannelManager</c> or <c>ILiveTvManager</c> - this satisfies RFC

@@ -29,7 +29,7 @@ public class UserViewMetadataService : MetadataService<UserView, ItemLookupInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public UserViewMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<UserViewMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

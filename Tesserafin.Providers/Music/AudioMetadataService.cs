@@ -32,7 +32,7 @@ public class AudioMetadataService : MetadataService<Audio, SongInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public AudioMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<AudioMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

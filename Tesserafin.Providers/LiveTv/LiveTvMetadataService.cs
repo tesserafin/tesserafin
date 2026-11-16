@@ -29,7 +29,7 @@ public class LiveTvMetadataService : MetadataService<LiveTvChannel, ItemLookupIn
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public LiveTvMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<LiveTvMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

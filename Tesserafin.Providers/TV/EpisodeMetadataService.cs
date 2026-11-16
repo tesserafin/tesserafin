@@ -31,7 +31,7 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public EpisodeMetadataService(
         IItemWriteCommands writes,
-            IServerConfigurationManager serverConfigurationManager,
+        IServerConfigurationManager serverConfigurationManager,
         ILogger<EpisodeMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,

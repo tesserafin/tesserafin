@@ -57,7 +57,8 @@ public sealed class ItemWriteCommandsEndToEndTests(TesserafinApplicationFactory 
 
             try
             {
-                Assert.ThrowsAny<Exception>(() => writes.CreateItems([primary], null, TestContext.Current.CancellationToken));
+                var failure = Assert.ThrowsAny<Exception>(() => writes.CreateItems([primary], null, TestContext.Current.CancellationToken));
+                Assert.Contains("second graph row rejected", failure.ToString(), StringComparison.Ordinal);
                 Assert.Null(lookup.GetItemById(primary.Id));
                 Assert.Null(lookup.GetItemById(alternateId));
                 Assert.Empty(added);
