@@ -29,10 +29,12 @@ internal sealed class LibraryStructureCommands : ILibraryStructureCommands
     private readonly IServerApplicationHost _appHost;
     private readonly ILibraryScanCoordinator _scans;
     private readonly IItemLookupService _items;
+    private readonly ILibraryOptionsStore _libraryOptions;
     private readonly ILogger<LibraryStructureCommands> _logger;
 
-    public LibraryStructureCommands(IServerConfigurationManager configurationManager, IFileSystem fileSystem, IServerApplicationHost appHost, ILibraryScanCoordinator scans, IItemLookupService items, ILogger<LibraryStructureCommands> logger)
+    public LibraryStructureCommands(IServerConfigurationManager configurationManager, IFileSystem fileSystem, IServerApplicationHost appHost, ILibraryScanCoordinator scans, IItemLookupService items, ILibraryOptionsStore libraryOptions, ILogger<LibraryStructureCommands> logger)
     {
+        _libraryOptions = libraryOptions;
         _configurationManager = configurationManager;
         _fileSystem = fileSystem;
         _appHost = appHost;
@@ -53,7 +55,7 @@ internal sealed class LibraryStructureCommands : ILibraryStructureCommands
                 }
                 finally
                 {
-                    CollectionFolder.OnCollectionFolderChange();
+                    _libraryOptions.Invalidate();
                 }
             },
             refreshLibrary,
@@ -88,7 +90,7 @@ internal sealed class LibraryStructureCommands : ILibraryStructureCommands
                     FileHelper.CreateEmpty(Path.Combine(path, collectionType.ToString()!.ToLowerInvariant() + ".collection"));
                 }
 
-                CollectionFolder.SaveLibraryOptions(path, options);
+                _libraryOptions.Save(path, options);
                 foreach (var source in options.PathInfos)
                 {
                     AddMediaPathInternal(selectedName, source, false);
@@ -165,9 +167,9 @@ internal sealed class LibraryStructureCommands : ILibraryStructureCommands
             {
                 ArgumentNullException.ThrowIfNull(path);
                 var library = ExistingLibrary(name);
-                var options = Clone(CollectionFolder.GetLibraryOptions(library));
+                var options = Clone(_libraryOptions.Get(library));
                 SyncLibraryOptionsToLocations(library, options);
-                CollectionFolder.SaveLibraryOptions(library, options);
+                _libraryOptions.Save(library, options);
             },
             false,
             false,
@@ -195,7 +197,7 @@ internal sealed class LibraryStructureCommands : ILibraryStructureCommands
                     throw new ArgumentException("The item is not a library definition.");
                 }
 
-                var old = CollectionFolder.GetLibraryOptions(library);
+                var old = _libraryOptions.Get(library);
                 foreach (var source in options.PathInfos)
                 {
                     if (!old.PathInfos.Any(path => string.Equals(path.Path, source.Path, StringComparison.Ordinal)))
@@ -209,7 +211,7 @@ internal sealed class LibraryStructureCommands : ILibraryStructureCommands
                     CreateShortcut(library, source);
                 }
 
-                CollectionFolder.SaveLibraryOptions(library, options);
+                _libraryOptions.Save(library, options);
                 found = true;
             },
             false,
@@ -265,13 +267,13 @@ internal sealed class LibraryStructureCommands : ILibraryStructureCommands
 
         if (saveLibraryOptions)
         {
-            var libraryOptions = Clone(CollectionFolder.GetLibraryOptions(virtualFolderPath));
+            var libraryOptions = Clone(_libraryOptions.Get(virtualFolderPath));
 
             libraryOptions.PathInfos = [.. libraryOptions.PathInfos, pathInfo];
 
             SyncLibraryOptionsToLocations(virtualFolderPath, libraryOptions);
 
-            CollectionFolder.SaveLibraryOptions(virtualFolderPath, libraryOptions);
+            _libraryOptions.Save(virtualFolderPath, libraryOptions);
         }
     }
 
@@ -346,14 +348,14 @@ internal sealed class LibraryStructureCommands : ILibraryStructureCommands
             _fileSystem.DeleteFile(shortcut);
         }
 
-        var libraryOptions = Clone(CollectionFolder.GetLibraryOptions(virtualFolderPath));
+        var libraryOptions = Clone(_libraryOptions.Get(virtualFolderPath));
 
         libraryOptions.PathInfos = libraryOptions
             .PathInfos
             .Where(i => !string.Equals(i.Path, mediaPath, StringComparison.Ordinal))
             .ToArray();
 
-        CollectionFolder.SaveLibraryOptions(virtualFolderPath, libraryOptions);
+        _libraryOptions.Save(virtualFolderPath, libraryOptions);
     }
 
     private void CreateShortcut(string virtualFolderPath, MediaPathInfo pathInfo)

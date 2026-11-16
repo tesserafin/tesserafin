@@ -78,8 +78,13 @@ public sealed class StandaloneVisibilityTests
         Mock.Get(rootProvider).Setup(p => p.GetUserRootFolder()).Returns(() => _root);
         fixture.Register(() => rootProvider);
 
+        var store = new Mock<ILibraryOptionsStore>();
+        store.Setup(s => s.Get(It.IsAny<string>()))
+            .Returns((string library) => _options.GetValueOrDefault(System.IO.Path.Combine(library, "options.xml")) ?? new LibraryOptions());
         var resolver = new Tesserafin.Server.Core.Library.CollectionFolderResolver(lookup, rootProvider);
         fixture.Register<ICollectionFolderResolver>(() => resolver);
+        fixture.Register(() => store.Object);
+        var libraryOptions = new Tesserafin.Server.Core.Library.LibraryItemOptions(resolver, lookup, rootProvider, configuration.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), store.Object);
 
         Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
 
@@ -94,12 +99,7 @@ public sealed class StandaloneVisibilityTests
         var localization = new Mock<ILocalizationManager>();
         localization.Setup(l => l.GetRatingScore(It.IsAny<string>(), It.IsAny<string?>()))
             .Returns((string rating, string? country) => _scores?.GetRatingScore(rating, country)!);
-        _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, localization.Object, configuration.Object, _activeRecordings));
-
-        var xml = new Mock<IXmlSerializer>();
-        xml.Setup(x => x.DeserializeFromFile(typeof(LibraryOptions), It.IsAny<string>()))
-            .Returns((Type _, string file) => _options.GetValueOrDefault(file)!);
-        CollectionFolder.XmlSerializer = xml.Object;
+        _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, localization.Object, configuration.Object, _activeRecordings, libraryOptions));
 
         BaseItem.LibraryManager = manager;
         BaseItem.ChannelManager = Mock.Of<IChannelManager>();

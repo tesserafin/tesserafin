@@ -1833,7 +1833,7 @@ namespace Tesserafin.Controller.Entities
                 // The options of the item itself when it is a library, else of its first library (DEBT-SERVER-7).
                 var options = scope is null
                     ? LibraryManager.GetLibraryOptions(this)
-                    : (this as CollectionFolder ?? scope.GetCollectionFolders(this).OfType<CollectionFolder>().FirstOrDefault())?.GetLibraryOptions();
+                    : scope.GetLibraryOptions(this);
                 lang = options?.MetadataCountryCode;
             }
 

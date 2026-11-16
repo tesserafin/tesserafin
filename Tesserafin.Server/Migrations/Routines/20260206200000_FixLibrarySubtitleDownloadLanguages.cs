@@ -19,6 +19,7 @@ internal class FixLibrarySubtitleDownloadLanguages : IAsyncMigrationRoutine
 {
     private readonly ILocalizationManager _localizationManager;
     private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryOptionsStore _libraryOptions;
     private readonly ILogger _logger;
 
     /// <summary>
@@ -27,15 +28,18 @@ internal class FixLibrarySubtitleDownloadLanguages : IAsyncMigrationRoutine
     /// <param name="localizationManager">The Localization manager.</param>
     /// <param name="startupLogger">The startup logger for Startup UI integration.</param>
     /// <param name="libraryManager">The Library manager.</param>
+    /// <param name="libraryOptions">The persisted library options.</param>
     /// <param name="logger">The logger.</param>
     public FixLibrarySubtitleDownloadLanguages(
         ILocalizationManager localizationManager,
         IStartupLogger<FixLibrarySubtitleDownloadLanguages> startupLogger,
         ILibraryManager libraryManager,
+        ILibraryOptionsStore libraryOptions,
         ILogger<FixLibrarySubtitleDownloadLanguages> logger)
     {
         _localizationManager = localizationManager;
         _libraryManager = libraryManager;
+        _libraryOptions = libraryOptions;
         _logger = startupLogger.With(logger);
     }
 
@@ -95,7 +99,7 @@ internal class FixLibrarySubtitleDownloadLanguages : IAsyncMigrationRoutine
             }
 
             options.SubtitleDownloadLanguages = [.. fixedLanguages];
-            collectionFolder.UpdateLibraryOptions(options);
+            _libraryOptions.Save(collectionFolder.Path, options);
         }
 
         _logger.LogInformation("Library subtitle download languages fixed.");

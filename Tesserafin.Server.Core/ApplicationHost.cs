@@ -294,18 +294,12 @@ namespace Tesserafin.Server.Core
                 return null;
             }
 
-            var appPaths = ApplicationPaths;
-
-            return path.Replace(appPaths.VirtualDataPath, appPaths.DataPath, StringComparison.OrdinalIgnoreCase)
-                .Replace(appPaths.VirtualInternalMetadataPath, appPaths.InternalMetadataPath, StringComparison.OrdinalIgnoreCase);
+            return VirtualPaths.Expand(ApplicationPaths, path);
         }
 
         public string ReverseVirtualPath(string path)
         {
-            var appPaths = ApplicationPaths;
-
-            return path.Replace(appPaths.DataPath, appPaths.VirtualDataPath, StringComparison.OrdinalIgnoreCase)
-                .Replace(appPaths.InternalMetadataPath, appPaths.VirtualInternalMetadataPath, StringComparison.OrdinalIgnoreCase);
+            return VirtualPaths.Reverse(ApplicationPaths, path);
         }
 
         /// <summary>
@@ -590,6 +584,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemWriteCommands, ItemWriteCommands>();
             serviceCollection.AddSingleton<IUserViewFactory, UserViewFactory>();
             serviceCollection.AddSingleton<IUserRootFolderProvider, UserRootFolderProvider>();
+            serviceCollection.AddSingleton<ILibraryOptionsStore, LibraryOptionsStore>();
             serviceCollection.AddSingleton<ICollectionFolderResolver, CollectionFolderResolver>();
             serviceCollection.AddSingleton<ActiveRecordings>();
             serviceCollection.AddSingleton<ITagVisibilityService, TagVisibilityService>();
@@ -826,7 +821,6 @@ namespace Tesserafin.Server.Core
             BaseItem.MediaSourceManager = Resolve<IMediaSourceManager>();
             BaseItem.ProviderManager = Resolve<IProviderManager>();
             BaseItem.UserDataManager = Resolve<IUserDataManager>();
-            CollectionFolder.XmlSerializer = _xmlSerializer;
             CollectionFolder.ApplicationHost = this;
             Folder.UserViewManager = Resolve<IUserViewManager>();
             Folder.CollectionManager = Resolve<ICollectionManager>();

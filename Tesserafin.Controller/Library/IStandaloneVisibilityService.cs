@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Data.Entities;
+using Tesserafin.Model.Configuration;
 
 namespace Tesserafin.Controller.Library
 {
@@ -45,5 +46,12 @@ namespace Tesserafin.Controller.Library
         /// </summary>
         /// <returns>The library ids, in root order.</returns>
         IReadOnlyList<Guid> GetLibraryIds();
+
+        /// <summary>
+        /// Gets the options of <paramref name="item"/> when it is a library, else of its first library.
+        /// </summary>
+        /// <param name="item">The item.</param>
+        /// <returns>The options; default options when the item belongs to no library.</returns>
+        LibraryOptions GetLibraryOptions(BaseItem item);
     }
 }

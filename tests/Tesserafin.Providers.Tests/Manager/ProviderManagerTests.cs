@@ -570,6 +570,9 @@ namespace Tesserafin.Providers.Tests.Manager
                 Mock.Of<IItemMetadataExporter>(),
                 Mock.Of<IItemImageService>(),
                 Mock.Of<IItemDeletionCommands>(),
+                Mock.Of<ILimitedConcurrencyLibraryScheduler>(),
+                Mock.Of<ILibraryOptionsStore>(),
+                Mock.Of<IHttpClientFactory>(),
                 Mock.Of<ISubtitleManager>(),
                 serverConfigurationManager.Object,
                 Mock.Of<ILibraryMonitor>(),
@@ -582,8 +585,7 @@ namespace Tesserafin.Providers.Tests.Manager
                 Mock.Of<ILyricManager>(),
                 Mock.Of<IRemoteImageSource>(),
                 Mock.Of<IMediaSegmentManager>(),
-                Mock.Of<ISimilarItemsManager>(),
-                Mock.Of<ILimitedConcurrencyLibraryScheduler>());
+                Mock.Of<ISimilarItemsManager>());
 
             return providerManager;
         }

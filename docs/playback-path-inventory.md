@@ -948,3 +948,21 @@ its `ApplicationHost` assignment are gone; `entityStaticServices` shrinks from 1
 `BaseItem.ItemRepository` stays: its two readers are `Folder.LoadChildren` (behind the lazy
 `Children` getter) and `Folder.IsPlayed`, both on entity read paths that need a children/played
 service of their own before the static can go.
+
+## 31. Library options persistence leaves `CollectionFolder` (consolidation step 5)
+
+`ILibraryOptionsStore` (`LibraryOptionsStore`, Server.Core) owns each library's `options.xml`:
+read with virtual media paths expanded, cache, write with paths reversed, `Invalidate` after
+structure changes, and an `Updated` event. It is a leaf (serializer, application paths, logger), so
+`CollectionFolderResolver` and the visibility service may depend on it.
+
+Callers: `LibraryItemOptions` (the item library options policy), `LibraryStructureCommands`, `ProviderManager`
+(cache invalidation on `Updated`) and the two options migrations. `IStandaloneVisibilityService`
+gains `GetLibraryOptions(item)`; `CollectionFolder.IsVisible` and the metadata-country fallback read
+options from their scope, and only a scope-less call falls back to `LibraryManager`.
+`ApplicationHost.ExpandVirtualPath`/`ReverseVirtualPath` share the store's `VirtualPaths` helper.
+
+Removed from `CollectionFolder`: the `XmlSerializer` static, the static cache, `GetLibraryOptions(path)`,
+`SaveLibraryOptions`, `OnCollectionFolderChange`, `UpdateLibraryOptions`, the instance
+`GetLibraryOptions()` and the static `LibraryOptionsUpdated` event. `entityStaticServices` 16 → 15.
+`CollectionFolder.ApplicationHost` stays (file-system child enumeration and shortcut expansion).

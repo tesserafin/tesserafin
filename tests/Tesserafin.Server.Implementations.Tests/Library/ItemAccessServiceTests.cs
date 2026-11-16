@@ -47,7 +47,7 @@ public class ItemAccessServiceTests
         _itemLookupService = new Tesserafin.Server.Core.Library.ItemLookupService(_itemRepositoryMock.Object, _configurationManagerMock.Object);
         // No library membership: these items live outside every library.
         var noLibraries = Mock.Of<ICollectionFolderResolver>(r => r.GetCollectionFolders(It.IsAny<BaseItem>()) == new List<Folder>());
-        _itemAccessService = new ItemAccessService(_itemLookupService, new TagVisibilityService(_itemLookupService, noLibraries, Mock.Of<IUserRootFolderProvider>(), _itemRepositoryMock.Object, Mock.Of<ILocalizationManager>(), _configurationManagerMock.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings()));
+        _itemAccessService = new ItemAccessService(_itemLookupService, new TagVisibilityService(_itemLookupService, noLibraries, Mock.Of<IUserRootFolderProvider>(), _itemRepositoryMock.Object, Mock.Of<ILocalizationManager>(), _configurationManagerMock.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings(), Mock.Of<ILibraryItemOptions>()));
     }
 
     private static void SetLibraryManagerStatic(ILibraryManager libraryManager)
@@ -137,6 +137,7 @@ public class ItemAccessServiceTests
         services.AddSingleton(Mock.Of<ICollectionFolderResolver>());
         services.AddSingleton(Mock.Of<IUserRootFolderProvider>());
         services.AddSingleton(Mock.Of<ILocalizationManager>());
+        services.AddSingleton(Mock.Of<ILibraryItemOptions>());
         services.AddSingleton<Tesserafin.Controller.LiveTv.ActiveRecordings>();
         services.AddSingleton<IStandaloneVisibilityService, TagVisibilityService>();
         services.AddSingleton<IItemAccessService, ItemAccessService>();

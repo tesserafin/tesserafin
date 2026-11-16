@@ -188,7 +188,7 @@ public sealed class LibraryStructureCommandsTests
             Traversal.Setup(t => t.RefreshTopFoldersAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
             Traversal.Setup(t => t.RefreshAllAsync(It.IsAny<IProgress<double>>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
             Coordinator = new LibraryScanCoordinator(Traversal.Object, new Lazy<ILibraryMonitor>(() => Monitor.Object), Mock.Of<ITaskManager>(), Configuration.Object, NullLogger<LibraryScanCoordinator>.Instance);
-            Commands = new LibraryStructureCommands(Configuration.Object, Files.Object, Mock.Of<IServerApplicationHost>(), Coordinator, Mock.Of<IItemLookupService>(), NullLogger<LibraryStructureCommands>.Instance);
+            Commands = new LibraryStructureCommands(Configuration.Object, Files.Object, Mock.Of<IServerApplicationHost>(), Coordinator, Mock.Of<IItemLookupService>(), Mock.Of<ILibraryOptionsStore>(s => s.Get(It.IsAny<string>()) == new LibraryOptions()), NullLogger<LibraryStructureCommands>.Instance);
         }
 
         public string Root { get; } = Directory.CreateTempSubdirectory("structure-commands-").FullName;
