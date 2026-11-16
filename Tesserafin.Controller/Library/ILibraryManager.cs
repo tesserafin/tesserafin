@@ -151,7 +151,6 @@ namespace Tesserafin.Controller.Library
 
         List<VirtualFolderInfo> GetVirtualFolders(bool includeRefreshState);
 
-
         /// <summary>
         /// Gets the item by id, as T, and validates user access.
         /// </summary>
@@ -236,9 +235,6 @@ namespace Tesserafin.Controller.Library
         /// </summary>
         /// <returns>UserRootFolder.</returns>
         Folder GetUserRootFolder();
-
-
-
 
         /// <summary>
         /// Retrieves the item.

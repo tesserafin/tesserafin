@@ -19,6 +19,7 @@ namespace Tesserafin.Server.Core.IO
     {
         private readonly ILogger<LibraryMonitor> _logger;
         private readonly ILibraryManager _libraryManager;
+        private readonly ILibraryWriteTracker _writes;
         private readonly IItemChangeEvents _changes;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly IFileSystem _fileSystem;
@@ -34,11 +35,6 @@ namespace Tesserafin.Server.Core.IO
         /// </summary>
         private readonly List<FileRefresher> _activeRefreshers = [];
 
-        /// <summary>
-        /// A dynamic list of paths that should be ignored.  Added to during our own file system modifications.
-        /// </summary>
-        private readonly ConcurrentDictionary<string, string> _tempIgnoredPaths = new(StringComparer.OrdinalIgnoreCase);
-
         private bool _disposed;
 
         /// <summary>
@@ -46,6 +42,7 @@ namespace Tesserafin.Server.Core.IO
         /// </summary>
         /// <param name="logger">The logger.</param>
         /// <param name="libraryManager">The library manager.</param>
+        /// <param name="writes">Shared filesystem write suppression.</param>
         /// <param name="changes">The completed item change feed.</param>
         /// <param name="configurationManager">The configuration manager.</param>
         /// <param name="fileSystem">The filesystem.</param>
@@ -54,6 +51,7 @@ namespace Tesserafin.Server.Core.IO
         public LibraryMonitor(
             ILogger<LibraryMonitor> logger,
             ILibraryManager libraryManager,
+            ILibraryWriteTracker writes,
             IItemChangeEvents changes,
             IServerConfigurationManager configurationManager,
             IFileSystem fileSystem,
@@ -61,6 +59,7 @@ namespace Tesserafin.Server.Core.IO
             DotIgnoreIgnoreRule dotIgnoreIgnoreRule)
         {
             _libraryManager = libraryManager;
+            _writes = writes;
             _changes = changes;
             _logger = logger;
             _configurationManager = configurationManager;
@@ -76,7 +75,7 @@ namespace Tesserafin.Server.Core.IO
         {
             ArgumentException.ThrowIfNullOrEmpty(path);
 
-            _tempIgnoredPaths[path] = path;
+            _writes.Begin(path);
         }
 
         /// <inheritdoc />
@@ -84,12 +83,7 @@ namespace Tesserafin.Server.Core.IO
         {
             ArgumentException.ThrowIfNullOrEmpty(path);
 
-            // This is an arbitrary amount of time, but delay it because file system writes often trigger events long after the file was actually written to.
-            // Seeing long delays in some situations, especially over the network, sometimes up to 45 seconds
-            // But if we make this delay too high, we risk missing legitimate changes, such as user adding a new file, or hand-editing metadata
-            await Task.Delay(45000).ConfigureAwait(false);
-
-            _tempIgnoredPaths.TryRemove(path, out _);
+            await _writes.CompleteAsync(path).ConfigureAwait(false);
 
             if (refreshPath)
             {
@@ -368,7 +362,7 @@ namespace Tesserafin.Server.Core.IO
             }
 
             // Ignore certain files, If the parent of an ignored path has a change event, ignore that too
-            foreach (var i in _tempIgnoredPaths.Keys)
+            foreach (var i in _writes.Paths)
             {
                 if (_fileSystem.AreEqual(i, path)
                     || _fileSystem.ContainsSubPath(i, path))

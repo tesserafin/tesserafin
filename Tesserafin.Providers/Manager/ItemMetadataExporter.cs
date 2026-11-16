@@ -17,15 +17,14 @@ namespace Tesserafin.Providers.Manager;
 /// <summary>Owns sidecar export selection and file watcher coordination.</summary>
 /// <param name="configuration">Metadata configuration.</param>
 /// <param name="options">Effective library options.</param>
-/// <param name="monitor">Watcher coordination, evaluated only for an actual file export.</param>
+/// <param name="writes">Shared filesystem write suppression.</param>
 /// <param name="logger">The logger.</param>
 public sealed class ItemMetadataExporter(
     IServerConfigurationManager configuration,
     ILibraryItemOptions options,
-    Lazy<ILibraryMonitor> monitor,
+    ILibraryWriteTracker writes,
     ILogger<ItemMetadataExporter> logger) : IItemMetadataExporter
 {
-    private readonly Lazy<ILibraryMonitor> _monitor = monitor;
     private readonly ILogger<ItemMetadataExporter> _logger = logger;
     private IMetadataSaver[] _savers = [];
 
@@ -69,7 +68,7 @@ public sealed class ItemMetadataExporter(
 
                 try
                 {
-                    _monitor.Value.ReportFileSystemChangeBeginning(path);
+                    writes.Begin(path);
                     await saver.SaveAsync(item, cancellationToken).ConfigureAwait(false);
                     item.DateLastSaved = DateTime.UtcNow;
                 }
@@ -83,7 +82,7 @@ public sealed class ItemMetadataExporter(
                 }
                 finally
                 {
-                    _monitor.Value.ReportFileSystemChangeComplete(path, false);
+                    _ = writes.CompleteAsync(path);
                 }
             }
             else

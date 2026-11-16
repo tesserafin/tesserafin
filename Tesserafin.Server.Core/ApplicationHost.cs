@@ -614,6 +614,7 @@ namespace Tesserafin.Server.Core
 
             serviceCollection.AddSingleton<IMusicManager, MusicManager>();
 
+            serviceCollection.AddSingleton<ILibraryWriteTracker, LibraryWriteTracker>();
             serviceCollection.AddSingleton<ILibraryMonitor, LibraryMonitor>();
             serviceCollection.AddSingleton<DotIgnoreIgnoreRule>();
 

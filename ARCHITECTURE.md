@@ -228,6 +228,8 @@ libraries. Every project has a matching `*.Tests` project in `tests/`.
   argument; API, providers, Live TV, scans, migrations and user-view creation use explicit commands.
   The query-side `IItemStore` remains a leaf and does not depend on the general command owner.
   Active manager query entry points remain while later read-side decomposition is pending.
+  File write suppression is shared with the library monitor through the autonomous
+  `ILibraryWriteTracker`; metadata export adds no deferred dependency back to the monitor.
 - **Resolution.** `LibraryManager.ResolvePath(s)` dispatches to ordered
   `IItemResolver` implementations (`MovieResolver`, `EpisodeResolver`,
   `SeriesResolver`, `AudioResolver`, `PhotoResolver`, …) that turn paths into the

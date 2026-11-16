@@ -898,3 +898,8 @@ side effect: refresh and image delivery use the image lifecycle explicitly. No n
 static is introduced. HTTP/OpenAPI and SDK shapes remain unchanged; .NET removals/signature
 changes are intentional. The new real-host graph rollback/retry/update/promotion test is required
 by name in CI. Validation results are recorded on the implementation PR, not assumed here.
+
+Filesystem suppression is shared by the monitor and metadata exporter through the autonomous
+`ILibraryWriteTracker`, without a new lazy edge to the library monitor. Overlapping writes keep
+suppression until each one's 45-second quiet period expires. The existing DI exception guard
+remains unchanged.
