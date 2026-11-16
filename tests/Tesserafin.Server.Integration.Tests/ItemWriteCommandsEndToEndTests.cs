@@ -52,7 +52,7 @@ public sealed class ItemWriteCommandsEndToEndTests(TesserafinApplicationFactory 
             await using (var database = await databases.CreateDbContextAsync(TestContext.Current.CancellationToken))
             {
                 before = await database.BaseItems.CountAsync(TestContext.Current.CancellationToken);
-                await database.Database.ExecuteSqlRawAsync($"CREATE TRIGGER fail_item_graph AFTER INSERT ON BaseItems WHEN (SELECT COUNT(*) FROM BaseItems) > {before + 1} BEGIN SELECT RAISE(ABORT, 'second graph row rejected'); END;", TestContext.Current.CancellationToken);
+                await database.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_item_graph AFTER INSERT ON BaseItems WHEN (SELECT COUNT(*) FROM BaseItems WHERE Path LIKE '%write-graph-host-%') > 1 BEGIN SELECT RAISE(ABORT, 'second graph row rejected'); END;", TestContext.Current.CancellationToken);
             }
 
             try

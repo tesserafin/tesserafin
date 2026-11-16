@@ -65,10 +65,10 @@ public sealed class ItemMetadataExporterTests
         file.SetupGet(s => s.Name).Returns("file");
         file.Setup(s => s.IsEnabledFor(It.IsAny<BaseItem>(), It.IsAny<ItemUpdateType>())).Returns(true);
         file.Setup(s => s.GetSavePath(It.IsAny<BaseItem>())).Returns("/media/item.nfo");
-        file.Setup(s => s.SaveAsync(It.IsAny<BaseItem>(), It.IsAny<CancellationToken>())).Returns((BaseItem _, CancellationToken token) =>
+        file.Setup(s => s.SaveAsync(It.IsAny<BaseItem>(), It.IsAny<CancellationToken>())).Returns(async (BaseItem _, CancellationToken token) =>
         {
-            cancellation.Cancel();
-            return Task.FromCanceled(token);
+            await cancellation.CancelAsync();
+            token.ThrowIfCancellationRequested();
         });
         var next = Saver("next");
         var service = Service(new Lazy<ILibraryMonitor>(() => monitor.Object), "file", "next");
