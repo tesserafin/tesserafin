@@ -12,6 +12,7 @@ using J2N.Collections.Generic.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Configuration;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Entities;
@@ -44,6 +45,7 @@ public partial class TrickplayManager : ITrickplayManager
     private readonly IPathManager _pathManager;
     private readonly IMediaSourceManager _mediaSourceManager;
     private readonly IMediaSegmentManager _mediaSegmentManager;
+    private readonly Lazy<IChannelManager> _channelManager;
 
     private static readonly AsyncNonKeyedLocker _resourcePool = new(1);
     private static readonly string[] _trickplayImgExtensions = [".jpg"];
@@ -62,6 +64,7 @@ public partial class TrickplayManager : ITrickplayManager
     /// <param name="pathManager">The path manager.</param>
     /// <param name="mediaSourceManager">The media source manager.</param>
     /// <param name="mediaSegmentManager">The media segment manager.</param>
+    /// <param name="channelManager">The channel manager, deferred: <see cref="IChannelManager"/> reaches this manager through <c>IDtoService</c>.</param>
     public TrickplayManager(
         ILogger<TrickplayManager> logger,
         IMediaEncoder mediaEncoder,
@@ -73,7 +76,8 @@ public partial class TrickplayManager : ITrickplayManager
         IApplicationPaths appPaths,
         IPathManager pathManager,
         IMediaSourceManager mediaSourceManager,
-        IMediaSegmentManager mediaSegmentManager)
+        IMediaSegmentManager mediaSegmentManager,
+        Lazy<IChannelManager> channelManager)
     {
         _logger = logger;
         _mediaEncoder = mediaEncoder;
@@ -86,6 +90,7 @@ public partial class TrickplayManager : ITrickplayManager
         _pathManager = pathManager;
         _mediaSourceManager = mediaSourceManager;
         _mediaSegmentManager = mediaSegmentManager;
+        _channelManager = channelManager;
     }
 
     /// <inheritdoc />
@@ -406,9 +411,7 @@ public partial class TrickplayManager : ITrickplayManager
             {
                 // Extract images
                 // Note: Media sources under parent items exist as their own video/item as well. Only use this video stream for trickplay.
-                // channelManager not injectable here: IChannelManager -> IDtoService -> ITrickplayManager
-                // is an existing DI edge, so ITrickplayManager -> IChannelManager would be circular.
-                var mediaSource = video.GetMediaSources(false, _mediaSourceManager, _mediaSegmentManager, BaseItem.ChannelManager).FirstOrDefault(source => Guid.Parse(source.Id).Equals(video.Id));
+                var mediaSource = video.GetMediaSources(false, _mediaSourceManager, _mediaSegmentManager, _channelManager.Value).FirstOrDefault(source => Guid.Parse(source.Id).Equals(video.Id));
 
                 if (mediaSource is null)
                 {
@@ -741,7 +744,7 @@ public partial class TrickplayManager : ITrickplayManager
     public async Task<Dictionary<string, Dictionary<int, TrickplayInfo>>> GetTrickplayManifest(BaseItem item)
     {
         var trickplayManifest = new Dictionary<string, Dictionary<int, TrickplayInfo>>();
-        foreach (var mediaSource in item.GetMediaSources(false, _mediaSourceManager, _mediaSegmentManager, BaseItem.ChannelManager))
+        foreach (var mediaSource in item.GetMediaSources(false, _mediaSourceManager, _mediaSegmentManager, _channelManager.Value))
         {
             if (mediaSource.IsRemote || !Guid.TryParse(mediaSource.Id, out var mediaSourceId))
             {

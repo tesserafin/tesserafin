@@ -1,16 +1,9 @@
 {
   "entityStaticServiceAccessFiles": [
-    "Tesserafin.Controller/BaseItemManager/BaseItemManager.cs",
     "Tesserafin.Controller/Entities/AggregateFolder.cs",
     "Tesserafin.Controller/Entities/BaseItemExtensions.cs",
     "Tesserafin.Controller/Entities/Folder.cs",
-    "Tesserafin.Providers/Lyric/LyricManager.cs",
-    "Tesserafin.Providers/Subtitles/SubtitleManager.cs",
-    "Tesserafin.Server.Core/ApplicationHost.cs",
-    "Tesserafin.Server.Core/Dto/DtoService.cs",
-    "Tesserafin.Server.Core/Library/MediaSourceManager.cs",
-    "Tesserafin.Server.Implementations/Trickplay/TrickplayManager.cs",
-    "src/Tesserafin.LiveTv/Recordings/RecordingsManager.cs"
+    "Tesserafin.Server.Core/ApplicationHost.cs"
   ],
   "entityStaticServices": [
     "BaseItem.ChannelManager",

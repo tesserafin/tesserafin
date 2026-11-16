@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Common;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Chapters;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Dto;
@@ -52,6 +53,7 @@ public class DtoServiceTests
             appHost.Object,
             new Mock<IMediaSourceManager>().Object,
             new Lazy<ILiveTvManager>(() => new Mock<ILiveTvManager>().Object),
+            new Lazy<IChannelManager>(Mock.Of<IChannelManager>),
             new Mock<ITrickplayManager>().Object,
             new Mock<IChapterManager>().Object,
             new Mock<IItemCountService>().Object);

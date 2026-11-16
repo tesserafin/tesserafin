@@ -903,3 +903,22 @@ Filesystem suppression is shared by the monitor and metadata exporter through th
 `ILibraryWriteTracker`, without a new lazy edge to the library monitor. Overlapping writes keep
 suppression until each one's 45-second quiet period expires. The existing DI exception guard
 remains unchanged.
+## 28. Entity static access in service consumers (consolidation step 5)
+
+Seven services read entity statics only to dodge DI cycles. They now receive dependencies:
+
+- `LyricManager`, `SubtitleManager`: library options from
+  `ICollectionFolderResolver.GetLibraryOptions`, moved from `LibraryManager` (which delegates).
+  The resolver keeps its leaf rule: no route back to `ILibraryManager`.
+- `DtoService`, `MediaSourceManager`, `TrickplayManager`, `BaseItemManager`: the registered
+  `Lazy<IChannelManager>`, resolved only for channel items. No new deferred registration.
+- `RecordingsManager`: KeepUpTo retention runs an ancestry-scoped catalogue query
+  (`CreateSeriesRecordingsQuery`) through `ILibraryManager`, instead of the obsolete five-argument
+  `Folder.GetItemList` fed by four statics. `Lazy<IItemQueryService>` remains forbidden.
+  Behaviour: every real non-folder item below the series folder, newest first. The former
+  `Series` path matched by series presentation key; ancestry is narrower when two series folders
+  share a key, which suits a per-folder retention rule.
+
+`entityStaticServiceAccessFiles` shrinks from 13 to 6: the entities (`AggregateFolder`,
+`BaseItemExtensions`, `Folder`), `ItemResolveArgs`, `ResolverHelper` (both reached from
+`LibraryManager` scan code) and the `ApplicationHost` assignments. The statics themselves remain.
