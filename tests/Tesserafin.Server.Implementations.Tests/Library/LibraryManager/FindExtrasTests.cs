@@ -1,15 +1,15 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using AutoFixture;
+using System;
 using AutoFixture.AutoMoq;
+using AutoFixture;
 using Moq;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
@@ -46,6 +46,8 @@ public class FindExtrasTests
         var itemLookupService = new Tesserafin.Server.Core.Library.ItemLookupService(itemRepository.Object, configMock.Object);
         fixture.Register<IItemLookupService>(() => itemLookupService);
         fixture.Register<Tesserafin.Server.Core.Library.IItemCacheStore>(() => itemLookupService);
+        Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
+
         _libraryManager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 fixture.Create<IEnumerable<IResolverIgnoreRule>>(),
                 new List<IItemResolver> { new AudioResolver(fixture.Create<NamingOptions>()) },

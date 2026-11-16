@@ -1,24 +1,24 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Moq;
-using Tesserafin.Controller;
 using Tesserafin.Controller.BaseItemManager;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Lyrics;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
+using Tesserafin.Controller;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.Manager;
@@ -565,6 +565,8 @@ namespace Tesserafin.Providers.Tests.Manager
                 .Returns(libraryOptions ?? new LibraryOptions());
 
             var providerManager = new ProviderManager(
+                Mock.Of<IItemWriteCommands>(),
+                Mock.Of<IItemMetadataExporter>(),
                 Mock.Of<IItemImageService>(),
                 Mock.Of<IItemDeletionCommands>(),
                 Mock.Of<ISubtitleManager>(),
@@ -600,7 +602,7 @@ namespace Tesserafin.Providers.Tests.Manager
             externalIds ??= Array.Empty<IExternalId>();
             externalUrlProviders ??= Array.Empty<IExternalUrlProvider>();
 
-            providerManager.AddParts(imageProviders, metadataServices, metadataProviders, metadataSavers, externalIds, externalUrlProviders);
+            providerManager.AddParts(imageProviders, metadataServices, metadataProviders, externalIds, externalUrlProviders);
         }
 
         /// <summary>

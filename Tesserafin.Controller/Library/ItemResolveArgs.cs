@@ -2,9 +2,9 @@
 
 #pragma warning disable CS1591
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Configuration;
@@ -23,18 +23,18 @@ namespace Tesserafin.Controller.Library
         /// </summary>
         private readonly IServerApplicationPaths _appPaths;
 
-        private readonly ILibraryManager _libraryManager;
+        private readonly IItemResolutionPolicy _policy;
         private LibraryOptions _libraryOptions;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ItemResolveArgs" /> class.
         /// </summary>
         /// <param name="appPaths">The app paths.</param>
-        /// <param name="libraryManager">The library manager.</param>
-        public ItemResolveArgs(IServerApplicationPaths appPaths, ILibraryManager libraryManager)
+        /// <param name="policy">The explicit resolution policy.</param>
+        public ItemResolveArgs(IServerApplicationPaths appPaths, IItemResolutionPolicy policy)
         {
             _appPaths = appPaths;
-            _libraryManager = libraryManager;
+            _policy = policy;
         }
 
         /// <summary>
@@ -45,7 +45,7 @@ namespace Tesserafin.Controller.Library
 
         public LibraryOptions LibraryOptions
         {
-            get => _libraryOptions ??= Parent is null ? new LibraryOptions() : _libraryManager.GetLibraryOptions(Parent);
+            get => _libraryOptions ??= Parent is null ? new LibraryOptions() : _policy.GetLibraryOptions(Parent);
             set => _libraryOptions = value;
         }
 
@@ -100,7 +100,7 @@ namespace Tesserafin.Controller.Library
         /// Gets a value indicating whether this instance is physical root.
         /// </summary>
         /// <value><c>true</c> if this instance is physical root; otherwise, <c>false</c>.</value>
-        public bool IsPhysicalRoot => IsDirectory && BaseItem.FileSystem.AreEqual(Path, _appPaths.RootFolderPath);
+        public bool IsPhysicalRoot => IsDirectory && _policy.AreEqualPaths(Path, _appPaths.RootFolderPath);
 
         /// <summary>
         /// Gets or sets the additional locations.
@@ -136,7 +136,7 @@ namespace Tesserafin.Controller.Library
                 // Not officially supported but in some cases we can handle it.
                 if (item is null)
                 {
-                    var parents = parent.GetParents();
+                    var parents = parent.GetParents(_policy);
                     foreach (var currentParent in parents)
                     {
                         if (currentParent is T)
@@ -232,7 +232,7 @@ namespace Tesserafin.Controller.Library
         /// <returns>The configured content type.</returns>
         public CollectionType? GetConfiguredContentType()
         {
-            return _libraryManager.GetConfiguredContentType(Path);
+            return _policy.GetConfiguredContentType(Path);
         }
 
         /// <summary>
@@ -245,7 +245,7 @@ namespace Tesserafin.Controller.Library
             for (var i = 0; i < numberOfChildren; i++)
             {
                 var child = FileSystemChildren[i];
-                if (_libraryManager.IgnoreFile(child, Parent))
+                if (_policy.IgnoreFile(child, Parent))
                 {
                     continue;
                 }
@@ -277,7 +277,7 @@ namespace Tesserafin.Controller.Library
                     return true;
                 }
 
-                return args.Path is not null && BaseItem.FileSystem.AreEqual(args.Path, Path);
+                return args.Path is not null && _policy.AreEqualPaths(args.Path, Path);
             }
 
             return false;

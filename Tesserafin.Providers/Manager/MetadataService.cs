@@ -2,16 +2,16 @@
 
 #pragma warning disable CS1591
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
@@ -29,6 +29,7 @@ namespace Tesserafin.Providers.Manager
         where TIdType : ItemLookupInfo, new()
     {
         protected MetadataService(
+            IItemWriteCommands writes,
             IServerConfigurationManager serverConfigurationManager,
             ILogger<MetadataService<TItemType, TIdType>> logger,
             IProviderManager providerManager,
@@ -38,6 +39,7 @@ namespace Tesserafin.Providers.Manager
             IExternalDataManager externalDataManager,
             IItemRepository itemRepository)
         {
+            Writes = writes;
             ServerConfigurationManager = serverConfigurationManager;
             Logger = logger;
             ProviderManager = providerManager;
@@ -48,6 +50,8 @@ namespace Tesserafin.Providers.Manager
             ItemRepository = itemRepository;
             ImageProvider = new ItemImageProvider(Logger, ProviderManager, FileSystem);
         }
+
+        protected IItemWriteCommands Writes { get; }
 
         protected ItemImageProvider ImageProvider { get; }
 
@@ -281,10 +285,10 @@ namespace Tesserafin.Providers.Manager
 
         protected async Task SaveItemAsync(MetadataResult<TItemType> result, ItemUpdateType reason, bool reattachUserData, CancellationToken cancellationToken)
         {
-            await result.Item.UpdateToRepositoryAsync(reason, cancellationToken).ConfigureAwait(false);
+            await result.Item.UpdateToRepositoryAsync(Writes, reason, cancellationToken).ConfigureAwait(false);
             if (reattachUserData)
             {
-                await result.Item.ReattachUserDataAsync(cancellationToken).ConfigureAwait(false);
+                await result.Item.ReattachUserDataAsync(Writes, cancellationToken).ConfigureAwait(false);
             }
 
             if (result.Item.SupportsPeople && result.People is not null)

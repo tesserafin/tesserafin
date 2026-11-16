@@ -2,21 +2,21 @@
 
 #pragma warning disable CS1591
 
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PlaylistsNET.Content;
 using PlaylistsNET.Models;
 using Tesserafin.Common.IO;
 using Tesserafin.Controller.Dto;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Extensions;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Playlists;
@@ -35,6 +35,7 @@ namespace Tesserafin.Server.Core.Playlists
 {
     public class PlaylistManager : IPlaylistManager
     {
+        private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
         private readonly ILibraryManager _libraryManager;
         private readonly IFileSystem _fileSystem;
@@ -47,6 +48,7 @@ namespace Tesserafin.Server.Core.Playlists
         private readonly IItemSortService _itemSortService;
 
         public PlaylistManager(
+            IItemWriteCommands writes,
             IItemDeletionCommands deletions,
             ILibraryManager libraryManager,
             IFileSystem fileSystem,
@@ -58,6 +60,7 @@ namespace Tesserafin.Server.Core.Playlists
             IItemQueryService itemQueryService,
             IItemSortService itemSortService)
         {
+            _writes = writes;
             _deletions = deletions;
             _libraryManager = libraryManager;
             _fileSystem = fileSystem;
@@ -160,9 +163,9 @@ namespace Tesserafin.Server.Core.Playlists
                 };
 
                 playlist.SetMediaType(request.MediaType);
-                parentFolder.AddChild(playlist);
+                parentFolder.AddChild(_writes, playlist);
 
-                await playlist.RefreshMetadata(_deletions, new MetadataRefreshOptions(new DirectoryService(_fileSystem)) { ForceSave = true }, CancellationToken.None)
+                await playlist.RefreshMetadata(_deletions, _writes, new MetadataRefreshOptions(new DirectoryService(_fileSystem)) { ForceSave = true }, CancellationToken.None)
                     .ConfigureAwait(false);
 
                 if (request.ItemIdList.Count > 0)
@@ -690,7 +693,7 @@ namespace Tesserafin.Server.Core.Playlists
 
         private async Task UpdatePlaylistInternal(Playlist playlist)
         {
-            await playlist.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+            await playlist.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
             if (playlist.IsFile)
             {

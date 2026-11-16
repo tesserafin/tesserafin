@@ -1,6 +1,6 @@
-using System;
 using System.Linq;
 using System.Reflection;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Tesserafin.Controller.Channels;
@@ -40,6 +40,7 @@ public class UserViewFactoryTests
         _fileSystemMock = new Mock<IFileSystem>();
 
         _userViewFactory = new UserViewFactory(
+            Mock.Of<IItemWriteCommands>(),
             _itemLookupServiceMock.Object,
             _itemStoreMock.Object,
             _configurationManagerMock.Object,
@@ -131,6 +132,7 @@ public class UserViewFactoryTests
         services.AddSingleton(_configurationManagerMock.Object);
         services.AddSingleton(_fileSystemMock.Object);
         services.AddSingleton(new Lazy<IProviderManager>(() => Mock.Of<IProviderManager>()));
+        services.AddSingleton<IItemWriteCommands>(Mock.Of<IItemWriteCommands>());
         services.AddSingleton<IUserViewFactory, UserViewFactory>();
 
         using var provider = services.BuildServiceProvider();
@@ -149,6 +151,7 @@ public class UserViewFactoryTests
         services.AddSingleton(_configurationManagerMock.Object);
         services.AddSingleton(_fileSystemMock.Object);
         services.AddSingleton(new Lazy<IProviderManager>(() => Mock.Of<IProviderManager>()));
+        services.AddSingleton<IItemWriteCommands>(Mock.Of<IItemWriteCommands>());
         services.AddSingleton<IUserViewFactory, UserViewFactory>();
 
         using var provider = services.BuildServiceProvider();

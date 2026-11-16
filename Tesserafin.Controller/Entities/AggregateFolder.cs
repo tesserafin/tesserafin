@@ -2,13 +2,13 @@
 
 #pragma warning disable CA1819, CS1591
 
-using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
@@ -155,11 +155,11 @@ namespace Tesserafin.Controller.Entities
             return base.GetNonCachedChildren(directoryService).Concat(_virtualChildren);
         }
 
-        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             ClearCache();
 
-            await base.ValidateChildrenInternal(deletions, images, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken)
+            await base.ValidateChildrenInternal(deletions, writes, images, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken)
                 .ConfigureAwait(false);
 
             ClearCache();

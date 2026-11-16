@@ -1,9 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using AutoFixture;
+using System;
 using AutoFixture.AutoMoq;
+using AutoFixture;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Common.Configuration;
@@ -128,6 +128,8 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
         // remarks: every higher-priority media resolver only claims media-shaped paths, never
         // exercised here since none are registered - matches the real production set's behavior for
         // this specific path, not merely "no resolvers at all").
+        Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
+
         _libraryManager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 Array.Empty<IResolverIgnoreRule>(),
                 new IItemResolver[] { new FolderResolver() },

@@ -1,14 +1,14 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
@@ -34,6 +34,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// <summary>
     /// Initializes a new instance of the <see cref="SeriesMetadataService"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
@@ -46,7 +47,8 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     public SeriesMetadataService(
-        IItemDeletionCommands deletions,
+        IItemWriteCommands writes,
+            IItemDeletionCommands deletions,
         IServerConfigurationManager serverConfigurationManager,
         ILogger<SeriesMetadataService> logger,
         IProviderManager providerManager,
@@ -57,7 +59,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
         IItemSortService itemSortService)
-        : base(serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
         _deletions = deletions;
         _localizationManager = localizationManager;
@@ -76,7 +78,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
                 var hasUpdate = refreshOptions is not null && season.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, ItemNamingService);
                 if (hasUpdate)
                 {
-                    await season.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+                    await season.UpdateToRepositoryAsync(Writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -151,7 +153,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 
             if (updateType > ItemUpdateType.None)
             {
-                await child.UpdateToRepositoryAsync(updateType, cancellationToken).ConfigureAwait(false);
+                await child.UpdateToRepositoryAsync(Writes, updateType, cancellationToken).ConfigureAwait(false);
             }
         }
     }
@@ -366,7 +368,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
                 if (episodeCount > 0)
                 {
                     existingSeason.IsVirtualItem = false;
-                    await existingSeason.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+                    await existingSeason.UpdateToRepositoryAsync(Writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -383,7 +385,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             // Assign the correct season id and name to episode.
             episode.SeasonId = season.Id;
             episode.SeasonName = season.Name;
-            await episode.UpdateToRepositoryAsync(ItemUpdateType.MetadataImport, cancellationToken).ConfigureAwait(false);
+            await episode.UpdateToRepositoryAsync(Writes, ItemUpdateType.MetadataImport, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -416,8 +418,8 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             SeriesPresentationUniqueKey = series.GetPresentationUniqueKey()
         };
 
-        series.AddChild(season);
-        await season.RefreshMetadata(_deletions, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken).ConfigureAwait(false);
+        series.AddChild(Writes, season);
+        await season.RefreshMetadata(_deletions, Writes, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken).ConfigureAwait(false);
 
         return season;
     }

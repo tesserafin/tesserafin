@@ -1,16 +1,16 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
-using AutoFixture;
+using System.Threading;
+using System;
 using AutoFixture.AutoMoq;
+using AutoFixture;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
@@ -18,9 +18,9 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Resolvers;
 using Tesserafin.Controller.Sorting;
-using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
+using Tesserafin.Data;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Naming.Common;
@@ -38,6 +38,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library.LibraryManager;
 [Collection(LibraryManagerStaticStateFixture.Name)]
 public class LibraryManagerItemLookupTests
 {
+    private readonly IItemWriteCommands _writes;
     private readonly Tesserafin.Server.Core.Library.LibraryManager _libraryManager;
     private readonly Tesserafin.Server.Core.Library.ItemDeletionCommands _deletions;
     private readonly Tesserafin.Server.Core.Library.ItemChangeEvents _changes = new(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.ItemChangeEvents>.Instance);
@@ -97,6 +98,8 @@ public class LibraryManagerItemLookupTests
             _itemLookupService,
             new Tesserafin.Server.Core.Library.TagVisibilityService(_itemLookupService, fixture.Freeze<ICollectionFolderResolver>(), fixture.Freeze<IUserRootFolderProvider>(), _itemRepositoryMock.Object, fixture.Freeze<ILocalizationManager>(), fixture.Freeze<IServerConfigurationManager>(), new Tesserafin.Controller.LiveTv.ActiveRecordings()));
         fixture.Register<IItemAccessService>(() => _itemAccessService);
+
+        _writes = Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
 
         _libraryManager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 fixture.Create<IEnumerable<IResolverIgnoreRule>>(),
@@ -284,7 +287,7 @@ public class LibraryManagerItemLookupTests
     {
         var artist = new MusicArtist { Id = Guid.NewGuid(), Name = "Artist" };
 
-        _libraryManager.CreateItems(new List<BaseItem> { artist }, null, System.Threading.CancellationToken.None);
+        _writes.CreateItems(new List<BaseItem> { artist }, null, System.Threading.CancellationToken.None);
 
         var result = _libraryManager.GetItemById(artist.Id);
 
@@ -571,7 +574,7 @@ public class LibraryManagerItemLookupTests
             .Returns(new StubUserRootFolder { StubChildren = [missing] });
 
         var roots = Mock.Of<ILibraryRootFolderProvider>(p => p.GetRootFolder() == new StubAggregateFolder());
-        var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(Mock.Of<IItemImageService>(), _deletions, roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
+        var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(_writes, Mock.Of<IItemImageService>(), _deletions, roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
         await traversal.RefreshTopFoldersAsync(TestContext.Current.CancellationToken, false);
 
         // Deleted from the database...
@@ -592,7 +595,7 @@ public class LibraryManagerItemLookupTests
             set { }
         }
 
-        protected override System.Threading.Tasks.Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override System.Threading.Tasks.Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
             => System.Threading.Tasks.Task.CompletedTask;
     }
 
@@ -606,7 +609,7 @@ public class LibraryManagerItemLookupTests
             set { }
         }
 
-        protected override System.Threading.Tasks.Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override System.Threading.Tasks.Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
             => System.Threading.Tasks.Task.CompletedTask;
     }
 }

@@ -1,7 +1,6 @@
-using System;
 using System.Linq;
 using System.Threading;
-
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
@@ -18,15 +17,18 @@ namespace Tesserafin.Server.Migrations.Routines;
 internal class FixPlaylistOwner : IMigrationRoutine
 #pragma warning restore CS0618 // Type or member is obsolete
 {
+    private readonly IItemWriteCommands _writes;
     private readonly ILogger<FixPlaylistOwner> _logger;
     private readonly ILibraryManager _libraryManager;
     private readonly IPlaylistManager _playlistManager;
 
     public FixPlaylistOwner(
+        IItemWriteCommands writes,
         ILogger<FixPlaylistOwner> logger,
         ILibraryManager libraryManager,
         IPlaylistManager playlistManager)
     {
+        _writes = writes;
         _logger = logger;
         _libraryManager = libraryManager;
         _playlistManager = playlistManager;
@@ -55,14 +57,14 @@ internal class FixPlaylistOwner : IMigrationRoutine
                     {
                         playlist.OwnerUserId = firstEditShare.UserId;
                         playlist.Shares = shares.Where(x => x != firstEditShare).ToArray();
-                        playlist.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).GetAwaiter().GetResult();
+                        playlist.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).GetAwaiter().GetResult();
                         _playlistManager.SavePlaylistFile(playlist);
                     }
                 }
                 else
                 {
                     playlist.OpenAccess = true;
-                    playlist.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).GetAwaiter().GetResult();
+                    playlist.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).GetAwaiter().GetResult();
                 }
             }
         }

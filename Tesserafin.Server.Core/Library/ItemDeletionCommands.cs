@@ -1,15 +1,15 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using AsyncKeyedLock;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
@@ -25,6 +25,7 @@ namespace Tesserafin.Server.Core.Library;
 /// <summary>Owns deletion ordering and reconciliation with explicit orchestration dependencies.</summary>
 internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
 {
+    private readonly IItemWriteCommands _writes;
     private readonly AsyncNonKeyedLocker _slot = new(1);
     private readonly ILibraryManager _library;
     private readonly IItemChangePublisher _changes;
@@ -41,6 +42,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
     private readonly ILogger<ItemDeletionCommands> _logger;
 
     public ItemDeletionCommands(
+        IItemWriteCommands writes,
         ILibraryManager library,
         IItemChangePublisher changes,
         IItemLookupService items,
@@ -55,6 +57,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         Lazy<IChannelManager> channels,
         ILogger<ItemDeletionCommands> logger)
     {
+        _writes = writes;
         _library = library;
         _changes = changes;
         _items = items;
@@ -325,7 +328,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
                     .Where(lc => !lc.ItemId.HasValue || (!lc.ItemId.Value.Equals(newPrimary.Id) && !missingIds.Contains(lc.ItemId.Value)))
                     .ToArray();
 
-                await newPrimary.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+                await newPrimary.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
                 // Re-route playlist/collection references from deleted primary to new primary
                 await _library.RerouteLinkedChildReferencesAsync(video.Id, newPrimary.Id).ConfigureAwait(false);
@@ -336,7 +339,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
                     alternate.SetPrimaryVersionId(newPrimary.Id);
                     // Only set OwnerId for local alternates; linked alternates are independent items
                     alternate.OwnerId = localAlternateIds.Contains(alternate.Id) ? newPrimary.Id : Guid.Empty;
-                    await alternate.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+                    await alternate.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
                 }
             }
         }
@@ -351,7 +354,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
                 primaryVideo.LinkedAlternateVersions = primaryVideo.LinkedAlternateVersions
                     .Where(lc => !lc.ItemId.HasValue || !lc.ItemId.Value.Equals(alternateVideo.Id))
                     .ToArray();
-                await primaryVideo.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+                await primaryVideo.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
             }
         }
 

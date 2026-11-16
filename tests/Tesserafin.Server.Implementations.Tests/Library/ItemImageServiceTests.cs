@@ -1,17 +1,17 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
-using System.Threading;
+using System.Net;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Drawing;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
@@ -303,7 +303,7 @@ public sealed class ItemImageServiceTests
         }
 
         var dependencies = manager.GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToArray();
-        Assert.Equal(29, dependencies.Length);
+        Assert.Contains(typeof(IItemWriteCommands), dependencies);
         Assert.DoesNotContain(typeof(IUserDataManager), dependencies);
         Assert.DoesNotContain(typeof(Tesserafin.Controller.MediaEncoding.IMediaEncoder), dependencies);
         Assert.DoesNotContain(typeof(IImageProcessor), dependencies);
@@ -403,7 +403,7 @@ public sealed class ItemImageServiceTests
 
     private sealed class NoRecursiveMovie : Movie
     {
-        public override Task UpdateToRepositoryAsync(ItemUpdateType updateReason, CancellationToken cancellationToken)
+        public override Task UpdateToRepositoryAsync(IItemWriteCommands writes, ItemUpdateType updateReason, CancellationToken cancellationToken)
             => throw new InvalidOperationException("Image processing reentered whole-item persistence.");
     }
 }

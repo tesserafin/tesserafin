@@ -2,7 +2,6 @@
 
 #pragma warning disable CS1591
 
-using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -13,20 +12,20 @@ using System.Net;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
+using System;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Prometheus.DotNetRuntime;
-using Tesserafin.Common;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Common.Events;
 using Tesserafin.Common.Net;
 using Tesserafin.Common.Plugins;
 using Tesserafin.Common.Updates;
-using Tesserafin.Controller;
+using Tesserafin.Common;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Chapters;
 using Tesserafin.Controller.ClientEvent;
@@ -36,8 +35,8 @@ using Tesserafin.Controller.ContentPacks;
 using Tesserafin.Controller.Diagnostics;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Dto;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LibraryTaskScheduler;
@@ -56,6 +55,7 @@ using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.Subtitles;
 using Tesserafin.Controller.SyncPlay;
 using Tesserafin.Controller.TV;
+using Tesserafin.Controller;
 using Tesserafin.Drawing;
 using Tesserafin.LocalMetadata.Savers;
 using Tesserafin.MediaEncoding.BdInfo;
@@ -78,16 +78,16 @@ using Tesserafin.Networking.Udp;
 using Tesserafin.Photos;
 using Tesserafin.Playback.Engine;
 using Tesserafin.Playback.Shadow;
-using Tesserafin.Providers.Books;
 using Tesserafin.Providers.Books.ComicBookInfo;
 using Tesserafin.Providers.Books.ComicInfo;
+using Tesserafin.Providers.Books;
 using Tesserafin.Providers.Lyric;
 using Tesserafin.Providers.Manager;
-using Tesserafin.Providers.Plugins.ListenBrainz;
 using Tesserafin.Providers.Plugins.ListenBrainz.Api;
-using Tesserafin.Providers.Plugins.Tmdb;
+using Tesserafin.Providers.Plugins.ListenBrainz;
 using Tesserafin.Providers.Plugins.Tmdb.Movies;
 using Tesserafin.Providers.Plugins.Tmdb.TV;
+using Tesserafin.Providers.Plugins.Tmdb;
 using Tesserafin.Providers.Subtitles;
 using Tesserafin.Server.Core.Chapters;
 using Tesserafin.Server.Core.Collections;
@@ -98,9 +98,9 @@ using Tesserafin.Server.Core.Devices;
 using Tesserafin.Server.Core.Dto;
 using Tesserafin.Server.Core.HttpServer.Security;
 using Tesserafin.Server.Core.IO;
-using Tesserafin.Server.Core.Library;
 using Tesserafin.Server.Core.Library.Search;
 using Tesserafin.Server.Core.Library.SimilarItems;
+using Tesserafin.Server.Core.Library;
 using Tesserafin.Server.Core.Localization;
 using Tesserafin.Server.Core.Playlists;
 using Tesserafin.Server.Core.Plugins;
@@ -583,6 +583,11 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemChangeEvents>(s => s.GetRequiredService<ItemChangeEvents>());
             serviceCollection.AddSingleton<IItemChangePublisher>(s => s.GetRequiredService<ItemChangeEvents>());
             serviceCollection.AddSingleton<IItemStore, ItemStore>();
+            serviceCollection.AddSingleton<ILibraryItemOptions, LibraryItemOptions>();
+            serviceCollection.AddSingleton<IItemResolutionService, ItemResolutionService>();
+            serviceCollection.AddSingleton<IItemMetadataExporter, ItemMetadataExporter>();
+            serviceCollection.AddSingleton<ItemVersionGraphPlanner>();
+            serviceCollection.AddSingleton<IItemWriteCommands, ItemWriteCommands>();
             serviceCollection.AddSingleton<IUserViewFactory, UserViewFactory>();
             serviceCollection.AddSingleton<IUserRootFolderProvider, UserRootFolderProvider>();
             serviceCollection.AddSingleton<ICollectionFolderResolver, CollectionFolderResolver>();
@@ -851,11 +856,12 @@ namespace Tesserafin.Server.Core
                 GetExports<IBaseItemComparer>());
             Resolve<ILibraryScanCoordinator>().SetPostScanTasks(GetExports<ILibraryPostScanTask>());
 
+            Resolve<IItemMetadataExporter>().AddParts(GetExports<IMetadataSaver>());
+
             Resolve<IProviderManager>().AddParts(
                 GetExports<IImageProvider>(),
                 GetExports<IMetadataService>(),
                 GetExports<IMetadataProvider>(),
-                GetExports<IMetadataSaver>(),
                 GetExports<IExternalId>(),
                 GetExports<IExternalUrlProvider>());
 

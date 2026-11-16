@@ -1,6 +1,6 @@
-using System;
 using System.Linq;
 using System.Threading;
+using System;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Playlists;
@@ -16,13 +16,16 @@ namespace Tesserafin.Server.Migrations.Routines;
 internal class RemoveDuplicatePlaylistChildren : IMigrationRoutine
 #pragma warning restore CS0618 // Type or member is obsolete
 {
+    private readonly IItemWriteCommands _writes;
     private readonly ILibraryManager _libraryManager;
     private readonly IPlaylistManager _playlistManager;
 
     public RemoveDuplicatePlaylistChildren(
+        IItemWriteCommands writes,
         ILibraryManager libraryManager,
         IPlaylistManager playlistManager)
     {
+        _writes = writes;
         _libraryManager = libraryManager;
         _playlistManager = playlistManager;
     }
@@ -52,7 +55,7 @@ internal class RemoveDuplicatePlaylistChildren : IMigrationRoutine
                             .DistinctBy(c => c.ItemId))
                         .ToArray();
                     playlist.LinkedChildren = newLinkedChildren;
-                    playlist.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).GetAwaiter().GetResult();
+                    playlist.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).GetAwaiter().GetResult();
                     _playlistManager.SavePlaylistFile(playlist);
                 }
             }

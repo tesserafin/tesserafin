@@ -1,15 +1,15 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Common.IO;
 using Tesserafin.Controller.Collections;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
@@ -29,6 +29,7 @@ namespace Tesserafin.Server.Core.Collections
     /// </summary>
     public class CollectionManager : ICollectionManager
     {
+        private readonly IItemWriteCommands _writes;
         private readonly ILibraryManager _libraryManager;
         private readonly ILibraryStructureCommands _structure;
         private readonly IFileSystem _fileSystem;
@@ -43,6 +44,7 @@ namespace Tesserafin.Server.Core.Collections
         /// <summary>
         /// Initializes a new instance of the <see cref="CollectionManager"/> class.
         /// </summary>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="structure">Library structure commands.</param>
         /// <param name="libraryManager">The library manager.</param>
         /// <param name="appPaths">The application paths.</param>
@@ -54,6 +56,7 @@ namespace Tesserafin.Server.Core.Collections
         /// <param name="linkedChildrenService">The linked children service.</param>
         /// <param name="itemSortService">The item sort service.</param>
         public CollectionManager(
+            IItemWriteCommands writes,
             ILibraryManager libraryManager,
             ILibraryStructureCommands structure,
             IApplicationPaths appPaths,
@@ -65,6 +68,7 @@ namespace Tesserafin.Server.Core.Collections
             ILinkedChildrenService linkedChildrenService,
             IItemSortService itemSortService)
         {
+            _writes = writes;
             _libraryManager = libraryManager;
             _structure = structure;
             _fileSystem = fileSystem;
@@ -196,7 +200,7 @@ namespace Tesserafin.Server.Core.Collections
                     DateModified = info.LastWriteTimeUtc
                 };
 
-                parentFolder.AddChild(collection);
+                parentFolder.AddChild(_writes, collection);
 
                 if (options.ItemIdList.Count > 0)
                 {
@@ -278,7 +282,7 @@ namespace Tesserafin.Server.Core.Collections
                 collection.LinkedChildren = newChildren;
                 collection.UpdateRatingToItems(linkedChildrenList);
 
-                await collection.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+                await collection.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
                 refreshOptions.ForceSave = true;
                 _providerManager.QueueRefresh(collection.Id, refreshOptions, RefreshPriority.High);
@@ -326,7 +330,7 @@ namespace Tesserafin.Server.Core.Collections
                 collection.LinkedChildren = collection.LinkedChildren.Except(list).ToArray();
             }
 
-            await collection.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+            await collection.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
             _providerManager.QueueRefresh(
                 collection.Id,
                 new MetadataRefreshOptions(new DirectoryService(_fileSystem))

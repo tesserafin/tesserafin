@@ -1,13 +1,13 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
-using System.Text.Json;
+using System.Net.Http;
+using System.Net;
 using System.Text.Json.Nodes;
+using System.Text.Json;
 using System.Threading.Tasks;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Api.Models.PlaybackSessionDtos;
 using Tesserafin.Common.Configuration;
@@ -501,7 +501,7 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
 
     private Guid SeedFilm(string path, MediaStream[] streams, string[]? tags = null) =>
         LibraryItemSeeder.SeedVideo(
-            _libraryManager,
+            _factory.Services.GetRequiredService<IItemWriteCommands>(),
             _mediaStreamRepository,
             path,
             "mkv",

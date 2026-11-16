@@ -1,15 +1,15 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Lyrics;
 using Tesserafin.Controller.Persistence;
@@ -28,6 +28,7 @@ namespace Tesserafin.Providers.Lyric;
 /// </summary>
 public class LyricManager : ILyricManager
 {
+    private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
     private readonly ILogger<LyricManager> _logger;
     private readonly IFileSystem _fileSystem;
@@ -40,6 +41,7 @@ public class LyricManager : ILyricManager
     /// <summary>
     /// Initializes a new instance of the <see cref="LyricManager"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
     /// <param name="logger">Instance of the <see cref="ILogger{LyricManager}"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
@@ -48,6 +50,7 @@ public class LyricManager : ILyricManager
     /// <param name="lyricProviders">The list of <see cref="ILyricProvider"/>.</param>
     /// <param name="lyricParsers">The list of <see cref="ILyricParser"/>.</param>
     public LyricManager(
+        IItemWriteCommands writes,
         IItemDeletionCommands deletions,
         ILogger<LyricManager> logger,
         IFileSystem fileSystem,
@@ -56,6 +59,7 @@ public class LyricManager : ILyricManager
         IEnumerable<ILyricProvider> lyricProviders,
         IEnumerable<ILyricParser> lyricParsers)
     {
+        _writes = writes;
         _deletions = deletions;
         _logger = logger;
         _fileSystem = fileSystem;
@@ -256,7 +260,7 @@ public class LyricManager : ILyricManager
             }
         }
 
-        return audio.RefreshMetadata(_deletions, CancellationToken.None);
+        return audio.RefreshMetadata(_deletions, _writes, CancellationToken.None);
     }
 
     /// <inheritdoc />

@@ -1,19 +1,19 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
+using System.Net;
 using System.Threading.Tasks;
+using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Playlists;
-using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
+using Tesserafin.Data;
 using Tesserafin.Database.Implementations;
 using Tesserafin.Model.Entities;
 using Tesserafin.Server.Implementations.Item;
@@ -32,9 +32,10 @@ public sealed class ItemDeletionCommandsEndToEndTests(TesserafinApplicationFacto
         using var client = await ClientAsync();
         using var sources = new Sources();
         var library = factory.Services.GetRequiredService<ILibraryManager>();
+        var libraryWrites = factory.Services.GetRequiredService<IItemWriteCommands>();
         var item = sources.Movie();
         var kept = sources.Movie();
-        library.CreateItems([item, kept], null, TestContext.Current.CancellationToken);
+        libraryWrites.CreateItems([item, kept], null, TestContext.Current.CancellationToken);
         var userId = (await AuthHelper.GetUserDtoAsync(client)).Id;
         var user = factory.Services.GetRequiredService<IUserManager>().GetUserById(userId)!;
         user.SetPermission(PermissionKind.EnableContentDeletion, true);
@@ -56,11 +57,12 @@ public sealed class ItemDeletionCommandsEndToEndTests(TesserafinApplicationFacto
         using var client = await ClientAsync();
         using var sources = new Sources();
         var library = factory.Services.GetRequiredService<ILibraryManager>();
+        var libraryWrites = factory.Services.GetRequiredService<IItemWriteCommands>();
         var primary = sources.Movie();
         var alternate = sources.Movie();
         alternate.SetPrimaryVersionId(primary.Id);
         var playlist = new Playlist { Id = Guid.NewGuid(), Name = "deletion-playlist" };
-        library.CreateItems([primary, alternate, playlist], null, TestContext.Current.CancellationToken);
+        libraryWrites.CreateItems([primary, alternate, playlist], null, TestContext.Current.CancellationToken);
         var userId = (await AuthHelper.GetUserDtoAsync(client)).Id;
         var key = "deletion-primary-" + primary.Id;
         await HistoryAsync(primary.Id, userId, key);
@@ -99,6 +101,7 @@ public sealed class ItemDeletionCommandsEndToEndTests(TesserafinApplicationFacto
         var changes = factory.Services.GetRequiredService<IItemChangeEvents>();
         Assert.Same(changes, factory.Services.GetRequiredService<IItemChangePublisher>());
         var library = factory.Services.GetRequiredService<ILibraryManager>();
+        var libraryWrites = factory.Services.GetRequiredService<IItemWriteCommands>();
         var store = factory.Services.GetRequiredService<IItemStore>();
         var deletions = factory.Services.GetRequiredService<IItemDeletionCommands>();
         var lookup = factory.Services.GetRequiredService<IItemLookupService>();
@@ -122,9 +125,9 @@ public sealed class ItemDeletionCommandsEndToEndTests(TesserafinApplicationFacto
         try
         {
             store.CreateItem(stored, null);
-            library.CreateItem(general, null);
+            libraryWrites.CreateItem(general, null);
             general.Name = "event-updated";
-            await library.UpdateItemAsync(general, library.RootFolder, ItemUpdateType.MetadataEdit, TestContext.Current.CancellationToken);
+            await libraryWrites.UpdateItemAsync(general, library.RootFolder, ItemUpdateType.MetadataEdit, TestContext.Current.CancellationToken);
             await deletions.DeleteAsync(general, new DeleteOptions { DeleteFileLocation = false }, TestContext.Current.CancellationToken);
             await deletions.DeleteAsync(stored, new DeleteOptions { DeleteFileLocation = false }, TestContext.Current.CancellationToken);
 

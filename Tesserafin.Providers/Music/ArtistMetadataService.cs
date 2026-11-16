@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
@@ -20,6 +20,7 @@ public class ArtistMetadataService : MetadataService<MusicArtist, ArtistInfo>
     /// <summary>
     /// Initializes a new instance of the <see cref="ArtistMetadataService"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -29,7 +30,8 @@ public class ArtistMetadataService : MetadataService<MusicArtist, ArtistInfo>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public ArtistMetadataService(
-        IServerConfigurationManager serverConfigurationManager,
+        IItemWriteCommands writes,
+            IServerConfigurationManager serverConfigurationManager,
         ILogger<ArtistMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
@@ -37,7 +39,7 @@ public class ArtistMetadataService : MetadataService<MusicArtist, ArtistInfo>
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository)
-        : base(serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
     }
 

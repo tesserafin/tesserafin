@@ -1,9 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Moq;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
@@ -15,9 +15,9 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
-using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
+using Tesserafin.Data;
 using Tesserafin.Model.Channels;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Globalization;
@@ -374,6 +374,7 @@ public sealed class UserViewCatalogParityTests
             fileSystemMock.Setup(f => f.GetValidFilename(It.IsAny<string>())).Returns<string>(s => s);
 
             UserViewFactory = new Tesserafin.Server.Core.Library.UserViewFactory(
+                Mock.Of<IItemWriteCommands>(),
                 itemLookupService,
                 itemStore,
                 ConfigMock.Object,

@@ -1,10 +1,10 @@
-using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -12,10 +12,10 @@ using Tesserafin.Api.Constants;
 using Tesserafin.Api.Extensions;
 using Tesserafin.Api.Helpers;
 using Tesserafin.Common.Api;
-using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Controller;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Providers;
 
@@ -27,6 +27,7 @@ namespace Tesserafin.Api.Controllers;
 [Route("")]
 public class RemoteImageController : BaseTesserafinApiController
 {
+    private readonly IItemWriteCommands _writes;
     private readonly IProviderManager _providerManager;
     private readonly IServerApplicationPaths _applicationPaths;
     private readonly ILibraryManager _libraryManager;
@@ -34,14 +35,17 @@ public class RemoteImageController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="RemoteImageController"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="applicationPaths">Instance of the <see cref="IServerApplicationPaths"/> interface.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     public RemoteImageController(
+        IItemWriteCommands writes,
         IProviderManager providerManager,
         IServerApplicationPaths applicationPaths,
         ILibraryManager libraryManager)
     {
+        _writes = writes;
         _providerManager = providerManager;
         _applicationPaths = applicationPaths;
         _libraryManager = libraryManager;
@@ -166,7 +170,7 @@ public class RemoteImageController : BaseTesserafinApiController
         await _providerManager.SaveImage(item, imageUrl, type, null, CancellationToken.None)
             .ConfigureAwait(false);
 
-        await item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
+        await item.UpdateToRepositoryAsync(_writes, ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
         return NoContent();
     }
 

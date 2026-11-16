@@ -1,11 +1,11 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
@@ -27,6 +27,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// <summary>
     /// Initializes a new instance of the <see cref="SeasonMetadataService"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -37,7 +38,8 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     public SeasonMetadataService(
-        IServerConfigurationManager serverConfigurationManager,
+        IItemWriteCommands writes,
+            IServerConfigurationManager serverConfigurationManager,
         ILogger<SeasonMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
@@ -46,7 +48,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
         IItemSortService itemSortService)
-        : base(serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
         _itemSortService = itemSortService;
     }

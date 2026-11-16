@@ -2,11 +2,11 @@
 
 #pragma warning disable CS1591
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
@@ -22,6 +22,7 @@ namespace Tesserafin.Providers.MediaInfo
 {
     public class SubtitleScheduledTask : IScheduledTask
     {
+        private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
         private readonly ILibraryManager _libraryManager;
         private readonly IServerConfigurationManager _config;
@@ -32,6 +33,7 @@ namespace Tesserafin.Providers.MediaInfo
         private readonly IMediaSourceManager _mediaSourceManager;
 
         public SubtitleScheduledTask(
+            IItemWriteCommands writes,
             IItemDeletionCommands deletions,
             ILibraryManager libraryManager,
             IServerConfigurationManager config,
@@ -41,6 +43,7 @@ namespace Tesserafin.Providers.MediaInfo
             IEnumerable<ISubtitleProvider> subtitleProviders,
             IMediaSourceManager mediaSourceManager)
         {
+            _writes = writes;
             _deletions = deletions;
             _libraryManager = libraryManager;
             _config = config;
@@ -206,7 +209,7 @@ namespace Tesserafin.Providers.MediaInfo
             // Rescan
             if (downloadedLanguages.Count > 0)
             {
-                await video.RefreshMetadata(_deletions, cancellationToken).ConfigureAwait(false);
+                await video.RefreshMetadata(_deletions, _writes, cancellationToken).ConfigureAwait(false);
                 return false;
             }
 

@@ -2,15 +2,15 @@
 
 #pragma warning disable CA1002, CA1721, CA1819, CS1591
 
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Security;
 using System.Text.Json.Serialization;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using J2N.Collections.Generic.Extensions;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Channels;
@@ -25,9 +25,9 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
-using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
+using Tesserafin.Data;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.IO;
@@ -225,9 +225,10 @@ namespace Tesserafin.Controller.Entities
         /// <summary>
         /// Adds the child.
         /// </summary>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="item">The item.</param>
         /// <exception cref="InvalidOperationException">Unable to add  + item.Name.</exception>
-        public void AddChild(BaseItem item)
+        public void AddChild(IItemWriteCommands writes, BaseItem item)
         {
             item.SetParent(this);
 
@@ -246,7 +247,7 @@ namespace Tesserafin.Controller.Entities
                 item.DateModified = DateTime.UtcNow;
             }
 
-            LibraryManager.CreateItem(item, this);
+            writes.CreateItem(item, this);
         }
 
         public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
@@ -291,15 +292,16 @@ namespace Tesserafin.Controller.Entities
             return ProviderManager.GetRefreshProgress(Id);
         }
 
-        public Task ValidateChildren(IItemDeletionCommands deletions, IItemImageService images, IProgress<double> progress, CancellationToken cancellationToken)
+        public Task ValidateChildren(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, CancellationToken cancellationToken)
         {
-            return ValidateChildren(deletions, images, progress, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken: cancellationToken);
+            return ValidateChildren(deletions, writes, images, progress, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken: cancellationToken);
         }
 
         /// <summary>
         /// Validates that the children of the folder still exist.
         /// </summary>
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="metadataRefreshOptions">The metadata refresh options.</param>
@@ -307,10 +309,10 @@ namespace Tesserafin.Controller.Entities
         /// <param name="allowRemoveRoot">remove item even this folder is root.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        public Task ValidateChildren(IItemDeletionCommands deletions, IItemImageService images, IProgress<double> progress, MetadataRefreshOptions metadataRefreshOptions, bool recursive = true, bool allowRemoveRoot = false, CancellationToken cancellationToken = default)
+        public Task ValidateChildren(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, MetadataRefreshOptions metadataRefreshOptions, bool recursive = true, bool allowRemoveRoot = false, CancellationToken cancellationToken = default)
         {
             Children = null; // invalidate cached children.
-            return ValidateChildrenInternal(deletions, images, progress, recursive, true, allowRemoveRoot, metadataRefreshOptions, metadataRefreshOptions.DirectoryService, cancellationToken);
+            return ValidateChildrenInternal(deletions, writes, images, progress, recursive, true, allowRemoveRoot, metadataRefreshOptions, metadataRefreshOptions.DirectoryService, cancellationToken);
         }
 
         private Dictionary<Guid, BaseItem> GetActualChildrenDictionary()
@@ -343,6 +345,7 @@ namespace Tesserafin.Controller.Entities
         /// Validates the children internal.
         /// </summary>
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
@@ -352,7 +355,7 @@ namespace Tesserafin.Controller.Entities
         /// <param name="directoryService">The directory service.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        protected virtual async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected virtual async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             if (recursive)
             {
@@ -366,7 +369,7 @@ namespace Tesserafin.Controller.Entities
                     throw new InvalidOperationException("Recursive datastructure detected abort processing this item.");
                 }
 
-                await ValidateChildrenInternal2(deletions, images, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
+                await ValidateChildrenInternal2(deletions, writes, images, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -394,7 +397,7 @@ namespace Tesserafin.Controller.Entities
             return true;
         }
 
-        private async Task ValidateChildrenInternal2(IItemDeletionCommands deletions, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        private async Task ValidateChildrenInternal2(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             if (!IsLibraryFolderAccessible(directoryService, this, allowRemoveRoot))
             {
@@ -475,7 +478,7 @@ namespace Tesserafin.Controller.Entities
 
                         if (currentChild.UpdateFromResolvedItem(child) > ItemUpdateType.None)
                         {
-                            await currentChild.UpdateToRepositoryAsync(ItemUpdateType.MetadataImport, cancellationToken).ConfigureAwait(false);
+                            await currentChild.UpdateToRepositoryAsync(writes, ItemUpdateType.MetadataImport, cancellationToken).ConfigureAwait(false);
                         }
                         else
                         {
@@ -587,7 +590,7 @@ namespace Tesserafin.Controller.Entities
 
                 if (newItems.Count > 0)
                 {
-                    LibraryManager.CreateItems(newItems, this, cancellationToken);
+                    writes.CreateItems(newItems, this, cancellationToken);
                 }
 
                 // Process deferred replaced-primary deletions now that new primaries exist in DB/cache.
@@ -617,7 +620,7 @@ namespace Tesserafin.Controller.Entities
                         {
                             altVideo.SetPrimaryVersionId(newPrimary.Id);
                             altVideo.OwnerId = localAlternateIds.Contains(altVideo.Id) ? newPrimary.Id : Guid.Empty;
-                            await altVideo.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+                            await altVideo.UpdateToRepositoryAsync(writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
                         }
                     }
 
@@ -675,7 +678,7 @@ namespace Tesserafin.Controller.Entities
                         {
                             altVideo.SetPrimaryVersionId(newPrimary.Id);
                             altVideo.OwnerId = newPrimary.Id;
-                            await altVideo.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+                            await altVideo.UpdateToRepositoryAsync(writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
                         }
                     }
 
@@ -684,7 +687,7 @@ namespace Tesserafin.Controller.Entities
                     oldPrimary.LinkedAlternateVersions = [];
                     oldPrimary.SetPrimaryVersionId(newPrimary.Id);
                     oldPrimary.OwnerId = newPrimary.Id;
-                    await oldPrimary.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+                    await oldPrimary.UpdateToRepositoryAsync(writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
 
                     // Re-route playlist/collection references from old primary to new primary
                     await LibraryManager.RerouteLinkedChildReferencesAsync(oldPrimary.Id, newPrimary.Id).ConfigureAwait(false);
@@ -699,7 +702,7 @@ namespace Tesserafin.Controller.Entities
                     {
                         if (child.GetUserDataKeys().Any(removedKeys.Contains))
                         {
-                            await child.ReattachUserDataAsync(cancellationToken).ConfigureAwait(false);
+                            await child.ReattachUserDataAsync(writes, cancellationToken).ConfigureAwait(false);
                         }
                     }
                 }
@@ -736,7 +739,7 @@ namespace Tesserafin.Controller.Entities
                     validChildrenNeedGeneration = false;
                 }
 
-                await ValidateSubFolders(deletions, images, accessibleChildren.OfType<Folder>().ToList(), directoryService, innerProgress, cancellationToken).ConfigureAwait(false);
+                await ValidateSubFolders(deletions, writes, images, accessibleChildren.OfType<Folder>().ToList(), directoryService, innerProgress, cancellationToken).ConfigureAwait(false);
             }
 
             if (refreshChildMetadata)
@@ -765,7 +768,7 @@ namespace Tesserafin.Controller.Entities
 
                 if (container is not null)
                 {
-                    await RefreshAllMetadataForContainer(deletions, images, container, refreshOptions, innerProgress, cancellationToken).ConfigureAwait(false);
+                    await RefreshAllMetadataForContainer(deletions, writes, images, container, refreshOptions, innerProgress, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
@@ -775,47 +778,47 @@ namespace Tesserafin.Controller.Entities
                         validChildren = Children.ToList();
                     }
 
-                    await RefreshMetadataRecursive(deletions, images, accessibleChildren, refreshOptions, recursive, innerProgress, cancellationToken).ConfigureAwait(false);
+                    await RefreshMetadataRecursive(deletions, writes, images, accessibleChildren, refreshOptions, recursive, innerProgress, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
 
-        private async Task RefreshMetadataRecursive(IItemDeletionCommands deletions, IItemImageService images, IList<BaseItem> children, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task RefreshMetadataRecursive(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IList<BaseItem> children, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
         {
             await RunTasks(
-                (baseItem, innerProgress) => RefreshChildMetadata(deletions, images, baseItem, refreshOptions, recursive && baseItem.IsFolder, innerProgress, cancellationToken),
+                (baseItem, innerProgress) => RefreshChildMetadata(deletions, writes, images, baseItem, refreshOptions, recursive && baseItem.IsFolder, innerProgress, cancellationToken),
                 children,
                 progress,
                 cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task RefreshAllMetadataForContainer(IItemDeletionCommands deletions, IItemImageService images, IMetadataContainer container, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task RefreshAllMetadataForContainer(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IMetadataContainer container, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
             if (container is Series series)
             {
-                await series.RefreshMetadata(deletions, refreshOptions, cancellationToken).ConfigureAwait(false);
+                await series.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
 
-            await container.RefreshAllMetadata(deletions, images, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
+            await container.RefreshAllMetadata(deletions, writes, images, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task RefreshChildMetadata(IItemDeletionCommands deletions, IItemImageService images, BaseItem child, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task RefreshChildMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, BaseItem child, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
         {
             if (child is IMetadataContainer container)
             {
-                await RefreshAllMetadataForContainer(deletions, images, container, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
+                await RefreshAllMetadataForContainer(deletions, writes, images, container, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
             }
             else
             {
                 if (refreshOptions.RefreshItem(child))
                 {
-                    await child.RefreshMetadata(deletions, refreshOptions, cancellationToken).ConfigureAwait(false);
+                    await child.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
                 }
 
                 if (recursive && child is Folder folder)
                 {
                     folder.Children = null; // invalidate cached children.
-                    await folder.RefreshMetadataRecursive(deletions, images, folder.Children.Except([this, child]).ToList(), refreshOptions, true, progress, cancellationToken).ConfigureAwait(false);
+                    await folder.RefreshMetadataRecursive(deletions, writes, images, folder.Children.Except([this, child]).ToList(), refreshOptions, true, progress, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -824,16 +827,17 @@ namespace Tesserafin.Controller.Entities
         /// Refreshes the children.
         /// </summary>
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="children">The children.</param>
         /// <param name="directoryService">The directory service.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        private async Task ValidateSubFolders(IItemDeletionCommands deletions, IItemImageService images, IList<Folder> children, IDirectoryService directoryService, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task ValidateSubFolders(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IList<Folder> children, IDirectoryService directoryService, IProgress<double> progress, CancellationToken cancellationToken)
         {
             await RunTasks(
-                (folder, innerProgress) => folder.ValidateChildrenInternal(deletions, images, innerProgress, true, false, false, null, directoryService, cancellationToken),
+                (folder, innerProgress) => folder.ValidateChildrenInternal(deletions, writes, images, innerProgress, true, false, false, null, directoryService, cancellationToken),
                 children,
                 progress,
                 cancellationToken).ConfigureAwait(false);
@@ -1936,7 +1940,7 @@ namespace Tesserafin.Controller.Entities
             return resolved;
         }
 
-        protected override async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        protected override async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
             var changesFound = false;
 
@@ -1948,7 +1952,7 @@ namespace Tesserafin.Controller.Entities
                 }
             }
 
-            var baseHasChanges = await base.RefreshedOwnedItems(deletions, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
+            var baseHasChanges = await base.RefreshedOwnedItems(deletions, writes, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
 
             return baseHasChanges || changesFound;
         }

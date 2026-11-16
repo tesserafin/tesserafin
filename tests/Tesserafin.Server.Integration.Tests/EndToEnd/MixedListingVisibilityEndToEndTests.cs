@@ -1,14 +1,14 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
-using System.Text.Json;
+using System.Net.Http;
+using System.Net;
 using System.Text.Json.Nodes;
-using System.Threading;
+using System.Text.Json;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
@@ -126,6 +126,7 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
         using var admin = server.AdminClient(s.AdminToken);
         using var bea = server.ClientFor("mix-bea", s.BeaToken);
         var library = server.Services.GetRequiredService<ILibraryManager>();
+        var libraryWrites = server.Services.GetRequiredService<IItemWriteCommands>();
         var parents = new[] { s.Films, s.Kids, s.Sets, library.GetItemById(s.SharedList)!.ParentId };
 
         await UpdatePolicyAsync(
@@ -176,6 +177,7 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
             (s.FilmsMovie, "film", 1903), (s.KidsSet, "kidsset", 1901), (s.PrivateList, "private", 1902), (s.SharedList, "shared", 1904),
         };
         var library = server.Services.GetRequiredService<ILibraryManager>();
+        var libraryWrites = server.Services.GetRequiredService<IItemWriteCommands>();
         foreach (var (id, mark, year) in marked)
         {
             var item = library.GetItemById(id)!;
@@ -184,13 +186,13 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
             item.Tags = ["mixt-" + mark];
             item.OfficialRating = "mixr-" + mark;
             item.ProductionYear = year;
-            await item.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None);
+            await item.UpdateToRepositoryAsync(server.Services.GetRequiredService<IItemWriteCommands>(), ItemUpdateType.MetadataEdit, CancellationToken.None);
 
             // As the library validators leave them: one presentation key each, or the by-name listing folds them into one.
             foreach (BaseItem byName in new BaseItem[] { library.GetGenre("mixg-" + mark), library.GetStudio("mixs-" + mark) })
             {
                 byName.PresentationUniqueKey = byName.CreatePresentationUniqueKey();
-                await byName.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None);
+                await byName.UpdateToRepositoryAsync(server.Services.GetRequiredService<IItemWriteCommands>(), ItemUpdateType.MetadataEdit, CancellationToken.None);
             }
         }
 
@@ -506,14 +508,15 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
         await WaitForLibraryScanAsync(server, before, cancellationToken);
 
         var library = server.Services.GetRequiredService<ILibraryManager>();
-        var filmsFolder = AddFolder(library, films);
-        var kidsFolder = AddFolder(library, kids);
+        var libraryWrites = server.Services.GetRequiredService<IItemWriteCommands>();
+        var filmsFolder = AddFolder(library, libraryWrites, films);
+        var kidsFolder = AddFolder(library, libraryWrites, kids);
         var ids = await LibrariesAsync(admin, cancellationToken);
         foreach (var (libraryId, folder) in new[] { (ids["mix-films"], filmsFolder), (ids["mix-kids"], kidsFolder) })
         {
             var collectionFolder = Assert.IsType<CollectionFolder>(library.GetItemById(libraryId));
             collectionFolder.PhysicalFolderIds = [folder];
-            await collectionFolder.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None);
+            await collectionFolder.UpdateToRepositoryAsync(server.Services.GetRequiredService<IItemWriteCommands>(), ItemUpdateType.MetadataEdit, CancellationToken.None);
         }
 
         var filmsMovie = Seed(server, Path.Combine(films, "mix-film.mp4"), filmsFolder);
@@ -593,10 +596,10 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
         Assert.Equal(HttpStatusCode.NoContent, added.StatusCode);
     }
 
-    private static Guid AddFolder(ILibraryManager library, string directory)
+    private static Guid AddFolder(ILibraryManager library, IItemWriteCommands libraryWrites, string directory)
     {
         var folder = new Folder { Id = Guid.NewGuid(), Name = Path.GetFileName(directory), Path = directory, ParentId = library.RootFolder.Id, DateCreated = DateTime.UtcNow, DateModified = DateTime.UtcNow };
-        library.CreateItems([folder], library.RootFolder, CancellationToken.None);
+        libraryWrites.CreateItems([folder], library.RootFolder, CancellationToken.None);
         return folder.Id;
     }
 
@@ -604,7 +607,7 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
     {
         File.WriteAllText(file, Path.GetFileName(file));
         return LibraryItemSeeder.SeedVideo(
-            server.Services.GetRequiredService<ILibraryManager>(),
+            server.Services.GetRequiredService<IItemWriteCommands>(),
             server.Services.GetRequiredService<IMediaStreamRepository>(),
             file,
             "mp4",

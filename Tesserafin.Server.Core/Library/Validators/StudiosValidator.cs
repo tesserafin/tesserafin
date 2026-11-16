@@ -1,8 +1,8 @@
-using System;
 using System.Globalization;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
@@ -16,6 +16,7 @@ namespace Tesserafin.Server.Core.Library.Validators;
 /// </summary>
 public class StudiosValidator
 {
+    private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
 
     /// <summary>
@@ -33,12 +34,14 @@ public class StudiosValidator
     /// <summary>
     /// Initializes a new instance of the <see cref="StudiosValidator" /> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
-    public StudiosValidator(IItemDeletionCommands deletions, ILibraryManager libraryManager, ILogger<StudiosValidator> logger, IItemRepository itemRepo)
+    public StudiosValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, ILibraryManager libraryManager, ILogger<StudiosValidator> logger, IItemRepository itemRepo)
     {
+        _writes = writes;
         _deletions = deletions;
         _libraryManager = libraryManager;
         _logger = logger;
@@ -85,7 +88,7 @@ public class StudiosValidator
 
                 if (!existingStudioIds.Contains(item.Id))
                 {
-                    await item.RefreshMetadata(_deletions, cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(_deletions, _writes, cancellationToken).ConfigureAwait(false);
                     refreshed++;
                 }
             }

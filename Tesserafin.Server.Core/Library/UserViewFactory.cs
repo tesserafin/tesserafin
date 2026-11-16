@@ -1,9 +1,9 @@
 #pragma warning disable CS1591
 
-using System;
 using System.Globalization;
 using System.IO;
 using System.Threading;
+using System;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
@@ -53,6 +53,7 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     internal sealed class UserViewFactory : IUserViewFactory
     {
+        private readonly IItemWriteCommands _writes;
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemStore _itemStore;
         private readonly IServerConfigurationManager _configurationManager;
@@ -64,6 +65,7 @@ namespace Tesserafin.Server.Core.Library
         /// <summary>
         /// Initializes a new instance of the <see cref="UserViewFactory"/> class.
         /// </summary>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="itemLookupService">The item lookup service (read side; see PR75/PR76).</param>
         /// <param name="itemStore">The item store leaf (id generation, save+register; see PR106a).</param>
         /// <param name="configurationManager">The server configuration manager.</param>
@@ -73,12 +75,14 @@ namespace Tesserafin.Server.Core.Library
         /// direct <see cref="IProviderManager"/> injection (see type-level remarks: RFC I1, PR106b).
         /// </param>
         public UserViewFactory(
+            IItemWriteCommands writes,
             IItemLookupService itemLookupService,
             IItemStore itemStore,
             IServerConfigurationManager configurationManager,
             IFileSystem fileSystem,
             Lazy<IProviderManager> providerManagerFactory)
         {
+            _writes = writes;
             _itemLookupService = itemLookupService;
             _itemStore = itemStore;
             _configurationManager = configurationManager;
@@ -202,7 +206,7 @@ namespace Tesserafin.Server.Core.Library
 
             if (refresh)
             {
-                item.UpdateToRepositoryAsync(ItemUpdateType.MetadataImport, CancellationToken.None).GetAwaiter().GetResult();
+                item.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataImport, CancellationToken.None).GetAwaiter().GetResult();
                 ProviderManager.QueueRefresh(item.Id, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), RefreshPriority.Normal);
             }
 
@@ -324,7 +328,7 @@ namespace Tesserafin.Server.Core.Library
             if (viewType != item.ViewType)
             {
                 item.ViewType = viewType;
-                item.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).GetAwaiter().GetResult();
+                item.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).GetAwaiter().GetResult();
             }
 
             var lastRefreshedUtc = item.DateLastRefreshed;

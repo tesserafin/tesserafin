@@ -1,12 +1,12 @@
-using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
-using System.Threading;
+using System.Net.Http;
+using System.Net;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -14,8 +14,8 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Drawing;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
@@ -221,7 +221,7 @@ public sealed class ItemImageProcessingEndToEndTests(ItemImageProcessingEndToEnd
         }
 
         var item = new Movie { Id = id, Name = "image-film", Path = path, IsInMixedFolder = true, DateLastSaved = DateTime.UnixEpoch, ImageInfos = [new ItemImageInfo { Type = ImageType.Primary, Path = url }] };
-        factory.Services.GetRequiredService<ILibraryManager>().CreateItems([item], null, TestContext.Current.CancellationToken);
+        factory.Services.GetRequiredService<IItemWriteCommands>().CreateItems([item], null, TestContext.Current.CancellationToken);
         Assert.True(await factory.Services.GetRequiredService<IItemPersistenceService>().SaveImagesAsync(item.Id, item.ImageInfos, TestContext.Current.CancellationToken));
         return item;
     }

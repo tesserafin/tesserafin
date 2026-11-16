@@ -2,16 +2,16 @@
 
 #pragma warning disable CS1591, SA1401
 
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json.Serialization;
-using System.Threading;
+using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Channels;
@@ -23,9 +23,9 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
-using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
+using Tesserafin.Data;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
@@ -1520,19 +1520,20 @@ namespace Tesserafin.Controller.Entities
             return prefix;
         }
 
-        public Task RefreshMetadata(IItemDeletionCommands deletions, CancellationToken cancellationToken)
+        public Task RefreshMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, CancellationToken cancellationToken)
         {
-            return RefreshMetadata(deletions, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken);
+            return RefreshMetadata(deletions, writes, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken);
         }
 
         /// <summary>
         /// The base implementation to refresh metadata.
         /// </summary>
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="options">The options.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>true if a provider reports we changed.</returns>
-        public async Task<ItemUpdateType> RefreshMetadata(IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken)
+        public async Task<ItemUpdateType> RefreshMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
             var requiresSave = false;
 
@@ -1542,7 +1543,7 @@ namespace Tesserafin.Controller.Entities
                 {
                     if (IsFileProtocol)
                     {
-                        requiresSave = await RefreshedOwnedItems(deletions, options, GetFileSystemChildren(options.DirectoryService), cancellationToken).ConfigureAwait(false);
+                        requiresSave = await RefreshedOwnedItems(deletions, writes, options, GetFileSystemChildren(options.DirectoryService), cancellationToken).ConfigureAwait(false);
                     }
                 }
                 catch (Exception ex)
@@ -1635,18 +1636,19 @@ namespace Tesserafin.Controller.Entities
         /// Returns true or false indicating if changes were found.
         /// </summary>
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="options">The metadata refresh options.</param>
         /// <param name="fileSystemChildren">The list of filesystem children.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns><c>true</c> if any items have changed, else <c>false</c>.</returns>
-        protected virtual async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        protected virtual async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
             if (!IsFileProtocol || !SupportsOwnedItems || IsInMixedFolder || this is ICollectionFolder or UserRootFolder or AggregateFolder || this.GetType() == typeof(Folder))
             {
                 return false;
             }
 
-            return await RefreshExtras(deletions, this, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
+            return await RefreshExtras(deletions, writes, this, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
         }
 
         protected virtual FileSystemMetadata[] GetFileSystemChildren(IDirectoryService directoryService)
@@ -1654,7 +1656,7 @@ namespace Tesserafin.Controller.Entities
             return directoryService.GetFileSystemEntries(ContainingFolderPath);
         }
 
-        private async Task<bool> RefreshExtras(IItemDeletionCommands deletions, BaseItem item, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        private async Task<bool> RefreshExtras(IItemDeletionCommands deletions, IItemWriteCommands writes, BaseItem item, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
             var extras = LibraryManager.FindExtras(item, fileSystemChildren, options.DirectoryService).ToArray();
             var newExtraIds = Array.ConvertAll(extras, x => x.Id);
@@ -1683,7 +1685,7 @@ namespace Tesserafin.Controller.Entities
 
                 i.OwnerId = ownerId;
                 i.ParentId = Guid.Empty;
-                return RefreshMetadataForOwnedItem(deletions, i, true, subOptions, cancellationToken);
+                return RefreshMetadataForOwnedItem(deletions, writes, i, true, subOptions, cancellationToken);
             });
 
             var removedExtraIds = currentExtraIds.Where(e => !newExtraIds.Contains(e)).ToArray();
@@ -2405,10 +2407,11 @@ namespace Tesserafin.Controller.Entities
         /// <summary>
         /// Deletes the image.
         /// </summary>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="type">The type.</param>
         /// <param name="index">The index.</param>
         /// <returns>A task.</returns>
-        public async Task DeleteImageAsync(ImageType type, int index)
+        public async Task DeleteImageAsync(IItemWriteCommands writes, ImageType type, int index)
         {
             var info = GetImageInfo(type, index);
 
@@ -2428,7 +2431,7 @@ namespace Tesserafin.Controller.Entities
             // Remove from item
             RemoveImage(info);
 
-            await UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
+            await UpdateToRepositoryAsync(writes, ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
         }
 
         public void RemoveImage(ItemImageInfo image)
@@ -2446,11 +2449,15 @@ namespace Tesserafin.Controller.Entities
             ImageInfos = [.. ImageInfos, image];
         }
 
-        public virtual async Task UpdateToRepositoryAsync(ItemUpdateType updateReason, CancellationToken cancellationToken)
-         => await LibraryManager.UpdateItemAsync(this, GetParent(), updateReason, cancellationToken).ConfigureAwait(false);
+        /// <summary>Copies item state for write preparation without changing the published instance.</summary>
+        /// <returns>A shallow copy; mutable child objects remain shared.</returns>
+        public BaseItem CopyForWrite() => (BaseItem)MemberwiseClone();
 
-        public async Task ReattachUserDataAsync(CancellationToken cancellationToken) =>
-            await LibraryManager.ReattachUserDataAsync(this, cancellationToken).ConfigureAwait(false);
+        public virtual async Task UpdateToRepositoryAsync(IItemWriteCommands writes, ItemUpdateType updateReason, CancellationToken cancellationToken)
+         => await writes.UpdateItemAsync(this, null, updateReason, cancellationToken).ConfigureAwait(false);
+
+        public async Task ReattachUserDataAsync(IItemWriteCommands writes, CancellationToken cancellationToken) =>
+            await writes.ReattachUserDataAsync(this, cancellationToken).ConfigureAwait(false);
 
         /// <summary>
         /// Validates that images within the item are still on the filesystem.
@@ -2686,7 +2693,7 @@ namespace Tesserafin.Controller.Entities
             return type == ImageType.Backdrop || type == ImageType.Chapter;
         }
 
-        public Task SwapImagesAsync(ImageType type, int index1, int index2)
+        public Task SwapImagesAsync(IItemWriteCommands writes, ImageType type, int index1, int index2)
         {
             if (!AllowsMultipleImages(type))
             {
@@ -2722,7 +2729,7 @@ namespace Tesserafin.Controller.Entities
             info2.Width = 0;
             info2.Height = 0;
 
-            return UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, CancellationToken.None);
+            return UpdateToRepositoryAsync(writes, ItemUpdateType.ImageUpdate, CancellationToken.None);
         }
 
         public virtual bool IsPlayed(User user, UserItemData userItemData)
@@ -2832,7 +2839,7 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        protected async Task RefreshMetadataForOwnedItem(IItemDeletionCommands deletions, BaseItem ownedItem, bool copyTitleMetadata, MetadataRefreshOptions options, CancellationToken cancellationToken)
+        protected async Task RefreshMetadataForOwnedItem(IItemDeletionCommands deletions, IItemWriteCommands writes, BaseItem ownedItem, bool copyTitleMetadata, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
             var newOptions = new MetadataRefreshOptions(options)
             {
@@ -2893,10 +2900,10 @@ namespace Tesserafin.Controller.Entities
                 }
             }
 
-            await ownedItem.RefreshMetadata(deletions, newOptions, cancellationToken).ConfigureAwait(false);
+            await ownedItem.RefreshMetadata(deletions, writes, newOptions, cancellationToken).ConfigureAwait(false);
         }
 
-        protected async Task RefreshMetadataForOwnedVideo(IItemDeletionCommands deletions, MetadataRefreshOptions options, bool copyTitleMetadata, string path, CancellationToken cancellationToken)
+        protected async Task RefreshMetadataForOwnedVideo(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, bool copyTitleMetadata, string path, CancellationToken cancellationToken)
         {
             var newOptions = new MetadataRefreshOptions(options)
             {
@@ -2923,7 +2930,7 @@ namespace Tesserafin.Controller.Entities
                 video.OwnerId = Id;
             }
 
-            await RefreshMetadataForOwnedItem(deletions, video, copyTitleMetadata, newOptions, cancellationToken).ConfigureAwait(false);
+            await RefreshMetadataForOwnedItem(deletions, writes, video, copyTitleMetadata, newOptions, cancellationToken).ConfigureAwait(false);
         }
 
         public string GetEtag(User user)

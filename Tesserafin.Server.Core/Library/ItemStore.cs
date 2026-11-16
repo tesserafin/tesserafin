@@ -1,8 +1,8 @@
 #pragma warning disable CS1591
 
-using System;
 using System.Collections.Generic;
 using System.Threading;
+using System;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
@@ -45,28 +45,7 @@ namespace Tesserafin.Server.Core.Library
 
         /// <inheritdoc />
         public Guid GetNewItemId(string key, Type type)
-        {
-            ArgumentException.ThrowIfNullOrEmpty(key);
-            ArgumentNullException.ThrowIfNull(type);
-
-            string programDataPath = _configurationManager.ApplicationPaths.ProgramDataPath;
-            if (key.StartsWith(programDataPath, StringComparison.Ordinal))
-            {
-                // Try to normalize paths located underneath program-data in an attempt to make them more portable
-                key = key.Substring(programDataPath.Length)
-                    .TrimStart('/', '\\')
-                    .Replace('/', '\\');
-            }
-
-            if (!_configurationManager.Configuration.EnableCaseSensitiveItemIds)
-            {
-                key = key.ToLowerInvariant();
-            }
-
-            key = type.FullName + key;
-
-            return key.GetMD5();
-        }
+            => ItemIdentity.Create(_configurationManager, key, type);
 
         /// <inheritdoc />
         public void CreateItem(BaseItem item, BaseItem? parent)

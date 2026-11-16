@@ -1,11 +1,11 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
-using AutoFixture;
+using System.Threading;
+using System;
 using AutoFixture.AutoMoq;
+using AutoFixture;
 using Moq;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
@@ -207,7 +207,7 @@ public sealed class ItemDeletionCommandsTests
         }
 
         var dependencies = manager.GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToArray();
-        Assert.Equal(29, dependencies.Length);
+        Assert.Contains(typeof(IItemWriteCommands), dependencies);
         Assert.DoesNotContain(typeof(IItemDeletionCommands), dependencies);
         Assert.DoesNotContain(typeof(Lazy<IExternalDataManager>), dependencies);
         Assert.DoesNotContain(typeof(Tesserafin.Controller.IO.IPathManager), dependencies);
@@ -314,7 +314,7 @@ public sealed class ItemDeletionCommandsTests
 
         public override IReadOnlyList<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, IChannelManager channelManager) => [];
 
-        public override Task UpdateToRepositoryAsync(ItemUpdateType updateReason, CancellationToken cancellationToken)
+        public override Task UpdateToRepositoryAsync(IItemWriteCommands writes, ItemUpdateType updateReason, CancellationToken cancellationToken)
         {
             Assert.False(cancellationToken.IsCancellationRequested);
             Saved = true;

@@ -1,13 +1,13 @@
 #nullable disable
 
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using AsyncKeyedLock;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -15,14 +15,14 @@ using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Extensions;
 using Tesserafin.Extensions.Json;
+using Tesserafin.Extensions;
 using Tesserafin.LiveTv;
 using Tesserafin.Model.Channels;
 using Tesserafin.Model.Dto;
@@ -42,6 +42,7 @@ namespace Tesserafin.LiveTv.Channels
     /// </summary>
     public class ChannelManager : IChannelManager, IDisposable
     {
+        private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
         private readonly IUserManager _userManager;
         private readonly IUserDataManager _userDataManager;
@@ -59,6 +60,7 @@ namespace Tesserafin.LiveTv.Channels
         /// <summary>
         /// Initializes a new instance of the <see cref="ChannelManager"/> class.
         /// </summary>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="deletions">Item deletion operations.</param>
         /// <param name="userManager">The user manager.</param>
         /// <param name="dtoService">The dto service.</param>
@@ -71,6 +73,7 @@ namespace Tesserafin.LiveTv.Channels
         /// <param name="memoryCache">The memory cache.</param>
         /// <param name="channels">The channels.</param>
         public ChannelManager(
+            IItemWriteCommands writes,
             IItemDeletionCommands deletions,
             IUserManager userManager,
             IDtoService dtoService,
@@ -83,6 +86,7 @@ namespace Tesserafin.LiveTv.Channels
             IMemoryCache memoryCache,
             IEnumerable<IChannel> channels)
         {
+            _writes = writes;
             _deletions = deletions;
             _userManager = userManager;
             _dtoService = dtoService;
@@ -490,11 +494,11 @@ namespace Tesserafin.LiveTv.Channels
             if (isNew)
             {
                 item.OnMetadataChanged();
-                _libraryManager.CreateItem(item, null);
+                _writes.CreateItem(item, null);
             }
 
             await item.RefreshMetadata(
-                _deletions,
+                _deletions, _writes,
                 new MetadataRefreshOptions(new DirectoryService(_fileSystem))
                 {
                     ForceSave = !isNew && forceUpdate
@@ -1143,7 +1147,7 @@ namespace Tesserafin.LiveTv.Channels
 
             if (isNew)
             {
-                _libraryManager.CreateItem(item, parentFolder);
+                _writes.CreateItem(item, parentFolder);
 
                 if (info.People is not null && info.People.Count > 0)
                 {
@@ -1152,7 +1156,7 @@ namespace Tesserafin.LiveTv.Channels
             }
             else if (forceUpdate)
             {
-                await item.UpdateToRepositoryAsync(ItemUpdateType.None, cancellationToken).ConfigureAwait(false);
+                await item.UpdateToRepositoryAsync(_writes, ItemUpdateType.None, cancellationToken).ConfigureAwait(false);
             }
 
             if ((isNew || forceUpdate) && info.Type == ChannelItemType.Media)

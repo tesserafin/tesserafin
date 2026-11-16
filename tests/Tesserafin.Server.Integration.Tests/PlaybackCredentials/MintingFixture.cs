@@ -1,13 +1,13 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
+using System.Net.Http;
+using System.Net;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Api.Models.PlaybackCredentialDtos;
 using Tesserafin.Api.Models.StartupDtos;
@@ -92,9 +92,9 @@ public sealed class MintingFixture : IAsyncLifetime
         var libraryManager = Factory.Services.GetRequiredService<ILibraryManager>();
         var mediaStreamRepository = Factory.Services.GetRequiredService<IMediaStreamRepository>();
 
-        VisibleItemId = Seed(libraryManager, mediaStreamRepository, "visible.mp4", "R1 mint visible", tags: []);
-        OtherItemId = Seed(libraryManager, mediaStreamRepository, "other.mp4", "R1 mint other", tags: []);
-        BlockedItemId = Seed(libraryManager, mediaStreamRepository, "blocked.mp4", "R1 mint blocked", tags: [BlockedTag]);
+        VisibleItemId = Seed(Factory.Services.GetRequiredService<IItemWriteCommands>(), mediaStreamRepository, "visible.mp4", "R1 mint visible", tags: []);
+        OtherItemId = Seed(Factory.Services.GetRequiredService<IItemWriteCommands>(), mediaStreamRepository, "other.mp4", "R1 mint other", tags: []);
+        BlockedItemId = Seed(Factory.Services.GetRequiredService<IItemWriteCommands>(), mediaStreamRepository, "blocked.mp4", "R1 mint blocked", tags: [BlockedTag]);
 
         await CreateRestrictedUserAsync().ConfigureAwait(false);
     }
@@ -221,7 +221,7 @@ public sealed class MintingFixture : IAsyncLifetime
     }
 
     private Guid Seed(
-        ILibraryManager libraryManager,
+        IItemWriteCommands writes,
         IMediaStreamRepository mediaStreamRepository,
         string fileName,
         string name,
@@ -245,7 +245,7 @@ public sealed class MintingFixture : IAsyncLifetime
             Tags = [.. tags]
         };
 
-        libraryManager.CreateItems([movie], null, CancellationToken.None);
+        writes.CreateItems([movie], null, CancellationToken.None);
         mediaStreamRepository.SaveMediaStreams(
             movie.Id,
             [

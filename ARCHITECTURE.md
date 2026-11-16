@@ -206,6 +206,28 @@ libraries. Every project has a matching `*.Tests` project in `tests/`.
   guide/channel filtering, reasons and parent resolution. Notifications reference live entities;
   this is not an immutable snapshot, durable outbox, replay mechanism or ordering guarantee
   across concurrent producers. General item writes/version preparation remain in the manager.
+- **Item graph writes.** `IItemWriteCommands` owns general create/update, per-item version
+  metadata propagation, cache publication and item notifications. The manager's five write
+  methods and metadata-save helper are removed without forwarding members. Resolution now runs
+  in `IItemResolutionService` over an explicit read policy and lookup; its helpers no longer
+  use entity-global lookup, filesystem or configuration services. `ILibraryItemOptions` owns
+  options and content-type lookup, and one internal identity policy serves creation/resolution.
+  `ItemVersionGraphPlanner` prepares typed local alternates, deduplicates paths and includes
+  multipart files before persistence. Individual video updates include existing path versions
+  even before their first linked row exists. Bulk refresh preserves its nonrecursive behavior,
+  avoiding a version lookup per guide program.
+- Updated save dates and propagated version metadata are staged on shallow item copies. One
+  existing persistence transaction saves the graph before cache publication and notifications.
+  A failed SQL write does not publish those staged fields; cache failure evicts the graph after
+  the durable write and emits no notification. This does not undo mutations callers made before
+  entering the command, deeply isolate mutable child objects, serialize every writer, or provide
+  a filesystem/database transaction. Sidecar exports remain best effort apart from cancellation.
+- `IItemMetadataExporter` owns registered saver execution and eligibility, separately from provider
+  refresh orchestration. General writes no longer implicitly localize/enrich images; explicit
+  refresh/image-delivery paths own that work. Entity refresh helpers carry the write port as an
+  argument; API, providers, Live TV, scans, migrations and user-view creation use explicit commands.
+  The query-side `IItemStore` remains a leaf and does not depend on the general command owner.
+  Active manager query entry points remain while later read-side decomposition is pending.
 - **Resolution.** `LibraryManager.ResolvePath(s)` dispatches to ordered
   `IItemResolver` implementations (`MovieResolver`, `EpisodeResolver`,
   `SeriesResolver`, `AudioResolver`, `PhotoResolver`, …) that turn paths into the

@@ -1,6 +1,6 @@
-using System;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Configuration;
@@ -20,7 +20,7 @@ public sealed class NfoUserDataSaver : IHostedService
     private readonly ILogger<NfoUserDataSaver> _logger;
     private readonly IConfigurationManager _config;
     private readonly IUserDataManager _userDataManager;
-    private readonly IProviderManager _providerManager;
+    private readonly IItemMetadataExporter _metadataExporter;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NfoUserDataSaver"/> class.
@@ -28,17 +28,17 @@ public sealed class NfoUserDataSaver : IHostedService
     /// <param name="logger">The <see cref="ILogger"/>.</param>
     /// <param name="config">The <see cref="IConfigurationManager"/>.</param>
     /// <param name="userDataManager">The <see cref="IUserDataManager"/>.</param>
-    /// <param name="providerManager">The <see cref="IProviderManager"/>.</param>
+    /// <param name="metadataExporter">The <see cref="IItemMetadataExporter"/>.</param>
     public NfoUserDataSaver(
         ILogger<NfoUserDataSaver> logger,
         IConfigurationManager config,
         IUserDataManager userDataManager,
-        IProviderManager providerManager)
+        IItemMetadataExporter metadataExporter)
     {
         _logger = logger;
         _config = config;
         _userDataManager = userDataManager;
-        _providerManager = providerManager;
+        _metadataExporter = metadataExporter;
     }
 
     /// <inheritdoc />
@@ -76,7 +76,7 @@ public sealed class NfoUserDataSaver : IHostedService
 
         try
         {
-            await _providerManager.SaveMetadataAsync(item, ItemUpdateType.MetadataDownload, [BaseNfoSaver.SaverName])
+            await _metadataExporter.SaveAsync(item, ItemUpdateType.MetadataDownload, CancellationToken.None, [BaseNfoSaver.SaverName])
                 .ConfigureAwait(false);
         }
         catch (Exception ex)

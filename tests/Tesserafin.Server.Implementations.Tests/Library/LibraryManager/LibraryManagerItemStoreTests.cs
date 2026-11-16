@@ -1,8 +1,8 @@
-using System;
 using System.Collections.Generic;
 using System.Threading;
-using AutoFixture;
+using System;
 using AutoFixture.AutoMoq;
+using AutoFixture;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.Configuration;
@@ -25,6 +25,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library.LibraryManager;
 [Collection(LibraryManagerStaticStateFixture.Name)]
 public class LibraryManagerItemStoreTests
 {
+    private readonly IItemWriteCommands _writes;
     private readonly Tesserafin.Server.Core.Library.LibraryManager _libraryManager;
     private readonly Tesserafin.Server.Core.Library.ItemLookupService _itemLookupService;
     private readonly Tesserafin.Server.Core.Library.ItemStore _itemStore;
@@ -74,6 +75,8 @@ public class LibraryManagerItemStoreTests
         fixture.Register<IItemChangePublisher>(() => _changes);
         fixture.Register(() => _itemStore);
         fixture.Register<IItemStore>(() => _itemStore);
+
+        _writes = Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
 
         _libraryManager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 fixture.Create<IEnumerable<IResolverIgnoreRule>>(),
@@ -151,7 +154,7 @@ public class LibraryManagerItemStoreTests
         var raisedCount = 0;
         _changes.ItemAdded += (_, _) => raisedCount++;
 
-        _libraryManager.CreateItems(new List<BaseItem> { item }, null, CancellationToken.None);
+        _writes.CreateItems(new List<BaseItem> { item }, null, CancellationToken.None);
 
         Assert.Equal(1, raisedCount);
     }
@@ -164,7 +167,7 @@ public class LibraryManagerItemStoreTests
         var notifications = 0;
         _changes.ItemAdded += (_, _) => notifications++;
 
-        _libraryManager.CreateItems([item], null, CancellationToken.None);
+        _writes.CreateItems([item], null, CancellationToken.None);
 
         Assert.Same(item, _libraryManager.GetItemById(item.Id));
         _persistenceServiceMock.Verify(p => p.SaveItems(It.IsAny<IReadOnlyList<BaseItem>>(), It.IsAny<CancellationToken>()), Times.Once);

@@ -1,3 +1,4 @@
+using Tesserafin.Controller.Library;
 #pragma warning disable CA1002, CS1591
 
 using System;
@@ -27,7 +28,7 @@ namespace Tesserafin.Controller.Library
     /// <summary>
     /// Interface ILibraryManager.
     /// </summary>
-    public interface ILibraryManager
+    public interface ILibraryManager : IItemResolutionPolicy
     {
         /// <summary>Gets the shared application root.</summary>
         AggregateFolder RootFolder { get; }
@@ -136,10 +137,11 @@ namespace Tesserafin.Controller.Library
         /// The items are stored in the db but not loaded into memory until actually requested by an operation.
         /// </summary>
         /// <param name="deletions">Deletion operations for validation.</param>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        Task ValidatePeopleAsync(IItemDeletionCommands deletions, IProgress<double> progress, CancellationToken cancellationToken);
+        Task ValidatePeopleAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, IProgress<double> progress, CancellationToken cancellationToken);
 
         /// <summary>
         /// Gets the default view.
@@ -149,22 +151,7 @@ namespace Tesserafin.Controller.Library
 
         List<VirtualFolderInfo> GetVirtualFolders(bool includeRefreshState);
 
-        /// <summary>
-        /// Gets the item by id.
-        /// </summary>
-        /// <param name="id">The id.</param>
-        /// <returns>BaseItem.</returns>
-        /// <exception cref="ArgumentNullException"><paramref name="id"/> is <c>null</c>.</exception>
-        BaseItem? GetItemById(Guid id);
 
-        /// <summary>
-        /// Gets the item by id, as T.
-        /// </summary>
-        /// <param name="id">The item id.</param>
-        /// <typeparam name="T">The type of item.</typeparam>
-        /// <returns>The item.</returns>
-        T? GetItemById<T>(Guid id)
-            where T : BaseItem;
 
         /// <summary>
         /// Gets the item by id, as T, and validates user access.
@@ -251,48 +238,10 @@ namespace Tesserafin.Controller.Library
         /// <returns>UserRootFolder.</returns>
         Folder GetUserRootFolder();
 
-        /// <summary>
-        /// Creates the item.
-        /// </summary>
-        /// <param name="item">Item to create.</param>
-        /// <param name="parent">Parent of new item.</param>
-        void CreateItem(BaseItem item, BaseItem? parent);
 
-        /// <summary>
-        /// Creates the items.
-        /// </summary>
-        /// <param name="items">Items to create.</param>
-        /// <param name="parent">Parent of new items.</param>
-        /// <param name="cancellationToken">CancellationToken to use for operation.</param>
-        void CreateItems(IReadOnlyList<BaseItem> items, BaseItem? parent, CancellationToken cancellationToken);
 
-        /// <summary>
-        /// Updates the item.
-        /// </summary>
-        /// <param name="items">Items to update.</param>
-        /// <param name="parent">Parent of updated items.</param>
-        /// <param name="updateReason">Reason for update.</param>
-        /// <param name="cancellationToken">CancellationToken to use for operation.</param>
-        /// <returns>Returns a Task that can be awaited.</returns>
-        Task UpdateItemsAsync(IReadOnlyList<BaseItem> items, BaseItem parent, ItemUpdateType updateReason, CancellationToken cancellationToken);
 
-        /// <summary>
-        /// Updates the item.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        /// <param name="parent">The parent item.</param>
-        /// <param name="updateReason">The update reason.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>Returns a Task that can be awaited.</returns>
-        Task UpdateItemAsync(BaseItem item, BaseItem parent, ItemUpdateType updateReason, CancellationToken cancellationToken);
 
-        /// <summary>
-        /// Reattaches the user data to the item.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>A task that represents the asynchronous reattachment operation.</returns>
-        Task ReattachUserDataAsync(BaseItem item, CancellationToken cancellationToken);
 
         /// <summary>
         /// Retrieves the item.
@@ -322,12 +271,6 @@ namespace Tesserafin.Controller.Library
         /// <returns>System.String.</returns>
         CollectionType? GetConfiguredContentType(BaseItem item);
 
-        /// <summary>
-        /// Gets the type of the configured content.
-        /// </summary>
-        /// <param name="path">The path.</param>
-        /// <returns>System.String.</returns>
-        CollectionType? GetConfiguredContentType(string path);
 
         /// <summary>
         /// Normalizes the root path list.
@@ -435,13 +378,6 @@ namespace Tesserafin.Controller.Library
         /// <returns>ItemInfo.</returns>
         ItemLookupInfo ParseName(string name);
 
-        /// <summary>
-        /// Gets the new item identifier.
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="type">The type.</param>
-        /// <returns>Guid.</returns>
-        Guid GetNewItemId(string key, Type type);
 
         /// <summary>
         /// Finds the extras.
@@ -467,7 +403,6 @@ namespace Tesserafin.Controller.Library
         /// <returns>The folders that contain the item.</returns>
         List<Folder> GetCollectionFolders(BaseItem item, IEnumerable<Folder> allUserRootChildren);
 
-        LibraryOptions GetLibraryOptions(BaseItem item);
 
         /// <summary>
         /// Gets the people.
@@ -593,13 +528,6 @@ namespace Tesserafin.Controller.Library
         /// <returns>QueryResult&lt;BaseItem&gt;.</returns>
         QueryResult<BaseItem> GetItemsResult(InternalItemsQuery query);
 
-        /// <summary>
-        /// Checks if the file is ignored.
-        /// </summary>
-        /// <param name="file">The file.</param>
-        /// <param name="parent">The parent.</param>
-        /// <returns><c>true</c> if ignored, <c>false</c> otherwise.</returns>
-        bool IgnoreFile(FileSystemMetadata file, BaseItem parent);
 
         Guid GetStudioId(string name);
 

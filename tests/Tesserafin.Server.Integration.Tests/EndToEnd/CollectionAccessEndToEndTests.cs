@@ -1,14 +1,14 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
-using System.Text.Json;
+using System.Net.Http;
+using System.Net;
 using System.Text.Json.Nodes;
-using System.Threading;
+using System.Text.Json;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
@@ -275,15 +275,16 @@ public sealed class CollectionAccessEndToEndTests : IDisposable
         await WaitForLibraryScanAsync(server, before, cancellationToken);
 
         var library = server.Services.GetRequiredService<ILibraryManager>();
-        var filmsFolder = AddFolder(library, films);
-        var kidsFolder = AddFolder(library, kids);
+        var libraryWrites = server.Services.GetRequiredService<IItemWriteCommands>();
+        var filmsFolder = AddFolder(library, libraryWrites, films);
+        var kidsFolder = AddFolder(library, libraryWrites, kids);
         var ids = await LibrariesAsync(admin, cancellationToken);
         foreach (var (libraryId, folder) in new[] { (ids["col-films"], filmsFolder), (ids["col-kids"], kidsFolder) })
         {
             // What the library's own refresh would have recorded after a scan.
             var collectionFolder = Assert.IsType<CollectionFolder>(library.GetItemById(libraryId));
             collectionFolder.PhysicalFolderIds = [folder];
-            await collectionFolder.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None);
+            await collectionFolder.UpdateToRepositoryAsync(server.Services.GetRequiredService<IItemWriteCommands>(), ItemUpdateType.MetadataEdit, CancellationToken.None);
         }
 
         var filmsMovie = Seed(server, Path.Combine(films, "col-film.mp4"), filmsFolder);
@@ -341,10 +342,10 @@ public sealed class CollectionAccessEndToEndTests : IDisposable
         Assert.Equal(HttpStatusCode.NoContent, added.StatusCode);
     }
 
-    private static Guid AddFolder(ILibraryManager library, string directory)
+    private static Guid AddFolder(ILibraryManager library, IItemWriteCommands libraryWrites, string directory)
     {
         var folder = new Folder { Id = Guid.NewGuid(), Name = Path.GetFileName(directory), Path = directory, ParentId = library.RootFolder.Id, DateCreated = DateTime.UtcNow, DateModified = DateTime.UtcNow };
-        library.CreateItems([folder], library.RootFolder, CancellationToken.None);
+        libraryWrites.CreateItems([folder], library.RootFolder, CancellationToken.None);
         return folder.Id;
     }
 
@@ -352,7 +353,7 @@ public sealed class CollectionAccessEndToEndTests : IDisposable
     {
         File.WriteAllText(file, Path.GetFileName(file));
         return LibraryItemSeeder.SeedVideo(
-            server.Services.GetRequiredService<ILibraryManager>(),
+            server.Services.GetRequiredService<IItemWriteCommands>(),
             server.Services.GetRequiredService<IMediaStreamRepository>(),
             file,
             "mp4",

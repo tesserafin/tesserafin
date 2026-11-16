@@ -1,17 +1,17 @@
 #pragma warning disable CS1591
 
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
@@ -28,6 +28,7 @@ namespace Tesserafin.Providers.Subtitles
 {
     public class SubtitleManager : ISubtitleManager
     {
+        private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
         private readonly ILogger<SubtitleManager> _logger;
         private readonly IFileSystem _fileSystem;
@@ -39,6 +40,7 @@ namespace Tesserafin.Providers.Subtitles
         private readonly ISubtitleProvider[] _subtitleProviders;
 
         public SubtitleManager(
+            IItemWriteCommands writes,
             IItemDeletionCommands deletions,
             ILogger<SubtitleManager> logger,
             IFileSystem fileSystem,
@@ -48,6 +50,7 @@ namespace Tesserafin.Providers.Subtitles
             IEnumerable<ISubtitleProvider> subtitleProviders,
             NamingOptions namingOptions)
         {
+            _writes = writes;
             _deletions = deletions;
             _logger = logger;
             _fileSystem = fileSystem;
@@ -398,7 +401,7 @@ namespace Tesserafin.Providers.Subtitles
                 _monitor.ReportFileSystemChangeComplete(path, false);
             }
 
-            return item.RefreshMetadata(_deletions, CancellationToken.None);
+            return item.RefreshMetadata(_deletions, _writes, CancellationToken.None);
         }
 
         /// <inheritdoc />

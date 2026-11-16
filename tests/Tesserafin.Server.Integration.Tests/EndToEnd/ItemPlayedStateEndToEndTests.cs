@@ -1,17 +1,17 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
+using System.Net.Http;
+using System.Net;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Database.Implementations;
@@ -73,9 +73,10 @@ public sealed class ItemPlayedStateEndToEndTests : IClassFixture<HlsIsolationApp
         _withheldFilm = SeedFilm(Path.Combine(withheldDir, "withheld-" + _suffix + ".mp4"), withheldFolder);
 
         var library = _factory.Services.GetRequiredService<ILibraryManager>();
+        var libraryWrites = _factory.Services.GetRequiredService<IItemWriteCommands>();
         var series = new Series { Id = Guid.NewGuid(), Name = "played-series-" + _suffix, Path = Path.Combine(openDir, "series"), ParentId = _openFolder, DateCreated = DateTime.UtcNow, DateModified = DateTime.UtcNow };
         series.PresentationUniqueKey = series.CreatePresentationUniqueKey();
-        library.CreateItems([series], null, CancellationToken.None);
+        libraryWrites.CreateItems([series], null, CancellationToken.None);
         _series = series.Id;
 
         _episode1 = SeedEpisode(series, 1, virtualItem: false, premiere: DateTime.UtcNow.AddYears(-1));
@@ -307,7 +308,7 @@ public sealed class ItemPlayedStateEndToEndTests : IClassFixture<HlsIsolationApp
     {
         File.WriteAllText(file, file);
         return LibraryItemSeeder.SeedVideo(
-            _factory.Services.GetRequiredService<ILibraryManager>(),
+            _factory.Services.GetRequiredService<IItemWriteCommands>(),
             _factory.Services.GetRequiredService<IMediaStreamRepository>(),
             file,
             "mp4",
@@ -338,7 +339,7 @@ public sealed class ItemPlayedStateEndToEndTests : IClassFixture<HlsIsolationApp
             DateModified = DateTime.UtcNow,
         };
         episode.PresentationUniqueKey = episode.CreatePresentationUniqueKey();
-        _factory.Services.GetRequiredService<ILibraryManager>().CreateItems([episode], null, CancellationToken.None);
+        _factory.Services.GetRequiredService<IItemWriteCommands>().CreateItems([episode], null, CancellationToken.None);
         return episode.Id;
     }
 
@@ -357,8 +358,9 @@ public sealed class ItemPlayedStateEndToEndTests : IClassFixture<HlsIsolationApp
     private Guid AddFolder(string directory, Guid libraryId)
     {
         var library = _factory.Services.GetRequiredService<ILibraryManager>();
+        var libraryWrites = _factory.Services.GetRequiredService<IItemWriteCommands>();
         var folder = new Folder { Id = Guid.NewGuid(), Name = Path.GetFileName(directory), Path = directory, ParentId = library.RootFolder.Id, DateCreated = DateTime.UtcNow, DateModified = DateTime.UtcNow };
-        library.CreateItems([folder], library.RootFolder, CancellationToken.None);
+        libraryWrites.CreateItems([folder], library.RootFolder, CancellationToken.None);
         Assert.IsType<CollectionFolder>(library.GetItemById(libraryId)).PhysicalFolderIds = [folder.Id];
         return folder.Id;
     }

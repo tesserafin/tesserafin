@@ -1,13 +1,13 @@
-using System;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text.Json;
+using System.Net.Http;
+using System.Net;
 using System.Text.Json.Nodes;
+using System.Text.Json;
 using System.Threading.Tasks;
+using System;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -270,7 +270,7 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
         await UpdateConfigurationAsync(userId, configuration => configuration["SubtitleMode"] = userSubtitleMode);
         var subtitlePath = EndToEndMediaFixtures.CreateExternalSrt(_workDir, $"film-{userSubtitleMode}.srt");
         var itemId = LibraryItemSeeder.SeedVideo(
-            _libraryManager,
+            _factory.Services.GetRequiredService<IItemWriteCommands>(),
             _mediaStreamRepository,
             _fixturePath,
             "mp4",
@@ -309,7 +309,7 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
 
     private Guid SeedFilm(string[]? tags = null) =>
         LibraryItemSeeder.SeedVideo(
-            _libraryManager,
+            _factory.Services.GetRequiredService<IItemWriteCommands>(),
             _mediaStreamRepository,
             _fixturePath,
             "mp4",

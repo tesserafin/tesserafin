@@ -1,9 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -12,9 +12,9 @@ using Tesserafin.Api.Extensions;
 using Tesserafin.Api.Helpers;
 using Tesserafin.Common.Api;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Providers;
@@ -33,6 +33,7 @@ namespace Tesserafin.Api.Controllers;
 [Authorize(Policy = Policies.RequiresElevation)]
 public class ItemUpdateController : BaseTesserafinApiController
 {
+    private readonly IItemWriteCommands _writes;
     private readonly ILibraryManager _libraryManager;
     private readonly IProviderManager _providerManager;
     private readonly ILocalizationManager _localizationManager;
@@ -42,18 +43,21 @@ public class ItemUpdateController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="ItemUpdateController"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
     public ItemUpdateController(
+        IItemWriteCommands writes,
         IFileSystem fileSystem,
         ILibraryManager libraryManager,
         IProviderManager providerManager,
         ILocalizationManager localizationManager,
         IServerConfigurationManager serverConfigurationManager)
     {
+        _writes = writes;
         _libraryManager = libraryManager;
         _providerManager = providerManager;
         _localizationManager = localizationManager;
@@ -106,7 +110,7 @@ public class ItemUpdateController : BaseTesserafinApiController
 
         item.OnMetadataChanged();
 
-        await item.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+        await item.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
         if (isLockedChanged && item.IsFolder)
         {
@@ -115,7 +119,7 @@ public class ItemUpdateController : BaseTesserafinApiController
             foreach (var child in folder.GetRecursiveChildren())
             {
                 child.IsLocked = newLockData;
-                await child.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+                await child.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
             }
         }
 
@@ -310,7 +314,7 @@ public class ItemUpdateController : BaseTesserafinApiController
                 }
 
                 season.OnMetadataChanged();
-                await season.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+                await season.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
                 foreach (var ep in season.Children.OfType<Episode>())
                 {
@@ -327,7 +331,7 @@ public class ItemUpdateController : BaseTesserafinApiController
                     }
 
                     ep.OnMetadataChanged();
-                    await ep.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+                    await ep.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
                 }
             }
         }
@@ -348,7 +352,7 @@ public class ItemUpdateController : BaseTesserafinApiController
                 }
 
                 ep.OnMetadataChanged();
-                await ep.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+                await ep.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
             }
         }
         else if (item is MusicAlbum album)
@@ -368,7 +372,7 @@ public class ItemUpdateController : BaseTesserafinApiController
                 }
 
                 track.OnMetadataChanged();
-                await track.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+                await track.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
             }
         }
 

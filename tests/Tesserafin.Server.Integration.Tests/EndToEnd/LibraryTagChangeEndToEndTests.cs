@@ -1,14 +1,14 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
-using System.Text.Json;
+using System.Net.Http;
+using System.Net;
 using System.Text.Json.Nodes;
-using System.Threading;
+using System.Text.Json;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
@@ -226,15 +226,16 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
         var ids = libraries.RootElement.EnumerateArray().ToDictionary(f => f.GetProperty("Name").GetString()!, f => Guid.Parse(f.GetProperty("ItemId").GetString()!));
 
         var library = server.Services.GetRequiredService<ILibraryManager>();
-        var filmsFolder = AddFolder(library, films);
-        var vaultFolder = AddFolder(library, vault);
+        var libraryWrites = server.Services.GetRequiredService<IItemWriteCommands>();
+        var filmsFolder = AddFolder(library, libraryWrites, films);
+        var vaultFolder = AddFolder(library, libraryWrites, vault);
 
         // What the libraries' own refresh would have recorded after a scan, saved so the next boot has it.
         foreach (var (libraryId, folders) in new[] { (ids["r2-films"], new[] { filmsFolder }), (ids["r2-vault"], new[] { vaultFolder, filmsFolder }) })
         {
             var collectionFolder = Assert.IsType<CollectionFolder>(library.GetItemById(libraryId));
             collectionFolder.PhysicalFolderIds = folders;
-            await collectionFolder.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None);
+            await collectionFolder.UpdateToRepositoryAsync(server.Services.GetRequiredService<IItemWriteCommands>(), ItemUpdateType.MetadataEdit, CancellationToken.None);
         }
 
         var inBoth = Seed(server, Path.Combine(films, "r2-film.mp4"), filmsFolder);
@@ -253,10 +254,10 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
         Assert.Equal(HttpStatusCode.NoContent, added.StatusCode);
     }
 
-    private static Guid AddFolder(ILibraryManager library, string directory)
+    private static Guid AddFolder(ILibraryManager library, IItemWriteCommands libraryWrites, string directory)
     {
         var folder = new Folder { Id = Guid.NewGuid(), Name = Path.GetFileName(directory), Path = directory, ParentId = library.RootFolder.Id, DateCreated = DateTime.UtcNow, DateModified = DateTime.UtcNow };
-        library.CreateItems([folder], library.RootFolder, CancellationToken.None);
+        libraryWrites.CreateItems([folder], library.RootFolder, CancellationToken.None);
         return folder.Id;
     }
 
@@ -264,7 +265,7 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
     {
         File.WriteAllText(file, Path.GetFileName(file));
         return LibraryItemSeeder.SeedVideo(
-            server.Services.GetRequiredService<ILibraryManager>(),
+            server.Services.GetRequiredService<IItemWriteCommands>(),
             server.Services.GetRequiredService<IMediaStreamRepository>(),
             file,
             "mp4",

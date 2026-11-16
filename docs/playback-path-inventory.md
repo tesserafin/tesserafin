@@ -871,3 +871,30 @@ still requires observers to subscribe before the changes they need. `LibraryMana
 29 constructor parameters but shrinks by removing notification orchestration; general write and
 alternate-version planning extraction is the next dependency boundary. HTTP/OpenAPI and SDK
 shapes are unchanged; the old .NET event contracts are intentionally removed.
+
+
+## 27. Item graph write ownership
+
+General creation, update, version propagation and user-data reattachment now belong to
+`IItemWriteCommands`. `CreateItem(s)`, `UpdateItem(s)Async`, `ReattachUserDataAsync` and
+`RunMetadataSavers` are removed from the manager/interface without compatibility forwarders.
+A read-only resolution service and options policy replace the writer's dependency on the manager.
+Resolver arguments/helpers use explicit lookup/filesystem/configuration inputs. Deterministic
+identity generation is shared by the item store, resolution service and remaining manager queries.
+
+One planner prepares typed local versions and their multipart paths for both create and update.
+Individual video updates stage propagated fields and dates on shallow copies, include existing
+versions whose link has not yet been inserted, and persist the whole graph before cache/events.
+Bulk refresh retains its nonrecursive version behavior. A save failure leaves staged dates and
+alternate metadata unpublished; a post-save cache failure evicts graph entries and emits no event.
+Caller mutations made before admission, shared mutable child objects, concurrent writers and
+external sidecar files are outside that database transaction. No deep snapshot or crash-recovery
+claim is made.
+
+Saver registration/execution moves to `IItemMetadataExporter`; the provider manager no longer
+exposes SaveMetadataAsync. File exports pair watcher suppression/restoration; cancellation
+propagates before catalogue persistence. Image localization is no longer a hidden full-item-write
+side effect: refresh and image delivery use the image lifecycle explicitly. No new entity service
+static is introduced. HTTP/OpenAPI and SDK shapes remain unchanged; .NET removals/signature
+changes are intentional. The new real-host graph rollback/retry/update/promotion test is required
+by name in CI. Validation results are recorded on the implementation PR, not assumed here.

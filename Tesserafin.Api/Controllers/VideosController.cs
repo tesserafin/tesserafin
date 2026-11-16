@@ -1,11 +1,11 @@
-using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -40,6 +40,7 @@ namespace Tesserafin.Api.Controllers;
 [Tags("Video")]
 public class VideosController : BaseTesserafinApiController
 {
+    private readonly IItemWriteCommands _writes;
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
     private readonly IDtoService _dtoService;
@@ -56,6 +57,7 @@ public class VideosController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="VideosController"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
@@ -67,6 +69,7 @@ public class VideosController : BaseTesserafinApiController
     /// <param name="httpClientFactory">Instance of the <see cref="IHttpClientFactory"/> interface.</param>
     /// <param name="encodingHelper">Instance of <see cref="EncodingHelper"/>.</param>
     public VideosController(
+        IItemWriteCommands writes,
         ILibraryManager libraryManager,
         IUserManager userManager,
         IDtoService dtoService,
@@ -78,6 +81,7 @@ public class VideosController : BaseTesserafinApiController
         IHttpClientFactory httpClientFactory,
         EncodingHelper encodingHelper)
     {
+        _writes = writes;
         _libraryManager = libraryManager;
         _userManager = userManager;
         _dtoService = dtoService;
@@ -169,12 +173,12 @@ public class VideosController : BaseTesserafinApiController
             link.SetPrimaryVersionId(null);
             link.LinkedAlternateVersions = Array.Empty<LinkedChild>();
 
-            await link.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+            await link.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
         }
 
         item.LinkedAlternateVersions = Array.Empty<LinkedChild>();
         item.SetPrimaryVersionId(null);
-        await item.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+        await item.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
         return NoContent();
     }
@@ -227,7 +231,7 @@ public class VideosController : BaseTesserafinApiController
         {
             item.SetPrimaryVersionId(primaryVersion.Id);
 
-            await item.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+            await item.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
             // Re-route any playlist/collection references from this item to the primary
             await _libraryManager.RerouteLinkedChildReferencesAsync(item.Id, primaryVersion.Id).ConfigureAwait(false);
@@ -252,12 +256,12 @@ public class VideosController : BaseTesserafinApiController
             if (item.LinkedAlternateVersions.Length > 0)
             {
                 item.LinkedAlternateVersions = Array.Empty<LinkedChild>();
-                await item.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+                await item.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
             }
         }
 
         primaryVersion.LinkedAlternateVersions = alternateVersionsOfPrimary.ToArray();
-        await primaryVersion.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+        await primaryVersion.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
         return NoContent();
     }
 

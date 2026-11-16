@@ -1,12 +1,12 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
@@ -26,6 +26,7 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
     /// <summary>
     /// Initializes a new instance of the <see cref="AlbumMetadataService"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -35,7 +36,8 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public AlbumMetadataService(
-        IServerConfigurationManager serverConfigurationManager,
+        IItemWriteCommands writes,
+            IServerConfigurationManager serverConfigurationManager,
         ILogger<AlbumMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
@@ -43,7 +45,7 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository)
-        : base(serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
     }
 

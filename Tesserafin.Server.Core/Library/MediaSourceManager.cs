@@ -2,7 +2,6 @@
 
 #pragma warning disable CS1591
 
-using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -10,15 +9,15 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using AsyncKeyedLock;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Common.Extensions;
-using Tesserafin.Controller;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
@@ -26,11 +25,12 @@ using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
-using Tesserafin.Data;
+using Tesserafin.Controller;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Extensions;
+using Tesserafin.Data;
 using Tesserafin.Extensions.Json;
+using Tesserafin.Extensions;
 using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
@@ -45,6 +45,7 @@ namespace Tesserafin.Server.Core.Library
         // Do not use a pipe here because Roku http requests to the server will fail, without any explicit error message.
         private const char LiveStreamIdDelimiter = '_';
 
+        private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
 
         private readonly IServerApplicationHost _appHost;
@@ -69,6 +70,7 @@ namespace Tesserafin.Server.Core.Library
         private IMediaSourceProvider[] _providers;
 
         public MediaSourceManager(
+            IItemWriteCommands writes,
             IItemDeletionCommands deletions,
             IServerApplicationHost appHost,
             IItemRepository itemRepo,
@@ -86,6 +88,7 @@ namespace Tesserafin.Server.Core.Library
             IMediaAttachmentRepository mediaAttachmentRepository,
             IMediaSegmentManager mediaSegmentManager)
         {
+            _writes = writes;
             _deletions = deletions;
             _appHost = appHost;
             _itemRepo = itemRepo;
@@ -196,7 +199,7 @@ namespace Tesserafin.Server.Core.Library
                     || (item.MediaType == MediaType.Audio && mediaSources[0].MediaStreams.All(i => i.Type != MediaStreamType.Audio))))
             {
                 await item.RefreshMetadata(
-                    _deletions,
+                    _deletions, _writes,
                     new MetadataRefreshOptions(_directoryService)
                     {
                         EnableRemoteContentProbe = true,

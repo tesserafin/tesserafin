@@ -1,9 +1,9 @@
-using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Entities;
@@ -24,6 +24,7 @@ namespace Tesserafin.Server.Core.ScheduledTasks.Tasks;
 /// </summary>
 public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
 {
+    private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
     private readonly ILibraryManager _libraryManager;
     private readonly ILibraryScanCoordinator _scans;
@@ -36,6 +37,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     /// <summary>
     /// Initializes a new instance of the <see cref="PeopleValidationTask" /> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
     /// <param name="scans">Library scan scheduling and state.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
@@ -45,6 +47,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     /// <param name="logger">Instance of the <see cref="ILogger{PeopleValidationTask}"/> interface.</param>
     /// <param name="itemTypeLookup">Instance of the <see cref="IItemTypeLookup"/> interface.</param>
     public PeopleValidationTask(
+        IItemWriteCommands writes,
         IItemDeletionCommands deletions,
         ILibraryManager libraryManager,
         ILibraryScanCoordinator scans,
@@ -54,6 +57,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
         ILogger<PeopleValidationTask> logger,
         IItemTypeLookup itemTypeLookup)
     {
+        _writes = writes;
         _deletions = deletions;
         _libraryManager = libraryManager;
         _scans = scans;
@@ -171,7 +175,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
         // Phase 2: Validate people (33-66%). Runs after orphaned PeopleBaseItemMap entries are
         // cleaned up above, so dead people are removed in a single pass instead of requiring a second run.
         IProgress<double> validateProgress = new Progress<double>((val) => progress.Report((val / 3) + 33));
-        await _libraryManager.ValidatePeopleAsync(_deletions, validateProgress, cancellationToken).ConfigureAwait(false);
+        await _libraryManager.ValidatePeopleAsync(_deletions, _writes, validateProgress, cancellationToken).ConfigureAwait(false);
 
         // Phase 3: Refresh images for people missing them (66-100%)
         IProgress<double> refreshProgress = new Progress<double>((val) => progress.Report((val / 3) + 66));
@@ -255,7 +259,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
                 MetadataRefreshMode = hasOverview ? MetadataRefreshMode.ValidationOnly : MetadataRefreshMode.Default
             };
 
-            await item.RefreshMetadata(_deletions, options, cancellationToken).ConfigureAwait(false);
+            await item.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (OperationCanceledException)

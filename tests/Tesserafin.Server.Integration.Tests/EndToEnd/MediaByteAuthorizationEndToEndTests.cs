@@ -1,16 +1,16 @@
-using System;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text;
+using System.Net.Http;
+using System.Net;
 using System.Text.Json;
-using System.Threading;
+using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Api.Models.PlaybackSessionDtos;
 using Tesserafin.Common.Configuration;
@@ -117,12 +117,13 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
 
         _workDir = Directory.CreateTempSubdirectory("tesserafin-smr1-e2e-").FullName;
         var libraryManager = _factory.Services.GetRequiredService<ILibraryManager>();
+        var libraryManagerWrites = _factory.Services.GetRequiredService<IItemWriteCommands>();
         var streams = _factory.Services.GetRequiredService<IMediaStreamRepository>();
 
         var withheldFile = await EndToEndMediaFixtures.CreateH264AacMp4Async(_workDir, "withheld.mp4", Seconds);
         _itemBytes = await File.ReadAllBytesAsync(withheldFile);
         _item = LibraryItemSeeder.SeedVideo(
-            libraryManager,
+            libraryManagerWrites,
             streams,
             withheldFile,
             "mp4",
@@ -134,7 +135,7 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
         // An item of its own for the withheld user: shorter, so its bytes are not the other's.
         var ownFile = await EndToEndMediaFixtures.CreateH264AacMp4Async(_workDir, "own.mp4", 3);
         _ownBytes = await File.ReadAllBytesAsync(ownFile);
-        _own = LibraryItemSeeder.SeedVideo(libraryManager, streams, ownFile, "mp4", Streams(), "SECURITY-MEDIA-R1 own " + _suffix, 3 * TimeSpan.TicksPerSecond);
+        _own = LibraryItemSeeder.SeedVideo(libraryManagerWrites, streams, ownFile, "mp4", Streams(), "SECURITY-MEDIA-R1 own " + _suffix, 3 * TimeSpan.TicksPerSecond);
         Assert.False(_ownBytes.AsSpan().SequenceEqual(_itemBytes));
 
         _transcodes = _factory.Services.GetRequiredService<IServerConfigurationManager>().GetTranscodePath();

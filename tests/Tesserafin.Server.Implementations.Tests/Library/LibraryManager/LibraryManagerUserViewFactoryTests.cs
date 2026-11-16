@@ -1,10 +1,10 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Threading;
-using AutoFixture;
+using System;
 using AutoFixture.AutoMoq;
+using AutoFixture;
 using Moq;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
@@ -50,6 +50,7 @@ public class LibraryManagerUserViewFactoryTests
     private readonly Tesserafin.Server.Core.Library.ItemLookupService _itemLookupService;
     private readonly Tesserafin.Server.Core.Library.ItemStore _itemStore;
     private readonly Tesserafin.Server.Core.Library.UserViewFactory _userViewFactory;
+    private readonly IItemWriteCommands _writes;
     private readonly Mock<IItemRepository> _itemRepositoryMock;
     private readonly Mock<IItemPersistenceService> _persistenceServiceMock;
     private readonly Mock<IServerConfigurationManager> _configurationManagerMock;
@@ -108,7 +109,9 @@ public class LibraryManagerUserViewFactoryTests
         // itself, with its own explicitly-controlled Lazy<IProviderManager> (distinct from
         // LibraryManager's own, AutoFixture-provided one) so tests can assert on I2 evaluation
         // timing directly against a known mock instance.
+        _writes = Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
         _userViewFactory = new Tesserafin.Server.Core.Library.UserViewFactory(
+            _writes,
             _itemLookupService,
             _itemStore,
             _configurationManagerMock.Object,
@@ -277,6 +280,7 @@ public class LibraryManagerUserViewFactoryTests
         var throwingLazy = new Lazy<IProviderManager>(() => throw new InvalidOperationException(
             "Lazy<IProviderManager>.Value evaluated when no refresh was due (RFC I2 violation)."));
         var factoryWithThrowingProvider = new Tesserafin.Server.Core.Library.UserViewFactory(
+            _writes,
             _itemLookupService,
             _itemStore,
             _configurationManagerMock.Object,
@@ -317,6 +321,7 @@ public class LibraryManagerUserViewFactoryTests
         });
 
         var factory = new Tesserafin.Server.Core.Library.UserViewFactory(
+            _writes,
             lookupServiceMock.Object,
             itemStore,
             _configurationManagerMock.Object,

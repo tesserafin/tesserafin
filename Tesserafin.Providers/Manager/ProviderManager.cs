@@ -1,35 +1,35 @@
-using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
 using System.Net.Mime;
+using System.Net;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using AsyncKeyedLock;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Net;
-using Tesserafin.Controller;
 using Tesserafin.Controller.BaseItemManager;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Lyrics;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
+using Tesserafin.Controller;
 using Tesserafin.Data.Enums;
 using Tesserafin.Data.Events;
-using Tesserafin.Extensions;
 using Tesserafin.Extensions.Json;
+using Tesserafin.Extensions;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Extensions;
@@ -51,6 +51,7 @@ namespace Tesserafin.Providers.Manager
     /// </summary>
     public class ProviderManager : IProviderManager, IDisposable
     {
+        private readonly IItemWriteCommands _writes;
         private readonly IItemImageService _images;
         private readonly IRemoteImageSource _remoteImages;
         private readonly IItemDeletionCommands _deletions;
@@ -81,7 +82,7 @@ namespace Tesserafin.Providers.Manager
         private IImageProvider[] _imageProviders = [];
         private IMetadataService[] _metadataServices = [];
         private IMetadataProvider[] _metadataProviders = [];
-        private IMetadataSaver[] _savers = [];
+        private readonly IItemMetadataExporter _metadataExporter;
         private IExternalId[] _externalIds = [];
         private IExternalUrlProvider[] _externalUrlProviders = [];
         private bool _isProcessingRefreshQueue;
@@ -90,6 +91,8 @@ namespace Tesserafin.Providers.Manager
         /// <summary>
         /// Initializes a new instance of the <see cref="ProviderManager"/> class.
         /// </summary>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
+        /// <param name="metadataExporter">Explicit item write/resolution ownership.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="deletions">Item deletion operations.</param>
         /// <param name="subtitleManager">The subtitle manager.</param>
@@ -106,6 +109,8 @@ namespace Tesserafin.Providers.Manager
         /// <param name="mediaSegmentManager">The media segment manager.</param>
         /// <param name="similarItemsManager">The similar items manager.</param>
         public ProviderManager(
+            IItemWriteCommands writes,
+            IItemMetadataExporter metadataExporter,
             IItemImageService images,
             IItemDeletionCommands deletions,
             ISubtitleManager subtitleManager,
@@ -122,6 +127,8 @@ namespace Tesserafin.Providers.Manager
             IMediaSegmentManager mediaSegmentManager,
             ISimilarItemsManager similarItemsManager)
         {
+            _writes = writes;
+            _metadataExporter = metadataExporter;
             _images = images;
             _deletions = deletions;
             _logger = logger;
@@ -155,7 +162,6 @@ namespace Tesserafin.Providers.Manager
             IEnumerable<IImageProvider> imageProviders,
             IEnumerable<IMetadataService> metadataServices,
             IEnumerable<IMetadataProvider> metadataProviders,
-            IEnumerable<IMetadataSaver> metadataSavers,
             IEnumerable<IExternalId> externalIds,
             IEnumerable<IExternalUrlProvider> externalUrlProviders)
         {
@@ -165,7 +171,7 @@ namespace Tesserafin.Providers.Manager
             _externalIds = externalIds.OrderBy(i => i.ProviderName).ToArray();
             _externalUrlProviders = externalUrlProviders.OrderBy(i => i.Name).ToArray();
 
-            _savers = metadataSavers.ToArray();
+
         }
 
         /// <inheritdoc/>
@@ -430,7 +436,7 @@ namespace Tesserafin.Providers.Manager
         /// <inheritdoc />
         public IEnumerable<IMetadataSaver> GetMetadataSavers(BaseItem item, LibraryOptions libraryOptions)
         {
-            return _savers.Where(i => IsSaverEnabledForItem(i, item, libraryOptions, ItemUpdateType.MetadataEdit, false));
+            return _metadataExporter.GetSavers(item, libraryOptions, ItemUpdateType.MetadataEdit, false);
         }
 
         private IEnumerable<IMetadataProvider<T>> GetMetadataProvidersInternal<T>(BaseItem item, LibraryOptions libraryOptions, MetadataOptions globalMetadataOptions, bool includeDisabled, bool forceEnableInternetMetadata, string libraryPath)
@@ -687,7 +693,7 @@ namespace Tesserafin.Providers.Manager
             }));
 
             // Savers
-            list.AddRange(_savers.Where(i => IsSaverEnabledForItem(i, item, libraryOptions, ItemUpdateType.MetadataEdit, true)).OrderBy(i => i.Name).Select(i => new MetadataPlugin
+            list.AddRange(_metadataExporter.GetSavers(item, libraryOptions, ItemUpdateType.MetadataEdit, true).OrderBy(i => i.Name).Select(i => new MetadataPlugin
             {
                 Name = i.Name,
                 Type = MetadataPluginType.MetadataSaver
@@ -714,137 +720,6 @@ namespace Tesserafin.Providers.Manager
         /// <inheritdoc/>
         public MetadataOptions GetMetadataOptions(BaseItem item)
             => _configurationManager.GetMetadataOptionsForType(item.GetType().Name) ?? new MetadataOptions();
-
-        /// <inheritdoc/>
-        public Task SaveMetadataAsync(BaseItem item, ItemUpdateType updateType)
-            => SaveMetadataAsync(item, updateType, _savers);
-
-        /// <inheritdoc/>
-        public Task SaveMetadataAsync(BaseItem item, ItemUpdateType updateType, IEnumerable<string> savers)
-            => SaveMetadataAsync(item, updateType, _savers.Where(i => savers.Contains(i.Name, StringComparison.OrdinalIgnoreCase)));
-
-        /// <summary>
-        /// Saves the metadata.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        /// <param name="updateType">Type of the update.</param>
-        /// <param name="savers">The savers.</param>
-        private async Task SaveMetadataAsync(BaseItem item, ItemUpdateType updateType, IEnumerable<IMetadataSaver> savers)
-        {
-            var libraryOptions = _libraryManager.GetLibraryOptions(item);
-            var applicableSavers = savers.Where(i => IsSaverEnabledForItem(i, item, libraryOptions, updateType, false)).ToList();
-            if (applicableSavers.Count == 0)
-            {
-                return;
-            }
-
-            foreach (var saver in applicableSavers)
-            {
-                _logger.LogDebug("Saving {Item} to {Saver}", (item.Path ?? item.Name).ToSingleLogLine(), saver.Name);
-
-                if (saver is IMetadataFileSaver fileSaver)
-                {
-                    string path;
-
-                    try
-                    {
-                        path = fileSaver.GetSavePath(item);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error in {Saver} GetSavePath", saver.Name);
-                        continue;
-                    }
-
-                    try
-                    {
-                        _libraryMonitor.ReportFileSystemChangeBeginning(path);
-                        await saver.SaveAsync(item, CancellationToken.None).ConfigureAwait(false);
-                        item.DateLastSaved = DateTime.UtcNow;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error in metadata saver");
-                    }
-                    finally
-                    {
-                        _libraryMonitor.ReportFileSystemChangeComplete(path, false);
-                    }
-                }
-                else
-                {
-                    try
-                    {
-                        await saver.SaveAsync(item, CancellationToken.None).ConfigureAwait(false);
-                        item.DateLastSaved = DateTime.UtcNow;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error in metadata saver");
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Determines whether [is saver enabled for item] [the specified saver].
-        /// </summary>
-        private bool IsSaverEnabledForItem(IMetadataSaver saver, BaseItem item, LibraryOptions libraryOptions, ItemUpdateType updateType, bool includeDisabled)
-        {
-            var options = GetMetadataOptions(item);
-
-            try
-            {
-                if (!saver.IsEnabledFor(item, updateType))
-                {
-                    return false;
-                }
-
-                if (!includeDisabled)
-                {
-                    if (libraryOptions.MetadataSavers is null)
-                    {
-                        if (options.DisabledMetadataSavers.Contains(saver.Name, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return false;
-                        }
-
-                        if (!item.IsSaveLocalMetadataEnabled())
-                        {
-                            if (updateType >= ItemUpdateType.MetadataEdit)
-                            {
-                                // Manual edit occurred
-                                // Even if save local is off, save locally anyway if the metadata file already exists
-                                if (saver is not IMetadataFileSaver fileSaver || !File.Exists(fileSaver.GetSavePath(item)))
-                                {
-                                    return false;
-                                }
-                            }
-                            else
-                            {
-                                // Manual edit did not occur
-                                // Since local metadata saving is disabled, consider it disabled
-                                return false;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (!libraryOptions.MetadataSavers.Contains(saver.Name, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return false;
-                        }
-                    }
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in {Saver}.IsEnabledFor", saver.Name);
-                return false;
-            }
-        }
 
         /// <inheritdoc/>
         public Task<IEnumerable<RemoteSearchResult>> GetRemoteSearchResults<TItemType, TLookupType>(RemoteSearchQuery<TLookupType> searchInfo, CancellationToken cancellationToken)
@@ -1139,7 +1014,7 @@ namespace Tesserafin.Providers.Manager
 
         private async Task RefreshItem(BaseItem item, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
-            await item.RefreshMetadata(_deletions, options, cancellationToken).ConfigureAwait(false);
+            await item.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
 
             // Collection folders don't validate their children so we'll have to simulate that here
             switch (item)
@@ -1148,7 +1023,7 @@ namespace Tesserafin.Providers.Manager
                     await RefreshCollectionFolderChildren(options, collectionFolder, cancellationToken).ConfigureAwait(false);
                     break;
                 case Folder folder:
-                    await folder.ValidateChildren(_deletions, _images, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await folder.ValidateChildren(_deletions, _writes, _images, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
                     break;
             }
         }
@@ -1157,9 +1032,9 @@ namespace Tesserafin.Providers.Manager
         {
             foreach (var child in collectionFolder.GetPhysicalFolders())
             {
-                await child.RefreshMetadata(_deletions, options, cancellationToken).ConfigureAwait(false);
+                await child.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
 
-                await child.ValidateChildren(_deletions, _images, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                await child.ValidateChildren(_deletions, _writes, _images, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -1182,13 +1057,13 @@ namespace Tesserafin.Providers.Manager
                 .Where(i => i is not null)
                 .Distinct();
 
-            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_deletions, _images, new Progress<double>(), options, true, false, cancellationToken));
+            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_deletions, _writes, _images, new Progress<double>(), options, true, false, cancellationToken));
 
             await Task.WhenAll(musicArtistRefreshTasks).ConfigureAwait(false);
 
             try
             {
-                await item.RefreshMetadata(_deletions, options, cancellationToken).ConfigureAwait(false);
+                await item.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

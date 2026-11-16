@@ -1,9 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using Tesserafin.Controller.Entities;
+using System;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Model.Entities;
@@ -12,7 +12,7 @@ namespace Tesserafin.Server.Integration.Tests.EndToEnd;
 
 /// <summary>
 /// PR119: registers a real, playable library item against the real, booted server's own persistence
-/// (<see cref="ILibraryManager.CreateItems"/> - real EF/SQLite, not a mock) plus real
+/// (<see cref="IItemWriteCommands.CreateItems"/> - real EF/SQLite, not a mock) plus real
 /// <see cref="MediaStream"/> rows (<see cref="IMediaStreamRepository.SaveMediaStreams"/>), WITHOUT
 /// driving a full library-folder scan.
 /// </summary>
@@ -26,7 +26,7 @@ namespace Tesserafin.Server.Integration.Tests.EndToEnd;
 /// scheduling/polling, resolver/naming-convention matching) on top of the one this PR is actually
 /// about (the URL contract). This seeder instead drives the same real, final persistence calls a scan
 /// would end up making for a single resolved item -
-/// <see cref="ILibraryManager.CreateItems(IReadOnlyList{Controller.Entities.BaseItem}, Controller.Entities.BaseItem?, CancellationToken)"/>
+/// <see cref="IItemWriteCommands.CreateItems(IReadOnlyList{Controller.Entities.BaseItem}, Controller.Entities.BaseItem?, CancellationToken)"/>
 /// (real <c>IItemRepository</c>/<c>IItemPersistenceService</c> underneath - confirmed against
 /// <c>LibraryManagerItemStoreTests</c>, which cross-checks this exact save-then-register path) and
 /// <see cref="IMediaStreamRepository.SaveMediaStreams"/> (the same call
@@ -46,7 +46,7 @@ public static class LibraryItemSeeder
     /// Creates, persists, and registers a single-source <see cref="Movie"/> item for
     /// <paramref name="mediaPath"/>.
     /// </summary>
-    /// <param name="libraryManager">The real, DI-resolved library manager.</param>
+    /// <param name="writes">The real, DI-resolved library manager.</param>
     /// <param name="mediaStreamRepository">The real, DI-resolved media stream repository.</param>
     /// <param name="mediaPath">The real file on disk to register.</param>
     /// <param name="container">The container of <paramref name="mediaPath"/> (for example <c>"mp4"</c>).</param>
@@ -63,7 +63,7 @@ public static class LibraryItemSeeder
     /// </param>
     /// <returns>The new item's id.</returns>
     public static Guid SeedVideo(
-        ILibraryManager libraryManager,
+        IItemWriteCommands writes,
         IMediaStreamRepository mediaStreamRepository,
         string mediaPath,
         string container,
@@ -75,7 +75,7 @@ public static class LibraryItemSeeder
         Action<Movie>? configure = null,
         bool film = true)
     {
-        ArgumentNullException.ThrowIfNull(libraryManager);
+        ArgumentNullException.ThrowIfNull(writes);
         ArgumentNullException.ThrowIfNull(mediaStreamRepository);
         ArgumentNullException.ThrowIfNull(streams);
 
@@ -109,7 +109,7 @@ public static class LibraryItemSeeder
         // No parent: this is the historical CreateItems path, not IItemStore - real IItemRepository/
         // IItemPersistenceService underneath (LibraryManagerItemStoreTests cross-checks the same call
         // against the real, non-mocked types this factory's DI container hands out).
-        libraryManager.CreateItems([movie], null, CancellationToken.None);
+        writes.CreateItems([movie], null, CancellationToken.None);
 
         // MediaSourceManager.GetStaticMediaSources reads MediaStreams from this repository, keyed by
         // item id (Tesserafin.Controller.Entities.BaseItem.GetVersionInfo) - never from the in-memory

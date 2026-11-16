@@ -1,17 +1,17 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
+using System.Net.Http;
+using System.Net;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.DependencyInjection;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Enums;
@@ -188,6 +188,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
 
         // People, and a series with one episode to come next, for the routes that name those.
         var library = _factory.Services.GetRequiredService<ILibraryManager>();
+        var libraryWrites = _factory.Services.GetRequiredService<IItemWriteCommands>();
         foreach (var (id, who) in new[] { (_hidden, "withheld-" + _suffix + " actor"), (_visible, "open-" + _suffix + " actor") })
         {
             library.UpdatePeople(library.GetItemById(id)!, [new PersonInfo { Name = who, Type = PersonKind.Actor }]);
@@ -195,7 +196,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
 
         var series = new Series { Id = Guid.NewGuid(), Name = "withheld-" + _suffix + " series", Path = Path.Combine(withheldDir, "series"), ParentId = _withheldFolder, DateCreated = DateTime.UtcNow, DateModified = DateTime.UtcNow };
         series.PresentationUniqueKey = series.CreatePresentationUniqueKey();
-        library.CreateItems([series], null, CancellationToken.None);
+        libraryWrites.CreateItems([series], null, CancellationToken.None);
         var episode = new Episode
         {
             Id = Guid.NewGuid(),
@@ -211,7 +212,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
             DateModified = DateTime.UtcNow,
         };
         episode.PresentationUniqueKey = episode.CreatePresentationUniqueKey();
-        library.CreateItems([episode], null, CancellationToken.None);
+        libraryWrites.CreateItems([episode], null, CancellationToken.None);
         _hiddenSeries = series.Id;
 
         // The scenario holds only if the seeding did: every seeded item exists, under the folder of its library.
@@ -774,7 +775,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     {
         File.WriteAllText(file, name);
         return LibraryItemSeeder.SeedVideo(
-            _factory.Services.GetRequiredService<ILibraryManager>(),
+            _factory.Services.GetRequiredService<IItemWriteCommands>(),
             _factory.Services.GetRequiredService<IMediaStreamRepository>(),
             file,
             "mp4",
@@ -825,8 +826,9 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     private Guid AddFolder(string directory, Guid libraryId)
     {
         var library = _factory.Services.GetRequiredService<ILibraryManager>();
+        var libraryWrites = _factory.Services.GetRequiredService<IItemWriteCommands>();
         var folder = new Folder { Id = Guid.NewGuid(), Name = Path.GetFileName(directory), Path = directory, ParentId = library.RootFolder.Id, DateCreated = DateTime.UtcNow, DateModified = DateTime.UtcNow };
-        library.CreateItems([folder], library.RootFolder, CancellationToken.None);
+        libraryWrites.CreateItems([folder], library.RootFolder, CancellationToken.None);
 
         // What the library's own refresh would have recorded after a scan.
         Assert.IsType<CollectionFolder>(library.GetItemById(libraryId)).PhysicalFolderIds = [folder.Id];

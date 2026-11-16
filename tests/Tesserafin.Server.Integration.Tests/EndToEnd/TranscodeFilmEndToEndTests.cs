@@ -1,15 +1,15 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
-using System.Text.Json;
+using System.Net.Http;
+using System.Net;
 using System.Text.Json.Nodes;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Api.Models.PlaybackSessionDtos;
 using Tesserafin.Common.Configuration;
@@ -539,7 +539,7 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
         }
 
         return LibraryItemSeeder.SeedVideo(
-            _libraryManager,
+            _factory.Services.GetRequiredService<IItemWriteCommands>(),
             _mediaStreamRepository,
             path,
             avi ? "avi" : "mkv",

@@ -1,13 +1,13 @@
-using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
-using System.Text;
+using System.Net.Http;
+using System.Net;
 using System.Text.Json;
+using System.Text;
 using System.Threading.Tasks;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Configuration;
@@ -73,7 +73,7 @@ public sealed class ProgressiveOutputIsolationEndToEndTests : IClassFixture<Held
         _workDir = Directory.CreateTempSubdirectory("tesserafin-p293-e2e-").FullName;
         var fixture = await EndToEndMediaFixtures.CreateH264AacMp4Async(_workDir, durationSeconds: Seconds);
         _item = LibraryItemSeeder.SeedVideo(
-            _factory.Services.GetRequiredService<ILibraryManager>(),
+            _factory.Services.GetRequiredService<IItemWriteCommands>(),
             _factory.Services.GetRequiredService<IMediaStreamRepository>(),
             fixture,
             "mp4",

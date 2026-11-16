@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
@@ -9,8 +8,9 @@ using System.IO;
 using System.Linq;
 using System.Net.Mime;
 using System.Security.Cryptography;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -42,6 +42,7 @@ namespace Tesserafin.Api.Controllers;
 [Route("")]
 public class ImageController : BaseTesserafinApiController
 {
+    private readonly IItemWriteCommands _writes;
     private readonly IItemImageService _images;
     private readonly IUserManager _userManager;
     private readonly ILibraryManager _libraryManager;
@@ -55,6 +56,7 @@ public class ImageController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="ImageController"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="images">Explicit image preparation and commit lifecycle.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
@@ -65,6 +67,7 @@ public class ImageController : BaseTesserafinApiController
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
     /// <param name="appPaths">Instance of the <see cref="IApplicationPaths"/> interface.</param>
     public ImageController(
+        IItemWriteCommands writes,
         IItemImageService images,
         IUserManager userManager,
         ILibraryManager libraryManager,
@@ -75,6 +78,7 @@ public class ImageController : BaseTesserafinApiController
         IServerConfigurationManager serverConfigurationManager,
         IApplicationPaths appPaths)
     {
+        _writes = writes;
         _images = images;
         _userManager = userManager;
         _libraryManager = libraryManager;
@@ -307,7 +311,7 @@ public class ImageController : BaseTesserafinApiController
             return NotFound();
         }
 
-        await item.DeleteImageAsync(imageType, imageIndex ?? 0).ConfigureAwait(false);
+        await item.DeleteImageAsync(_writes, imageType, imageIndex ?? 0).ConfigureAwait(false);
         return NoContent();
     }
 
@@ -335,7 +339,7 @@ public class ImageController : BaseTesserafinApiController
             return NotFound();
         }
 
-        await item.DeleteImageAsync(imageType, imageIndex).ConfigureAwait(false);
+        await item.DeleteImageAsync(_writes, imageType, imageIndex).ConfigureAwait(false);
         return NoContent();
     }
 
@@ -375,7 +379,7 @@ public class ImageController : BaseTesserafinApiController
             // Handle image/png; charset=utf-8
             var mimeType = Request.ContentType?.Split(';').FirstOrDefault();
             await _providerManager.SaveImage(item, stream, mimeType, imageType, null, CancellationToken.None).ConfigureAwait(false);
-            await item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
+            await item.UpdateToRepositoryAsync(_writes, ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
 
             return NoContent();
         }
@@ -419,7 +423,7 @@ public class ImageController : BaseTesserafinApiController
             // Handle image/png; charset=utf-8
             var mimeType = Request.ContentType?.Split(';').FirstOrDefault();
             await _providerManager.SaveImage(item, stream, mimeType, imageType, null, CancellationToken.None).ConfigureAwait(false);
-            await item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
+            await item.UpdateToRepositoryAsync(_writes, ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
 
             return NoContent();
         }
@@ -451,7 +455,7 @@ public class ImageController : BaseTesserafinApiController
             return NotFound();
         }
 
-        await item.SwapImagesAsync(imageType, imageIndex, newIndex).ConfigureAwait(false);
+        await item.SwapImagesAsync(_writes, imageType, imageIndex, newIndex).ConfigureAwait(false);
         return NoContent();
     }
 

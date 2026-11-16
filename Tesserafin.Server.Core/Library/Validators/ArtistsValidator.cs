@@ -1,11 +1,11 @@
-using System;
 using System.Globalization;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Enums;
@@ -17,6 +17,7 @@ namespace Tesserafin.Server.Core.Library.Validators;
 /// </summary>
 public class ArtistsValidator
 {
+    private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
 
     /// <summary>
@@ -33,12 +34,14 @@ public class ArtistsValidator
     /// <summary>
     /// Initializes a new instance of the <see cref="ArtistsValidator" /> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
-    public ArtistsValidator(IItemDeletionCommands deletions, ILibraryManager libraryManager, ILogger<ArtistsValidator> logger, IItemRepository itemRepo)
+    public ArtistsValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, ILibraryManager libraryManager, ILogger<ArtistsValidator> logger, IItemRepository itemRepo)
     {
+        _writes = writes;
         _deletions = deletions;
         _libraryManager = libraryManager;
         _logger = logger;
@@ -82,7 +85,7 @@ public class ArtistsValidator
 
                 if (isNew || neverRefreshed)
                 {
-                    await item.RefreshMetadata(_deletions, cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(_deletions, _writes, cancellationToken).ConfigureAwait(false);
                     refreshed++;
                 }
             }

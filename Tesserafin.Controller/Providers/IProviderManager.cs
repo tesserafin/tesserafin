@@ -2,11 +2,11 @@
 
 #pragma warning disable CS1591
 
-using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Data.Events;
@@ -98,14 +98,12 @@ namespace Tesserafin.Controller.Providers
         /// <param name="imageProviders">Image providers to use.</param>
         /// <param name="metadataServices">Metadata services to use.</param>
         /// <param name="metadataProviders">Metadata providers to use.</param>
-        /// <param name="metadataSavers">Metadata savers to use.</param>
         /// <param name="externalIds">External IDs to use.</param>
         /// <param name="externalUrlProviders">The list of external url providers.</param>
         void AddParts(
             IEnumerable<IImageProvider> imageProviders,
             IEnumerable<IMetadataService> metadataServices,
             IEnumerable<IMetadataProvider> metadataProviders,
-            IEnumerable<IMetadataSaver> metadataSavers,
             IEnumerable<IExternalId> externalIds,
             IEnumerable<IExternalUrlProvider> externalUrlProviders);
 
@@ -181,23 +179,6 @@ namespace Tesserafin.Controller.Providers
         /// <param name="item">The item.</param>
         /// <returns>IEnumerable{ExternalIdInfo}.</returns>
         IEnumerable<ExternalIdInfo> GetExternalIdInfos(IHasProviderIds item);
-
-        /// <summary>
-        /// Saves the metadata.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        /// <param name="updateType">Type of the update.</param>
-        /// <returns>The task object representing the asynchronous operation.</returns>
-        Task SaveMetadataAsync(BaseItem item, ItemUpdateType updateType);
-
-        /// <summary>
-        /// Saves the metadata.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        /// <param name="updateType">Type of the update.</param>
-        /// <param name="savers">The metadata savers.</param>
-        /// <returns>The task object representing the asynchronous operation.</returns>
-        Task SaveMetadataAsync(BaseItem item, ItemUpdateType updateType, IEnumerable<string> savers);
 
         /// <summary>
         /// Gets the metadata options.

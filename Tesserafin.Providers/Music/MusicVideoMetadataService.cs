@@ -1,5 +1,5 @@
-using System;
 using System.Linq;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
@@ -21,6 +21,7 @@ public class MusicVideoMetadataService : MetadataService<MusicVideo, MusicVideoI
     /// <summary>
     /// Initializes a new instance of the <see cref="MusicVideoMetadataService"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -30,7 +31,8 @@ public class MusicVideoMetadataService : MetadataService<MusicVideo, MusicVideoI
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public MusicVideoMetadataService(
-        IServerConfigurationManager serverConfigurationManager,
+        IItemWriteCommands writes,
+            IServerConfigurationManager serverConfigurationManager,
         ILogger<MusicVideoMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
@@ -38,7 +40,7 @@ public class MusicVideoMetadataService : MetadataService<MusicVideo, MusicVideoI
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository)
-        : base(serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
     }
 

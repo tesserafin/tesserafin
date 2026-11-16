@@ -2,12 +2,12 @@
 
 #pragma warning disable CS1591
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Library;
@@ -257,7 +257,7 @@ namespace Tesserafin.Controller.Entities
             return _originalFolderViewTypes.Contains(viewType);
         }
 
-        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }

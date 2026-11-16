@@ -1,7 +1,7 @@
-using System;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
@@ -16,6 +16,7 @@ namespace Tesserafin.Server.Core.Library.Validators;
 /// </summary>
 public class PeopleValidator
 {
+    private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
 
     /// <summary>
@@ -34,13 +35,15 @@ public class PeopleValidator
     /// <summary>
     /// Initializes a new instance of the <see cref="PeopleValidator" /> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="itemPeopleService">The item people service.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="fileSystem">The file system.</param>
-    public PeopleValidator(IItemDeletionCommands deletions, ILibraryManager libraryManager, IItemPeopleService itemPeopleService, ILogger logger, IFileSystem fileSystem)
+    public PeopleValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, ILibraryManager libraryManager, IItemPeopleService itemPeopleService, ILogger logger, IFileSystem fileSystem)
     {
+        _writes = writes;
         _deletions = deletions;
         _libraryManager = libraryManager;
         _itemPeopleService = itemPeopleService;
@@ -85,7 +88,7 @@ public class PeopleValidator
                     MetadataRefreshMode = MetadataRefreshMode.ValidationOnly
                 };
 
-                await item.RefreshMetadata(_deletions, options, cancellationToken).ConfigureAwait(false);
+                await item.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

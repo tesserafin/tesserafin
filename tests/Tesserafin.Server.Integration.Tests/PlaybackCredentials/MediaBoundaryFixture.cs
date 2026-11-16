@@ -1,12 +1,12 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
+using System.Net.Http;
+using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Api.Models.PlaybackCredentialDtos;
 using Tesserafin.Api.Models.StartupDtos;
@@ -105,10 +105,11 @@ public sealed class MediaBoundaryFixture : IAsyncLifetime
         Directory.CreateDirectory(_workDirectory);
 
         var libraryManager = Factory.Services.GetRequiredService<ILibraryManager>();
+        var libraryManagerWrites = Factory.Services.GetRequiredService<IItemWriteCommands>();
         var mediaStreamRepository = Factory.Services.GetRequiredService<IMediaStreamRepository>();
 
-        ItemId = SeedItem(libraryManager, mediaStreamRepository, "fixture.mp4", "R1 media boundary fixture");
-        OtherItemId = SeedItem(libraryManager, mediaStreamRepository, "other.mp4", "R1 media boundary second fixture");
+        ItemId = SeedItem(Factory.Services.GetRequiredService<IItemWriteCommands>(), mediaStreamRepository, "fixture.mp4", "R1 media boundary fixture");
+        OtherItemId = SeedItem(Factory.Services.GetRequiredService<IItemWriteCommands>(), mediaStreamRepository, "other.mp4", "R1 media boundary second fixture");
 
         Routes = MediaRouteCatalog.For(ItemId, MediaSourceId, SubtitleStreamIndex);
     }
@@ -313,14 +314,14 @@ public sealed class MediaBoundaryFixture : IAsyncLifetime
         return payload;
     }
 
-    private Guid SeedItem(ILibraryManager libraryManager, IMediaStreamRepository mediaStreamRepository, string fileName, string name)
+    private Guid SeedItem(IItemWriteCommands libraryManagerWrites, IMediaStreamRepository mediaStreamRepository, string fileName, string name)
     {
         var mediaPath = Path.Combine(_workDirectory, fileName);
         File.WriteAllBytes(mediaPath, _mediaBytes);
         var subtitlePath = EndToEndMediaFixtures.CreateExternalSrt(_workDirectory, Path.GetFileNameWithoutExtension(fileName) + ".srt");
 
         return LibraryItemSeeder.SeedVideo(
-            libraryManager,
+            libraryManagerWrites,
             mediaStreamRepository,
             mediaPath,
             "mp4",

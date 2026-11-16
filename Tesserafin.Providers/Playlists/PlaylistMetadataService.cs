@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
@@ -23,6 +23,7 @@ public class PlaylistMetadataService : MetadataService<Playlist, ItemLookupInfo>
     /// <summary>
     /// Initializes a new instance of the <see cref="PlaylistMetadataService"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -32,7 +33,8 @@ public class PlaylistMetadataService : MetadataService<Playlist, ItemLookupInfo>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public PlaylistMetadataService(
-        IServerConfigurationManager serverConfigurationManager,
+        IItemWriteCommands writes,
+            IServerConfigurationManager serverConfigurationManager,
         ILogger<PlaylistMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
@@ -40,7 +42,7 @@ public class PlaylistMetadataService : MetadataService<Playlist, ItemLookupInfo>
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository)
-        : base(serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
     }
 

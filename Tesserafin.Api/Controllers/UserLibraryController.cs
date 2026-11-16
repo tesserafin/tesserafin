@@ -1,9 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -11,9 +11,9 @@ using Tesserafin.Api.Extensions;
 using Tesserafin.Api.Helpers;
 using Tesserafin.Api.ModelBinders;
 using Tesserafin.Controller.Dto;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
@@ -34,6 +34,7 @@ namespace Tesserafin.Api.Controllers;
 [Tags("Library")]
 public class UserLibraryController : BaseTesserafinApiController
 {
+    private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
     private readonly IUserManager _userManager;
     private readonly IUserDataManager _userDataRepository;
@@ -45,6 +46,7 @@ public class UserLibraryController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="UserLibraryController"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="userDataRepository">Instance of the <see cref="IUserDataManager"/> interface.</param>
@@ -53,6 +55,7 @@ public class UserLibraryController : BaseTesserafinApiController
     /// <param name="userViewManager">Instance of the <see cref="IUserViewManager"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
     public UserLibraryController(
+        IItemWriteCommands writes,
         IItemDeletionCommands deletions,
         IUserManager userManager,
         IUserDataManager userDataRepository,
@@ -61,6 +64,7 @@ public class UserLibraryController : BaseTesserafinApiController
         IUserViewManager userViewManager,
         IFileSystem fileSystem)
     {
+        _writes = writes;
         _deletions = deletions;
         _userManager = userManager;
         _userDataRepository = userDataRepository;
@@ -661,7 +665,7 @@ public class UserLibraryController : BaseTesserafinApiController
                     ForceSave = true
                 };
 
-                await item.RefreshMetadata(_deletions, options, CancellationToken.None).ConfigureAwait(false);
+                await item.RefreshMetadata(_deletions, _writes, options, CancellationToken.None).ConfigureAwait(false);
             }
         }
     }

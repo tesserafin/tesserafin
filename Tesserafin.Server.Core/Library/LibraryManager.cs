@@ -1,24 +1,23 @@
 #pragma warning disable CS1591
 #pragma warning disable CA5394
 
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
-using System.Threading;
+using System.Net;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
-using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Dto;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
@@ -28,9 +27,10 @@ using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Resolvers;
 using Tesserafin.Controller.Sorting;
-using Tesserafin.Data;
+using Tesserafin.Controller;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
+using Tesserafin.Data;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Drawing;
@@ -61,7 +61,9 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     internal class LibraryManager : ILibraryManager, IItemLookupService
     {
-        private readonly IItemImageService _images;
+        private readonly IItemMetadataExporter _metadata;
+        private readonly IItemResolutionService _resolution;
+        private readonly ILibraryItemOptions _options;
         private readonly ILogger<LibraryManager> _logger;
         private readonly IUserManager _userManager;
         private readonly IServerConfigurationManager _configurationManager;
@@ -70,7 +72,7 @@ namespace Tesserafin.Server.Core.Library
         private readonly IServerApplicationHost _appHost;
         private readonly IFileSystem _fileSystem;
         private readonly IItemRepository _itemRepository;
-        private readonly IItemPersistenceService _persistenceService;
+        private readonly IItemWriteCommands _writes;
         private readonly INextUpService _nextUpService;
         private readonly IItemCountService _countService;
         private readonly ILinkedChildrenService _linkedChildrenService;
@@ -83,7 +85,6 @@ namespace Tesserafin.Server.Core.Library
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemCacheStore _itemCacheStore;
         private readonly IItemAccessService _itemAccessService;
-        private readonly IItemChangePublisher _changes;
         private readonly IUserViewFactory _userViewFactory;
         private readonly IUserRootFolderProvider _userRootFolderProvider;
         private readonly ICollectionFolderResolver _collectionFolderResolver;
@@ -95,7 +96,9 @@ namespace Tesserafin.Server.Core.Library
         /// <summary>
         /// Initializes a new instance of the <see cref="LibraryManager" /> class.
         /// </summary>
-        /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+        /// <param name="resolution">Filesystem resolution.</param>
+        /// <param name="options">Library options and content policy.</param>
+        /// <param name="metadata">Explicit metadata export.</param>
         /// <param name="appHost">The application host.</param>
         /// <param name="loggerFactory">The logger factory.</param>
         /// <param name="userManager">The user manager.</param>
@@ -112,7 +115,7 @@ namespace Tesserafin.Server.Core.Library
         /// this is the edge whose removal breaks the SCC.
         /// </param>
         /// <param name="itemRepository">The item repository.</param>
-        /// <param name="persistenceService">The item persistence service.</param>
+        /// <param name="writes">Item graph write ownership.</param>
         /// <param name="nextUpService">The next up service.</param>
         /// <param name="countService">The item count service.</param>
         /// <param name="linkedChildrenService">The linked children service.</param>
@@ -126,14 +129,15 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="itemLookupService">The item lookup service (read side of the item lookup cache; see PR75/PR76).</param>
         /// <param name="itemCacheStore">The item cache lifecycle port (register/invalidate side of the same cache; see PR76).</param>
         /// <param name="itemAccessService">The item access service (user visibility on top of the item lookup service; see PR77).</param>
-        /// <param name="changes">Completed item change publication.</param>
         /// <param name="userViewFactory">The user-view factory leaf (named/shadow view creation; see PR106b). <see cref="GetNamedView(User, string, CollectionType?, string)"/> and the other overloads delegate to it - a leaf dependency, not a cycle: <c>UserViewFactory</c> never references <see cref="ILibraryManager"/>.</param>
         /// <param name="userRootFolderProvider">The user root folder provider leaf (construction/cache of the per-server <see cref="UserRootFolder"/>; see PR107). <see cref="GetUserRootFolder"/> and this class's internal callers delegate to it - a leaf dependency, not a cycle: <c>UserRootFolderProvider</c> never references <see cref="ILibraryManager"/>. <see cref="LibraryManager"/> no longer implements <see cref="IUserRootFolderProvider"/> itself (it used to be aliased onto it via a DI factory cast - RFC <c>docs/rfc-di-query-user-views-v2.md</c> §0/§1's "piège n°1").</param>
         /// <param name="collectionFolderResolver">The library membership leaf (<see cref="GetCollectionFolders(BaseItem)"/> and its overload delegate to it; see DEBT-SERVER-2) - a leaf dependency, not a cycle: <c>CollectionFolderResolver</c> never references <see cref="ILibraryManager"/>.</param>
         /// <param name="dotIgnoreIgnoreRule">The ignore rules.</param>
         /// <param name="roots">Application aggregate root ownership.</param>
         public LibraryManager(
-            IItemImageService images,
+            IItemResolutionService resolution,
+            ILibraryItemOptions options,
+            IItemMetadataExporter metadata,
             IServerApplicationHost appHost,
             ILoggerFactory loggerFactory,
             IUserManager userManager,
@@ -142,7 +146,7 @@ namespace Tesserafin.Server.Core.Library
             Lazy<IProviderManager> providerManagerFactory,
             IUserViewCatalog userViewCatalog,
             IItemRepository itemRepository,
-            IItemPersistenceService persistenceService,
+            IItemWriteCommands writes,
             INextUpService nextUpService,
             IItemCountService countService,
             ILinkedChildrenService linkedChildrenService,
@@ -156,14 +160,15 @@ namespace Tesserafin.Server.Core.Library
             IItemLookupService itemLookupService,
             IItemCacheStore itemCacheStore,
             IItemAccessService itemAccessService,
-            IItemChangePublisher changes,
             IUserViewFactory userViewFactory,
             IUserRootFolderProvider userRootFolderProvider,
             ICollectionFolderResolver collectionFolderResolver,
             DotIgnoreIgnoreRule dotIgnoreIgnoreRule,
             ILibraryRootFolderProvider roots)
         {
-            _images = images;
+            _resolution = resolution;
+            _options = options;
+            _metadata = metadata;
             _appHost = appHost;
             _logger = loggerFactory.CreateLogger<LibraryManager>();
             _userManager = userManager;
@@ -172,7 +177,7 @@ namespace Tesserafin.Server.Core.Library
             _providerManagerFactory = providerManagerFactory;
             _userViewCatalog = userViewCatalog;
             _itemRepository = itemRepository;
-            _persistenceService = persistenceService;
+            _writes = writes;
             _nextUpService = nextUpService;
             _countService = countService;
             _linkedChildrenService = linkedChildrenService;
@@ -184,7 +189,6 @@ namespace Tesserafin.Server.Core.Library
             _itemCacheStore = itemCacheStore;
             _itemAccessService = itemAccessService;
 
-            _changes = changes;
             _userViewFactory = userViewFactory;
             _userRootFolderProvider = userRootFolderProvider;
             _collectionFolderResolver = collectionFolderResolver;
@@ -212,19 +216,6 @@ namespace Tesserafin.Server.Core.Library
         /// <value>The intro providers.</value>
         private IIntroProvider[] IntroProviders { get; set; } = [];
 
-        /// <summary>
-        /// Gets or sets the list of entity resolution ignore rules.
-        /// </summary>
-        /// <value>The entity resolution ignore rules.</value>
-        private IResolverIgnoreRule[] EntityResolutionIgnoreRules { get; set; } = [];
-
-        /// <summary>
-        /// Gets or sets the list of currently registered entity resolvers.
-        /// </summary>
-        /// <value>The entity resolvers enumerable.</value>
-        private IItemResolver[] EntityResolvers { get; set; } = [];
-
-        private IMultiItemResolver[] MultiItemResolvers { get; set; } = [];
 
         /// <summary>
         /// Adds the parts.
@@ -239,12 +230,21 @@ namespace Tesserafin.Server.Core.Library
             IEnumerable<IIntroProvider> introProviders,
             IEnumerable<IBaseItemComparer> itemComparers)
         {
-            EntityResolutionIgnoreRules = rules.ToArray();
-            EntityResolvers = resolvers.OrderBy(i => i.Priority).ToArray();
-            MultiItemResolvers = EntityResolvers.OfType<IMultiItemResolver>().ToArray();
+            _resolution.AddParts(rules, resolvers);
             IntroProviders = introProviders.ToArray();
             _itemSortService.AddParts(itemComparers);
         }
+
+        public Video? ResolveAlternateVersion(string path, Type expectedVideoType, Folder? parent, CollectionType? collectionType)
+            => _resolution.ResolveAlternateVersion(path, expectedVideoType, parent, collectionType);
+
+        public List<FileSystemMetadata> NormalizeRootPathList(IEnumerable<FileSystemMetadata> paths)
+            => _resolution.NormalizeRootPathList(paths);
+
+        private BaseItem? ResolvePath(FileSystemMetadata fileInfo, IDirectoryService directoryService, IItemResolver[]? resolvers, Folder? parent = null, CollectionType? collectionType = null, LibraryOptions? libraryOptions = null)
+            => _resolution.ResolvePath(fileInfo, directoryService, resolvers, parent, collectionType, libraryOptions);
+
+        public bool AreEqualPaths(string first, string second) => _fileSystem.AreEqual(first, second);
 
         public void RegisterItem(BaseItem item)
         {
@@ -253,37 +253,6 @@ namespace Tesserafin.Server.Core.Library
             _itemCacheStore.Register(item);
         }
 
-        /// <summary>
-        /// Resolves the item.
-        /// </summary>
-        /// <param name="args">The args.</param>
-        /// <param name="resolvers">The resolvers.</param>
-        /// <returns>BaseItem.</returns>
-        private BaseItem? ResolveItem(ItemResolveArgs args, IItemResolver[]? resolvers)
-        {
-            var item = (resolvers ?? EntityResolvers).Select(r => Resolve(args, r))
-                .FirstOrDefault(i => i is not null);
-
-            if (item is not null)
-            {
-                ResolverHelper.SetInitialItemValues(item, args, _fileSystem, this);
-            }
-
-            return item;
-        }
-
-        private BaseItem? Resolve(ItemResolveArgs args, IItemResolver resolver)
-        {
-            try
-            {
-                return resolver.ResolvePath(args);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in {Resolver} resolving {Path}", resolver.GetType().Name, args.Path);
-                return null;
-            }
-        }
 
         public Guid GetNewItemId(string key, Type type)
         {
@@ -291,218 +260,22 @@ namespace Tesserafin.Server.Core.Library
         }
 
         private Guid GetNewItemIdInternal(string key, Type type, bool forceCaseInsensitive)
-        {
-            ArgumentException.ThrowIfNullOrEmpty(key);
-            ArgumentNullException.ThrowIfNull(type);
-
-            string programDataPath = _configurationManager.ApplicationPaths.ProgramDataPath;
-            if (key.StartsWith(programDataPath, StringComparison.Ordinal))
-            {
-                // Try to normalize paths located underneath program-data in an attempt to make them more portable
-                key = key.Substring(programDataPath.Length)
-                    .TrimStart('/', '\\')
-                    .Replace('/', '\\');
-            }
-
-            if (forceCaseInsensitive || !_configurationManager.Configuration.EnableCaseSensitiveItemIds)
-            {
-                key = key.ToLowerInvariant();
-            }
-
-            key = type.FullName + key;
-
-            return key.GetMD5();
-        }
+            => ItemIdentity.Create(_configurationManager, key, type, forceCaseInsensitive);
 
         public BaseItem? ResolvePath(
             FileSystemMetadata fileInfo,
             Folder? parent = null,
             IDirectoryService? directoryService = null,
             CollectionType? collectionType = null)
-            => ResolvePath(fileInfo, directoryService ?? new DirectoryService(_fileSystem), null, parent, collectionType);
+            => _resolution.ResolvePath(fileInfo, parent, directoryService, collectionType);
 
-        private void SetAdditionalPartsFromStack(Video altVideo, string path)
-        {
-            if (altVideo.AdditionalParts is { Length: > 0 })
-            {
-                return;
-            }
-
-            var directory = Path.GetDirectoryName(path);
-            if (string.IsNullOrEmpty(directory))
-            {
-                return;
-            }
-
-            IEnumerable<FileSystemMetadata> siblings;
-            try
-            {
-                siblings = _fileSystem.GetFiles(directory);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to enumerate siblings to detect stack for {Path}", path);
-                return;
-            }
-
-            var stacks = StackResolver.Resolve(siblings, _namingOptions);
-            foreach (var stack in stacks)
-            {
-                if (stack.Files.Count > 1
-                    && string.Equals(stack.Files[0], path, StringComparison.OrdinalIgnoreCase))
-                {
-                    altVideo.AdditionalParts = stack.Files.Skip(1).ToArray();
-                    return;
-                }
-            }
-        }
-
-        /// <inheritdoc />
-        public Video? ResolveAlternateVersion(string path, Type expectedVideoType, Folder? parent, CollectionType? collectionType)
-        {
-            // Clean up any existing item saved with wrong type (e.g. Video instead of Movie).
-            // This happens when items were previously resolved without proper type context
-            // in mixed-content libraries where collectionType is null.
-            var expectedId = GetNewItemId(path, expectedVideoType);
-            var resolved = ResolvePath(
-                _fileSystem.GetFileSystemInfo(path),
-                parent,
-                collectionType: collectionType) as Video;
-
-            if (resolved is null)
-            {
-                return null;
-            }
-
-            // Ensure the alternate version has the same concrete type as the primary video.
-            // ResolvePath may return a generic Video for files in mixed-content libraries
-            // where collectionType is null, even though the primary is a Movie/Episode/etc.
-            if (resolved.GetType() != expectedVideoType)
-            {
-                if (Activator.CreateInstance(expectedVideoType) is Video correctVideo)
-                {
-                    correctVideo.Path = resolved.Path;
-                    correctVideo.Name = resolved.Name;
-                    correctVideo.VideoType = resolved.VideoType;
-                    correctVideo.ProductionYear = resolved.ProductionYear;
-                    correctVideo.ExtraType = resolved.ExtraType;
-                    resolved = correctVideo;
-                }
-            }
-
-            resolved.Id = expectedId;
-            return resolved;
-        }
-
-        private BaseItem? ResolvePath(
-            FileSystemMetadata fileInfo,
-            IDirectoryService directoryService,
-            IItemResolver[]? resolvers,
-            Folder? parent = null,
-            CollectionType? collectionType = null,
-            LibraryOptions? libraryOptions = null)
-        {
-            ArgumentNullException.ThrowIfNull(fileInfo);
-
-            var fullPath = fileInfo.FullName;
-
-            if (collectionType is null && parent is not null)
-            {
-                collectionType = GetContentTypeOverride(fullPath, true);
-            }
-
-            var args = new ItemResolveArgs(_configurationManager.ApplicationPaths, this)
-            {
-                Parent = parent,
-                FileInfo = fileInfo,
-                CollectionType = collectionType,
-                LibraryOptions = libraryOptions
-            };
-
-            // Return null if ignore rules deem that we should do so
-            if (IgnoreFile(args.FileInfo, args.Parent))
-            {
-                return null;
-            }
-
-            // Gather child folder and files
-            if (args.IsDirectory)
-            {
-                var isPhysicalRoot = args.IsPhysicalRoot;
-
-                // When resolving the root, we need it's grandchildren (children of user views)
-                var flattenFolderDepth = isPhysicalRoot ? 2 : 0;
-
-                FileSystemMetadata[] files;
-                var isVf = args.IsVf;
-
-                try
-                {
-                    files = FileData.GetFilteredFileSystemEntries(directoryService, args.Path, _fileSystem, _appHost, _logger, args, flattenFolderDepth: flattenFolderDepth, resolveShortcuts: isPhysicalRoot || isVf);
-                }
-                catch (Exception ex)
-                {
-                    if (parent is not null && parent.IsPhysicalRoot)
-                    {
-                        _logger.LogError(ex, "Error in GetFilteredFileSystemEntries isPhysicalRoot: {0} IsVf: {1}", isPhysicalRoot, isVf);
-
-                        files = [];
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-
-                // Need to remove sub-paths that may have been resolved from shortcuts
-                // Example: if \\server\movies exists, then strip out \\server\movies\action
-                if (isPhysicalRoot)
-                {
-                    files = NormalizeRootPathList(files).ToArray();
-                }
-
-                args.FileSystemChildren = files;
-            }
-
-            // Filter content based on ignore rules
-            if (args.IsDirectory)
-            {
-                var filtered = args.GetActualFileSystemChildren().ToArray();
-                args.FileSystemChildren = filtered ?? [];
-            }
-
-            return ResolveItem(args, resolvers);
-        }
 
         public bool IgnoreFile(FileSystemMetadata file, BaseItem? parent)
-            => EntityResolutionIgnoreRules.Any(r => r.ShouldIgnore(file, parent));
+            => _resolution.IgnoreFile(file, parent);
 
-        public List<FileSystemMetadata> NormalizeRootPathList(IEnumerable<FileSystemMetadata> paths)
-        {
-            var originalList = paths.ToList();
-
-            var list = originalList.Where(i => i.IsDirectory)
-                .Select(i => Path.TrimEndingDirectorySeparator(i.FullName))
-                .Distinct()
-                .ToList();
-
-            var dupes = list.Where(subPath => !subPath.EndsWith(":\\", StringComparison.Ordinal) && list.Any(i => _fileSystem.ContainsSubPath(i, subPath)))
-                .ToList();
-
-            foreach (var dupe in dupes)
-            {
-                _logger.LogInformation("Found duplicate path: {0}", dupe);
-            }
-
-            var newList = list.Except(dupes, StringComparer.Ordinal).Select(_fileSystem.GetDirectoryInfo).ToList();
-            newList.AddRange(originalList.Where(i => !i.IsDirectory));
-            return newList;
-        }
 
         public IEnumerable<BaseItem> ResolvePaths(IEnumerable<FileSystemMetadata> files, IDirectoryService directoryService, Folder parent, LibraryOptions libraryOptions, CollectionType? collectionType = null)
-        {
-            return ResolvePaths(files, directoryService, parent, libraryOptions, collectionType, EntityResolvers);
-        }
+            => _resolution.ResolvePaths(files, directoryService, parent, libraryOptions, collectionType);
 
         public IEnumerable<BaseItem> ResolvePaths(
             IEnumerable<FileSystemMetadata> files,
@@ -511,58 +284,8 @@ namespace Tesserafin.Server.Core.Library
             LibraryOptions libraryOptions,
             CollectionType? collectionType,
             IItemResolver[] resolvers)
-        {
-            var fileList = files.Where(i => !IgnoreFile(i, parent)).ToList();
+            => _resolution.ResolvePaths(files, directoryService, parent, libraryOptions, collectionType, resolvers);
 
-            if (parent is not null)
-            {
-                var multiItemResolvers = resolvers is null ? MultiItemResolvers : resolvers.OfType<IMultiItemResolver>();
-
-                foreach (var resolver in multiItemResolvers)
-                {
-                    var result = resolver.ResolveMultiple(parent, fileList, collectionType, directoryService);
-
-                    if (result?.Items.Count > 0)
-                    {
-                        var items = result.Items;
-                        items.RemoveAll(item => !ResolverHelper.SetInitialItemValues(item, parent, this, directoryService));
-                        items.AddRange(ResolveFileList(result.ExtraFiles, directoryService, parent, collectionType, resolvers, libraryOptions));
-                        return items;
-                    }
-                }
-            }
-
-            return ResolveFileList(fileList, directoryService, parent, collectionType, resolvers, libraryOptions);
-        }
-
-        private IEnumerable<BaseItem> ResolveFileList(
-            IReadOnlyList<FileSystemMetadata> fileList,
-            IDirectoryService directoryService,
-            Folder? parent,
-            CollectionType? collectionType,
-            IItemResolver[]? resolvers,
-            LibraryOptions libraryOptions)
-        {
-            // Given that fileList is a list we can save enumerator allocations by indexing
-            for (var i = 0; i < fileList.Count; i++)
-            {
-                var file = fileList[i];
-                BaseItem? result = null;
-                try
-                {
-                    result = ResolvePath(file, directoryService, resolvers, parent, collectionType, libraryOptions);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error resolving path {Path}", file.FullName);
-                }
-
-                if (result is not null)
-                {
-                    yield return result;
-                }
-            }
-        }
 
         /// <inheritdoc />
         /// <remarks>
@@ -720,7 +443,7 @@ namespace Tesserafin.Server.Core.Library
                     Path = path
                 };
 
-                CreateItem(item, null);
+                _writes.CreateItem(item, null);
             }
 
             return item;
@@ -734,12 +457,12 @@ namespace Tesserafin.Server.Core.Library
         }
 
         /// <inheritdoc />
-        public Task ValidatePeopleAsync(IItemDeletionCommands deletions, IProgress<double> progress, CancellationToken cancellationToken)
+        public Task ValidatePeopleAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, IProgress<double> progress, CancellationToken cancellationToken)
         {
             // Ensure the location is available.
             Directory.CreateDirectory(_configurationManager.ApplicationPaths.PeoplePath);
 
-            return new PeopleValidator(deletions, this, _itemPeopleService, _logger, _fileSystem).ValidatePeople(cancellationToken, progress);
+            return new PeopleValidator(writes, deletions, this, _itemPeopleService, _logger, _fileSystem).ValidatePeople(cancellationToken, progress);
         }
 
         /// <summary>
@@ -1522,187 +1245,6 @@ namespace Tesserafin.Server.Core.Library
             return _itemSortService.Sort(items, user, orderBy);
         }
 
-        /// <inheritdoc />
-        public void CreateItem(BaseItem item, BaseItem? parent)
-        {
-            CreateItems([item], parent, CancellationToken.None);
-        }
-
-        /// <inheritdoc />
-        public void CreateItems(IReadOnlyList<BaseItem> items, BaseItem? parent, CancellationToken cancellationToken)
-        {
-            // Resolve and add any local alternate version items that don't exist yet
-            // This ensures they exist in the database when LinkedChildren are processed
-            var allItems = new List<BaseItem>(items);
-            var parentFolder = parent as Folder;
-            var parentCollectionType = parent is not null ? GetTopFolderContentType(parent) : null;
-            foreach (var item in items)
-            {
-                if (item is Video video && video.LocalAlternateVersions.Length > 0)
-                {
-                    var videoType = video.GetType();
-                    foreach (var path in video.LocalAlternateVersions)
-                    {
-                        if (string.IsNullOrEmpty(path))
-                        {
-                            continue;
-                        }
-
-                        // Use the primary video's type for ID calculation to ensure consistency
-                        var altId = GetNewItemId(path, videoType);
-                        if (GetItemById(altId) is null && !allItems.Any(i => i.Id.Equals(altId)))
-                        {
-                            // Alternate version doesn't exist, resolve and create it
-                            // ensuring it has the same type as the primary video
-                            var altVideo = ResolveAlternateVersion(path, videoType, parentFolder, parentCollectionType);
-                            if (altVideo is not null)
-                            {
-                                altVideo.OwnerId = video.Id;
-                                altVideo.SetPrimaryVersionId(video.Id);
-                                // ResolveAlternateVersion only sees the alternate's primary file.
-                                // If the alternate is itself a stack (e.g. 1080p part1 + part2),
-                                // detect its parts from sibling files so its AdditionalParts persist.
-                                SetAdditionalPartsFromStack(altVideo, path);
-                                allItems.Add(altVideo);
-                            }
-                        }
-                    }
-                }
-            }
-
-            _persistenceService.SaveItems(allItems, cancellationToken);
-
-            foreach (var item in allItems)
-            {
-                RegisterItem(item);
-            }
-
-            if (parent is Folder folder)
-            {
-                folder.Children = null;
-                folder.UserData = null;
-            }
-
-            foreach (var item in items)
-            {
-                // Exclude live TV guide noise.
-                if (item.SourceType == SourceType.Library)
-                {
-                    try
-                    {
-                        _changes.Added(item, parent ?? item.GetParent(this));
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Unable to prepare creation notification for item {ItemId}", item.Id);
-                    }
-                }
-            }
-        }
-
-        /// <inheritdoc />
-        public async Task UpdateItemsAsync(IReadOnlyList<BaseItem> items, BaseItem parent, ItemUpdateType updateReason, CancellationToken cancellationToken)
-        {
-            foreach (var item in items)
-            {
-                item.DateLastSaved = DateTime.UtcNow;
-                await RunMetadataSavers(item, updateReason, cancellationToken).ConfigureAwait(false);
-
-                // Modify again, so saved value is after write time of externally saved metadata
-                item.DateLastSaved = DateTime.UtcNow;
-            }
-
-            // Resolve and add any local alternate version items that don't exist yet
-            // This ensures they exist in the database when LinkedChildren are processed
-            var allItems = new List<BaseItem>(items);
-            var parentFolder = parent as Folder;
-            var parentCollectionType = GetTopFolderContentType(parent);
-            foreach (var item in items)
-            {
-                if (item is Video video && video.LocalAlternateVersions.Length > 0)
-                {
-                    var videoType = video.GetType();
-                    foreach (var path in video.LocalAlternateVersions)
-                    {
-                        if (string.IsNullOrEmpty(path))
-                        {
-                            continue;
-                        }
-
-                        // Use the primary video's type for ID calculation to ensure consistency
-                        var altId = GetNewItemId(path, videoType);
-                        if (GetItemById(altId) is null && !allItems.Any(i => i.Id.Equals(altId)))
-                        {
-                            // Alternate version doesn't exist, resolve and create it
-                            // ensuring it has the same type as the primary video
-                            var altVideo = ResolveAlternateVersion(path, videoType, parentFolder, parentCollectionType);
-                            if (altVideo is not null)
-                            {
-                                altVideo.OwnerId = video.Id;
-                                altVideo.SetPrimaryVersionId(video.Id);
-                                // ResolveAlternateVersion only sees the alternate's primary file.
-                                // If the alternate is itself a stack (e.g. 1080p part1 + part2),
-                                // detect its parts from sibling files so its AdditionalParts persist.
-                                SetAdditionalPartsFromStack(altVideo, path);
-                                allItems.Add(altVideo);
-                            }
-                        }
-                    }
-                }
-            }
-
-            _persistenceService.SaveItems(allItems, cancellationToken);
-
-            foreach (var item in allItems)
-            {
-                if (!items.Contains(item))
-                {
-                    RegisterItem(item);
-                }
-            }
-
-            if (parent is Folder folder)
-            {
-                folder.Children = null;
-                folder.UserData = null;
-            }
-
-            foreach (var item in items)
-            {
-                if (item.SourceType == SourceType.Library)
-                {
-                    _changes.Updated(item, parent, updateReason);
-                }
-            }
-        }
-
-        /// <inheritdoc />
-        public Task UpdateItemAsync(BaseItem item, BaseItem parent, ItemUpdateType updateReason, CancellationToken cancellationToken)
-            => UpdateItemsAsync([item], parent, updateReason, cancellationToken);
-
-        /// <inheritdoc />
-        public async Task ReattachUserDataAsync(BaseItem item, CancellationToken cancellationToken)
-        {
-            await _persistenceService.ReattachUserDataAsync(item, cancellationToken).ConfigureAwait(false);
-        }
-
-        private async Task RunMetadataSavers(BaseItem item, ItemUpdateType updateReason, CancellationToken cancellationToken)
-        {
-            if (item.IsFileProtocol)
-            {
-                await ProviderManager.SaveMetadataAsync(item, updateReason).ConfigureAwait(false);
-            }
-
-            if (item.ImageInfos.Length > 0)
-            {
-                var images = await _images.PrepareRefreshAsync(item, updateReason >= ItemUpdateType.ImageUpdate, false, cancellationToken).ConfigureAwait(false);
-                await using (images.ConfigureAwait(false))
-                {
-                    await images.CommitAsync(cancellationToken).ConfigureAwait(false);
-                }
-            }
-        }
-
         /// <summary>
         /// Retrieves the item.
         /// </summary>
@@ -1724,18 +1266,7 @@ namespace Tesserafin.Server.Core.Library
             => _collectionFolderResolver.GetCollectionFolders(item, allUserRootChildren);
 
         public LibraryOptions GetLibraryOptions(BaseItem item)
-        {
-            if (item is CollectionFolder collectionFolder)
-            {
-                return collectionFolder.GetLibraryOptions();
-            }
-
-            // List.Find is more performant than FirstOrDefault due to enumerator allocation
-            return GetCollectionFolders(item)
-                .Find(folder => folder is CollectionFolder) is CollectionFolder collectionFolder2
-                ? collectionFolder2.GetLibraryOptions()
-                : new LibraryOptions();
-        }
+            => _options.GetLibraryOptions(item);
 
         public CollectionType? GetContentType(BaseItem item)
         {
@@ -1789,43 +1320,10 @@ namespace Tesserafin.Server.Core.Library
         }
 
         private CollectionType? GetContentTypeOverride(string path, bool inherit)
-        {
-            var nameValuePair = _configurationManager.Configuration.ContentTypes
-                                    .FirstOrDefault(i => _fileSystem.AreEqual(i.Name, path)
-                                                         || (inherit && !string.IsNullOrEmpty(i.Name)
-                                                                     && _fileSystem.ContainsSubPath(i.Name, path)));
-            if (Enum.TryParse<CollectionType>(nameValuePair?.Value, out var collectionType))
-            {
-                return collectionType;
-            }
-
-            return null;
-        }
+            => _options.GetConfiguredContentType(path, inherit);
 
         private CollectionType? GetTopFolderContentType(BaseItem item)
-        {
-            if (item is null)
-            {
-                return null;
-            }
-
-            while (!item.ParentId.IsEmpty())
-            {
-                var parent = item.GetParent(this);
-                if (parent is null || parent is AggregateFolder)
-                {
-                    break;
-                }
-
-                item = parent;
-            }
-
-            return GetUserRootFolder().Children
-                .OfType<ICollectionFolder>()
-                .Where(i => string.Equals(i.Path, item.Path, StringComparison.OrdinalIgnoreCase) || i.PhysicalLocations.Contains(item.Path))
-                .Select(i => i.CollectionType)
-                .FirstOrDefault(i => i is not null);
-        }
+            => _options.GetTopFolderContentType(item);
 
         /// <inheritdoc />
         /// <remarks>
@@ -2167,13 +1665,13 @@ namespace Tesserafin.Server.Core.Library
                 {
                     if (createEntity)
                     {
-                        CreateItems([personEntity], null, CancellationToken.None);
+                        _writes.CreateItems([personEntity], null, CancellationToken.None);
                     }
 
-                    await RunMetadataSavers(personEntity, itemUpdateType, cancellationToken).ConfigureAwait(false);
+                    await _metadata.SaveAsync(personEntity, itemUpdateType, cancellationToken).ConfigureAwait(false);
                     personEntity.DateLastSaved = DateTime.UtcNow;
 
-                    CreateItems([personEntity], null, CancellationToken.None);
+                    _writes.CreateItems([personEntity], null, CancellationToken.None);
                 }
             }
         }
@@ -2196,7 +1694,7 @@ namespace Tesserafin.Server.Core.Library
                         }
                     }
 
-                    await RunMetadataSavers(parent, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+                    await _metadata.SaveAsync(parent, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
                 }
             }
         }

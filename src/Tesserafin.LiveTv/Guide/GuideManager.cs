@@ -1,8 +1,8 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Dto;
@@ -13,8 +13,8 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
-using Tesserafin.LiveTv;
 using Tesserafin.LiveTv.Configuration;
+using Tesserafin.LiveTv;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.LiveTv;
@@ -30,6 +30,7 @@ public class GuideManager : IGuideManager
 
     private static readonly ParallelOptions _cacheParallelOptions = new() { MaxDegreeOfParallelism = Math.Min(Environment.ProcessorCount, 10) };
 
+    private readonly IItemWriteCommands _writes;
     private readonly IItemImageService _images;
     private readonly IItemDeletionCommands _deletions;
     private readonly ILogger<GuideManager> _logger;
@@ -51,6 +52,7 @@ public class GuideManager : IGuideManager
     /// <summary>
     /// Initializes a new instance of the <see cref="GuideManager"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="images">Explicit image preparation and commit lifecycle.</param>
     /// <param name="deletions">Item deletion operations.</param>
     /// <param name="logger">The <see cref="ILogger{TCategoryName}"/>.</param>
@@ -64,6 +66,7 @@ public class GuideManager : IGuideManager
     /// <param name="schedulesDirectService">The <see cref="ISchedulesDirectService"/>.</param>
     /// <param name="tvDtoService">The <see cref="LiveTvDtoService"/>.</param>
     public GuideManager(
+        IItemWriteCommands writes,
         IItemImageService images,
         IItemDeletionCommands deletions,
         ILogger<GuideManager> logger,
@@ -77,6 +80,7 @@ public class GuideManager : IGuideManager
         ISchedulesDirectService schedulesDirectService,
         LiveTvDtoService tvDtoService)
     {
+        _writes = writes;
         _images = images;
         _deletions = deletions;
         _logger = logger;
@@ -288,14 +292,14 @@ public class GuideManager : IGuideManager
 
                 if (newPrograms.Count > 0)
                 {
-                    _libraryManager.CreateItems(newPrograms, currentChannel, cancellationToken);
+                    _writes.CreateItems(newPrograms, currentChannel, cancellationToken);
 
                     await PreCacheImages(newPrograms, maxCacheDate).ConfigureAwait(false);
                 }
 
                 if (updatedPrograms.Count > 0)
                 {
-                    await _libraryManager.UpdateItemsAsync(
+                    await _writes.UpdateItemsAsync(
                         updatedPrograms,
                         currentChannel,
                         ItemUpdateType.MetadataImport,
@@ -314,9 +318,9 @@ public class GuideManager : IGuideManager
                     currentChannel.AddTag("Kids");
                 }
 
-                await currentChannel.UpdateToRepositoryAsync(ItemUpdateType.MetadataImport, cancellationToken).ConfigureAwait(false);
+                await currentChannel.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataImport, cancellationToken).ConfigureAwait(false);
                 await currentChannel.RefreshMetadata(
-                    _deletions,
+                    _deletions, _writes,
                     new MetadataRefreshOptions(new DirectoryService(_fileSystem))
                     {
                         ForceSave = true
@@ -465,11 +469,11 @@ public class GuideManager : IGuideManager
 
         if (isNew)
         {
-            _libraryManager.CreateItem(item, parentFolder);
+            _writes.CreateItem(item, parentFolder);
         }
         else if (forceUpdate)
         {
-            await _libraryManager.UpdateItemAsync(item, parentFolder, ItemUpdateType.MetadataImport, cancellationToken).ConfigureAwait(false);
+            await _writes.UpdateItemAsync(item, parentFolder, ItemUpdateType.MetadataImport, cancellationToken).ConfigureAwait(false);
         }
 
         return item;

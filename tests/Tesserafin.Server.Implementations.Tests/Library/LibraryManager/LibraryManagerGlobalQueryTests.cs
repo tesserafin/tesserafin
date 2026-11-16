@@ -1,13 +1,13 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using AutoFixture;
+using System;
 using AutoFixture.AutoMoq;
+using AutoFixture;
 using Moq;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
@@ -80,6 +80,8 @@ public class LibraryManagerGlobalQueryTests
             itemLookupService,
             new Tesserafin.Server.Core.Library.TagVisibilityService(itemLookupService, fixture.Freeze<ICollectionFolderResolver>(), fixture.Freeze<IUserRootFolderProvider>(), _itemRepositoryMock.Object, fixture.Freeze<ILocalizationManager>(), fixture.Freeze<IServerConfigurationManager>(), new Tesserafin.Controller.LiveTv.ActiveRecordings()));
         fixture.Register<IItemAccessService>(() => itemAccessService);
+
+        Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
 
         _libraryManager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 fixture.Create<IEnumerable<IResolverIgnoreRule>>(),

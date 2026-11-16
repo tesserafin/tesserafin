@@ -1,10 +1,10 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
@@ -23,6 +23,7 @@ public class BoxSetMetadataService : MetadataService<BoxSet, BoxSetInfo>
     /// <summary>
     /// Initializes a new instance of the <see cref="BoxSetMetadataService"/> class.
     /// </summary>
+    /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -32,7 +33,8 @@ public class BoxSetMetadataService : MetadataService<BoxSet, BoxSetInfo>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public BoxSetMetadataService(
-        IServerConfigurationManager serverConfigurationManager,
+        IItemWriteCommands writes,
+            IServerConfigurationManager serverConfigurationManager,
         ILogger<BoxSetMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
@@ -40,7 +42,7 @@ public class BoxSetMetadataService : MetadataService<BoxSet, BoxSetInfo>
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository)
-        : base(serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
     }
 

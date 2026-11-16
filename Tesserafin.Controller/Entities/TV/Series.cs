@@ -2,13 +2,13 @@
 
 #pragma warning disable CS1591
 
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json.Serialization;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Dto;
@@ -16,9 +16,9 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
-using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
+using Tesserafin.Data;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Querying;
 using MetadataProvider = Tesserafin.Model.Entities.MetadataProvider;
@@ -308,7 +308,7 @@ namespace Tesserafin.Controller.Entities.TV
             return allEpisodes.DistinctBy(i => i.Id).Reverse();
         }
 
-        public async Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
+        public async Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
             Children = null; // invalidate cached children.
             // Refresh bottom up, seasons and episodes first, then the series
@@ -329,7 +329,7 @@ namespace Tesserafin.Controller.Entities.TV
 
                 if (refreshOptions.RefreshItem(item))
                 {
-                    await item.RefreshMetadata(deletions, refreshOptions, cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
                 }
 
                 numComplete++;
@@ -360,7 +360,7 @@ namespace Tesserafin.Controller.Entities.TV
                 {
                     if (refreshOptions.RefreshItem(item))
                     {
-                        await item.RefreshMetadata(deletions, refreshOptions, cancellationToken).ConfigureAwait(false);
+                        await item.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
                     }
                 }
 

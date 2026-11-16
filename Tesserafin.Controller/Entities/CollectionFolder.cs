@@ -2,15 +2,15 @@
 
 #pragma warning disable CS1591
 
-using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading;
+using System.Text.Json;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
@@ -332,6 +332,7 @@ namespace Tesserafin.Controller.Entities
         /// ***Currently does not contain logic to maintain items that are unavailable in the file system***.
         /// </summary>
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
+        /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
@@ -341,7 +342,7 @@ namespace Tesserafin.Controller.Entities
         /// <param name="directoryService">The directory service.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
