@@ -48,22 +48,22 @@ public sealed class RemainingPipelineCharacterizationTests
         switch (scenario.Backend)
         {
             case "Amf":
-            {
-                var graph = AmfPipelineRenderer.Render(helper.CaptureAmfHardwarePipeline(state, options, Decoder(scenario), scenario.Encoder));
-                return Snapshot(graph.MainFilters, graph.SubFilters, graph.OverlayFilters);
-            }
+                {
+                    var graph = AmfPipelineRenderer.Render(helper.CaptureAmfHardwarePipeline(state, options, Decoder(scenario), scenario.Encoder));
+                    return Snapshot(graph.MainFilters, graph.SubFilters, graph.OverlayFilters);
+                }
 
             case "VideoToolbox":
-            {
-                var graph = VideoToolboxPipelineRenderer.Render(helper.CaptureVideoToolboxHardwarePipeline(state, options, Decoder(scenario), scenario.Encoder));
-                return Snapshot(graph.MainFilters, graph.SubFilters, graph.OverlayFilters);
-            }
+                {
+                    var graph = VideoToolboxPipelineRenderer.Render(helper.CaptureVideoToolboxHardwarePipeline(state, options, Decoder(scenario), scenario.Encoder));
+                    return Snapshot(graph.MainFilters, graph.SubFilters, graph.OverlayFilters);
+                }
 
             default:
-            {
-                var graph = RkmppPipelineRenderer.Render(helper.CaptureRkmppHardwarePipeline(state, options, Decoder(scenario), scenario.Encoder));
-                return Snapshot(graph.MainFilters, graph.SubFilters, graph.OverlayFilters);
-            }
+                {
+                    var graph = RkmppPipelineRenderer.Render(helper.CaptureRkmppHardwarePipeline(state, options, Decoder(scenario), scenario.Encoder));
+                    return Snapshot(graph.MainFilters, graph.SubFilters, graph.OverlayFilters);
+                }
         }
     }
 
