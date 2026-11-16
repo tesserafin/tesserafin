@@ -320,7 +320,8 @@ public class GuideManager : IGuideManager
 
                 await currentChannel.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataImport, cancellationToken).ConfigureAwait(false);
                 await currentChannel.RefreshMetadata(
-                    _deletions, _writes,
+                    _deletions,
+                    _writes,
                     new MetadataRefreshOptions(new DirectoryService(_fileSystem))
                     {
                         ForceSave = true

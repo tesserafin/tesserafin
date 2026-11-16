@@ -52,6 +52,7 @@ namespace Tesserafin.Providers.Manager
     public class ProviderManager : IProviderManager, IDisposable
     {
         private readonly IItemWriteCommands _writes;
+        private readonly IItemMetadataExporter _metadataExporter;
         private readonly IItemImageService _images;
         private readonly IRemoteImageSource _remoteImages;
         private readonly IItemDeletionCommands _deletions;
@@ -82,7 +83,6 @@ namespace Tesserafin.Providers.Manager
         private IImageProvider[] _imageProviders = [];
         private IMetadataService[] _metadataServices = [];
         private IMetadataProvider[] _metadataProviders = [];
-        private readonly IItemMetadataExporter _metadataExporter;
         private IExternalId[] _externalIds = [];
         private IExternalUrlProvider[] _externalUrlProviders = [];
         private bool _isProcessingRefreshQueue;
@@ -92,7 +92,7 @@ namespace Tesserafin.Providers.Manager
         /// Initializes a new instance of the <see cref="ProviderManager"/> class.
         /// </summary>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="metadataExporter">Explicit item write/resolution ownership.</param>
+        /// <param name="metadataExporter">Metadata saver selection and execution.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="deletions">Item deletion operations.</param>
         /// <param name="subtitleManager">The subtitle manager.</param>
@@ -170,7 +170,6 @@ namespace Tesserafin.Providers.Manager
             _metadataProviders = metadataProviders.ToArray();
             _externalIds = externalIds.OrderBy(i => i.ProviderName).ToArray();
             _externalUrlProviders = externalUrlProviders.OrderBy(i => i.Name).ToArray();
-
         }
 
         /// <inheritdoc/>

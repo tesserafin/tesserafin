@@ -199,7 +199,8 @@ namespace Tesserafin.Server.Core.Library
                     || (item.MediaType == MediaType.Audio && mediaSources[0].MediaStreams.All(i => i.Type != MediaStreamType.Audio))))
             {
                 await item.RefreshMetadata(
-                    _deletions, _writes,
+                    _deletions,
+                    _writes,
                     new MetadataRefreshOptions(_directoryService)
                     {
                         EnableRemoteContentProbe = true,

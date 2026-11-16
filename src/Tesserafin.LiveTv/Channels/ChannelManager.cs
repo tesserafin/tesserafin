@@ -498,7 +498,8 @@ namespace Tesserafin.LiveTv.Channels
             }
 
             await item.RefreshMetadata(
-                _deletions, _writes,
+                _deletions,
+                _writes,
                 new MetadataRefreshOptions(new DirectoryService(_fileSystem))
                 {
                     ForceSave = !isNew && forceUpdate
