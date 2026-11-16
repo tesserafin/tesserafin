@@ -776,3 +776,34 @@ an edit begins, reconciliation uses an independent 30-second cooperative cleanup
 restoration and primary-error preservation. Options caching is published after successful XML
 serialization. This does not promise rollback of a batch of filesystem changes, and it does not
 remove the remaining CollectionFolder options-store statics or LibraryManager responsibilities.
+
+
+## 24. Item deletion ownership
+
+`IItemDeletionCommands` replaces the manager deletion overloads and `DeleteItemsUnsafeFast`.
+The singleton command owner serializes destructive operations. Controllers, maintenance,
+providers, Live TV and migrations await it; entity refresh/validation methods pass it explicitly
+through recursive calls. No synchronous adapter or new entity static service is introduced.
+`LibraryManager` loses deletion helpers, IPathManager and lazy external-data dependencies
+(33 → 31 constructor parameters). Its existing removal-event publisher stays available to the
+command owner, alongside alternate queries and metadata/linked-reference writes.
+
+The required source path is removed before metadata, alternate promotion or catalogue/cache
+changes; a required-file failure leaves those untouched. Optional metadata cleanup retains the
+existing best-effort policy. Surviving alternates are promoted/reparented before deleting the
+primary, playlist references are rerouted, and missing alternate paths are excluded from the
+promoted version's graph. UserData detachment/retention remains owned by the persistence
+transaction. Catalogue-only removal leaves external media bytes intact; managed internal
+entity paths still follow their existing cleanup policy, with path-component containment.
+Bulk unreferenced cleanup retains its leaf-only/no-promotion/no-event semantics.
+
+Cancellation can refuse admission or a queued operation. Once deletion starts, the command
+finishes its side effects independently of caller cancellation. This is not atomic rollback
+across filesystem, external providers and database: a later failure may occur after source bytes
+are gone. The command serializes deletions, not all scan or item-write operations, and does not
+claim a separate host stop/drain protocol. Broader entity-global removal remains pending.
+
+Alternate resolution no longer secretly deletes an older generic Video. Async version refresh
+explicitly requests obsolete-entry cleanup before resolving the typed version; synchronous item
+creation/update only resolves and persists the typed graph. No legacy compatibility promise is
+made for old .NET manager or refresh signatures. HTTP operations and OpenAPI shapes are unchanged.

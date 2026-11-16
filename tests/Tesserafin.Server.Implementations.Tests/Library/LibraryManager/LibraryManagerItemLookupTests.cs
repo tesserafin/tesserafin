@@ -39,6 +39,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library.LibraryManager;
 public class LibraryManagerItemLookupTests
 {
     private readonly Tesserafin.Server.Core.Library.LibraryManager _libraryManager;
+    private readonly Tesserafin.Server.Core.Library.ItemDeletionCommands _deletions;
     private readonly Tesserafin.Server.Core.Library.ItemLookupService _itemLookupService;
     private readonly Tesserafin.Server.Core.Library.ItemAccessService _itemAccessService;
     private readonly Mock<IItemRepository> _itemRepositoryMock;
@@ -101,6 +102,9 @@ public class LibraryManagerItemLookupTests
                 fixture.Create<IEnumerable<IIntroProvider>>(),
                 fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
+        fixture.Register<ILibraryManager>(() => _libraryManager);
+        fixture.Inject<Microsoft.Extensions.Logging.ILogger<Tesserafin.Server.Core.Library.ItemDeletionCommands>>(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.ItemDeletionCommands>.Instance);
+        _deletions = fixture.Create<Tesserafin.Server.Core.Library.ItemDeletionCommands>();
     }
 
     private static void SetConfigurationManagerStatic(IServerConfigurationManager configurationManager)
@@ -292,7 +296,7 @@ public class LibraryManagerItemLookupTests
     // ---------------------------------------------------------------
 
     [Fact]
-    public void DeleteItem_CacheableItem_InvalidatesCache()
+    public async Task DeleteItem_CacheableItem_InvalidatesCache()
     {
         SetConfigurationManagerStatic(_configurationManagerMock.Object);
 
@@ -305,7 +309,7 @@ public class LibraryManagerItemLookupTests
         _libraryManager.RegisterItem(channel);
         Assert.Same(channel, _libraryManager.GetItemById(channel.Id));
 
-        _libraryManager.DeleteItem(channel, new DeleteOptions { DeleteFileLocation = false }, null!, false);
+        await _deletions.DeleteAsync(channel, new DeleteOptions { DeleteFileLocation = false }, null, TestContext.Current.CancellationToken);
 
         _itemRepositoryMock.Setup(r => r.RetrieveItem(channel.Id)).Returns((BaseItem)null!);
         var result = _libraryManager.GetItemById(channel.Id);
@@ -320,7 +324,7 @@ public class LibraryManagerItemLookupTests
     // ---------------------------------------------------------------
 
     [Fact]
-    public void DeleteItemsUnsafeFast_CacheableItem_InvalidatesCache()
+    public async Task DeleteUnreferenced_CacheableItem_InvalidatesCache()
     {
         SetConfigurationManagerStatic(_configurationManagerMock.Object);
 
@@ -328,7 +332,7 @@ public class LibraryManagerItemLookupTests
         _libraryManager.RegisterItem(channel);
         Assert.Same(channel, _libraryManager.GetItemById(channel.Id));
 
-        _libraryManager.DeleteItemsUnsafeFast(new List<BaseItem> { channel }, deleteSourceFiles: false);
+        await _deletions.DeleteUnreferencedAsync(new List<BaseItem> { channel }, deleteSourceFiles: false, TestContext.Current.CancellationToken);
 
         _itemRepositoryMock.Setup(r => r.RetrieveItem(channel.Id)).Returns((BaseItem)null!);
         var result = _libraryManager.GetItemById(channel.Id);
@@ -375,7 +379,7 @@ public class LibraryManagerItemLookupTests
     // ---------------------------------------------------------------
 
     [Fact]
-    public void DeleteItem_ParentResolution_UsesInstanceLookupNotStaticLibraryManager()
+    public async Task DeleteItem_ParentResolution_UsesInstanceLookupNotStaticLibraryManager()
     {
         SetConfigurationManagerStatic(_configurationManagerMock.Object);
 
@@ -397,7 +401,7 @@ public class LibraryManagerItemLookupTests
         ItemChangeEventArgs? raisedArgs = null;
         _libraryManager.ItemRemoved += (_, args) => raisedArgs = args;
 
-        _libraryManager.DeleteItem(channel, new DeleteOptions { DeleteFileLocation = false }, notifyParentItem: true);
+        await _deletions.DeleteAsync(channel, new DeleteOptions { DeleteFileLocation = false }, TestContext.Current.CancellationToken);
 
         Assert.NotNull(raisedArgs);
         Assert.Same(channel, raisedArgs.Item);
@@ -565,7 +569,7 @@ public class LibraryManagerItemLookupTests
             .Returns(new StubUserRootFolder { StubChildren = [missing] });
 
         var roots = Mock.Of<ILibraryRootFolderProvider>(p => p.GetRootFolder() == new StubAggregateFolder());
-        var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
+        var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(_deletions, roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
         await traversal.RefreshTopFoldersAsync(TestContext.Current.CancellationToken, false);
 
         // Deleted from the database...
@@ -586,7 +590,7 @@ public class LibraryManagerItemLookupTests
             set { }
         }
 
-        protected override System.Threading.Tasks.Task ValidateChildrenInternal(IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override System.Threading.Tasks.Task ValidateChildrenInternal(IItemDeletionCommands deletions, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
             => System.Threading.Tasks.Task.CompletedTask;
     }
 
@@ -600,7 +604,7 @@ public class LibraryManagerItemLookupTests
             set { }
         }
 
-        protected override System.Threading.Tasks.Task ValidateChildrenInternal(IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override System.Threading.Tasks.Task ValidateChildrenInternal(IItemDeletionCommands deletions, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
             => System.Threading.Tasks.Task.CompletedTask;
     }
 }

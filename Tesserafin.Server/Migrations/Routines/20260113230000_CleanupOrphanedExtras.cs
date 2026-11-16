@@ -28,6 +28,7 @@ namespace Tesserafin.Server.Migrations.Routines;
 [TesserafinMigrationBackup(TesserafinDb = true)]
 public class CleanupOrphanedExtras : IAsyncMigrationRoutine
 {
+    private readonly IItemDeletionCommands _deletions;
     private readonly IStartupLogger<CleanupOrphanedExtras> _logger;
     private readonly IDbContextFactory<TesserafinDbContext> _dbContextFactory;
     private readonly ILibraryManager _libraryManager;
@@ -35,14 +36,17 @@ public class CleanupOrphanedExtras : IAsyncMigrationRoutine
     /// <summary>
     /// Initializes a new instance of the <see cref="CleanupOrphanedExtras"/> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="logger">The startup logger.</param>
     /// <param name="dbContextFactory">The database context factory.</param>
     /// <param name="libraryManager">The library manager.</param>
     public CleanupOrphanedExtras(
+        IItemDeletionCommands deletions,
         IStartupLogger<CleanupOrphanedExtras> logger,
         IDbContextFactory<TesserafinDbContext> dbContextFactory,
         ILibraryManager libraryManager)
     {
+        _deletions = deletions;
         _logger = logger;
         _dbContextFactory = dbContextFactory;
         _libraryManager = libraryManager;
@@ -99,7 +103,7 @@ public class CleanupOrphanedExtras : IAsyncMigrationRoutine
                         true)!)
                     .ToList();
 
-                _libraryManager.DeleteItemsUnsafeFast(itemsToDelete);
+                await _deletions.DeleteUnreferencedAsync(itemsToDelete, false, cancellationToken).ConfigureAwait(false);
 
                 deletedSoFar += batch.Count;
                 _logger.LogInformation("Deleting orphaned extras: {Deleted}/{Total}", deletedSoFar, orphanedItemIds.Count);

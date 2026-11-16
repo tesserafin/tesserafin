@@ -16,6 +16,8 @@ namespace Tesserafin.Server.Core.Library.Validators;
 /// </summary>
 public class PeopleValidator
 {
+    private readonly IItemDeletionCommands _deletions;
+
     /// <summary>
     /// The _library manager.
     /// </summary>
@@ -32,12 +34,14 @@ public class PeopleValidator
     /// <summary>
     /// Initializes a new instance of the <see cref="PeopleValidator" /> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="itemPeopleService">The item people service.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="fileSystem">The file system.</param>
-    public PeopleValidator(ILibraryManager libraryManager, IItemPeopleService itemPeopleService, ILogger logger, IFileSystem fileSystem)
+    public PeopleValidator(IItemDeletionCommands deletions, ILibraryManager libraryManager, IItemPeopleService itemPeopleService, ILogger logger, IFileSystem fileSystem)
     {
+        _deletions = deletions;
         _libraryManager = libraryManager;
         _itemPeopleService = itemPeopleService;
         _logger = logger;
@@ -81,7 +85,7 @@ public class PeopleValidator
                     MetadataRefreshMode = MetadataRefreshMode.ValidationOnly
                 };
 
-                await item.RefreshMetadata(options, cancellationToken).ConfigureAwait(false);
+                await item.RefreshMetadata(_deletions, options, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -112,7 +116,7 @@ public class PeopleValidator
         var i = 0;
         foreach (var item in deadEntities.Chunk(500))
         {
-            _libraryManager.DeleteItemsUnsafeFast(item, true);
+            await _deletions.DeleteUnreferencedAsync(item, true, cancellationToken).ConfigureAwait(false);
             subProgress.Report(100f / deadEntities.Count * (i++ * 100));
         }
 

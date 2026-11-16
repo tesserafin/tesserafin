@@ -3,6 +3,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 
 namespace Tesserafin.Controller.Entities
@@ -12,10 +13,11 @@ namespace Tesserafin.Controller.Entities
         /// <summary>
         /// Refreshes all metadata.
         /// </summary>
+        /// <param name="deletions">Explicit deletion operations for this refresh.</param>
         /// <param name="refreshOptions">The refresh options.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        Task RefreshAllMetadata(MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken);
+        Task RefreshAllMetadata(IItemDeletionCommands deletions, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken);
     }
 }

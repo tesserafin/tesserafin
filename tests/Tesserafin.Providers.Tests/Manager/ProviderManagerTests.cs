@@ -565,6 +565,7 @@ namespace Tesserafin.Providers.Tests.Manager
                 .Returns(libraryOptions ?? new LibraryOptions());
 
             var providerManager = new ProviderManager(
+                Mock.Of<IItemDeletionCommands>(),
                 Mock.Of<IHttpClientFactory>(),
                 Mock.Of<ISubtitleManager>(),
                 serverConfigurationManager.Object,

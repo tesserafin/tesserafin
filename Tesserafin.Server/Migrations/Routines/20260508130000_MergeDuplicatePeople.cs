@@ -29,6 +29,7 @@ public class MergeDuplicatePeople : IAsyncMigrationRoutine
 {
     private const string PersonType = "Tesserafin.Controller.Entities.Person";
 
+    private readonly IItemDeletionCommands _deletions;
     private readonly IStartupLogger<MergeDuplicatePeople> _logger;
     private readonly IDbContextFactory<TesserafinDbContext> _dbContextFactory;
     private readonly ILibraryManager _libraryManager;
@@ -37,16 +38,19 @@ public class MergeDuplicatePeople : IAsyncMigrationRoutine
     /// <summary>
     /// Initializes a new instance of the <see cref="MergeDuplicatePeople"/> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="logger">The startup logger.</param>
     /// <param name="dbContextFactory">The database context factory.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="persistenceService">The item persistence service.</param>
     public MergeDuplicatePeople(
+        IItemDeletionCommands deletions,
         IStartupLogger<MergeDuplicatePeople> logger,
         IDbContextFactory<TesserafinDbContext> dbContextFactory,
         ILibraryManager libraryManager,
         IItemPersistenceService persistenceService)
     {
+        _deletions = deletions;
         _logger = logger;
         _dbContextFactory = dbContextFactory;
         _libraryManager = libraryManager;
@@ -182,7 +186,7 @@ public class MergeDuplicatePeople : IAsyncMigrationRoutine
             return;
         }
 
-        // Resolve via LibraryManager so DeleteItemsUnsafeFast can also remove the
+        // Resolve via LibraryManager so unreferenced deletion can also remove the
         // %MetadataPath%/People/<Letter>/<Name> directories the duplicate stubs left behind.
         // Delete in batches so we never issue one massive delete transaction and progress stays visible.
         _logger.LogInformation("Deleting {Count} duplicate Person BaseItems...", idsToDelete.Count);
@@ -200,7 +204,7 @@ public class MergeDuplicatePeople : IAsyncMigrationRoutine
                 .ToList();
             if (itemsToDelete.Count > 0)
             {
-                _libraryManager.DeleteItemsUnsafeFast(itemsToDelete!);
+                await _deletions.DeleteUnreferencedAsync(itemsToDelete!, false, cancellationToken).ConfigureAwait(false);
             }
 
             var deletedIds = itemsToDelete.Select(i => i!.Id).ToHashSet();

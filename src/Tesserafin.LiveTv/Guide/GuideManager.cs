@@ -30,6 +30,7 @@ public class GuideManager : IGuideManager
 
     private static readonly ParallelOptions _cacheParallelOptions = new() { MaxDegreeOfParallelism = Math.Min(Environment.ProcessorCount, 10) };
 
+    private readonly IItemDeletionCommands _deletions;
     private readonly ILogger<GuideManager> _logger;
     private readonly IConfigurationManager _config;
     private readonly IFileSystem _fileSystem;
@@ -49,6 +50,7 @@ public class GuideManager : IGuideManager
     /// <summary>
     /// Initializes a new instance of the <see cref="GuideManager"/> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="logger">The <see cref="ILogger{TCategoryName}"/>.</param>
     /// <param name="config">The <see cref="IConfigurationManager"/>.</param>
     /// <param name="fileSystem">The <see cref="IFileSystem"/>.</param>
@@ -60,6 +62,7 @@ public class GuideManager : IGuideManager
     /// <param name="schedulesDirectService">The <see cref="ISchedulesDirectService"/>.</param>
     /// <param name="tvDtoService">The <see cref="LiveTvDtoService"/>.</param>
     public GuideManager(
+        IItemDeletionCommands deletions,
         ILogger<GuideManager> logger,
         IConfigurationManager config,
         IFileSystem fileSystem,
@@ -71,6 +74,7 @@ public class GuideManager : IGuideManager
         ISchedulesDirectService schedulesDirectService,
         LiveTvDtoService tvDtoService)
     {
+        _deletions = deletions;
         _logger = logger;
         _config = config;
         _fileSystem = fileSystem;
@@ -149,8 +153,8 @@ public class GuideManager : IGuideManager
 
         if (cleanDatabase)
         {
-            CleanDatabase(newChannelIdList.ToArray(), [BaseItemKind.LiveTvChannel], progress, cancellationToken);
-            CleanDatabase(newProgramIdList.ToArray(), [BaseItemKind.LiveTvProgram], progress, cancellationToken);
+            await CleanDatabase(newChannelIdList.ToArray(), [BaseItemKind.LiveTvChannel], progress, cancellationToken).ConfigureAwait(false);
+            await CleanDatabase(newProgramIdList.ToArray(), [BaseItemKind.LiveTvProgram], progress, cancellationToken).ConfigureAwait(false);
         }
 
         var coreService = _liveTvManager.Services.OfType<DefaultLiveTvService>().FirstOrDefault();
@@ -308,6 +312,7 @@ public class GuideManager : IGuideManager
 
                 await currentChannel.UpdateToRepositoryAsync(ItemUpdateType.MetadataImport, cancellationToken).ConfigureAwait(false);
                 await currentChannel.RefreshMetadata(
+                    _deletions,
                     new MetadataRefreshOptions(new DirectoryService(_fileSystem))
                     {
                         ForceSave = true
@@ -333,7 +338,7 @@ public class GuideManager : IGuideManager
         return new Tuple<List<Guid>, List<Guid>>(channels, programIds);
     }
 
-    private void CleanDatabase(Guid[] currentIdList, BaseItemKind[] validTypes, IProgress<double> progress, CancellationToken cancellationToken)
+    private async Task CleanDatabase(Guid[] currentIdList, BaseItemKind[] validTypes, IProgress<double> progress, CancellationToken cancellationToken)
     {
         var list = _itemRepo.GetItemIdsList(new InternalItemsQuery
         {
@@ -359,14 +364,14 @@ public class GuideManager : IGuideManager
 
                 if (item is not null)
                 {
-                    _libraryManager.DeleteItem(
+                    await _deletions.DeleteAsync(
                         item,
                         new DeleteOptions
                         {
                             DeleteFileLocation = false,
                             DeleteFromExternalProvider = false
                         },
-                        false);
+                        cancellationToken).ConfigureAwait(false);
                 }
             }
 

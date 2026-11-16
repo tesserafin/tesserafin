@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller;
@@ -20,8 +22,9 @@ namespace Tesserafin.Server.Migrations.Routines;
 /// </summary>
 [TesserafinMigration("2026-01-13T12:00:00", nameof(MigrateLinkedChildren))]
 [TesserafinMigrationBackup(TesserafinDb = true)]
-internal class MigrateLinkedChildren : IDatabaseMigrationRoutine
+internal class MigrateLinkedChildren : IAsyncMigrationRoutine
 {
+    private readonly IItemDeletionCommands _deletions;
     private readonly ILogger<MigrateLinkedChildren> _logger;
     private readonly IDbContextFactory<TesserafinDbContext> _dbProvider;
     private readonly ILibraryManager _libraryManager;
@@ -29,12 +32,14 @@ internal class MigrateLinkedChildren : IDatabaseMigrationRoutine
     private readonly IServerApplicationPaths _appPaths;
 
     public MigrateLinkedChildren(
+        IItemDeletionCommands deletions,
         ILoggerFactory loggerFactory,
         IDbContextFactory<TesserafinDbContext> dbProvider,
         ILibraryManager libraryManager,
         IServerApplicationHost appHost,
         IServerApplicationPaths appPaths)
     {
+        _deletions = deletions;
         _logger = loggerFactory.CreateLogger<MigrateLinkedChildren>();
         _dbProvider = dbProvider;
         _libraryManager = libraryManager;
@@ -43,7 +48,7 @@ internal class MigrateLinkedChildren : IDatabaseMigrationRoutine
     }
 
     /// <inheritdoc/>
-    public void Perform()
+    public async Task PerformAsync(CancellationToken cancellationToken)
     {
         using var context = _dbProvider.CreateDbContext();
 
@@ -253,7 +258,7 @@ internal class MigrateLinkedChildren : IDatabaseMigrationRoutine
                 }
 
                 context.LinkedChildren.AddRange(toInsert);
-                context.SaveChanges();
+                await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
                 _logger.LogInformation("Successfully inserted {Count} LinkedChildren records.", toInsert.Count);
             }
@@ -269,14 +274,14 @@ internal class MigrateLinkedChildren : IDatabaseMigrationRoutine
 
         _logger.LogInformation("LinkedChildren migration completed. Processed {Count} items.", processedCount);
 
-        CleanupWrongTypeAlternateVersions(context);
-        CleanupOrphanedAlternateVersionBaseItems(context);
-        CleanupItemsFromDeletedLibraries(context);
-        CleanupStaleFileEntries(context);
+        await CleanupWrongTypeAlternateVersions(context, cancellationToken).ConfigureAwait(false);
+        await CleanupOrphanedAlternateVersionBaseItems(context, cancellationToken).ConfigureAwait(false);
+        await CleanupItemsFromDeletedLibraries(context, cancellationToken).ConfigureAwait(false);
+        await CleanupStaleFileEntries(context, cancellationToken).ConfigureAwait(false);
         CleanupOrphanedLinkedChildren(context);
     }
 
-    private void CleanupWrongTypeAlternateVersions(TesserafinDbContext context)
+    private async Task CleanupWrongTypeAlternateVersions(TesserafinDbContext context, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Cleaning up alternate version items with wrong type...");
 
@@ -313,12 +318,12 @@ internal class MigrateLinkedChildren : IDatabaseMigrationRoutine
             .Select(id => _libraryManager.GetItemById(id))
             .Where(item => item is not null)
             .ToList();
-        var deleted = DeleteItems(itemsToDelete!);
+        var deleted = await DeleteItems(itemsToDelete!, cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation("Removed {Count} wrong-type alternate version items. They will be recreated with the correct type on next library scan.", deleted);
     }
 
-    private void CleanupOrphanedAlternateVersionBaseItems(TesserafinDbContext context)
+    private async Task CleanupOrphanedAlternateVersionBaseItems(TesserafinDbContext context, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting cleanup of orphaned alternate version BaseItems...");
 
@@ -344,12 +349,12 @@ internal class MigrateLinkedChildren : IDatabaseMigrationRoutine
             .Select(id => _libraryManager.GetItemById(id))
             .Where(item => item is not null)
             .ToList();
-        var deleted = DeleteItems(itemsToDelete!);
+        var deleted = await DeleteItems(itemsToDelete!, cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation("Removed {Count} orphaned alternate version BaseItems.", deleted);
     }
 
-    private void CleanupItemsFromDeletedLibraries(TesserafinDbContext context)
+    private async Task CleanupItemsFromDeletedLibraries(TesserafinDbContext context, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting cleanup of items from deleted libraries...");
 
@@ -373,12 +378,12 @@ internal class MigrateLinkedChildren : IDatabaseMigrationRoutine
             .Select(id => _libraryManager.GetItemById(id))
             .Where(item => item is not null)
             .ToList();
-        var deleted = DeleteItems(itemsToDelete!);
+        var deleted = await DeleteItems(itemsToDelete!, cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation("Removed {Count} items from deleted libraries.", deleted);
     }
 
-    private void CleanupStaleFileEntries(TesserafinDbContext context)
+    private async Task CleanupStaleFileEntries(TesserafinDbContext context, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting cleanup of items with missing files...");
 
@@ -461,12 +466,12 @@ internal class MigrateLinkedChildren : IDatabaseMigrationRoutine
             .Select(id => _libraryManager.GetItemById(id))
             .Where(item => item is not null)
             .ToList();
-        var deleted = DeleteItems(itemsToDelete!);
+        var deleted = await DeleteItems(itemsToDelete!, cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation("Removed {Count} stale items.", deleted);
     }
 
-    private int DeleteItems(IReadOnlyCollection<BaseItem> items)
+    private async Task<int> DeleteItems(IReadOnlyCollection<BaseItem> items, CancellationToken cancellationToken)
     {
         if (items.Count == 0)
         {
@@ -477,10 +482,15 @@ internal class MigrateLinkedChildren : IDatabaseMigrationRoutine
         var deleted = 0;
         foreach (var item in items)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                _libraryManager.DeleteItem(item, options);
+                await _deletions.DeleteAsync(item, options, cancellationToken).ConfigureAwait(false);
                 deleted++;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {

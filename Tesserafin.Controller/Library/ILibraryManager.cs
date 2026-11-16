@@ -146,14 +146,20 @@ namespace Tesserafin.Controller.Library
         /// <exception cref="ArgumentOutOfRangeException">Throws if year is invalid.</exception>
         Year GetYear(int value);
 
+        /// <summary>Publishes removal after catalogue and cache reconciliation.</summary>
+        /// <param name="item">Removed item.</param>
+        /// <param name="parent">Previous parent.</param>
+        void ReportItemRemoved(BaseItem item, BaseItem? parent);
+
         /// <summary>
         /// Validate and refresh the People sub-set of the IBN.
         /// The items are stored in the db but not loaded into memory until actually requested by an operation.
         /// </summary>
+        /// <param name="deletions">Deletion operations for validation.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        Task ValidatePeopleAsync(IProgress<double> progress, CancellationToken cancellationToken);
+        Task ValidatePeopleAsync(IItemDeletionCommands deletions, IProgress<double> progress, CancellationToken cancellationToken);
 
         Task UpdateImagesAsync(BaseItem item, bool forceUpdate = false);
 
@@ -357,38 +363,6 @@ namespace Tesserafin.Controller.Library
         /// </summary>
         /// <param name="item">The item.</param>
         void RegisterItem(BaseItem item);
-
-        /// <summary>
-        /// Deletes the item.
-        /// </summary>
-        /// <param name="item">Item to delete.</param>
-        /// <param name="options">Options to use for deletion.</param>
-        void DeleteItem(BaseItem item, DeleteOptions options);
-
-        /// <summary>
-        /// Deletes items that are not having any children like Actors.
-        /// </summary>
-        /// <param name="items">Items to delete.</param>
-        /// <param name="deleteSourceFiles">Whether to delete source media files on disk. Defaults to false.</param>
-        /// <remarks>In comparison to <see cref="DeleteItem(BaseItem, DeleteOptions, BaseItem, bool)"/> this method skips a lot of steps assuming there are no children to recusively delete nor does it define the special handling for channels and alike.</remarks>
-        public void DeleteItemsUnsafeFast(IReadOnlyCollection<BaseItem> items, bool deleteSourceFiles = false);
-
-        /// <summary>
-        /// Deletes the item.
-        /// </summary>
-        /// <param name="item">Item to delete.</param>
-        /// <param name="options">Options to use for deletion.</param>
-        /// <param name="notifyParentItem">Notify parent of deletion.</param>
-        void DeleteItem(BaseItem item, DeleteOptions options, bool notifyParentItem);
-
-        /// <summary>
-        /// Deletes the item.
-        /// </summary>
-        /// <param name="item">Item to delete.</param>
-        /// <param name="options">Options to use for deletion.</param>
-        /// <param name="parent">Parent of item.</param>
-        /// <param name="notifyParentItem">Notify parent of deletion.</param>
-        void DeleteItem(BaseItem item, DeleteOptions options, BaseItem parent, bool notifyParentItem);
 
         /// <summary>
         /// Gets the named view.

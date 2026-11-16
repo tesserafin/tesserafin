@@ -34,6 +34,7 @@ namespace Tesserafin.Api.Controllers;
 [Tags("Library")]
 public class UserLibraryController : BaseTesserafinApiController
 {
+    private readonly IItemDeletionCommands _deletions;
     private readonly IUserManager _userManager;
     private readonly IUserDataManager _userDataRepository;
     private readonly ILibraryManager _libraryManager;
@@ -44,6 +45,7 @@ public class UserLibraryController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="UserLibraryController"/> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="userDataRepository">Instance of the <see cref="IUserDataManager"/> interface.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
@@ -51,6 +53,7 @@ public class UserLibraryController : BaseTesserafinApiController
     /// <param name="userViewManager">Instance of the <see cref="IUserViewManager"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
     public UserLibraryController(
+        IItemDeletionCommands deletions,
         IUserManager userManager,
         IUserDataManager userDataRepository,
         ILibraryManager libraryManager,
@@ -58,6 +61,7 @@ public class UserLibraryController : BaseTesserafinApiController
         IUserViewManager userViewManager,
         IFileSystem fileSystem)
     {
+        _deletions = deletions;
         _userManager = userManager;
         _userDataRepository = userDataRepository;
         _libraryManager = libraryManager;
@@ -657,7 +661,7 @@ public class UserLibraryController : BaseTesserafinApiController
                     ForceSave = true
                 };
 
-                await item.RefreshMetadata(options, CancellationToken.None).ConfigureAwait(false);
+                await item.RefreshMetadata(_deletions, options, CancellationToken.None).ConfigureAwait(false);
             }
         }
     }

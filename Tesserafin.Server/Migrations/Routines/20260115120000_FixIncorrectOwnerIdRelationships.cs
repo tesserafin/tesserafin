@@ -22,6 +22,7 @@ namespace Tesserafin.Server.Migrations.Routines;
 [TesserafinMigrationBackup(TesserafinDb = true)]
 public class FixIncorrectOwnerIdRelationships : IAsyncMigrationRoutine
 {
+    private readonly IItemDeletionCommands _deletions;
     private readonly IStartupLogger<FixIncorrectOwnerIdRelationships> _logger;
     private readonly IDbContextFactory<TesserafinDbContext> _dbContextFactory;
     private readonly ILibraryManager _libraryManager;
@@ -30,16 +31,19 @@ public class FixIncorrectOwnerIdRelationships : IAsyncMigrationRoutine
     /// <summary>
     /// Initializes a new instance of the <see cref="FixIncorrectOwnerIdRelationships"/> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="logger">The startup logger.</param>
     /// <param name="dbContextFactory">The database context factory.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="persistenceService">The item persistence service.</param>
     public FixIncorrectOwnerIdRelationships(
+        IItemDeletionCommands deletions,
         IStartupLogger<FixIncorrectOwnerIdRelationships> logger,
         IDbContextFactory<TesserafinDbContext> dbContextFactory,
         ILibraryManager libraryManager,
         IItemPersistenceService persistenceService)
     {
+        _deletions = deletions;
         _logger = logger;
         _dbContextFactory = dbContextFactory;
         _libraryManager = libraryManager;
@@ -155,7 +159,7 @@ public class FixIncorrectOwnerIdRelationships : IAsyncMigrationRoutine
                     .ToList();
                 if (itemsToDelete.Count > 0)
                 {
-                    _libraryManager.DeleteItemsUnsafeFast(itemsToDelete!);
+                    await _deletions.DeleteUnreferencedAsync(itemsToDelete!, false, cancellationToken).ConfigureAwait(false);
                 }
 
                 // Fall back to direct DB deletion for any items that couldn't be resolved via LibraryManager

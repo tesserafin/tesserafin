@@ -39,6 +39,7 @@ namespace Tesserafin.Api.Controllers;
 /// </summary>
 public class LiveTvController : BaseTesserafinApiController
 {
+    private readonly IItemDeletionCommands _deletions;
     private readonly ILiveTvManager _liveTvManager;
     private readonly IGuideManager _guideManager;
     private readonly ITunerHostManager _tunerHostManager;
@@ -54,6 +55,7 @@ public class LiveTvController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="LiveTvController"/> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="liveTvManager">Instance of the <see cref="ILiveTvManager"/> interface.</param>
     /// <param name="guideManager">Instance of the <see cref="IGuideManager"/> interface.</param>
     /// <param name="tunerHostManager">Instance of the <see cref="ITunerHostManager"/> interface.</param>
@@ -66,6 +68,7 @@ public class LiveTvController : BaseTesserafinApiController
     /// <param name="transcodeManager">Instance of the <see cref="ITranscodeManager"/> interface.</param>
     /// <param name="schedulesDirectService">Instance of the <see cref="ISchedulesDirectService"/> interface.</param>
     public LiveTvController(
+        IItemDeletionCommands deletions,
         ILiveTvManager liveTvManager,
         IGuideManager guideManager,
         ITunerHostManager tunerHostManager,
@@ -78,6 +81,7 @@ public class LiveTvController : BaseTesserafinApiController
         ITranscodeManager transcodeManager,
         ISchedulesDirectService schedulesDirectService)
     {
+        _deletions = deletions;
         _liveTvManager = liveTvManager;
         _guideManager = guideManager;
         _tunerHostManager = tunerHostManager;
@@ -778,7 +782,7 @@ public class LiveTvController : BaseTesserafinApiController
     [Authorize(Policy = Policies.LiveTvManagement)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult DeleteRecording([FromRoute, Required] Guid recordingId)
+    public async Task<ActionResult> DeleteRecording([FromRoute, Required] Guid recordingId)
     {
         var item = _libraryManager.GetItemById<BaseItem>(recordingId, User.GetUserId());
         if (item is null)
@@ -786,10 +790,13 @@ public class LiveTvController : BaseTesserafinApiController
             return NotFound();
         }
 
-        _libraryManager.DeleteItem(item, new DeleteOptions
-        {
-            DeleteFileLocation = false
-        });
+        await _deletions.DeleteAsync(
+            item,
+            new DeleteOptions
+            {
+                DeleteFileLocation = false
+            },
+            HttpContext.RequestAborted).ConfigureAwait(false);
 
         return NoContent();
     }

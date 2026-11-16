@@ -12,6 +12,8 @@ namespace Tesserafin.Server.Core.Library.Validators;
 /// </summary>
 public class GenresPostScanTask : ILibraryPostScanTask
 {
+    private readonly IItemDeletionCommands _deletions;
+
     /// <summary>
     /// The _library manager.
     /// </summary>
@@ -22,14 +24,17 @@ public class GenresPostScanTask : ILibraryPostScanTask
     /// <summary>
     /// Initializes a new instance of the <see cref="GenresPostScanTask" /> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
     public GenresPostScanTask(
+        IItemDeletionCommands deletions,
         ILibraryManager libraryManager,
         ILogger<GenresValidator> logger,
         IItemRepository itemRepo)
     {
+        _deletions = deletions;
         _libraryManager = libraryManager;
         _logger = logger;
         _itemRepo = itemRepo;
@@ -43,6 +48,6 @@ public class GenresPostScanTask : ILibraryPostScanTask
     /// <returns>Task.</returns>
     public Task Run(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        return new GenresValidator(_libraryManager, _logger, _itemRepo).Run(progress, cancellationToken);
+        return new GenresValidator(_deletions, _libraryManager, _logger, _itemRepo).Run(progress, cancellationToken);
     }
 }

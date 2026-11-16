@@ -7,8 +7,7 @@ namespace Tesserafin.Server.Core.Library
     /// <summary>
     /// Internal lifecycle port for the item lookup cache owned by <see cref="ItemLookupService"/>.
     /// Deliberately excluded from the public, read-only <see cref="Tesserafin.Controller.Library.IItemLookupService"/>
-    /// contract - only <see cref="LibraryManager"/> (the sole writer of items into the library) is
-    /// expected to register or invalidate cache entries.
+    /// contract - item writers register entries and deletion/scan owners invalidate them.
     /// </summary>
     /// <remarks>
     /// Kept <c>internal</c> rather than public: <see cref="LibraryManager"/> lives in the same

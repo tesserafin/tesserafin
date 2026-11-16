@@ -9,7 +9,6 @@
     "Tesserafin.Providers/Subtitles/SubtitleManager.cs",
     "Tesserafin.Server.Core/ApplicationHost.cs",
     "Tesserafin.Server.Core/Dto/DtoService.cs",
-    "Tesserafin.Server.Core/Library/LibraryManager.cs",
     "Tesserafin.Server.Core/Library/MediaSourceManager.cs",
     "Tesserafin.Server.Core/Library/ResolverHelper.cs",
     "Tesserafin.Server.Implementations/Trickplay/TrickplayManager.cs",

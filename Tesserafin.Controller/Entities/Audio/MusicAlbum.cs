@@ -162,7 +162,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return id;
         }
 
-        public async Task RefreshAllMetadata(MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
+        public async Task RefreshAllMetadata(IItemDeletionCommands deletions, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
             var items = GetRecursiveChildren();
 
@@ -175,7 +175,7 @@ namespace Tesserafin.Controller.Entities.Audio
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var updateType = await item.RefreshMetadata(refreshOptions, cancellationToken).ConfigureAwait(false);
+                var updateType = await item.RefreshMetadata(deletions, refreshOptions, cancellationToken).ConfigureAwait(false);
                 childUpdateType = childUpdateType | updateType;
 
                 numComplete++;
@@ -194,15 +194,15 @@ namespace Tesserafin.Controller.Entities.Audio
             }
 
             // Refresh current item
-            await RefreshMetadata(parentRefreshOptions, cancellationToken).ConfigureAwait(false);
+            await RefreshMetadata(deletions, parentRefreshOptions, cancellationToken).ConfigureAwait(false);
 
             if (!refreshOptions.IsAutomated)
             {
-                await RefreshArtists(refreshOptions, cancellationToken).ConfigureAwait(false);
+                await RefreshArtists(deletions, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        private async Task RefreshArtists(MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
+        private async Task RefreshArtists(IItemDeletionCommands deletions, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
         {
             foreach (var i in this.GetAllArtists())
             {
@@ -219,7 +219,7 @@ namespace Tesserafin.Controller.Entities.Audio
                     continue;
                 }
 
-                await artist.RefreshMetadata(refreshOptions, cancellationToken).ConfigureAwait(false);
+                await artist.RefreshMetadata(deletions, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
         }
     }

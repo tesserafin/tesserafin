@@ -45,6 +45,8 @@ namespace Tesserafin.Server.Core.Library
         // Do not use a pipe here because Roku http requests to the server will fail, without any explicit error message.
         private const char LiveStreamIdDelimiter = '_';
 
+        private readonly IItemDeletionCommands _deletions;
+
         private readonly IServerApplicationHost _appHost;
         private readonly IItemRepository _itemRepo;
         private readonly IUserManager _userManager;
@@ -67,6 +69,7 @@ namespace Tesserafin.Server.Core.Library
         private IMediaSourceProvider[] _providers;
 
         public MediaSourceManager(
+            IItemDeletionCommands deletions,
             IServerApplicationHost appHost,
             IItemRepository itemRepo,
             IApplicationPaths applicationPaths,
@@ -83,6 +86,7 @@ namespace Tesserafin.Server.Core.Library
             IMediaAttachmentRepository mediaAttachmentRepository,
             IMediaSegmentManager mediaSegmentManager)
         {
+            _deletions = deletions;
             _appHost = appHost;
             _itemRepo = itemRepo;
             _userManager = userManager;
@@ -192,6 +196,7 @@ namespace Tesserafin.Server.Core.Library
                     || (item.MediaType == MediaType.Audio && mediaSources[0].MediaStreams.All(i => i.Type != MediaStreamType.Audio))))
             {
                 await item.RefreshMetadata(
+                    _deletions,
                     new MetadataRefreshOptions(_directoryService)
                     {
                         EnableRemoteContentProbe = true,

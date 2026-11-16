@@ -36,6 +36,7 @@ namespace Tesserafin.LiveTv.Recordings;
 /// <inheritdoc cref="IRecordingsManager" />
 public sealed class RecordingsManager : IRecordingsManager, IDisposable
 {
+    private readonly IItemDeletionCommands _deletions;
     private readonly ILogger<RecordingsManager> _logger;
     private readonly IServerConfigurationManager _config;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -59,6 +60,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="RecordingsManager"/> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="logger">The <see cref="ILogger"/>.</param>
     /// <param name="config">The <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="httpClientFactory">The <see cref="IHttpClientFactory"/>.</param>
@@ -76,6 +78,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     /// <param name="recordingsMetadataManager">The <see cref="RecordingsMetadataManager"/>.</param>
     /// <param name="activeRecordings">The <see cref="ActiveRecordings"/>.</param>
     public RecordingsManager(
+        IItemDeletionCommands deletions,
         ILogger<RecordingsManager> logger,
         IServerConfigurationManager config,
         IHttpClientFactory httpClientFactory,
@@ -93,6 +96,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         RecordingsMetadataManager recordingsMetadataManager,
         ActiveRecordings activeRecordings)
     {
+        _deletions = deletions;
         _logger = logger;
         _config = config;
         _httpClientFactory = httpClientFactory;
@@ -682,7 +686,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
                 .Skip(seriesTimer.KeepUpTo - 1)
                 .ToList();
 
-            DeleteLibraryItemsForTimers(timersToDelete);
+            await DeleteLibraryItemsForTimers(timersToDelete).ConfigureAwait(false);
 
             if (_libraryManager.FindByPath(seriesPath, true) is not Folder librarySeries)
             {
@@ -719,13 +723,13 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
             {
                 try
                 {
-                    _libraryManager.DeleteItem(
+                    await _deletions.DeleteAsync(
                         item,
                         new DeleteOptions
                         {
                             DeleteFileLocation = true
                         },
-                        true);
+                        CancellationToken.None).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -735,7 +739,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         }
     }
 
-    private void DeleteLibraryItemsForTimers(List<TimerInfo> timers)
+    private async Task DeleteLibraryItemsForTimers(List<TimerInfo> timers)
     {
         foreach (var timer in timers)
         {
@@ -746,7 +750,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
 
             try
             {
-                DeleteLibraryItemForTimer(timer);
+                await DeleteLibraryItemForTimer(timer).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -755,18 +759,18 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         }
     }
 
-    private void DeleteLibraryItemForTimer(TimerInfo timer)
+    private async Task DeleteLibraryItemForTimer(TimerInfo timer)
     {
         var libraryItem = _libraryManager.FindByPath(timer.RecordingPath, false);
         if (libraryItem is not null)
         {
-            _libraryManager.DeleteItem(
+            await _deletions.DeleteAsync(
                 libraryItem,
                 new DeleteOptions
                 {
                     DeleteFileLocation = true
                 },
-                true);
+                CancellationToken.None).ConfigureAwait(false);
         }
         else if (File.Exists(timer.RecordingPath))
         {

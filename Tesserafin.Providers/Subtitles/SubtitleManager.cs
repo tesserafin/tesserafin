@@ -28,6 +28,7 @@ namespace Tesserafin.Providers.Subtitles
 {
     public class SubtitleManager : ISubtitleManager
     {
+        private readonly IItemDeletionCommands _deletions;
         private readonly ILogger<SubtitleManager> _logger;
         private readonly IFileSystem _fileSystem;
         private readonly ILibraryMonitor _monitor;
@@ -38,6 +39,7 @@ namespace Tesserafin.Providers.Subtitles
         private readonly ISubtitleProvider[] _subtitleProviders;
 
         public SubtitleManager(
+            IItemDeletionCommands deletions,
             ILogger<SubtitleManager> logger,
             IFileSystem fileSystem,
             ILibraryMonitor monitor,
@@ -46,6 +48,7 @@ namespace Tesserafin.Providers.Subtitles
             IEnumerable<ISubtitleProvider> subtitleProviders,
             NamingOptions namingOptions)
         {
+            _deletions = deletions;
             _logger = logger;
             _fileSystem = fileSystem;
             _monitor = monitor;
@@ -395,7 +398,7 @@ namespace Tesserafin.Providers.Subtitles
                 _monitor.ReportFileSystemChangeComplete(path, false);
             }
 
-            return item.RefreshMetadata(CancellationToken.None);
+            return item.RefreshMetadata(_deletions, CancellationToken.None);
         }
 
         /// <inheritdoc />

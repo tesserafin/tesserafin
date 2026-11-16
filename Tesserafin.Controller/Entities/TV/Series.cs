@@ -308,7 +308,7 @@ namespace Tesserafin.Controller.Entities.TV
             return allEpisodes.DistinctBy(i => i.Id).Reverse();
         }
 
-        public async Task RefreshAllMetadata(MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
+        public async Task RefreshAllMetadata(IItemDeletionCommands deletions, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
             Children = null; // invalidate cached children.
             // Refresh bottom up, seasons and episodes first, then the series
@@ -329,7 +329,7 @@ namespace Tesserafin.Controller.Entities.TV
 
                 if (refreshOptions.RefreshItem(item))
                 {
-                    await item.RefreshMetadata(refreshOptions, cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(deletions, refreshOptions, cancellationToken).ConfigureAwait(false);
                 }
 
                 numComplete++;
@@ -360,7 +360,7 @@ namespace Tesserafin.Controller.Entities.TV
                 {
                     if (refreshOptions.RefreshItem(item))
                     {
-                        await item.RefreshMetadata(refreshOptions, cancellationToken).ConfigureAwait(false);
+                        await item.RefreshMetadata(deletions, refreshOptions, cancellationToken).ConfigureAwait(false);
                     }
                 }
 

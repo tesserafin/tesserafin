@@ -82,7 +82,6 @@ namespace Tesserafin.Server.Core.Library
         private readonly NamingOptions _namingOptions;
         private readonly IPeopleRepository _peopleRepository;
         private readonly ExtraResolver _extraResolver;
-        private readonly IPathManager _pathManager;
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemCacheStore _itemCacheStore;
         private readonly IItemAccessService _itemAccessService;
@@ -91,7 +90,6 @@ namespace Tesserafin.Server.Core.Library
         private readonly IUserRootFolderProvider _userRootFolderProvider;
         private readonly ICollectionFolderResolver _collectionFolderResolver;
         private readonly IMediaStreamLanguageService _mediaStreamLanguageService;
-        private readonly Lazy<IExternalDataManager> _externalDataManagerFactory;
 
         private readonly DotIgnoreIgnoreRule _dotIgnoreIgnoreRule;
         private readonly ILibraryRootFolderProvider _roots;
@@ -128,9 +126,7 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="namingOptions">The naming options.</param>
         /// <param name="directoryService">The directory service.</param>
         /// <param name="peopleRepository">The people repository.</param>
-        /// <param name="pathManager">The path manager.</param>
         /// <param name="mediaStreamLanguageService">The media stream language service.</param>
-        /// <param name="externalDataManagerFactory">The external data manager (lazy, to break the DI cycle through ChapterManager).</param>
         /// <param name="itemLookupService">The item lookup service (read side of the item lookup cache; see PR75/PR76).</param>
         /// <param name="itemCacheStore">The item cache lifecycle port (register/invalidate side of the same cache; see PR76).</param>
         /// <param name="itemAccessService">The item access service (user visibility on top of the item lookup service; see PR77).</param>
@@ -162,9 +158,7 @@ namespace Tesserafin.Server.Core.Library
             NamingOptions namingOptions,
             IDirectoryService directoryService,
             IPeopleRepository peopleRepository,
-            IPathManager pathManager,
             IMediaStreamLanguageService mediaStreamLanguageService,
-            Lazy<IExternalDataManager> externalDataManagerFactory,
             IItemLookupService itemLookupService,
             IItemCacheStore itemCacheStore,
             IItemAccessService itemAccessService,
@@ -208,11 +202,9 @@ namespace Tesserafin.Server.Core.Library
 
             _namingOptions = namingOptions;
             _peopleRepository = peopleRepository;
-            _pathManager = pathManager;
             _extraResolver = new ExtraResolver(loggerFactory.CreateLogger<ExtraResolver>(), namingOptions, directoryService);
 
             _mediaStreamLanguageService = mediaStreamLanguageService;
-            _externalDataManagerFactory = externalDataManagerFactory;
         }
 
         /// <summary>
@@ -313,408 +305,6 @@ namespace Tesserafin.Server.Core.Library
             {
                 _logger.LogError(ex, "Error in ItemAdded event handler");
             }
-        }
-
-        public void DeleteItem(BaseItem item, DeleteOptions options)
-        {
-            DeleteItem(item, options, false);
-        }
-
-        public void DeleteItem(BaseItem item, DeleteOptions options, bool notifyParentItem)
-        {
-            ArgumentNullException.ThrowIfNull(item);
-
-            var parent = item.GetOwner(this) ?? item.GetParent(this);
-
-            DeleteItem(item, options, parent, notifyParentItem);
-        }
-
-        public void DeleteItemsUnsafeFast(IReadOnlyCollection<BaseItem> items, bool deleteSourceFiles = false)
-        {
-            if (items.Count == 0)
-            {
-                return;
-            }
-
-            var pathMaps = items.Select(e =>
-                (Item: e,
-                InternalPath: GetInternalMetadataPaths(e),
-                DeletePaths: deleteSourceFiles ? e.GetDeletePaths() : [])).ToArray();
-
-            foreach (var (item, internalPaths, pathsToDelete) in pathMaps)
-            {
-                foreach (var metadataPath in internalPaths)
-                {
-                    if (!Directory.Exists(metadataPath))
-                    {
-                        continue;
-                    }
-
-                    _logger.LogDebug(
-                        "Deleting metadata path, Type: {Type}, Name: {Name}, Path: {Path}, Id: {Id}",
-                        item.GetType().Name,
-                        item.Name ?? "Unknown name",
-                        metadataPath,
-                        item.Id);
-
-                    try
-                    {
-                        Directory.Delete(metadataPath, true);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error deleting {MetadataPath}", metadataPath);
-                    }
-                }
-
-                foreach (var fileSystemInfo in pathsToDelete)
-                {
-                    DeleteItemPath(item, false, fileSystemInfo);
-                }
-            }
-
-            var externalDataManager = _externalDataManagerFactory.Value;
-            foreach (var (item, _, _) in pathMaps)
-            {
-                externalDataManager.DeleteExternalItemFiles(item);
-            }
-
-            _persistenceService.DeleteItem([.. pathMaps.Select(f => f.Item.Id)]);
-            _itemCacheStore.RemoveRange(pathMaps.Select(f => f.Item.Id));
-        }
-
-        public void DeleteItem(BaseItem item, DeleteOptions options, BaseItem parent, bool notifyParentItem)
-        {
-            ArgumentNullException.ThrowIfNull(item);
-
-            if (item.SourceType == SourceType.Channel)
-            {
-                if (options.DeleteFromExternalProvider)
-                {
-                    try
-                    {
-                        BaseItem.ChannelManager.DeleteItem(item).GetAwaiter().GetResult();
-                    }
-                    catch (ArgumentException)
-                    {
-                        // channel no longer installed
-                    }
-                }
-
-                options.DeleteFileLocation = false;
-            }
-
-            if (item is LiveTvProgram)
-            {
-                _logger.LogDebug(
-                    "Removing item, Type: {Type}, Name: {Name}, Path: {Path}, Id: {Id}",
-                    item.GetType().Name,
-                    item.Name ?? "Unknown name",
-                    item.Path ?? string.Empty,
-                    item.Id);
-            }
-            else
-            {
-                _logger.LogInformation(
-                    "Removing item, Type: {Type}, Name: {Name}, Path: {Path}, Id: {Id}",
-                    item.GetType().Name,
-                    item.Name ?? "Unknown name",
-                    item.Path ?? string.Empty,
-                    item.Id);
-            }
-
-            // If deleting a primary version video, clear PrimaryVersionId from alternate versions
-            // OwnerId check: items with OwnerId set are alternate versions or extras, not primaries
-            if (item is Video video && !video.PrimaryVersionId.HasValue && video.OwnerId.IsEmpty())
-            {
-                var localAlternateIds = GetLocalAlternateVersionIds(video).ToHashSet();
-                var allAlternateVersions = localAlternateIds
-                    .Concat(GetLinkedAlternateVersions(video).Select(v => v.Id))
-                    .Distinct()
-                    .Select(id => GetItemById(id))
-                    .OfType<Video>()
-                    .ToList();
-
-                // Partition alternates by whether their files still exist on disk
-                var alternateVersions = new List<Video>();
-                var missingAlternates = new List<Video>();
-                foreach (var alt in allAlternateVersions)
-                {
-                    if (!string.IsNullOrEmpty(alt.Path) && !_fileSystem.FileExists(alt.Path))
-                    {
-                        missingAlternates.Add(alt);
-                    }
-                    else
-                    {
-                        alternateVersions.Add(alt);
-                    }
-                }
-
-                // Delete alternates whose files no longer exist to avoid ghost items.
-                // Clear PrimaryVersionId first so DeleteItem doesn't try to update the primary being deleted.
-                foreach (var missing in missingAlternates)
-                {
-                    _logger.LogInformation(
-                        "Deleting missing alternate version {Name} ({Path})",
-                        missing.Name ?? "Unknown name",
-                        missing.Path ?? string.Empty);
-                    missing.SetPrimaryVersionId(null);
-                    missing.OwnerId = Guid.Empty;
-                    missing.LocalAlternateVersions = [];
-                    missing.LinkedAlternateVersions = [];
-                    DeleteItem(missing, new DeleteOptions { DeleteFileLocation = false }, false);
-                }
-
-                if (alternateVersions.Count > 0)
-                {
-                    _logger.LogInformation(
-                        "Clearing PrimaryVersionId from {Count} alternate versions of {Name}",
-                        alternateVersions.Count,
-                        item.Name ?? "Unknown name");
-
-                    // Promote the first alternate version to be the new primary
-                    var newPrimary = alternateVersions[0];
-                    newPrimary.SetPrimaryVersionId(null);
-                    newPrimary.OwnerId = Guid.Empty;
-
-                    // Transfer alternate version arrays from old primary to new primary
-                    // so UpdateToRepositoryAsync creates correct LinkedChildren entries
-                    newPrimary.LocalAlternateVersions = video.LocalAlternateVersions
-                        .Where(p => !string.Equals(p, newPrimary.Path, StringComparison.OrdinalIgnoreCase))
-                        .ToArray();
-                    newPrimary.LinkedAlternateVersions = video.LinkedAlternateVersions
-                        .Where(lc => !lc.ItemId.HasValue || !lc.ItemId.Value.Equals(newPrimary.Id))
-                        .ToArray();
-
-                    newPrimary.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).GetAwaiter().GetResult();
-
-                    // Re-route playlist/collection references from deleted primary to new primary
-                    RerouteLinkedChildReferencesAsync(video.Id, newPrimary.Id).GetAwaiter().GetResult();
-
-                    // Update remaining alternates to point to new primary
-                    foreach (var alternate in alternateVersions.Skip(1))
-                    {
-                        alternate.SetPrimaryVersionId(newPrimary.Id);
-                        // Only set OwnerId for local alternates; linked alternates are independent items
-                        alternate.OwnerId = localAlternateIds.Contains(alternate.Id) ? newPrimary.Id : Guid.Empty;
-                        alternate.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).GetAwaiter().GetResult();
-                    }
-                }
-            }
-            else if (item is Video alternateVideo && alternateVideo.PrimaryVersionId.HasValue)
-            {
-                // If deleting an alternate version, re-route references to its primary
-                RerouteLinkedChildReferencesAsync(alternateVideo.Id, alternateVideo.PrimaryVersionId.Value).GetAwaiter().GetResult();
-
-                // Remove deleted alternate from primary's LinkedAlternateVersions
-                if (GetItemById(alternateVideo.PrimaryVersionId.Value) is Video primaryVideo)
-                {
-                    primaryVideo.LinkedAlternateVersions = primaryVideo.LinkedAlternateVersions
-                        .Where(lc => !lc.ItemId.HasValue || !lc.ItemId.Value.Equals(alternateVideo.Id))
-                        .ToArray();
-                    primaryVideo.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).GetAwaiter().GetResult();
-                }
-            }
-
-            var children = item.IsFolder
-                ? ((Folder)item).GetRecursiveChildren(false)
-                : [];
-
-            foreach (var metadataPath in GetMetadataPaths(item, children))
-            {
-                if (!Directory.Exists(metadataPath))
-                {
-                    continue;
-                }
-
-                _logger.LogDebug(
-                    "Deleting metadata path, Type: {Type}, Name: {Name}, Path: {Path}, Id: {Id}",
-                    item.GetType().Name,
-                    item.Name ?? "Unknown name",
-                    metadataPath,
-                    item.Id);
-
-                try
-                {
-                    Directory.Delete(metadataPath, true);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error deleting {MetadataPath}", metadataPath);
-                }
-            }
-
-            if ((options.DeleteFileLocation && item.IsFileProtocol) || IsInternalItem(item))
-            {
-                // Assume only the first is required
-                // Add this flag to GetDeletePaths if required in the future
-                var isRequiredForDelete = true;
-
-                foreach (var fileSystemInfo in item.GetDeletePaths())
-                {
-                    DeleteItemPath(item, isRequiredForDelete, fileSystemInfo);
-
-                    isRequiredForDelete = false;
-                }
-            }
-
-            item.SetParent(null);
-
-            var externalDataManager = _externalDataManagerFactory.Value;
-            externalDataManager.DeleteExternalItemFiles(item);
-            foreach (var child in children)
-            {
-                externalDataManager.DeleteExternalItemFiles(child);
-            }
-
-            _persistenceService.DeleteItem([item.Id, .. children.Select(f => f.Id)]);
-            _itemCacheStore.Remove(item.Id);
-            _itemCacheStore.RemoveRange(children.Select(child => child.Id));
-
-            if (parent is Folder folder)
-            {
-                folder.Children = null;
-                folder.UserData = null;
-            }
-
-            ReportItemRemoved(item, parent);
-        }
-
-        private void DeleteItemPath(BaseItem item, bool isRequiredForDelete, FileSystemMetadata fileSystemInfo)
-        {
-            if (Directory.Exists(fileSystemInfo.FullName) || File.Exists(fileSystemInfo.FullName))
-            {
-                try
-                {
-                    _logger.LogInformation(
-                        "Deleting item path, Type: {Type}, Name: {Name}, Path: {Path}, Id: {Id}",
-                        item.GetType().Name,
-                        item.Name ?? "Unknown name",
-                        fileSystemInfo.FullName,
-                        item.Id);
-
-                    if (fileSystemInfo.IsDirectory)
-                    {
-                        Directory.Delete(fileSystemInfo.FullName, true);
-                    }
-                    else
-                    {
-                        File.Delete(fileSystemInfo.FullName);
-                    }
-                }
-                catch (DirectoryNotFoundException)
-                {
-                    _logger.LogInformation(
-                        "Directory not found, only removing from database, Type: {Type}, Name: {Name}, Path: {Path}, Id: {Id}",
-                        item.GetType().Name,
-                        item.Name ?? "Unknown name",
-                        fileSystemInfo.FullName,
-                        item.Id);
-                }
-                catch (FileNotFoundException)
-                {
-                    _logger.LogInformation(
-                        "File not found, only removing from database, Type: {Type}, Name: {Name}, Path: {Path}, Id: {Id}",
-                        item.GetType().Name,
-                        item.Name ?? "Unknown name",
-                        fileSystemInfo.FullName,
-                        item.Id);
-                }
-                catch (IOException)
-                {
-                    if (isRequiredForDelete)
-                    {
-                        throw;
-                    }
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    if (isRequiredForDelete)
-                    {
-                        throw;
-                    }
-                }
-            }
-        }
-
-        private bool IsInternalItem(BaseItem item)
-        {
-            if (!item.IsFileProtocol)
-            {
-                return false;
-            }
-
-            var pathToCheck = item switch
-            {
-                Genre => _configurationManager.ApplicationPaths.GenrePath,
-                MusicArtist => _configurationManager.ApplicationPaths.ArtistsPath,
-                MusicGenre => _configurationManager.ApplicationPaths.MusicGenrePath,
-                Person => _configurationManager.ApplicationPaths.PeoplePath,
-                Studio => _configurationManager.ApplicationPaths.StudioPath,
-                Year => _configurationManager.ApplicationPaths.YearPath,
-                _ => null
-            };
-
-            var itemPath = item.Path;
-            if (!string.IsNullOrEmpty(pathToCheck) && !string.IsNullOrEmpty(itemPath))
-            {
-                var cleanPath = _fileSystem.GetValidFilename(itemPath);
-                var cleanCheckPath = _fileSystem.GetValidFilename(pathToCheck);
-
-                return cleanPath.StartsWith(cleanCheckPath, StringComparison.Ordinal);
-            }
-
-            return false;
-        }
-
-        private List<string> GetMetadataPaths(BaseItem item, IEnumerable<BaseItem> children)
-        {
-            var list = GetInternalMetadataPaths(item);
-            foreach (var child in children)
-            {
-                list.AddRange(GetInternalMetadataPaths(child));
-            }
-
-            return list;
-        }
-
-        private List<string> GetInternalMetadataPaths(BaseItem item)
-        {
-            var list = new List<string>
-            {
-                item.GetInternalMetadataPath()
-            };
-
-            if (item is Video video)
-            {
-                // Trickplay
-                list.Add(_pathManager.GetTrickplayDirectory(video));
-
-                // Chapter Images
-                list.Add(_pathManager.GetChapterImageFolderPath(video));
-
-                // mediaSourceManager not injectable here: it already depends on ILibraryManager, so
-                // ILibraryManager -> IMediaSourceManager would be circular. Also deliberately not
-                // growing LibraryManager's constructor (already 23 params, slated for point-5
-                // breakup) — falls back to the statics.
-                // Subtitles and attachments
-                foreach (var mediaSource in item.GetMediaSources(false, BaseItem.MediaSourceManager, BaseItem.MediaSegmentManager, BaseItem.ChannelManager))
-                {
-                    var subtitleFolder = _pathManager.GetSubtitleFolderPath(mediaSource.Id);
-                    if (subtitleFolder is not null)
-                    {
-                        list.Add(subtitleFolder);
-                    }
-
-                    var attachmentFolder = _pathManager.GetAttachmentFolderPath(mediaSource.Id);
-                    if (attachmentFolder is not null)
-                    {
-                        list.Add(attachmentFolder);
-                    }
-                }
-            }
-
-            return list;
         }
 
         /// <summary>
@@ -828,20 +418,6 @@ namespace Tesserafin.Server.Core.Library
             // This happens when items were previously resolved without proper type context
             // in mixed-content libraries where collectionType is null.
             var expectedId = GetNewItemId(path, expectedVideoType);
-            if (expectedVideoType != typeof(Video))
-            {
-                var wrongTypeId = GetNewItemId(path, typeof(Video));
-                if (!wrongTypeId.Equals(expectedId) && GetItemById(wrongTypeId) is Video wrongTypeItem)
-                {
-                    _logger.LogInformation(
-                        "Removing alternate version with wrong type {WrongType}, expected {ExpectedType}: {Path}",
-                        wrongTypeItem.GetType().Name,
-                        expectedVideoType.Name,
-                        path);
-                    DeleteItem(wrongTypeItem, new DeleteOptions { DeleteFileLocation = false });
-                }
-            }
-
             var resolved = ResolvePath(
                 _fileSystem.GetFileSystemInfo(path),
                 parent,
@@ -1212,12 +788,12 @@ namespace Tesserafin.Server.Core.Library
         }
 
         /// <inheritdoc />
-        public Task ValidatePeopleAsync(IProgress<double> progress, CancellationToken cancellationToken)
+        public Task ValidatePeopleAsync(IItemDeletionCommands deletions, IProgress<double> progress, CancellationToken cancellationToken)
         {
             // Ensure the location is available.
             Directory.CreateDirectory(_configurationManager.ApplicationPaths.PeoplePath);
 
-            return new PeopleValidator(this, _itemPeopleService, _logger, _fileSystem).ValidatePeople(cancellationToken, progress);
+            return new PeopleValidator(deletions, this, _itemPeopleService, _logger, _fileSystem).ValidatePeople(cancellationToken, progress);
         }
 
         /// <summary>
@@ -2331,7 +1907,7 @@ namespace Tesserafin.Server.Core.Library
         /// </summary>
         /// <param name="item">The item.</param>
         /// <param name="parent">The parent item.</param>
-        public void ReportItemRemoved(BaseItem item, BaseItem parent)
+        public void ReportItemRemoved(BaseItem item, BaseItem? parent)
         {
             if (ItemRemoved is not null)
             {

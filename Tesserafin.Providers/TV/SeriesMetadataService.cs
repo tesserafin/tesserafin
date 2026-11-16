@@ -27,12 +27,14 @@ namespace Tesserafin.Providers.TV;
 /// </summary>
 public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 {
+    private readonly IItemDeletionCommands _deletions;
     private readonly ILocalizationManager _localizationManager;
     private readonly IItemSortService _itemSortService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SeriesMetadataService"/> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -44,6 +46,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     public SeriesMetadataService(
+        IItemDeletionCommands deletions,
         IServerConfigurationManager serverConfigurationManager,
         ILogger<SeriesMetadataService> logger,
         IProviderManager providerManager,
@@ -56,6 +59,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         IItemSortService itemSortService)
         : base(serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
+        _deletions = deletions;
         _localizationManager = localizationManager;
         _itemSortService = itemSortService;
     }
@@ -91,8 +95,8 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             await UpdateSeriesChildrenInfoAsync(item, cancellationToken).ConfigureAwait(false);
         }
 
-        RemoveObsoleteEpisodes(item);
-        RemoveObsoleteSeasons(item);
+        await RemoveObsoleteEpisodes(item, cancellationToken).ConfigureAwait(false);
+        await RemoveObsoleteSeasons(item, cancellationToken).ConfigureAwait(false);
         await CreateSeasonsAsync(item, cancellationToken).ConfigureAwait(false);
     }
 
@@ -176,7 +180,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         }
     }
 
-    private void RemoveObsoleteSeasons(Series series)
+    private async Task RemoveObsoleteSeasons(Series series, CancellationToken cancellationToken)
     {
         // TODO Legacy. It's not really "physical" seasons as any virtual seasons are always converted to non-virtual in CreateSeasonsAsync.
         var physicalSeasonNumbers = new HashSet<int>();
@@ -202,19 +206,19 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             {
                 Logger.LogInformation("Removing virtual season {SeasonNumber} in series {SeriesName}", virtualSeason.IndexNumber, series.Name);
 
-                LibraryManager.DeleteItem(
+                await _deletions.DeleteAsync(
                     virtualSeason,
                     new DeleteOptions
                     {
                         // Internal metadata paths are removed regardless of this.
                         DeleteFileLocation = false
                     },
-                    false);
+                    cancellationToken).ConfigureAwait(false);
             }
         }
     }
 
-    private void RemoveObsoleteEpisodes(Series series)
+    private async Task RemoveObsoleteEpisodes(Series series, CancellationToken cancellationToken)
     {
         var episodesBySeason = series.GetEpisodes(null, new DtoOptions(), true, _itemSortService)
                         .OfType<Episode>()
@@ -248,12 +252,12 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
                     continue;
                 }
 
-                DeleteEpisode(episode);
+                await DeleteEpisode(episode, cancellationToken).ConfigureAwait(false);
             }
         }
     }
 
-    private void DeleteEpisode(Episode episode)
+    private async Task DeleteEpisode(Episode episode, CancellationToken cancellationToken)
     {
         Logger.LogInformation(
             "Removing virtual episode S{SeasonNumber}E{EpisodeNumber} in series {SeriesName}",
@@ -261,14 +265,14 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             episode.IndexNumber,
             episode.SeriesName);
 
-        LibraryManager.DeleteItem(
+        await _deletions.DeleteAsync(
             episode,
             new DeleteOptions
             {
                 // Internal metadata paths are removed regardless of this.
                 DeleteFileLocation = false
             },
-            false);
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static bool NeedsVirtualSeason(Episode episode, HashSet<Guid> physicalSeasonIds, HashSet<string> physicalSeasonPaths)
@@ -413,7 +417,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         };
 
         series.AddChild(season);
-        await season.RefreshMetadata(new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken).ConfigureAwait(false);
+        await season.RefreshMetadata(_deletions, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken).ConfigureAwait(false);
 
         return season;
     }

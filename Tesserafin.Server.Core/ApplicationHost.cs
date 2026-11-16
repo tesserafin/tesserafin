@@ -562,6 +562,11 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddTransient(provider => new Lazy<ILibraryMonitor>(provider.GetRequiredService<ILibraryMonitor>));
             serviceCollection.AddTransient(provider => new Lazy<IProviderManager>(provider.GetRequiredService<IProviderManager>));
             serviceCollection.AddTransient(provider => new Lazy<IExternalDataManager>(provider.GetRequiredService<IExternalDataManager>));
+            // Deletion can refresh metadata and remove channel data; these services themselves
+            // consume the deletion port. Defer their construction, never their command completion.
+            serviceCollection.AddTransient(provider => new Lazy<IMediaSourceManager>(provider.GetRequiredService<IMediaSourceManager>));
+            serviceCollection.AddTransient(provider => new Lazy<IMediaSegmentManager>(provider.GetRequiredService<IMediaSegmentManager>));
+            serviceCollection.AddTransient(provider => new Lazy<IChannelManager>(provider.GetRequiredService<IChannelManager>));
 
             // LiveTvPresenceProvider (PR108) needs the registered ILiveTvService count to reproduce
             // LiveTvManager.IsLiveTvEnabled, but the in-tree DefaultLiveTvService implementation
@@ -588,6 +593,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<ILibraryRootFolderProvider, LibraryRootFolderProvider>();
             serviceCollection.AddSingleton<ILibraryScanTraversal, LibraryScanTraversal>();
             serviceCollection.AddSingleton<ILibraryStructureCommands, LibraryStructureCommands>();
+            serviceCollection.AddSingleton<IItemDeletionCommands, ItemDeletionCommands>();
             serviceCollection.AddSingleton<LibraryScanCoordinator>();
             serviceCollection.AddSingleton<ILibraryScanCoordinator>(sp => sp.GetRequiredService<LibraryScanCoordinator>());
             serviceCollection.AddSingleton<Microsoft.Extensions.Hosting.IHostedService>(sp => sp.GetRequiredService<LibraryScanCoordinator>());

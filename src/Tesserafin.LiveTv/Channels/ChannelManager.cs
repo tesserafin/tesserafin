@@ -42,6 +42,7 @@ namespace Tesserafin.LiveTv.Channels
     /// </summary>
     public class ChannelManager : IChannelManager, IDisposable
     {
+        private readonly IItemDeletionCommands _deletions;
         private readonly IUserManager _userManager;
         private readonly IUserDataManager _userDataManager;
         private readonly IDtoService _dtoService;
@@ -58,6 +59,7 @@ namespace Tesserafin.LiveTv.Channels
         /// <summary>
         /// Initializes a new instance of the <see cref="ChannelManager"/> class.
         /// </summary>
+        /// <param name="deletions">Item deletion operations.</param>
         /// <param name="userManager">The user manager.</param>
         /// <param name="dtoService">The dto service.</param>
         /// <param name="libraryManager">The library manager.</param>
@@ -69,6 +71,7 @@ namespace Tesserafin.LiveTv.Channels
         /// <param name="memoryCache">The memory cache.</param>
         /// <param name="channels">The channels.</param>
         public ChannelManager(
+            IItemDeletionCommands deletions,
             IUserManager userManager,
             IDtoService dtoService,
             ILibraryManager libraryManager,
@@ -80,6 +83,7 @@ namespace Tesserafin.LiveTv.Channels
             IMemoryCache memoryCache,
             IEnumerable<IChannel> channels)
         {
+            _deletions = deletions;
             _userManager = userManager;
             _dtoService = dtoService;
             _libraryManager = libraryManager;
@@ -490,6 +494,7 @@ namespace Tesserafin.LiveTv.Channels
             }
 
             await item.RefreshMetadata(
+                _deletions,
                 new MetadataRefreshOptions(new DirectoryService(_fileSystem))
                 {
                     ForceSave = !isNew && forceUpdate
@@ -741,7 +746,7 @@ namespace Tesserafin.LiveTv.Channels
                     var deadItem = _libraryManager.GetItemById(deadId);
                     if (deadItem is not null)
                     {
-                        _libraryManager.DeleteItem(
+                        await _deletions.DeleteAsync(
                             deadItem,
                             new DeleteOptions
                             {
@@ -749,7 +754,7 @@ namespace Tesserafin.LiveTv.Channels
                                 DeleteFromExternalProvider = false
                             },
                             parentItem,
-                            false);
+                            cancellationToken).ConfigureAwait(false);
                     }
                 }
             }

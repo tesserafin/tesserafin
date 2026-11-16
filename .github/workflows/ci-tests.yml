@@ -354,6 +354,8 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.CompleteJourney_ChangesDefinitionAndPaths_ButNeverDeletesSourceMedia
           --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.ConcurrentCreates_ChooseDistinctNamesAfterAdmission_AndCanBeRemovedIndependently
           --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.FailedOptionWrite_KeepsPreviouslyPublishedOptions_AndReleasesTheMutationSlot
+          --require Tesserafin.Server.Integration.Tests.ItemDeletionCommandsEndToEndTests.HttpDeletion_RemovesSourceAndCachedItem_ButConservesUserHistory
+          --require Tesserafin.Server.Integration.Tests.ItemDeletionCommandsEndToEndTests.CatalogueOnlyDeletion_PromotesAlternateAndReroutesPlaylist_WithoutDeletingEitherSource
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_StartAndSeek_ServesRangesFromTheSessionFile
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_ParametersThatDoNotMatchTheSession_AreNotServed
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_Stop_DeletesTheSessionAndRevokesItsCapability

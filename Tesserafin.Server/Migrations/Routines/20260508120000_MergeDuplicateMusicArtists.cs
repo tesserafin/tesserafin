@@ -26,6 +26,7 @@ public class MergeDuplicateMusicArtists : IAsyncMigrationRoutine
 {
     private const string MusicArtistType = "Tesserafin.Controller.Entities.Audio.MusicArtist";
 
+    private readonly IItemDeletionCommands _deletions;
     private readonly IStartupLogger<MergeDuplicateMusicArtists> _logger;
     private readonly IDbContextFactory<TesserafinDbContext> _dbContextFactory;
     private readonly ILibraryManager _libraryManager;
@@ -34,16 +35,19 @@ public class MergeDuplicateMusicArtists : IAsyncMigrationRoutine
     /// <summary>
     /// Initializes a new instance of the <see cref="MergeDuplicateMusicArtists"/> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="logger">The startup logger.</param>
     /// <param name="dbContextFactory">The database context factory.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="persistenceService">The item persistence service.</param>
     public MergeDuplicateMusicArtists(
+        IItemDeletionCommands deletions,
         IStartupLogger<MergeDuplicateMusicArtists> logger,
         IDbContextFactory<TesserafinDbContext> dbContextFactory,
         ILibraryManager libraryManager,
         IItemPersistenceService persistenceService)
     {
+        _deletions = deletions;
         _logger = logger;
         _dbContextFactory = dbContextFactory;
         _libraryManager = libraryManager;
@@ -179,7 +183,7 @@ public class MergeDuplicateMusicArtists : IAsyncMigrationRoutine
                 return;
             }
 
-            // Resolve via LibraryManager so DeleteItemsUnsafeFast can also remove the
+            // Resolve via LibraryManager so unreferenced deletion can also remove the
             // %MetadataPath%/artists/<Name> directories that the duplicate stubs left behind.
             // Fall back to the persistence service for any items the LibraryManager can't resolve.
             // Delete in batches so we never issue one massive delete transaction and progress stays visible.
@@ -198,7 +202,7 @@ public class MergeDuplicateMusicArtists : IAsyncMigrationRoutine
                     .ToList();
                 if (itemsToDelete.Count > 0)
                 {
-                    _libraryManager.DeleteItemsUnsafeFast(itemsToDelete!);
+                    await _deletions.DeleteUnreferencedAsync(itemsToDelete!, false, cancellationToken).ConfigureAwait(false);
                 }
 
                 var deletedIds = itemsToDelete.Select(i => i!.Id).ToHashSet();

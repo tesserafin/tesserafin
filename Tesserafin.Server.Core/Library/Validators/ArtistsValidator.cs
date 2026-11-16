@@ -17,6 +17,8 @@ namespace Tesserafin.Server.Core.Library.Validators;
 /// </summary>
 public class ArtistsValidator
 {
+    private readonly IItemDeletionCommands _deletions;
+
     /// <summary>
     /// The library manager.
     /// </summary>
@@ -31,11 +33,13 @@ public class ArtistsValidator
     /// <summary>
     /// Initializes a new instance of the <see cref="ArtistsValidator" /> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
-    public ArtistsValidator(ILibraryManager libraryManager, ILogger<ArtistsValidator> logger, IItemRepository itemRepo)
+    public ArtistsValidator(IItemDeletionCommands deletions, ILibraryManager libraryManager, ILogger<ArtistsValidator> logger, IItemRepository itemRepo)
     {
+        _deletions = deletions;
         _libraryManager = libraryManager;
         _logger = logger;
         _itemRepo = itemRepo;
@@ -78,7 +82,7 @@ public class ArtistsValidator
 
                 if (isNew || neverRefreshed)
                 {
-                    await item.RefreshMetadata(cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(_deletions, cancellationToken).ConfigureAwait(false);
                     refreshed++;
                 }
             }
@@ -115,7 +119,7 @@ public class ArtistsValidator
             _logger.LogInformation("Deleting dead {ItemType} {ItemId} {ItemName}", item.GetType().Name, item.Id.ToString("N", CultureInfo.InvariantCulture), item.Name);
         }
 
-        _libraryManager.DeleteItemsUnsafeFast(deadEntities, deleteSourceFiles: true);
+        await _deletions.DeleteUnreferencedAsync(deadEntities, true, cancellationToken).ConfigureAwait(false);
 
         progress.Report(100);
     }

@@ -15,6 +15,8 @@ namespace Tesserafin.Server.Core.Library.Validators;
 /// </summary>
 public class MusicGenresValidator
 {
+    private readonly IItemDeletionCommands _deletions;
+
     /// <summary>
     /// The library manager.
     /// </summary>
@@ -29,11 +31,13 @@ public class MusicGenresValidator
     /// <summary>
     /// Initializes a new instance of the <see cref="MusicGenresValidator" /> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
-    public MusicGenresValidator(ILibraryManager libraryManager, ILogger<MusicGenresValidator> logger, IItemRepository itemRepo)
+    public MusicGenresValidator(IItemDeletionCommands deletions, ILibraryManager libraryManager, ILogger<MusicGenresValidator> logger, IItemRepository itemRepo)
     {
+        _deletions = deletions;
         _libraryManager = libraryManager;
         _logger = logger;
         _itemRepo = itemRepo;
@@ -64,7 +68,7 @@ public class MusicGenresValidator
                 var item = _libraryManager.GetMusicGenre(name);
                 if (!existingMusicGenreIds.Contains(item.Id))
                 {
-                    await item.RefreshMetadata(cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(_deletions, cancellationToken).ConfigureAwait(false);
                     refreshed++;
                 }
             }

@@ -35,6 +35,7 @@ namespace Tesserafin.Server.Core.Playlists
 {
     public class PlaylistManager : IPlaylistManager
     {
+        private readonly IItemDeletionCommands _deletions;
         private readonly ILibraryManager _libraryManager;
         private readonly IFileSystem _fileSystem;
         private readonly ILibraryMonitor _iLibraryMonitor;
@@ -46,6 +47,7 @@ namespace Tesserafin.Server.Core.Playlists
         private readonly IItemSortService _itemSortService;
 
         public PlaylistManager(
+            IItemDeletionCommands deletions,
             ILibraryManager libraryManager,
             IFileSystem fileSystem,
             ILibraryMonitor iLibraryMonitor,
@@ -56,6 +58,7 @@ namespace Tesserafin.Server.Core.Playlists
             IItemQueryService itemQueryService,
             IItemSortService itemSortService)
         {
+            _deletions = deletions;
             _libraryManager = libraryManager;
             _fileSystem = fileSystem;
             _iLibraryMonitor = iLibraryMonitor;
@@ -159,7 +162,7 @@ namespace Tesserafin.Server.Core.Playlists
                 playlist.SetMediaType(request.MediaType);
                 parentFolder.AddChild(playlist);
 
-                await playlist.RefreshMetadata(new MetadataRefreshOptions(new DirectoryService(_fileSystem)) { ForceSave = true }, CancellationToken.None)
+                await playlist.RefreshMetadata(_deletions, new MetadataRefreshOptions(new DirectoryService(_fileSystem)) { ForceSave = true }, CancellationToken.None)
                     .ConfigureAwait(false);
 
                 if (request.ItemIdList.Count > 0)
@@ -611,7 +614,7 @@ namespace Tesserafin.Server.Core.Playlists
                 else if (!playlist.OpenAccess)
                 {
                     // Remove playlist if not shared
-                    _libraryManager.DeleteItem(
+                    await _deletions.DeleteAsync(
                         playlist,
                         new DeleteOptions
                         {
@@ -619,7 +622,7 @@ namespace Tesserafin.Server.Core.Playlists
                             DeleteFromExternalProvider = false
                         },
                         playlist.GetParent(),
-                        false);
+                        CancellationToken.None).ConfigureAwait(false);
                 }
             }
         }

@@ -51,6 +51,7 @@ namespace Tesserafin.Providers.Manager
     /// </summary>
     public class ProviderManager : IProviderManager, IDisposable
     {
+        private readonly IItemDeletionCommands _deletions;
         private readonly Lock _refreshQueueLock = new();
         private readonly ILogger<ProviderManager> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
@@ -94,6 +95,7 @@ namespace Tesserafin.Providers.Manager
         /// <summary>
         /// Initializes a new instance of the <see cref="ProviderManager"/> class.
         /// </summary>
+        /// <param name="deletions">Item deletion operations.</param>
         /// <param name="httpClientFactory">The Http client factory.</param>
         /// <param name="subtitleManager">The subtitle manager.</param>
         /// <param name="configurationManager">The configuration manager.</param>
@@ -109,6 +111,7 @@ namespace Tesserafin.Providers.Manager
         /// <param name="mediaSegmentManager">The media segment manager.</param>
         /// <param name="similarItemsManager">The similar items manager.</param>
         public ProviderManager(
+            IItemDeletionCommands deletions,
             IHttpClientFactory httpClientFactory,
             ISubtitleManager subtitleManager,
             IServerConfigurationManager configurationManager,
@@ -124,6 +127,7 @@ namespace Tesserafin.Providers.Manager
             IMediaSegmentManager mediaSegmentManager,
             ISimilarItemsManager similarItemsManager)
         {
+            _deletions = deletions;
             _logger = logger;
             _httpClientFactory = httpClientFactory;
             _configurationManager = configurationManager;
@@ -1193,7 +1197,7 @@ namespace Tesserafin.Providers.Manager
 
         private async Task RefreshItem(BaseItem item, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
-            await item.RefreshMetadata(options, cancellationToken).ConfigureAwait(false);
+            await item.RefreshMetadata(_deletions, options, cancellationToken).ConfigureAwait(false);
 
             // Collection folders don't validate their children so we'll have to simulate that here
             switch (item)
@@ -1202,7 +1206,7 @@ namespace Tesserafin.Providers.Manager
                     await RefreshCollectionFolderChildren(options, collectionFolder, cancellationToken).ConfigureAwait(false);
                     break;
                 case Folder folder:
-                    await folder.ValidateChildren(new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await folder.ValidateChildren(_deletions, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
                     break;
             }
         }
@@ -1211,9 +1215,9 @@ namespace Tesserafin.Providers.Manager
         {
             foreach (var child in collectionFolder.GetPhysicalFolders())
             {
-                await child.RefreshMetadata(options, cancellationToken).ConfigureAwait(false);
+                await child.RefreshMetadata(_deletions, options, cancellationToken).ConfigureAwait(false);
 
-                await child.ValidateChildren(new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                await child.ValidateChildren(_deletions, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -1236,13 +1240,13 @@ namespace Tesserafin.Providers.Manager
                 .Where(i => i is not null)
                 .Distinct();
 
-            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(new Progress<double>(), options, true, false, cancellationToken));
+            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_deletions, new Progress<double>(), options, true, false, cancellationToken));
 
             await Task.WhenAll(musicArtistRefreshTasks).ConfigureAwait(false);
 
             try
             {
-                await item.RefreshMetadata(options, cancellationToken).ConfigureAwait(false);
+                await item.RefreshMetadata(_deletions, options, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

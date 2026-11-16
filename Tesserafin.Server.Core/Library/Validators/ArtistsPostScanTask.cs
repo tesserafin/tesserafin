@@ -12,6 +12,8 @@ namespace Tesserafin.Server.Core.Library.Validators;
 /// </summary>
 public class ArtistsPostScanTask : ILibraryPostScanTask
 {
+    private readonly IItemDeletionCommands _deletions;
+
     /// <summary>
     /// The _library manager.
     /// </summary>
@@ -22,14 +24,17 @@ public class ArtistsPostScanTask : ILibraryPostScanTask
     /// <summary>
     /// Initializes a new instance of the <see cref="ArtistsPostScanTask" /> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
     public ArtistsPostScanTask(
+        IItemDeletionCommands deletions,
         ILibraryManager libraryManager,
         ILogger<ArtistsValidator> logger,
         IItemRepository itemRepo)
     {
+        _deletions = deletions;
         _libraryManager = libraryManager;
         _logger = logger;
         _itemRepo = itemRepo;
@@ -43,6 +48,6 @@ public class ArtistsPostScanTask : ILibraryPostScanTask
     /// <returns>Task.</returns>
     public Task Run(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        return new ArtistsValidator(_libraryManager, _logger, _itemRepo).Run(progress, cancellationToken);
+        return new ArtistsValidator(_deletions, _libraryManager, _logger, _itemRepo).Run(progress, cancellationToken);
     }
 }

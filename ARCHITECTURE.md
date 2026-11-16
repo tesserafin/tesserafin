@@ -171,6 +171,16 @@ libraries. Every project has a matching `*.Tests` project in `tests/`.
   a failure after creating some shortcuts or writing a definition may leave partial configuration.
   Reconciliation is attempted and the primary error retained. Referenced media directories are never
   deleted by removing their library definition or path reference.
+- **Item deletion.** `IItemDeletionCommands` / `ItemDeletionCommands` own source and metadata
+  deletion, alternate promotion, playlist-reference rerouting, persistence/cache invalidation and
+  removal notifications. API, scan/refresh, maintenance and migration callers await that port;
+  `LibraryManager` has no deletion facade and now takes 31 constructor dependencies (previously
+  33). Entities receive the port as a refresh argument, never a new static service property.
+  Required source deletion precedes catalogue/version changes. Cancellation applies to admission;
+  destructive work already started finishes reconciliation. Filesystem and database changes are
+  not a distributed transaction: later failures can leave an already deleted source. UserData
+  retention stays in `ItemPersistenceService`. The typed alternate resolver is now free of
+  deletion side effects; obsolete generic-version cleanup is explicit in async video refresh.
 - **Resolution.** `LibraryManager.ResolvePath(s)` dispatches to ordered
   `IItemResolver` implementations (`MovieResolver`, `EpisodeResolver`,
   `SeriesResolver`, `AudioResolver`, `PhotoResolver`, …) that turn paths into the

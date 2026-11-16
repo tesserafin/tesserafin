@@ -24,6 +24,7 @@ namespace Tesserafin.Server.Core.ScheduledTasks.Tasks;
 /// </summary>
 public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
 {
+    private readonly IItemDeletionCommands _deletions;
     private readonly ILibraryManager _libraryManager;
     private readonly ILibraryScanCoordinator _scans;
     private readonly ILocalizationManager _localization;
@@ -35,6 +36,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     /// <summary>
     /// Initializes a new instance of the <see cref="PeopleValidationTask" /> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="scans">Library scan scheduling and state.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="localization">Instance of the <see cref="ILocalizationManager"/> interface.</param>
@@ -43,6 +45,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     /// <param name="logger">Instance of the <see cref="ILogger{PeopleValidationTask}"/> interface.</param>
     /// <param name="itemTypeLookup">Instance of the <see cref="IItemTypeLookup"/> interface.</param>
     public PeopleValidationTask(
+        IItemDeletionCommands deletions,
         ILibraryManager libraryManager,
         ILibraryScanCoordinator scans,
         ILocalizationManager localization,
@@ -51,6 +54,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
         ILogger<PeopleValidationTask> logger,
         IItemTypeLookup itemTypeLookup)
     {
+        _deletions = deletions;
         _libraryManager = libraryManager;
         _scans = scans;
         _localization = localization;
@@ -167,7 +171,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
         // Phase 2: Validate people (33-66%). Runs after orphaned PeopleBaseItemMap entries are
         // cleaned up above, so dead people are removed in a single pass instead of requiring a second run.
         IProgress<double> validateProgress = new Progress<double>((val) => progress.Report((val / 3) + 33));
-        await _libraryManager.ValidatePeopleAsync(validateProgress, cancellationToken).ConfigureAwait(false);
+        await _libraryManager.ValidatePeopleAsync(_deletions, validateProgress, cancellationToken).ConfigureAwait(false);
 
         // Phase 3: Refresh images for people missing them (66-100%)
         IProgress<double> refreshProgress = new Progress<double>((val) => progress.Report((val / 3) + 66));
@@ -251,7 +255,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
                 MetadataRefreshMode = hasOverview ? MetadataRefreshMode.ValidationOnly : MetadataRefreshMode.Default
             };
 
-            await item.RefreshMetadata(options, cancellationToken).ConfigureAwait(false);
+            await item.RefreshMetadata(_deletions, options, cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (OperationCanceledException)

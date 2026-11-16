@@ -15,6 +15,7 @@ namespace Tesserafin.LiveTv.Channels
     /// </summary>
     public class ChannelPostScanTask
     {
+        private readonly IItemDeletionCommands _deletions;
         private readonly IChannelManager _channelManager;
         private readonly ILogger _logger;
         private readonly ILibraryManager _libraryManager;
@@ -22,11 +23,13 @@ namespace Tesserafin.LiveTv.Channels
         /// <summary>
         /// Initializes a new instance of the <see cref="ChannelPostScanTask"/> class.
         /// </summary>
+        /// <param name="deletions">Item deletion operations.</param>
         /// <param name="channelManager">The channel manager.</param>
         /// <param name="logger">The logger.</param>
         /// <param name="libraryManager">The library manager.</param>
-        public ChannelPostScanTask(IChannelManager channelManager, ILogger logger, ILibraryManager libraryManager)
+        public ChannelPostScanTask(IItemDeletionCommands deletions, IChannelManager channelManager, ILogger logger, ILibraryManager libraryManager)
         {
+            _deletions = deletions;
             _channelManager = channelManager;
             _logger = logger;
             _libraryManager = libraryManager;
@@ -38,15 +41,14 @@ namespace Tesserafin.LiveTv.Channels
         /// <param name="progress">The progress.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The completed task.</returns>
-        public Task Run(IProgress<double> progress, CancellationToken cancellationToken)
+        public async Task Run(IProgress<double> progress, CancellationToken cancellationToken)
         {
-            CleanDatabase(cancellationToken);
+            await CleanDatabase(cancellationToken).ConfigureAwait(false);
 
             progress.Report(100);
-            return Task.CompletedTask;
         }
 
-        private void CleanDatabase(CancellationToken cancellationToken)
+        private async Task CleanDatabase(CancellationToken cancellationToken)
         {
             var installedChannelIds = ((ChannelManager)_channelManager).GetInstalledChannelIds();
 
@@ -60,11 +62,11 @@ namespace Tesserafin.LiveTv.Channels
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                CleanChannel((Channel)channel, cancellationToken);
+                await CleanChannel((Channel)channel, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        private void CleanChannel(Channel channel, CancellationToken cancellationToken)
+        private async Task CleanChannel(Channel channel, CancellationToken cancellationToken)
         {
             _logger.LogInformation("Cleaning channel {0} from database", channel.Id);
 
@@ -78,23 +80,23 @@ namespace Tesserafin.LiveTv.Channels
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                _libraryManager.DeleteItem(
+                await _deletions.DeleteAsync(
                     item,
                     new DeleteOptions
                     {
                         DeleteFileLocation = false
                     },
-                    false);
+                    cancellationToken).ConfigureAwait(false);
             }
 
             // Finally, delete the channel itself
-            _libraryManager.DeleteItem(
+            await _deletions.DeleteAsync(
                 channel,
                 new DeleteOptions
                 {
                     DeleteFileLocation = false
                 },
-                false);
+                cancellationToken).ConfigureAwait(false);
         }
     }
 }

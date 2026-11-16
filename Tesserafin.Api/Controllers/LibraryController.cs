@@ -48,6 +48,7 @@ namespace Tesserafin.Api.Controllers;
 [Route("")]
 public class LibraryController : BaseTesserafinApiController
 {
+    private readonly IItemDeletionCommands _deletions;
     private readonly IProviderManager _providerManager;
     private readonly ISimilarItemsManager _similarItemsManager;
     private readonly ILibraryManager _libraryManager;
@@ -65,6 +66,7 @@ public class LibraryController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="LibraryController"/> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="similarItemsManager">Instance of the <see cref="ISimilarItemsManager"/> interface.</param>
     /// <param name="scans">Library scan scheduling and state.</param>
@@ -79,6 +81,7 @@ public class LibraryController : BaseTesserafinApiController
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     public LibraryController(
+        IItemDeletionCommands deletions,
         IProviderManager providerManager,
         ISimilarItemsManager similarItemsManager,
         ILibraryManager libraryManager,
@@ -93,6 +96,7 @@ public class LibraryController : BaseTesserafinApiController
         IServerConfigurationManager serverConfigurationManager,
         IItemSortService itemSortService)
     {
+        _deletions = deletions;
         _providerManager = providerManager;
         _similarItemsManager = similarItemsManager;
         _libraryManager = libraryManager;
@@ -379,7 +383,7 @@ public class LibraryController : BaseTesserafinApiController
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult DeleteItem(Guid itemId)
+    public async Task<ActionResult> DeleteItem(Guid itemId)
     {
         var userId = User.GetUserId();
         var isApiKey = User.GetIsApiKey();
@@ -403,10 +407,10 @@ public class LibraryController : BaseTesserafinApiController
             return Unauthorized("Unauthorized access");
         }
 
-        _libraryManager.DeleteItem(
+        await _deletions.DeleteAsync(
             item,
             new DeleteOptions { DeleteFileLocation = true },
-            true);
+            HttpContext.RequestAborted).ConfigureAwait(false);
 
         return NoContent();
     }
@@ -423,7 +427,7 @@ public class LibraryController : BaseTesserafinApiController
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult DeleteItems([FromQuery, ModelBinder(typeof(CommaDelimitedCollectionModelBinder))] Guid[] ids)
+    public async Task<ActionResult> DeleteItems([FromQuery, ModelBinder(typeof(CommaDelimitedCollectionModelBinder))] Guid[] ids)
     {
         var isApiKey = User.GetIsApiKey();
         var userId = User.GetUserId();
@@ -449,10 +453,10 @@ public class LibraryController : BaseTesserafinApiController
                 return Unauthorized("Unauthorized access");
             }
 
-            _libraryManager.DeleteItem(
+            await _deletions.DeleteAsync(
                 item,
                 new DeleteOptions { DeleteFileLocation = true },
-                true);
+                HttpContext.RequestAborted).ConfigureAwait(false);
         }
 
         return NoContent();

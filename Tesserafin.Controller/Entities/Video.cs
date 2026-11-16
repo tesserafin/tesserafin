@@ -475,9 +475,9 @@ namespace Tesserafin.Controller.Entities
             return updateType;
         }
 
-        protected override async Task<bool> RefreshedOwnedItems(MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        protected override async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
-            var hasChanges = await base.RefreshedOwnedItems(options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
+            var hasChanges = await base.RefreshedOwnedItems(deletions, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
 
             // Clean up LocalAlternateVersions - remove paths that no longer exist
             if (LocalAlternateVersions.Length > 0)
@@ -493,7 +493,7 @@ namespace Tesserafin.Controller.Entities
             if (IsStacked)
             {
                 var tasks = AdditionalParts
-                    .Select(i => RefreshMetadataForOwnedVideo(options, true, i, typeof(Video), cancellationToken));
+                    .Select(i => RefreshMetadataForOwnedVideo(deletions, options, true, i, typeof(Video), cancellationToken));
 
                 await Task.WhenAll(tasks).ConfigureAwait(false);
             }
@@ -506,7 +506,7 @@ namespace Tesserafin.Controller.Entities
                 // Check if LinkedChildren are in sync before processing
                 var existingVersionCount = LibraryManager.GetLocalAlternateVersionIds(this).Count();
                 var tasks = LocalAlternateVersions
-                    .Select(i => RefreshMetadataForVersions(options, false, i, cancellationToken));
+                    .Select(i => RefreshMetadataForVersions(deletions, options, false, i, cancellationToken));
 
                 await Task.WhenAll(tasks).ConfigureAwait(false);
 
@@ -520,6 +520,7 @@ namespace Tesserafin.Controller.Entities
         }
 
         private async Task RefreshMetadataForVersions(
+            IItemDeletionCommands deletions,
             MetadataRefreshOptions options,
             bool copyTitleMetadata,
             string path,
@@ -533,6 +534,7 @@ namespace Tesserafin.Controller.Entities
             {
                 var parentFolder = GetParent() as Folder;
                 var collectionType = LibraryManager.GetContentType(this);
+                await deletions.DeleteObsoleteAlternateAsync(path, GetType(), cancellationToken).ConfigureAwait(false);
                 var altVideo = LibraryManager.ResolveAlternateVersion(path, GetType(), parentFolder, collectionType);
                 if (altVideo is not null)
                 {
@@ -542,7 +544,7 @@ namespace Tesserafin.Controller.Entities
                 }
             }
 
-            await RefreshMetadataForOwnedVideo(options, copyTitleMetadata, path, cancellationToken).ConfigureAwait(false);
+            await RefreshMetadataForOwnedVideo(deletions, options, copyTitleMetadata, path, cancellationToken).ConfigureAwait(false);
 
             // Create LinkedChild entry for this local alternate version
             // This ensures the relationship exists in the database even if the alternate version
@@ -561,13 +563,15 @@ namespace Tesserafin.Controller.Entities
         }
 
         private new Task RefreshMetadataForOwnedVideo(
+            IItemDeletionCommands deletions,
             MetadataRefreshOptions options,
             bool copyTitleMetadata,
             string path,
             CancellationToken cancellationToken)
-            => RefreshMetadataForOwnedVideo(options, copyTitleMetadata, path, GetType(), cancellationToken);
+            => RefreshMetadataForOwnedVideo(deletions, options, copyTitleMetadata, path, GetType(), cancellationToken);
 
         private async Task RefreshMetadataForOwnedVideo(
+            IItemDeletionCommands deletions,
             MetadataRefreshOptions options,
             bool copyTitleMetadata,
             string path,
@@ -588,7 +592,7 @@ namespace Tesserafin.Controller.Entities
                 if (LibraryManager.GetItemById(id) is Video orphanedVideo && orphanedVideo.OwnerId.Equals(Id))
                 {
                     Logger.LogInformation("Owned video file no longer exists, removing orphaned item: {Path}", path);
-                    LibraryManager.DeleteItem(orphanedVideo, new DeleteOptions { DeleteFileLocation = false });
+                    await deletions.DeleteAsync(orphanedVideo, new DeleteOptions { DeleteFileLocation = false }, cancellationToken).ConfigureAwait(false);
                 }
 
                 return;
@@ -630,7 +634,7 @@ namespace Tesserafin.Controller.Entities
                 video.OwnerId = Id;
             }
 
-            await RefreshMetadataForOwnedItem(video, copyTitleMetadata, newOptions, cancellationToken).ConfigureAwait(false);
+            await RefreshMetadataForOwnedItem(deletions, video, copyTitleMetadata, newOptions, cancellationToken).ConfigureAwait(false);
         }
 
         /// <inheritdoc />

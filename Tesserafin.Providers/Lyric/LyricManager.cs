@@ -28,6 +28,7 @@ namespace Tesserafin.Providers.Lyric;
 /// </summary>
 public class LyricManager : ILyricManager
 {
+    private readonly IItemDeletionCommands _deletions;
     private readonly ILogger<LyricManager> _logger;
     private readonly IFileSystem _fileSystem;
     private readonly ILibraryMonitor _libraryMonitor;
@@ -39,6 +40,7 @@ public class LyricManager : ILyricManager
     /// <summary>
     /// Initializes a new instance of the <see cref="LyricManager"/> class.
     /// </summary>
+    /// <param name="deletions">Item deletion operations.</param>
     /// <param name="logger">Instance of the <see cref="ILogger{LyricManager}"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
     /// <param name="libraryMonitor">Instance of the <see cref="ILibraryMonitor"/> interface.</param>
@@ -46,6 +48,7 @@ public class LyricManager : ILyricManager
     /// <param name="lyricProviders">The list of <see cref="ILyricProvider"/>.</param>
     /// <param name="lyricParsers">The list of <see cref="ILyricParser"/>.</param>
     public LyricManager(
+        IItemDeletionCommands deletions,
         ILogger<LyricManager> logger,
         IFileSystem fileSystem,
         ILibraryMonitor libraryMonitor,
@@ -53,6 +56,7 @@ public class LyricManager : ILyricManager
         IEnumerable<ILyricProvider> lyricProviders,
         IEnumerable<ILyricParser> lyricParsers)
     {
+        _deletions = deletions;
         _logger = logger;
         _fileSystem = fileSystem;
         _libraryMonitor = libraryMonitor;
@@ -252,7 +256,7 @@ public class LyricManager : ILyricManager
             }
         }
 
-        return audio.RefreshMetadata(CancellationToken.None);
+        return audio.RefreshMetadata(_deletions, CancellationToken.None);
     }
 
     /// <inheritdoc />

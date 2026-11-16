@@ -20,6 +20,7 @@ namespace Tesserafin.Server.Core.Data;
 
 public class CleanDatabaseScheduledTask : ILibraryPostScanTask
 {
+    private readonly IItemDeletionCommands _deletions;
     private readonly ILibraryManager _libraryManager;
     private readonly ILogger<CleanDatabaseScheduledTask> _logger;
     private readonly IDbContextFactory<TesserafinDbContext> _dbProvider;
@@ -29,6 +30,7 @@ public class CleanDatabaseScheduledTask : ILibraryPostScanTask
     private readonly IChannelManager _channelManager;
 
     public CleanDatabaseScheduledTask(
+        IItemDeletionCommands deletions,
         ILibraryManager libraryManager,
         ILogger<CleanDatabaseScheduledTask> logger,
         IDbContextFactory<TesserafinDbContext> dbProvider,
@@ -37,6 +39,7 @@ public class CleanDatabaseScheduledTask : ILibraryPostScanTask
         IMediaSegmentManager mediaSegmentManager,
         IChannelManager channelManager)
     {
+        _deletions = deletions;
         _libraryManager = libraryManager;
         _logger = logger;
         _dbProvider = dbProvider;
@@ -105,10 +108,13 @@ public class CleanDatabaseScheduledTask : ILibraryPostScanTask
                 }
 
                 // Delete item
-                _libraryManager.DeleteItem(item, new DeleteOptions
-                {
-                    DeleteFileLocation = false
-                });
+                await _deletions.DeleteAsync(
+                    item,
+                    new DeleteOptions
+                    {
+                        DeleteFileLocation = false
+                    },
+                    cancellationToken).ConfigureAwait(false);
             }
 
             numComplete++;
@@ -152,7 +158,7 @@ public class CleanDatabaseScheduledTask : ILibraryPostScanTask
             if (playlist.IsFile && !File.Exists(playlist.Path))
             {
                 _logger.LogInformation("Removing file-based playlist {Name} because source file {Path} no longer exists", playlist.Name, playlist.Path);
-                _libraryManager.DeleteItem(playlist, new DeleteOptions { DeleteFileLocation = false });
+                await _deletions.DeleteAsync(playlist, new DeleteOptions { DeleteFileLocation = false }, cancellationToken).ConfigureAwait(false);
             }
 
             numComplete++;

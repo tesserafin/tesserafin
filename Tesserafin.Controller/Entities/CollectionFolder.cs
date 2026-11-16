@@ -11,7 +11,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
@@ -332,6 +331,7 @@ namespace Tesserafin.Controller.Entities
         /// Compare our current children (presumably just read from the repo) with the current state of the file system and adjust for any changes
         /// ***Currently does not contain logic to maintain items that are unavailable in the file system***.
         /// </summary>
+        /// <param name="deletions">Explicit deletion operations for this refresh.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
         /// <param name="refreshChildMetadata">if set to <c>true</c> [refresh child metadata].</param>
@@ -340,7 +340,7 @@ namespace Tesserafin.Controller.Entities
         /// <param name="directoryService">The directory service.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        protected override Task ValidateChildrenInternal(IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
