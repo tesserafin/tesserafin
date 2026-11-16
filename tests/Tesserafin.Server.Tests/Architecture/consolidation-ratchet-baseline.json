@@ -19,7 +19,6 @@
     "CollectionFolder.ApplicationHost",
     "CollectionFolder.XmlSerializer",
     "Folder.CollectionManager",
-    "Folder.LimitedConcurrencyLibraryScheduler",
     "Folder.UserViewManager",
     "UserView.TVSeriesManager",
     "Video.RecordingsManager"
