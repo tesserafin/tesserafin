@@ -176,6 +176,11 @@ namespace Tesserafin.Providers.Manager
 
                 if (providers.Count > 0 || isFirstRefresh || requiresRefresh)
                 {
+                    if (await BeforeMetadataRefreshAsync(itemOfType, libraryOptions, refreshOptions, cancellationToken).ConfigureAwait(false))
+                    {
+                        updateType |= ItemUpdateType.MetadataImport;
+                    }
+
                     if (item.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, ItemNamingService))
                     {
                         updateType |= ItemUpdateType.MetadataImport;
@@ -302,6 +307,18 @@ namespace Tesserafin.Providers.Manager
                 await PeopleCommands.UpdateAsync(baseItem, result.People, cancellationToken).ConfigureAwait(false);
             }
         }
+
+        /// <summary>
+        /// Reads metadata the item's own media carries, before <see cref="BaseItem.BeforeMetadataRefresh"/>
+        /// and the providers run. Services, not the entity, own any I/O this needs.
+        /// </summary>
+        /// <param name="item">The item.</param>
+        /// <param name="libraryOptions">The options of the item's library.</param>
+        /// <param name="refreshOptions">The refresh options.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns><c>true</c> when the item changed.</returns>
+        protected virtual Task<bool> BeforeMetadataRefreshAsync(TItemType item, LibraryOptions libraryOptions, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
+            => Task.FromResult(false);
 
         protected virtual Task AfterMetadataRefresh(TItemType item, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
         {

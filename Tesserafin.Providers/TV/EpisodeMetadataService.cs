@@ -1,11 +1,17 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Model.Configuration;
+using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.Manager;
@@ -17,6 +23,9 @@ namespace Tesserafin.Providers.TV;
 /// </summary>
 public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
 {
+    private readonly IMediaEncoder _mediaEncoder;
+    private readonly IMediaSourceManager _mediaSourceManager;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="EpisodeMetadataService"/> class.
     /// </summary>
@@ -30,6 +39,8 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
+    /// <param name="mediaEncoder">Reads the episode information embedded in the file.</param>
+    /// <param name="mediaSourceManager">Supplies the episode's media source to read.</param>
     public EpisodeMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -40,9 +51,68 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
         ILibraryManager libraryManager,
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
-        IItemRepository itemRepository)
+        IItemRepository itemRepository,
+        IMediaEncoder mediaEncoder,
+        IMediaSourceManager mediaSourceManager)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
+        _mediaEncoder = mediaEncoder;
+        _mediaSourceManager = mediaSourceManager;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// With <see cref="LibraryOptions.EnableEmbeddedEpisodeInfos"/>, an unlocked library or Live TV mp4 episode
+    /// takes its season, episode and show names from the file's own tags. A probe failure is logged and leaves
+    /// the episode unchanged; cancellation propagates.
+    /// </remarks>
+    protected override async Task<bool> BeforeMetadataRefreshAsync(Episode item, LibraryOptions libraryOptions, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
+    {
+        if (item.IsLocked
+            || item.SourceType is not (SourceType.Library or SourceType.LiveTV)
+            || !libraryOptions.EnableEmbeddedEpisodeInfos
+            || !string.Equals(item.Container, "mp4", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        Tesserafin.Model.MediaInfo.MediaInfo mediaInfo;
+        try
+        {
+            mediaInfo = await _mediaEncoder.GetMediaInfo(
+                new MediaInfoRequest
+                {
+                    MediaSource = _mediaSourceManager.GetStaticMediaSources(item, false)[0],
+                    MediaType = DlnaProfileType.Video
+                },
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogError(ex, "Error reading the episode information with ffprobe. Episode: {EpisodeInfo}", item.Path);
+            return false;
+        }
+
+        var changed = false;
+        if (mediaInfo.ParentIndexNumber > 0 && item.ParentIndexNumber != mediaInfo.ParentIndexNumber)
+        {
+            item.ParentIndexNumber = mediaInfo.ParentIndexNumber;
+            changed = true;
+        }
+
+        if (mediaInfo.IndexNumber > 0 && item.IndexNumber != mediaInfo.IndexNumber)
+        {
+            item.IndexNumber = mediaInfo.IndexNumber;
+            changed = true;
+        }
+
+        if (!string.IsNullOrEmpty(mediaInfo.ShowName) && !string.Equals(item.SeriesName, mediaInfo.ShowName, StringComparison.Ordinal))
+        {
+            item.SeriesName = mediaInfo.ShowName;
+            changed = true;
+        }
+
+        return changed;
     }
 
     /// <inheritdoc />

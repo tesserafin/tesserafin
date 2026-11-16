@@ -25,8 +25,6 @@ namespace Tesserafin.Controller.Entities.TV
     /// </summary>
     public class Episode : Video, IHasTrailers, IHasLookupInfo<EpisodeInfo>, IHasSeries
     {
-        public static IMediaEncoder MediaEncoder { get; set; }
-
         /// <inheritdoc />
         [JsonIgnore]
         public IReadOnlyList<BaseItem> LocalTrailers => GetExtras([Tesserafin.Model.Entities.ExtraType.Trailer]).ToArray();
@@ -370,43 +368,6 @@ namespace Tesserafin.Controller.Entities.TV
             {
                 if (SourceType == SourceType.Library || SourceType == SourceType.LiveTV)
                 {
-                    var libraryOptions = LibraryManager.GetLibraryOptions(this);
-                    if (libraryOptions.EnableEmbeddedEpisodeInfos && string.Equals(Container, "mp4", StringComparison.OrdinalIgnoreCase))
-                    {
-                        try
-                        {
-                            // BeforeMetadataRefresh isn't part of the GetMediaSources/GetMediaStreams
-                            // chain the mediaSourceManager/mediaSegmentManager/channelManager
-                            // parameters were threaded through (out of scope: a much wider virtual
-                            // with 15 overrides/17 callers) — falls back to the statics here.
-                            var mediaInfo = MediaEncoder.GetMediaInfo(
-                                new MediaInfoRequest
-                                {
-                                    MediaSource = GetMediaSources(false, MediaSourceManager, MediaSegmentManager, ChannelManager)[0],
-                                    MediaType = DlnaProfileType.Video
-                                },
-                                CancellationToken.None).GetAwaiter().GetResult();
-                            if (mediaInfo.ParentIndexNumber > 0)
-                            {
-                                ParentIndexNumber = mediaInfo.ParentIndexNumber;
-                            }
-
-                            if (mediaInfo.IndexNumber > 0)
-                            {
-                                IndexNumber = mediaInfo.IndexNumber;
-                            }
-
-                            if (!string.IsNullOrEmpty(mediaInfo.ShowName))
-                            {
-                                SeriesName = mediaInfo.ShowName;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.LogError(ex, "Error reading the episode information with ffprobe. Episode: {EpisodeInfo}", Path);
-                        }
-                    }
-
                     try
                     {
                         if (itemNamingService.FillMissingEpisodeNumbersFromPath(this, replaceAllMetadata))
