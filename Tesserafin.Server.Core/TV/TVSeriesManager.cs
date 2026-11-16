@@ -24,6 +24,7 @@ namespace Tesserafin.Server.Core.TV
 {
     public class TVSeriesManager : ITVSeriesManager
     {
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly IUserDataManager _userDataManager;
         private readonly ILibraryManager _libraryManager;
         private readonly IServerConfigurationManager _configurationManager;
@@ -39,8 +40,10 @@ namespace Tesserafin.Server.Core.TV
             IMediaSourceManager mediaSourceManager,
             IMediaSegmentManager mediaSegmentManager,
             IChannelManager channelManager,
-            IItemSortService itemSortService)
+            IItemSortService itemSortService,
+            IStandaloneVisibilityService visibility)
         {
+            _visibility = visibility;
             _userDataManager = userDataManager;
             _libraryManager = libraryManager;
             _configurationManager = configurationManager;
@@ -87,7 +90,7 @@ namespace Tesserafin.Server.Core.TV
             }
             else
             {
-                parents = _libraryManager.GetUserRootFolder().GetChildren(user, true, null, _itemSortService)
+                parents = _libraryManager.GetUserRootFolder().GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService)
                    .Where(i => i is Folder)
                    .Where(i => !user.GetPreferenceValues<Guid>(PreferenceKind.LatestItemExcludes).Contains(i.Id))
                    .ToArray();

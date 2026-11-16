@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Diacritics.Extensions;
 using Tesserafin.Controller.Dto;
+using Tesserafin.Controller.Library;
 using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
@@ -175,6 +176,16 @@ namespace Tesserafin.Controller.Entities
         public int? Limit { get; set; }
 
         public User? User { get; set; }
+
+        /// <summary>
+        /// Gets or sets the scope that decides which items <see cref="User"/> may see when an entity filters
+        /// in memory (children, linked children, post-filtered box sets and playlists).
+        /// </summary>
+        /// <remarks>
+        /// The entity read paths never fall back to static services: a user-filtered read without a scope
+        /// fails through <see cref="RequireVisibility"/>.
+        /// </remarks>
+        public IStandaloneVisibilityService? Visibility { get; set; }
 
         public bool? IsFolder { get; set; }
 
@@ -504,6 +515,14 @@ namespace Tesserafin.Controller.Entities
         public IReadOnlyList<string> AudioLanguages { get; set; }
 
         public IReadOnlyList<string> SubtitleLanguages { get; set; }
+
+        /// <summary>
+        /// Gets the visibility scope this query carries.
+        /// </summary>
+        /// <returns>The scope.</returns>
+        /// <exception cref="InvalidOperationException">The query carries no scope.</exception>
+        public IStandaloneVisibilityService RequireVisibility()
+            => Visibility ?? throw new InvalidOperationException("A user-filtered entity read needs a visibility scope on its query.");
 
         public void SetUser(User user)
         {

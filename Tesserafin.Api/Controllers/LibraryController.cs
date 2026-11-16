@@ -48,6 +48,7 @@ namespace Tesserafin.Api.Controllers;
 [Route("")]
 public class LibraryController : BaseTesserafinApiController
 {
+    private readonly IStandaloneVisibilityService _visibility;
     private readonly IItemDeletionCommands _deletions;
     private readonly IProviderManager _providerManager;
     private readonly ISimilarItemsManager _similarItemsManager;
@@ -80,6 +81,7 @@ public class LibraryController : BaseTesserafinApiController
     /// <param name="logger">Instance of the <see cref="ILogger{LibraryController}"/> interface.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
+    /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
     public LibraryController(
         IItemDeletionCommands deletions,
         IProviderManager providerManager,
@@ -94,8 +96,10 @@ public class LibraryController : BaseTesserafinApiController
         ILibraryMonitor libraryMonitor,
         ILogger<LibraryController> logger,
         IServerConfigurationManager serverConfigurationManager,
-        IItemSortService itemSortService)
+        IItemSortService itemSortService,
+        IStandaloneVisibilityService visibility)
     {
+        _visibility = visibility;
         _deletions = deletions;
         _providerManager = providerManager;
         _similarItemsManager = similarItemsManager;
@@ -1009,7 +1013,7 @@ public class LibraryController : BaseTesserafinApiController
     private BaseItem? TranslateParentItem(BaseItem item, User user)
     {
         return item.GetParent() is AggregateFolder
-            ? _libraryManager.GetUserRootFolder().GetChildren(user, true, null, _itemSortService)
+            ? _libraryManager.GetUserRootFolder().GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService)
                 .FirstOrDefault(i => i.PhysicalLocations.Contains(item.Path))
             : item;
     }

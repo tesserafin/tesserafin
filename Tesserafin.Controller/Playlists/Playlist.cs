@@ -171,11 +171,11 @@ namespace Tesserafin.Controller.Playlists
             return base.GetChildren(user, true, query);
         }
 
-        public static IReadOnlyList<BaseItem> GetPlaylistItems(IEnumerable<BaseItem> inputItems, User user, DtoOptions options, IItemQueryService itemQueryService)
+        public static IReadOnlyList<BaseItem> GetPlaylistItems(IEnumerable<BaseItem> inputItems, User user, DtoOptions options, IItemQueryService itemQueryService, IStandaloneVisibilityService visibility)
         {
             if (user is not null)
             {
-                inputItems = inputItems.Where(i => i.IsVisibleStandalone(user));
+                inputItems = inputItems.Where(i => i.IsVisibleStandalone(user, visibility));
             }
 
             var list = new List<BaseItem>();
@@ -232,7 +232,7 @@ namespace Tesserafin.Controller.Playlists
             return [item];
         }
 
-        public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
+        public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
             if (!IsSharedItem)
             {
@@ -264,7 +264,7 @@ namespace Tesserafin.Controller.Playlists
             return user.HasPermission(PermissionKind.IsAdministrator) || user.Id.Equals(OwnerUserId);
         }
 
-        public override bool IsVisibleStandalone(User user, ITagVisibilityService tagVisibility)
+        public override bool IsVisibleStandalone(User user, IStandaloneVisibilityService tagVisibility)
         {
             if (!IsSharedItem)
             {

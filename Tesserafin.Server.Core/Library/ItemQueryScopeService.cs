@@ -37,6 +37,7 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     internal sealed class ItemQueryScopeService : IItemQueryScopeService
     {
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemAccessService _itemAccessService;
         private readonly IUserViewCatalog _userViewCatalog;
@@ -51,13 +52,16 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="userViewCatalog">Used to resolve a user's visible views in <see cref="AddUserToQuery"/> (PR110: replaces <c>IUserViewManager</c>).</param>
         /// <param name="itemSortService">Used to sort the root folder's children in the grouped-folders branch.</param>
         /// <param name="rootFolderProvider">Used to obtain the user root folder in the grouped-folders branch.</param>
+        /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
         public ItemQueryScopeService(
             IItemLookupService itemLookupService,
             IItemAccessService itemAccessService,
             IUserViewCatalog userViewCatalog,
             IItemSortService itemSortService,
-            IUserRootFolderProvider rootFolderProvider)
+            IUserRootFolderProvider rootFolderProvider,
+            IStandaloneVisibilityService visibility)
         {
+            _visibility = visibility;
             _itemLookupService = itemLookupService;
             _itemAccessService = itemAccessService;
             _userViewCatalog = userViewCatalog;
@@ -211,7 +215,7 @@ namespace Tesserafin.Server.Core.Library
                     && user.GetPreference(PreferenceKind.GroupedFolders).Length > 0)
                 {
                     return _rootFolderProvider.GetUserRootFolder()
-                        .GetChildren(user, true, null, _itemSortService)
+                        .GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService)
                         .OfType<CollectionFolder>()
                         .Where(i => i.CollectionType is null || i.CollectionType == view.ViewType)
                         .Where(i => user.IsFolderGrouped(i.Id))

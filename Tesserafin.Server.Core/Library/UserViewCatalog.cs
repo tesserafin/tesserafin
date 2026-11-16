@@ -42,6 +42,7 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     internal sealed class UserViewCatalog : IUserViewCatalog
     {
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly IUserRootFolderProvider _userRootFolderProvider;
         private readonly IUserViewFactory _userViewFactory;
         private readonly IChannelCatalog _channelCatalog;
@@ -62,6 +63,7 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="config">The server configuration manager (<c>EnableFolderView</c>).</param>
         /// <param name="localizationManager">The localization manager (view labels).</param>
         /// <param name="visibleContentProbe">The playlist/boxset visible-content probe.</param>
+        /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
         public UserViewCatalog(
             IUserRootFolderProvider userRootFolderProvider,
             IUserViewFactory userViewFactory,
@@ -70,8 +72,10 @@ namespace Tesserafin.Server.Core.Library
             IItemSortService itemSortService,
             IServerConfigurationManager config,
             ILocalizationManager localizationManager,
-            IVisibleContentProbe visibleContentProbe)
+            IVisibleContentProbe visibleContentProbe,
+            IStandaloneVisibilityService visibility)
         {
+            _visibility = visibility;
             _userRootFolderProvider = userRootFolderProvider;
             _userViewFactory = userViewFactory;
             _channelCatalog = channelCatalog;
@@ -88,7 +92,7 @@ namespace Tesserafin.Server.Core.Library
             var user = query.User;
 
             var folders = _userRootFolderProvider.GetUserRootFolder()
-                .GetChildren(user, true, null, _itemSortService)
+                .GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService)
                 .OfType<Folder>()
                 .ToList();
 

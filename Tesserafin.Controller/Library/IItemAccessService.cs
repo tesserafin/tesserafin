@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Entities;
 
 namespace Tesserafin.Controller.Library
@@ -49,5 +51,15 @@ namespace Tesserafin.Controller.Library
         /// <param name="user">The user.</param>
         /// <returns><c>true</c> when the item is visible standalone.</returns>
         bool IsVisibleStandalone(BaseItem item, User user);
+
+        /// <summary>
+        /// Gets the children of <paramref name="folder"/> that <paramref name="user"/> may see, read through the
+        /// visibility services.
+        /// </summary>
+        /// <param name="folder">The folder.</param>
+        /// <param name="user">The user.</param>
+        /// <param name="itemSortService">The sort service the folder's own ordering uses.</param>
+        /// <returns>The visible children.</returns>
+        IReadOnlyList<BaseItem> GetChildren(Folder folder, User user, IItemSortService itemSortService);
     }
 }

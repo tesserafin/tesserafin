@@ -444,7 +444,8 @@ public sealed class UserViewCatalogParityTests
                 channelManagerMock.Object,
                 ItemSortService,
                 catalog,
-                UserViewFactory);
+                UserViewFactory,
+                Mock.Of<IStandaloneVisibilityService>());
         }
 
         public UserViewCatalog BuildCatalog(Folder root)
@@ -466,7 +467,7 @@ public sealed class UserViewCatalogParityTests
             var probeMock = new Mock<IVisibleContentProbe>();
             probeMock
                 .Setup(p => p.HasVisibleContent(It.IsAny<Folder>(), It.IsAny<User>()))
-                .Returns((Folder library, User user) => library is ProbeFolder probeFolder && probeFolder.Items.Any(item => item.IsVisible(user)));
+                .Returns((Folder library, User user) => library is ProbeFolder probeFolder && probeFolder.Items.Any(item => item.IsVisible(user, false, Mock.Of<IStandaloneVisibilityService>())));
 
             return new UserViewCatalog(
                 rootProviderMock.Object,
@@ -476,7 +477,8 @@ public sealed class UserViewCatalogParityTests
                 ItemSortService,
                 ConfigMock.Object,
                 Localization,
-                probeMock.Object);
+                probeMock.Object,
+                Mock.Of<IStandaloneVisibilityService>());
         }
     }
 
@@ -520,6 +522,6 @@ public sealed class UserViewCatalogParityTests
     {
         public bool Visible { get; init; }
 
-        public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService? tagVisibility) => Visible;
+        public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility) => Visible;
     }
 }

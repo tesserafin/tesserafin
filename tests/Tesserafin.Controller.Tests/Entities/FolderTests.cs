@@ -9,6 +9,7 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Tests.TestSupport;
 using Tesserafin.Controller.TV;
 using Tesserafin.Data.Entities;
 using Tesserafin.Model.Configuration;
@@ -42,7 +43,7 @@ public class FolderTests
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
 
-        var result = folder.GetItems(new InternalItemsQuery(), channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
+        var result = folder.GetItems(new InternalItemsQuery { Visibility = PermissiveVisibility.Scope }, channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
 
         Assert.Equal(2, result.Items.Count);
         Assert.Contains(child1, result.Items);
@@ -67,7 +68,7 @@ public class FolderTests
             .Setup(x => x.GetChannelItemsInternal(It.IsAny<InternalItemsQuery>(), It.IsAny<IProgress<double>>(), It.IsAny<System.Threading.CancellationToken>()))
             .ReturnsAsync(new Tesserafin.Model.Querying.QueryResult<BaseItem>(0, 1, new BaseItem[] { channelItem }));
 
-        var result = folder.GetItems(new InternalItemsQuery(), channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
+        var result = folder.GetItems(new InternalItemsQuery { Visibility = PermissiveVisibility.Scope }, channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
 
         Assert.Single(result.Items);
         Assert.Equal(channelItem, result.Items[0]);
@@ -88,7 +89,7 @@ public class FolderTests
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
 
-        var result = folder.GetItemList(new InternalItemsQuery(), channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
+        var result = folder.GetItemList(new InternalItemsQuery { Visibility = PermissiveVisibility.Scope }, channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
 
         Assert.Single(result);
         Assert.Equal(child, result[0]);
@@ -114,7 +115,7 @@ public class FolderTests
 
         // CollapseBoxSetItems explicitly false: PostFilterAndSort still runs (user is not null)
         // but CollapseBoxSetItemsIfNeeded's own gate short-circuits before touching collectionManager.
-        var query = new InternalItemsQuery { User = user, CollapseBoxSetItems = false };
+        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, User = user, CollapseBoxSetItems = false };
 
         var result = folder.GetItems(query, channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
 
@@ -151,7 +152,7 @@ public class FolderTests
         // Explicit CollapseBoxSetItems = true, both grouping settings enabled: PostFilterAndSort
         // must route through CollapseBoxSetItemsIfNeeded -> collectionManager.CollapseItemsWithinBoxSets,
         // the branch left uncovered by PR15 (cf. plan doc, point 1 "reste du point 1").
-        var query = new InternalItemsQuery { User = user, CollapseBoxSetItems = true };
+        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, User = user, CollapseBoxSetItems = true };
 
         var result = folder.GetItems(query, channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
 
@@ -187,7 +188,7 @@ public class FolderTests
             .Setup(x => x.GetChannelItemsInternal(It.IsAny<InternalItemsQuery>(), It.IsAny<IProgress<double>>(), It.IsAny<System.Threading.CancellationToken>()))
             .ReturnsAsync(new QueryResult<BaseItem>(0, 1, new BaseItem[] { channelItem }));
 
-        var result = userView.GetItems(new InternalItemsQuery(), channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
+        var result = userView.GetItems(new InternalItemsQuery { Visibility = PermissiveVisibility.Scope }, channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
 
         Assert.Single(result.Items);
         Assert.Equal(channelItem, result.Items[0]);

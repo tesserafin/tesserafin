@@ -1560,24 +1560,15 @@ namespace Tesserafin.Controller.Entities
             return await ProviderManager.RefreshSingleItem(this, refreshOptions, cancellationToken).ConfigureAwait(false);
         }
 
-        protected bool IsVisibleStandaloneInternal(User user, bool checkFolders)
+        protected bool IsVisibleStandaloneInternal(User user, bool checkFolders, IStandaloneVisibilityService scope)
         {
-            return IsVisibleStandaloneInternal(user, checkFolders, null);
-        }
-
-        protected bool IsVisibleStandaloneInternal(User user, bool checkFolders, ITagVisibilityService tagVisibility)
-        {
-            // An IStandaloneVisibilityService also supplies the parents and libraries; otherwise they
-            // come through the static LibraryManager (DEBT-SERVER-4).
-            var scope = tagVisibility as IStandaloneVisibilityService;
-
-            if (!IsVisible(user, false, tagVisibility))
+            if (!IsVisible(user, false, scope))
             {
                 return false;
             }
 
-            var parents = scope?.GetParents(this) ?? GetParents().ToList();
-            if (parents.Any(i => !i.IsVisible(user, true, tagVisibility)))
+            var parents = scope.GetParents(this);
+            if (parents.Any(i => !i.IsVisible(user, true, scope)))
             {
                 return false;
             }
@@ -1591,7 +1582,7 @@ namespace Tesserafin.Controller.Entities
                     return true;
                 }
 
-                var itemCollectionFolders = (scope?.GetCollectionFolders(this) ?? LibraryManager.GetCollectionFolders(this)).Select(i => i.Id).ToList();
+                var itemCollectionFolders = scope.GetCollectionFolders(this).Select(i => i.Id).ToList();
 
                 if (itemCollectionFolders.Count > 0)
                 {
@@ -1600,7 +1591,7 @@ namespace Tesserafin.Controller.Entities
                     if (blockedMediaFolders.Length > 0)
                     {
                         // User has blocked folders - get all library folders and exclude blocked ones
-                        userCollectionFolderIds = (scope?.GetLibraryIds() ?? LibraryManager.GetUserRootFolder().Children.Select(i => i.Id))
+                        userCollectionFolderIds = scope.GetLibraryIds()
                             .Where(id => !blockedMediaFolders.Contains(id));
                     }
                     else if (user.HasPermission(PermissionKind.EnableAllFolders))
@@ -1840,9 +1831,9 @@ namespace Tesserafin.Controller.Entities
             if (string.IsNullOrEmpty(lang))
             {
                 // The server's, through the service when it supplies it (DEBT-SERVER-8).
-                lang = scope is IRatingVisibilityService ratings
-                    ? ratings.GetServerMetadataCountryCode()
-                    : ConfigurationManager.Configuration.MetadataCountryCode;
+                lang = scope is null
+                    ? ConfigurationManager.Configuration.MetadataCountryCode
+                    : scope.GetServerMetadataCountryCode();
             }
 
             return lang;
@@ -1870,37 +1861,23 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>
-        /// Determines if a given user has access to this item, reading tags through the static <see cref="LibraryManager"/>.
-        /// </summary>
-        /// <param name="user">The user.</param>
-        /// <param name="skipAllowedTagsCheck">Don't check for allowed tags.</param>
-        /// <returns><c>true</c> if [is parental allowed] [the specified user]; otherwise, <c>false</c>.</returns>
-        /// <exception cref="ArgumentNullException">If user is null.</exception>
-        public bool IsParentalAllowed(User user, bool skipAllowedTagsCheck)
-        {
-            return IsParentalAllowed(user, skipAllowedTagsCheck, null);
-        }
-
-        /// <summary>
         /// Determines if a given user has access to this item.
         /// </summary>
         /// <param name="user">The user.</param>
         /// <param name="skipAllowedTagsCheck">Don't check for allowed tags.</param>
-        /// <param name="tagVisibility">Where the tags come from; <c>null</c> reads them through the static <see cref="LibraryManager"/>.</param>
+        /// <param name="scope">Supplies tags, parents, libraries and rating scores.</param>
         /// <returns><c>true</c> if [is parental allowed] [the specified user]; otherwise, <c>false</c>.</returns>
-        /// <exception cref="ArgumentNullException">If user is null.</exception>
-        public bool IsParentalAllowed(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
+        /// <exception cref="ArgumentNullException">If user or scope is null.</exception>
+        public bool IsParentalAllowed(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService scope)
         {
             ArgumentNullException.ThrowIfNull(user);
+            ArgumentNullException.ThrowIfNull(scope);
 
-            if (!(tagVisibility?.IsVisibleViaTags(this, user, skipAllowedTagsCheck) ?? IsVisibleViaTags(user, skipAllowedTagsCheck)))
+            if (!scope.IsVisibleViaTags(this, user, skipAllowedTagsCheck))
             {
                 return false;
             }
 
-            // The parents and libraries the rating reads come from the service when it supplies them
-            // (DEBT-SERVER-4).
-            var scope = tagVisibility as IStandaloneVisibilityService;
             var maxAllowedRating = user.MaxParentalRatingScore;
             var maxAllowedSubRating = user.MaxParentalRatingSubScore;
             var rating = GetCustomRatingForComparision(scope);
@@ -1916,9 +1893,7 @@ namespace Tesserafin.Controller.Entities
             }
 
             var countryCode = GetPreferredMetadataCountryCode(scope);
-            var ratingScore = scope is IRatingVisibilityService ratings
-                ? ratings.GetRatingScore(rating, countryCode)
-                : LocalizationManager.GetRatingScore(rating, countryCode);
+            var ratingScore = scope.GetRatingScore(rating, countryCode);
 
             // Could not determine rating level
             if (ratingScore is null)
@@ -2112,27 +2087,15 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>
-        /// Determines if this item should be visible to a given user, reading tags through the static <see cref="LibraryManager"/>.
-        /// Kept for the published surface; overrides belong on the overload that takes an <see cref="ITagVisibilityService"/>.
-        /// </summary>
-        /// <param name="user">The user.</param>
-        /// <param name="skipAllowedTagsCheck">Don't check for allowed tags.</param>
-        /// <returns><c>true</c> if the specified user is visible; otherwise, <c>false</c>.</returns>
-        public virtual bool IsVisible(User user, bool skipAllowedTagsCheck = false)
-        {
-            return IsVisible(user, skipAllowedTagsCheck, null);
-        }
-
-        /// <summary>
         /// Determines if this folder should be visible to a given user.
         /// Default is just parental allowed. Can be overridden for more functionality.
         /// </summary>
         /// <param name="user">The user.</param>
         /// <param name="skipAllowedTagsCheck">Don't check for allowed tags.</param>
-        /// <param name="tagVisibility">Where the tags come from; <c>null</c> reads them through the static <see cref="LibraryManager"/>. Overrides pass it on.</param>
+        /// <param name="tagVisibility">Supplies tags, parents, libraries and rating scores. Overrides pass it on.</param>
         /// <returns><c>true</c> if the specified user is visible; otherwise, <c>false</c>.</returns>
         /// <exception cref="ArgumentNullException"><paramref name="user" /> is <c>null</c>.</exception>
-        public virtual bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
+        public virtual bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
             ArgumentNullException.ThrowIfNull(user);
 
@@ -2140,25 +2103,14 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>
-        /// Determines if this item, its parents and its libraries admit a given user, reading tags through the static <see cref="LibraryManager"/>.
-        /// Kept for the published surface; overrides belong on the overload that takes an <see cref="ITagVisibilityService"/>.
-        /// </summary>
-        /// <param name="user">The user.</param>
-        /// <returns><c>true</c> if the item is visible to the user.</returns>
-        public virtual bool IsVisibleStandalone(User user)
-        {
-            return IsVisibleStandalone(user, null);
-        }
-
-        /// <summary>
         /// Determines if this item, its parents and its libraries admit a given user.
         /// </summary>
         /// <param name="user">The user.</param>
-        /// <param name="tagVisibility">Where the tags come from; <c>null</c> reads them through the static <see cref="LibraryManager"/>. Overrides pass it on.</param>
+        /// <param name="tagVisibility">Supplies tags, parents, libraries and rating scores. Overrides pass it on.</param>
         /// <returns><c>true</c> if the item is visible to the user.</returns>
-        public virtual bool IsVisibleStandalone(User user, ITagVisibilityService tagVisibility)
+        public virtual bool IsVisibleStandalone(User user, IStandaloneVisibilityService tagVisibility)
         {
-            if (GetSourceType(tagVisibility as IStandaloneVisibilityService) == SourceType.Channel)
+            if (GetSourceType(tagVisibility) == SourceType.Channel)
             {
                 return IsVisibleStandaloneInternal(user, false, tagVisibility) && Channel.IsChannelVisible(this, user, tagVisibility);
             }
@@ -2196,9 +2148,9 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <param name="info">The info.</param>
         /// <param name="scope">Where the items come from: by id from it, and by path when it is an
-        /// <see cref="ILinkedChildVisibilityService"/>; <c>null</c> reads them through the static <see cref="LibraryManager"/>.</param>
+        /// <see cref="IStandaloneVisibilityService"/>; <c>null</c> reads them through the static <see cref="LibraryManager"/>.</param>
         /// <returns>BaseItem.</returns>
-        protected BaseItem GetLinkedChild(LinkedChild info, IBoxSetVisibilityService scope)
+        protected BaseItem GetLinkedChild(LinkedChild info, IStandaloneVisibilityService scope)
         {
             // First get using the cached Id
             if (info.ItemId.HasValue)
@@ -2234,7 +2186,7 @@ namespace Tesserafin.Controller.Entities
         }
 
 #pragma warning disable CS0618 // Type or member is obsolete - fallback for legacy LinkedChild data
-        private BaseItem FindLinkedChild(LinkedChild info, IBoxSetVisibilityService scope)
+        private BaseItem FindLinkedChild(LinkedChild info, IStandaloneVisibilityService scope)
         {
             // First try to find by ItemId (new preferred method)
             if (info.ItemId.HasValue && !info.ItemId.Value.Equals(Guid.Empty))
@@ -2254,7 +2206,7 @@ namespace Tesserafin.Controller.Entities
             {
                 path = FileSystem.MakeAbsolutePath(ContainingFolderPath, path);
 
-                var itemByPath = scope is ILinkedChildVisibilityService paths
+                var itemByPath = scope is IStandaloneVisibilityService paths
                     ? paths.FindByPath(path)
                     : LibraryManager.FindByPath(path, null);
 
@@ -2283,7 +2235,7 @@ namespace Tesserafin.Controller.Entities
         }
 #pragma warning restore CS0618
 
-        private static BaseItem GetLinkedItemById(Guid id, IBoxSetVisibilityService scope)
+        private static BaseItem GetLinkedItemById(Guid id, IStandaloneVisibilityService scope)
         {
             return scope is null ? LibraryManager.GetItemById(id) : scope.GetItemById(id);
         }

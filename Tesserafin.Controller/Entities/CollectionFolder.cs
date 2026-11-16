@@ -95,11 +95,9 @@ namespace Tesserafin.Controller.Entities
             return false;
         }
 
-        public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
+        public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
-            var options = tagVisibility is IStandaloneVisibilityService scope
-                ? scope.GetLibraryOptions(this)
-                : LibraryManager.GetLibraryOptions(this);
+            var options = tagVisibility.GetLibraryOptions(this);
             if (options.Enabled)
             {
                 return base.IsVisible(user, skipAllowedTagsCheck, tagVisibility);

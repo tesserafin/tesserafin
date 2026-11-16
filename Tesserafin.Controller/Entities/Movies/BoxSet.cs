@@ -163,7 +163,7 @@ namespace Tesserafin.Controller.Entities.Movies
             return Sort(children, user, itemSortService).ToArray();
         }
 
-        public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, out int totalItemCount, InternalItemsQuery query = null)
+        public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, out int totalItemCount, InternalItemsQuery query)
         {
             var children = base.GetChildren(user, includeLinkedChildren, out totalItemCount, query);
             return Sort(children, user).ToArray();
@@ -206,7 +206,7 @@ namespace Tesserafin.Controller.Entities.Movies
             return GetItemLookupInfo<BoxSetInfo>();
         }
 
-        public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
+        public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
             if (IsLegacyBoxSet)
             {
@@ -223,10 +223,8 @@ namespace Tesserafin.Controller.Entities.Movies
                 return true;
             }
 
-            // An IBoxSetVisibilityService also supplies the libraries and the linked children; otherwise
-            // they come through the static LibraryManager (DEBT-SERVER-5).
-            var scope = tagVisibility as IBoxSetVisibilityService;
-            var userLibraryFolderIds = scope is null ? GetLibraryFolderIds(user) : GetLibraryFolderIds(user, scope);
+            var scope = tagVisibility;
+            var userLibraryFolderIds = GetLibraryFolderIds(user, scope);
             var libraryFolderIds = LibraryFolderIds ?? GetLibraryFolderIds(scope);
 
             if (libraryFolderIds.Length == 0)
@@ -252,7 +250,7 @@ namespace Tesserafin.Controller.Entities.Movies
             return true;
         }
 
-        public override bool IsVisibleStandalone(User user, ITagVisibilityService tagVisibility)
+        public override bool IsVisibleStandalone(User user, IStandaloneVisibilityService tagVisibility)
         {
             if (IsLegacyBoxSet)
             {
@@ -265,22 +263,15 @@ namespace Tesserafin.Controller.Entities.Movies
             return IsVisibleStandaloneInternal(user, true, tagVisibility);
         }
 
-        private Guid[] GetLibraryFolderIds(User user)
-        {
-            return LibraryManager.GetUserRootFolder().GetChildren(user, true)
-                .Select(i => i.Id)
-                .ToArray();
-        }
-
         /// <summary>
-        /// Gets the user's libraries as <see cref="GetLibraryFolderIds(User)"/> does, through the service.
+        /// Gets the ids of the libraries <paramref name="user"/> may see, through the service.
         /// </summary>
         /// <remarks>
         /// The user root's children are the libraries (<see cref="IStandaloneVisibilityService.GetLibraryIds"/>);
         /// the static path also lists the aggregate root's virtual children and the user root's linked
         /// children, which <see cref="GetLibraryFolderIds()"/> never returns, so they cannot match.
         /// </remarks>
-        private static Guid[] GetLibraryFolderIds(User user, IBoxSetVisibilityService scope)
+        private static Guid[] GetLibraryFolderIds(User user, IStandaloneVisibilityService scope)
         {
             return scope.GetLibraryIds()
                 .Select(scope.GetItemById)
@@ -291,10 +282,10 @@ namespace Tesserafin.Controller.Entities.Movies
 
         public Guid[] GetLibraryFolderIds()
         {
-            return GetLibraryFolderIds((IBoxSetVisibilityService)null);
+            return GetLibraryFolderIds((IStandaloneVisibilityService)null);
         }
 
-        private Guid[] GetLibraryFolderIds(IBoxSetVisibilityService scope)
+        private Guid[] GetLibraryFolderIds(IStandaloneVisibilityService scope)
         {
             var expandedFolders = new List<Guid>();
 
@@ -310,7 +301,7 @@ namespace Tesserafin.Controller.Entities.Movies
         /// there is one: by id, then, for an entry without an id or whose id finds nothing, by path
         /// (DEBT-SERVER-7).
         /// </summary>
-        private List<BaseItem> GetLinkedChildren(IBoxSetVisibilityService scope)
+        private List<BaseItem> GetLinkedChildren(IStandaloneVisibilityService scope)
         {
             if (scope is null)
             {
@@ -323,13 +314,13 @@ namespace Tesserafin.Controller.Entities.Movies
                 .ToList();
         }
 
-        private IEnumerable<BaseItem> FlattenItems(IEnumerable<BaseItem> items, List<Guid> expandedFolders, IBoxSetVisibilityService scope)
+        private IEnumerable<BaseItem> FlattenItems(IEnumerable<BaseItem> items, List<Guid> expandedFolders, IStandaloneVisibilityService scope)
         {
             return items
                 .SelectMany(i => FlattenItems(i, expandedFolders, scope));
         }
 
-        private IEnumerable<BaseItem> FlattenItems(BaseItem item, List<Guid> expandedFolders, IBoxSetVisibilityService scope)
+        private IEnumerable<BaseItem> FlattenItems(BaseItem item, List<Guid> expandedFolders, IStandaloneVisibilityService scope)
         {
             if (item is BoxSet boxset)
             {

@@ -248,7 +248,7 @@ namespace Tesserafin.Controller.Entities
             writes.CreateItem(item, this);
         }
 
-        public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
+        public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
             if (this is ICollectionFolder && this is not BasePluginFolder)
             {
@@ -889,13 +889,13 @@ namespace Tesserafin.Controller.Entities
             });
         }
 
-        public virtual int GetChildCount(User user)
+        public virtual int GetChildCount(User user, IStandaloneVisibilityService scope)
         {
             if (LinkedChildren.Length > 0)
             {
                 if (this is not ICollectionFolder)
                 {
-                    return GetChildren(user, true).Count;
+                    return GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope }).Count;
                 }
             }
 
@@ -911,6 +911,7 @@ namespace Tesserafin.Controller.Entities
                     Recursive = false,
                     Limit = 0,
                     Parent = this,
+                    Visibility = scope,
                     DtoOptions = new DtoOptions(false)
                     {
                         EnableImages = false
@@ -923,32 +924,6 @@ namespace Tesserafin.Controller.Entities
 #pragma warning restore CS0618
 
             return result.TotalRecordCount;
-        }
-
-        public virtual int GetRecursiveChildCount(User user)
-        {
-            // Same scope boundary as GetChildCount above: falls back to the static.
-            // Documented legitimate caller of the obsolete 5-parameter overload — see
-            // docs/major-rewrite-plan-v13.md § PR28/N.
-#pragma warning disable CS0618
-            return GetItems(
-                new InternalItemsQuery(user)
-                {
-                    Recursive = true,
-                    IsFolder = false,
-                    IsVirtualItem = false,
-                    EnableTotalRecordCount = true,
-                    Limit = 0,
-                    DtoOptions = new DtoOptions(false)
-                    {
-                        EnableImages = false
-                    }
-                },
-                ChannelManager,
-                CollectionManager,
-                UserViewManager,
-                UserView.TVSeriesManager).TotalRecordCount;
-#pragma warning restore CS0618
         }
 
         public QueryResult<BaseItem> QueryRecursive(InternalItemsQuery query)
@@ -992,7 +967,8 @@ namespace Tesserafin.Controller.Entities
             if (user is not null)
             {
                 // needed for boxsets and playlists
-                itemsList = itemsList.Where(i => i.IsVisibleStandalone(query.User));
+                var scope = query.RequireVisibility();
+                itemsList = itemsList.Where(i => i.IsVisibleStandalone(user, scope));
             }
 
             IEnumerable<BaseItem> returnItems;
@@ -1183,7 +1159,8 @@ namespace Tesserafin.Controller.Entities
                 DisplayAlbumFolders = query.DisplayAlbumFolders,
                 NameStartsWith = query.NameStartsWith,
                 NameStartsWithOrGreater = query.NameStartsWithOrGreater,
-                NameLessThan = query.NameLessThan
+                NameLessThan = query.NameLessThan,
+                Visibility = query.Visibility
             };
 
             return UserViewBuilder.Filter(
@@ -1572,21 +1549,30 @@ namespace Tesserafin.Controller.Entities
             return true;
         }
 
-        public virtual IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, out int totalItemCount, InternalItemsQuery query = null)
+        /// <summary>
+        /// Gets the children <paramref name="user"/> may see.
+        /// </summary>
+        /// <param name="user">The user.</param>
+        /// <param name="includeLinkedChildren">Whether linked children count as children.</param>
+        /// <param name="totalItemCount">The number of visible children before paging.</param>
+        /// <param name="query">The query; it must carry the visibility scope (<see cref="InternalItemsQuery.Visibility"/>).</param>
+        /// <returns>The visible children.</returns>
+        public virtual IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, out int totalItemCount, InternalItemsQuery query)
         {
             ArgumentNullException.ThrowIfNull(user);
-            query ??= new InternalItemsQuery();
+            ArgumentNullException.ThrowIfNull(query);
+            var scope = query.RequireVisibility();
             query.User = user;
 
             // the true root should return our users root folder children
             if (IsPhysicalRoot)
             {
-                return LibraryManager.GetUserRootFolder().GetChildren(user, includeLinkedChildren, out totalItemCount);
+                return LibraryManager.GetUserRootFolder().GetChildren(user, includeLinkedChildren, out totalItemCount, new InternalItemsQuery(user) { Visibility = scope });
             }
 
             var result = new Dictionary<Guid, BaseItem>();
 
-            totalItemCount = AddChildren(user, includeLinkedChildren, result, false, query);
+            totalItemCount = AddChildren(user, includeLinkedChildren, result, false, query, scope);
 
             return result.Values.ToArray();
         }
@@ -1596,7 +1582,7 @@ namespace Tesserafin.Controller.Entities
             return GetChildren(user, includeLinkedChildren, out totalItemCount, query);
         }
 
-        public virtual IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query = null)
+        public virtual IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query)
         {
             return GetChildren(user, includeLinkedChildren, out _, query);
         }
@@ -1606,7 +1592,7 @@ namespace Tesserafin.Controller.Entities
             return GetChildren(user, includeLinkedChildren, query);
         }
 
-        protected virtual IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user)
+        protected virtual IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user, InternalItemsQuery query)
         {
             return Children;
         }
@@ -1614,7 +1600,7 @@ namespace Tesserafin.Controller.Entities
         /// <summary>
         /// Adds the children to list.
         /// </summary>
-        private int AddChildren(User user, bool includeLinkedChildren, Dictionary<Guid, BaseItem> result, bool recursive, InternalItemsQuery query, HashSet<Folder> visitedFolders = null)
+        private int AddChildren(User user, bool includeLinkedChildren, Dictionary<Guid, BaseItem> result, bool recursive, InternalItemsQuery query, IStandaloneVisibilityService scope, HashSet<Folder> visitedFolders = null)
         {
             // Prevent infinite recursion of nested folders
             visitedFolders ??= new HashSet<Folder>();
@@ -1634,25 +1620,25 @@ namespace Tesserafin.Controller.Entities
             // If there are not sub-folders, proceed as normal.
             if (children is null)
             {
-                children = GetEligibleChildrenForRecursiveChildren(user);
+                children = GetEligibleChildrenForRecursiveChildren(user, query);
             }
 
             if (includeLinkedChildren)
             {
-                children = children.Concat(GetLinkedChildren(user)).ToArray();
+                children = children.Concat(GetLinkedChildren(user, scope)).ToArray();
             }
 
-            return AddChildrenFromCollection(children, user, includeLinkedChildren, result, recursive, query, visitedFolders);
+            return AddChildrenFromCollection(children, user, includeLinkedChildren, result, recursive, query, scope, visitedFolders);
         }
 
-        private int AddChildrenFromCollection(IEnumerable<BaseItem> children, User user, bool includeLinkedChildren, Dictionary<Guid, BaseItem> result, bool recursive, InternalItemsQuery query, HashSet<Folder> visitedFolders)
+        private int AddChildrenFromCollection(IEnumerable<BaseItem> children, User user, bool includeLinkedChildren, Dictionary<Guid, BaseItem> result, bool recursive, InternalItemsQuery query, IStandaloneVisibilityService scope, HashSet<Folder> visitedFolders)
         {
             query ??= new InternalItemsQuery();
             var limit = query.Limit > 0 ? query.Limit : int.MaxValue;
             query.Limit = 0;
 
             var visibleChildren = children
-                .Where(e => e.IsVisible(user))
+                .Where(e => e.IsVisible(user, false, scope))
                 .ToArray();
 
             var realChildren = UserViewBuilder.Filter(visibleChildren, query.User, query, UserDataManager, LibraryManager)
@@ -1676,7 +1662,7 @@ namespace Tesserafin.Controller.Entities
                     .Where(e => e.IsFolder)
                     .OfType<Folder>())
                 {
-                    childCount += child.AddChildren(user, includeLinkedChildren, result, true, query, visitedFolders);
+                    childCount += child.AddChildren(user, includeLinkedChildren, result, true, query, scope, visitedFolders);
                 }
             }
 
@@ -1686,10 +1672,11 @@ namespace Tesserafin.Controller.Entities
         public virtual IReadOnlyList<BaseItem> GetRecursiveChildren(User user, InternalItemsQuery query, out int totalCount)
         {
             ArgumentNullException.ThrowIfNull(user);
+            ArgumentNullException.ThrowIfNull(query);
 
             var result = new Dictionary<Guid, BaseItem>();
 
-            totalCount = AddChildren(user, true, result, true, query);
+            totalCount = AddChildren(user, true, result, true, query, query.RequireVisibility());
 
             return result.Values.ToArray();
         }
@@ -1802,7 +1789,7 @@ namespace Tesserafin.Controller.Entities
             return false;
         }
 
-        public List<BaseItem> GetLinkedChildren(User user)
+        public List<BaseItem> GetLinkedChildren(User user, IStandaloneVisibilityService scope)
         {
             if (!FilterLinkedChildrenPerUser || user is null)
             {
@@ -1818,7 +1805,7 @@ namespace Tesserafin.Controller.Entities
             }
 
             var allUserRootChildren = LibraryManager.GetUserRootFolder()
-                .GetChildren(user, true)
+                .GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope })
                 .OfType<Folder>()
                 .ToList();
 
@@ -1842,7 +1829,7 @@ namespace Tesserafin.Controller.Entities
                     var childProtocol = childOwner.PathProtocol;
                     if (!childProtocol.HasValue || childProtocol.Value != Tesserafin.Model.MediaInfo.MediaProtocol.File)
                     {
-                        if (!childOwner.IsVisibleStandalone(user))
+                        if (!childOwner.IsVisibleStandalone(user, scope))
                         {
                             continue;
                         }

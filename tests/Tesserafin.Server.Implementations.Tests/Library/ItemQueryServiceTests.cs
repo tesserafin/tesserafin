@@ -17,6 +17,7 @@ using Tesserafin.Data.Enums;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Querying;
 using Tesserafin.Server.Core.Library;
+using Tesserafin.Server.Implementations.Tests.TestSupport;
 using Xunit;
 
 namespace Tesserafin.Server.Implementations.Tests.Library;
@@ -50,7 +51,7 @@ public class ItemQueryServiceTests
         BaseItem.ConfigurationManager = configurationManager;
         BaseItem.UserDataManager = new Mock<IUserDataManager>().Object;
 
-        return new ItemQueryService(channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object, configurationManager, itemSortService ?? new PassthroughItemSortService(), itemLookupService.Object, itemRepository.Object, scopeService.Object);
+        return new ItemQueryService(channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object, configurationManager, itemSortService ?? new PassthroughItemSortService(), itemLookupService.Object, itemRepository.Object, scopeService.Object, PermissiveVisibility.Scope);
     }
 
     [Fact]
@@ -62,7 +63,7 @@ public class ItemQueryServiceTests
         var child = new Movie { Id = Guid.NewGuid() };
         folder.Children = new BaseItem[] { child };
 
-        var result = service.GetItems(folder, new InternalItemsQuery());
+        var result = service.GetItems(folder, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope });
 
         Assert.Single(result.Items);
         Assert.Equal(child, result.Items[0]);
@@ -86,7 +87,7 @@ public class ItemQueryServiceTests
         var child = new Movie { Id = Guid.NewGuid() };
         folder.Children = new BaseItem[] { child };
 
-        var result = service.GetItemList(folder, new InternalItemsQuery());
+        var result = service.GetItemList(folder, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope });
 
         Assert.Single(result);
         Assert.Equal(child, result[0]);
@@ -115,9 +116,9 @@ public class ItemQueryServiceTests
         // Parity test deliberately compares against the obsolete 5-parameter overload — see
         // docs/major-rewrite-plan-v13.md § PR28/N.
 #pragma warning disable CS0618
-        var expected = folder.GetItems(new InternalItemsQuery(), channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
+        var expected = folder.GetItems(new InternalItemsQuery { Visibility = PermissiveVisibility.Scope }, channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
 #pragma warning restore CS0618
-        var actual = service.PostFilterAndSort(folder, folder.Children, new InternalItemsQuery());
+        var actual = service.PostFilterAndSort(folder, folder.Children, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope });
 
         Assert.Equal(expected.Items, actual.Items);
         Assert.Equal(expected.TotalRecordCount, actual.TotalRecordCount);
@@ -133,7 +134,7 @@ public class ItemQueryServiceTests
         folder.Children = new BaseItem[] { child };
         var user = new User("test-user", "provider", "provider");
 
-        InternalItemsQuery MakeQuery() => new() { User = user, CollapseBoxSetItems = false };
+        InternalItemsQuery MakeQuery() => new() { Visibility = PermissiveVisibility.Scope, User = user, CollapseBoxSetItems = false };
 
         // Parity test deliberately compares against the obsolete 5-parameter overload — see
         // docs/major-rewrite-plan-v13.md § PR28/N.
@@ -165,7 +166,7 @@ public class ItemQueryServiceTests
             .Setup(x => x.CollapseItemsWithinBoxSets(It.IsAny<IEnumerable<BaseItem>>(), user))
             .Returns((IEnumerable<BaseItem> items, User _) => items);
 
-        InternalItemsQuery MakeQuery() => new() { User = user, CollapseBoxSetItems = true };
+        InternalItemsQuery MakeQuery() => new() { Visibility = PermissiveVisibility.Scope, User = user, CollapseBoxSetItems = true };
 
         // Parity test deliberately compares against the obsolete 5-parameter overload — see
         // docs/major-rewrite-plan-v13.md § PR28/N.
@@ -205,6 +206,7 @@ public class ItemQueryServiceTests
 
         InternalItemsQuery MakeQuery() => new()
         {
+            Visibility = PermissiveVisibility.Scope,
             User = user,
             CollapseBoxSetItems = true,
             NameStartsWith = nameStartsWith,
@@ -246,7 +248,7 @@ public class ItemQueryServiceTests
         // Present in Children so a wrongly-taken fast path would return this instead of the sentinel below.
         folder.Children = new BaseItem[] { new Movie { Id = Guid.NewGuid() } };
 
-        var result = service.GetItems(folder, new InternalItemsQuery { Recursive = true });
+        var result = service.GetItems(folder, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, Recursive = true });
 
         Assert.Single(result.Items);
         Assert.Equal(sentinel, result.Items[0]);
@@ -265,7 +267,7 @@ public class ItemQueryServiceTests
         var folder = new Folder { Id = Guid.NewGuid() };
         folder.Children = new BaseItem[] { new Movie { Id = Guid.NewGuid() } };
 
-        var result = service.GetItems(folder, new InternalItemsQuery { ItemIds = new[] { sentinel.Id } });
+        var result = service.GetItems(folder, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, ItemIds = new[] { sentinel.Id } });
 
         Assert.Single(result.Items);
         Assert.Equal(sentinel, result.Items[0]);
@@ -284,7 +286,7 @@ public class ItemQueryServiceTests
             .Setup(x => x.GetChannelItemsInternal(It.IsAny<InternalItemsQuery>(), It.IsAny<IProgress<double>>(), It.IsAny<System.Threading.CancellationToken>()))
             .ReturnsAsync(new QueryResult<BaseItem>(0, 1, new BaseItem[] { channelItem }));
 
-        var result = service.GetItems(folder, new InternalItemsQuery());
+        var result = service.GetItems(folder, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope });
 
         Assert.Single(result.Items);
         Assert.Equal(channelItem, result.Items[0]);
@@ -310,7 +312,7 @@ public class ItemQueryServiceTests
             .Setup(x => x.GetChannelItemsInternal(It.IsAny<InternalItemsQuery>(), It.IsAny<IProgress<double>>(), It.IsAny<System.Threading.CancellationToken>()))
             .ReturnsAsync(new QueryResult<BaseItem>(0, 1, new BaseItem[] { channelItem }));
 
-        var result = service.GetItems(userView, new InternalItemsQuery());
+        var result = service.GetItems(userView, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope });
 
         Assert.Single(result.Items);
         Assert.Equal(channelItem, result.Items[0]);
@@ -325,7 +327,7 @@ public class ItemQueryServiceTests
         var child = new Movie { Id = Guid.NewGuid() };
         folder.Children = new BaseItem[] { child };
 
-        var query = new InternalItemsQuery { EnableTotalRecordCount = true };
+        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, EnableTotalRecordCount = true };
 
         var result = service.GetItemList(folder, query);
 
@@ -354,7 +356,7 @@ public class ItemQueryServiceTests
             libraryManager: libraryManager.Object,
             itemSortService: sortService);
 
-        var result = service.GetItems(boxSet, new InternalItemsQuery(user));
+        var result = service.GetItems(boxSet, new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope, });
 
         Assert.Equal(new BaseItem[] { alpha, zulu }, result.Items);
         Assert.Single(sortService.Calls);
@@ -381,7 +383,7 @@ public class ItemQueryServiceTests
             libraryManager: libraryManager.Object,
             itemSortService: sortService);
 
-        var result = service.GetItemList(boxSet, new InternalItemsQuery(user));
+        var result = service.GetItemList(boxSet, new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope, });
 
         Assert.Equal(new BaseItem[] { alpha, zulu }, result);
         Assert.Single(sortService.Calls);
@@ -399,7 +401,7 @@ public class ItemQueryServiceTests
         var service = CreateService(out _, out _, out _, out _, out var itemLookupService, out var itemRepository, out var scopeService);
 
         var parent = new Folder { Id = Guid.NewGuid() };
-        var query = new InternalItemsQuery { Recursive = true, ParentId = parent.Id };
+        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, Recursive = true, ParentId = parent.Id };
         var expected = new BaseItem[] { new Movie { Id = Guid.NewGuid() } };
 
         itemLookupService.Setup(x => x.GetItemById(parent.Id)).Returns(parent);
@@ -417,7 +419,7 @@ public class ItemQueryServiceTests
         var service = CreateService(out _, out _, out _, out _, out var itemLookupService, out var itemRepository, out var scopeService);
 
         var missingParentId = Guid.NewGuid();
-        var query = new InternalItemsQuery { Recursive = true, ParentId = missingParentId };
+        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, Recursive = true, ParentId = missingParentId };
         var expected = new BaseItem[] { new Movie { Id = Guid.NewGuid() } };
 
         itemLookupService.Setup(x => x.GetItemById(missingParentId)).Returns((BaseItem?)null);
@@ -435,7 +437,7 @@ public class ItemQueryServiceTests
         var service = CreateService(out _, out _, out _, out _, out var itemLookupService, out var itemRepository, out var scopeService);
 
         var user = new User("test-user", "provider", "provider");
-        var query = new InternalItemsQuery { User = user };
+        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, User = user };
         var expected = new BaseItem[] { new Movie { Id = Guid.NewGuid() } };
 
         itemRepository.Setup(x => x.GetItemList(query)).Returns(expected);
@@ -452,7 +454,7 @@ public class ItemQueryServiceTests
     {
         var service = CreateService(out _, out _, out _, out _, out _, out var itemRepository, out _);
 
-        var query = new InternalItemsQuery { EnableTotalRecordCount = true };
+        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, EnableTotalRecordCount = true };
         var expected = new QueryResult<BaseItem>(0, 1, new BaseItem[] { new Movie { Id = Guid.NewGuid() } });
 
         itemRepository.Setup(x => x.GetItems(query)).Returns(expected);
@@ -468,7 +470,7 @@ public class ItemQueryServiceTests
     {
         var service = CreateService(out _, out _, out _, out _, out _, out var itemRepository, out _);
 
-        var query = new InternalItemsQuery { EnableTotalRecordCount = false, StartIndex = 5 };
+        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, EnableTotalRecordCount = false, StartIndex = 5 };
         var items = new BaseItem[] { new Movie { Id = Guid.NewGuid() } };
 
         itemRepository.Setup(x => x.GetItemList(query)).Returns(items);
@@ -489,7 +491,7 @@ public class ItemQueryServiceTests
         var service = CreateService(out _, out _, out _, out _, out var itemLookupService, out var itemRepository, out var scopeService);
 
         var parent = new Folder { Id = Guid.NewGuid() };
-        var query = new InternalItemsQuery { Recursive = true, ParentId = parent.Id, EnableTotalRecordCount = false };
+        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, Recursive = true, ParentId = parent.Id, EnableTotalRecordCount = false };
         var items = new BaseItem[] { new Movie { Id = Guid.NewGuid() } };
 
         itemLookupService.Setup(x => x.GetItemById(parent.Id)).Returns(parent);
@@ -507,7 +509,7 @@ public class ItemQueryServiceTests
         var service = CreateService(out _, out _, out _, out _, out _, out var itemRepository, out var scopeService);
 
         var user = new User("test-user", "provider", "provider");
-        var query = new InternalItemsQuery { User = user, EnableTotalRecordCount = true };
+        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, User = user, EnableTotalRecordCount = true };
         var expected = new QueryResult<BaseItem>(0, 0, Array.Empty<BaseItem>());
 
         itemRepository.Setup(x => x.GetItems(query)).Returns(expected);

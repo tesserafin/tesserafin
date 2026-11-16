@@ -14,10 +14,8 @@ using Tesserafin.Model.Globalization;
 namespace Tesserafin.Server.Core.Library
 {
     /// <summary>
-    /// Sole production implementation of <see cref="ITagVisibilityService"/>,
-    /// <see cref="IStandaloneVisibilityService"/>, <see cref="IBoxSetVisibilityService"/>,
-    /// <see cref="ILinkedChildVisibilityService"/>, <see cref="IRatingVisibilityService"/> and
-    /// <see cref="IRecordingVisibilityService"/>, built on the id lookup (parents), the library membership
+    /// Sole production implementation of <see cref="IStandaloneVisibilityService"/> (and so of
+    /// <see cref="ITagVisibilityService"/>), built on the id lookup (parents), the library membership
     /// resolver, the user root folder (libraries), the item repository (path search), the localization (rating
     /// scores), the server configuration (country code) and the active recordings only.
     /// </summary>
@@ -29,7 +27,7 @@ namespace Tesserafin.Server.Core.Library
     /// and for the box set's library and linked-children checks (DEBT-SERVER-5, DEBT-SERVER-7), and the
     /// rating score (DEBT-SERVER-8) and a video's source type (DEBT-SERVER-9).
     /// </remarks>
-    internal sealed class TagVisibilityService : ILinkedChildVisibilityService, IRatingVisibilityService, IRecordingVisibilityService
+    internal sealed class TagVisibilityService : IStandaloneVisibilityService
     {
         private readonly ILibraryItemOptions _libraryOptions;
         private readonly IItemLookupService _itemLookupService;

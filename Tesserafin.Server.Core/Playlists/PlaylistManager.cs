@@ -197,7 +197,7 @@ namespace Tesserafin.Server.Core.Playlists
                 return [];
             }
 
-            return playlistsFolder.GetChildren(user, true, null, _itemSortService).OfType<Playlist>().ToList();
+            return playlistsFolder.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService).OfType<Playlist>().ToList();
         }
 
         private static string GetTargetPath(string path)
@@ -214,7 +214,7 @@ namespace Tesserafin.Server.Core.Playlists
         {
             var items = itemIds.Select(_libraryManager.GetItemById).Where(i => i is not null);
 
-            return Playlist.GetPlaylistItems(items, user, options, _itemQueryService);
+            return Playlist.GetPlaylistItems(items, user, options, _itemQueryService, _visibility);
         }
 
         public Task AddItemToPlaylistAsync(Guid playlistId, IReadOnlyCollection<Guid> itemIds, int? position, Guid userId)

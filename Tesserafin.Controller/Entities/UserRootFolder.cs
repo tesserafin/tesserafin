@@ -146,14 +146,14 @@ namespace Tesserafin.Controller.Entities
             return UserViewBuilder.SortAndPage(result, null, query, itemSortService);
         }
 
-        public override int GetChildCount(User user)
+        public override int GetChildCount(User user, IStandaloneVisibilityService scope)
         {
-            return GetChildren(user, true).Count;
+            return GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope }).Count;
         }
 
-        protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user)
+        protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user, InternalItemsQuery query)
         {
-            var list = base.GetEligibleChildrenForRecursiveChildren(user).ToList();
+            var list = base.GetEligibleChildrenForRecursiveChildren(user, query).ToList();
             list.AddRange(LibraryManager.RootFolder.VirtualChildren);
 
             return list;

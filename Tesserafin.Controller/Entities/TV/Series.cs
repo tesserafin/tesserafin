@@ -122,7 +122,7 @@ namespace Tesserafin.Controller.Entities.TV
             return series.GetPresentationUniqueKey();
         }
 
-        public override int GetChildCount(User user)
+        public override int GetChildCount(User user, IStandaloneVisibilityService scope)
         {
             var seriesKey = GetUniqueSeriesKey(this);
 
@@ -140,32 +140,6 @@ namespace Tesserafin.Controller.Entities.TV
             });
 
             return result;
-        }
-
-        public override int GetRecursiveChildCount(User user)
-        {
-            var seriesKey = GetUniqueSeriesKey(this);
-
-            var query = new InternalItemsQuery(user)
-            {
-                AncestorWithPresentationUniqueKey = null,
-                SeriesPresentationUniqueKey = seriesKey,
-                DtoOptions = new DtoOptions(false)
-                {
-                    EnableImages = false
-                }
-            };
-
-            if (query.IncludeItemTypes.Length == 0)
-            {
-                query.IncludeItemTypes = new[] { BaseItemKind.Episode };
-            }
-
-            query.IsVirtualItem = false;
-            query.Limit = 0;
-            var totalRecordCount = LibraryManager.GetCount(query);
-
-            return totalRecordCount;
         }
 
         /// <summary>

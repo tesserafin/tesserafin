@@ -194,7 +194,7 @@ public sealed class InheritedTagVisibilityTests
         AddLibrary("Movies", ["lib"], "/media/movies");
         var movie = AddMovie(Add(new Folder { Path = "/media/movies" }), "/media/movies/a.mkv");
 
-        foreach (var tags in new[] { null, _tags })
+        foreach (var tags in new[] { _tags })
         {
             Assert.False(movie.IsVisible(User(allowed: ["family"]), false, tags));
             Assert.True(movie.IsVisible(User(allowed: ["family"]), true, tags));
@@ -219,7 +219,7 @@ public sealed class InheritedTagVisibilityTests
         var root = Add((Folder)Activator.CreateInstance(rootType)!);
         var library = Add(new Folder { Path = "/media/movies", ParentId = root.Id, Tags = ["lib"] });
 
-        foreach (var tags in new[] { null, _tags })
+        foreach (var tags in new[] { _tags })
         {
             Assert.True(library.IsVisible(User(allowed: ["family"]), false, tags));
             Assert.False(library.IsVisible(User(blocked: ["lib"]), false, tags));
@@ -231,7 +231,6 @@ public sealed class InheritedTagVisibilityTests
     {
         var movie = Add(new Movie { Path = "/media/other/a.mkv" });
 
-        Assert.False(movie.IsVisible(User(allowed: ["family"])));
         Assert.False(movie.IsVisible(User(allowed: ["family"]), false, _tags));
     }
 
@@ -304,9 +303,6 @@ public sealed class InheritedTagVisibilityTests
 
         Assert.False(IsVisible(item, User(blocked: ["lib"])));
         Assert.True(IsVisible(item, User(allowed: ["lib"])));
-
-        Assert.True(item.IsVisibleStandalone(User(blocked: ["lib"])));
-        Assert.False(item.IsVisibleStandalone(User(allowed: ["lib"])));
     }
 
     private void BlindStatic()

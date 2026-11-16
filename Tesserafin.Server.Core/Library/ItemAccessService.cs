@@ -1,8 +1,10 @@
 #pragma warning disable CS1591
 
 using System;
+using System.Collections.Generic;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Entities;
 
 namespace Tesserafin.Server.Core.Library
@@ -20,7 +22,7 @@ namespace Tesserafin.Server.Core.Library
     /// Tag inheritance and the tag filter (DEBT-SERVER-3), then the parents and the libraries of the
     /// folder restriction (DEBT-SERVER-4), come from <see cref="IStandaloneVisibilityService"/>, passed
     /// down the entities' visibility overrides through
-    /// <see cref="BaseItem.IsVisibleStandalone(User, ITagVisibilityService)"/>. What still reads the
+    /// <see cref="BaseItem.IsVisibleStandalone(User, IStandaloneVisibilityService)"/>. What still reads the
     /// static <see cref="BaseItem.LibraryManager"/> on this path is channel and box set visibility, and
     /// the library options read for a rating's country code once neither the item, its parents nor its
     /// libraries carry one.
@@ -49,17 +51,21 @@ namespace Tesserafin.Server.Core.Library
             return ItemIsVisible(item, user) ? item : null;
         }
 
-        /// <summary>
-        /// Determines whether <paramref name="item"/> is visible to <paramref name="user"/>.
-        /// <see cref="UserRootFolder"/> is always visible regardless of a user's tag/parental
-        /// restrictions.
-        /// </summary>
+        /// <inheritdoc />
+        public IReadOnlyList<BaseItem> GetChildren(Folder folder, User user, IItemSortService itemSortService)
+            => folder.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _tagVisibility }, itemSortService);
+
         /// <inheritdoc />
         public bool IsVisible(BaseItem item, User user) => item.IsVisible(user, false, _tagVisibility);
 
         /// <inheritdoc />
         public bool IsVisibleStandalone(BaseItem item, User user) => item.IsVisibleStandalone(user, _tagVisibility);
 
+        /// <summary>
+        /// Determines whether <paramref name="item"/> is visible to <paramref name="user"/>.
+        /// <see cref="UserRootFolder"/> is always visible regardless of a user's tag/parental
+        /// restrictions.
+        /// </summary>
         private bool ItemIsVisible(BaseItem? item, User user)
         {
             if (item is null)

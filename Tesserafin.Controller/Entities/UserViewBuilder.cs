@@ -32,6 +32,7 @@ namespace Tesserafin.Controller.Entities
         private readonly IChannelManager _channelManager;
         private readonly ICollectionManager _collectionManager;
         private readonly IItemSortService _itemSortService;
+        private readonly IStandaloneVisibilityService _visibility;
 
         public UserViewBuilder(
             IUserViewManager userViewManager,
@@ -41,8 +42,10 @@ namespace Tesserafin.Controller.Entities
             ITVSeriesManager tvSeriesManager,
             IChannelManager channelManager,
             ICollectionManager collectionManager,
-            IItemSortService itemSortService)
+            IItemSortService itemSortService,
+            IStandaloneVisibilityService visibility)
         {
+            _visibility = visibility;
             _userViewManager = userViewManager;
             _libraryManager = libraryManager;
             _logger = logger;
@@ -152,9 +155,10 @@ namespace Tesserafin.Controller.Entities
 
         private IReadOnlyList<BaseItem> GetChildren(Folder folder, User user)
         {
+            var query = new InternalItemsQuery(user) { Visibility = _visibility };
             return _itemSortService is null
-                ? folder.GetChildren(user, true)
-                : folder.GetChildren(user, true, null, _itemSortService);
+                ? folder.GetChildren(user, true, query)
+                : folder.GetChildren(user, true, query, _itemSortService);
         }
 
         private QueryResult<BaseItem> GetMovieFolders(Folder parent, User user, InternalItemsQuery query)

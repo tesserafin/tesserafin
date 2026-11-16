@@ -43,7 +43,8 @@ public class ItemQueryScopeServiceTests
             _itemAccessServiceMock.Object,
             _userViewCatalogMock.Object,
             _itemSortServiceMock.Object,
-            _rootFolderProviderMock.Object);
+            _rootFolderProviderMock.Object,
+            Mock.Of<IStandaloneVisibilityService>());
     }
 
     // ---------------------------------------------------------------

@@ -29,6 +29,7 @@ namespace Tesserafin.Api.Controllers;
 [Tags("Year")]
 public class YearsController : BaseTesserafinApiController
 {
+    private readonly IStandaloneVisibilityService _visibility;
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
     private readonly IDtoService _dtoService;
@@ -41,12 +42,15 @@ public class YearsController : BaseTesserafinApiController
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
+    /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
     public YearsController(
         ILibraryManager libraryManager,
         IUserManager userManager,
         IDtoService dtoService,
-        IItemSortService itemSortService)
+        IItemSortService itemSortService,
+        IStandaloneVisibilityService visibility)
     {
+        _visibility = visibility;
         _libraryManager = libraryManager;
         _userManager = userManager;
         _dtoService = dtoService;
@@ -103,6 +107,7 @@ public class YearsController : BaseTesserafinApiController
 
         var query = new InternalItemsQuery(user)
         {
+            Visibility = _visibility,
             ExcludeItemTypes = excludeItemTypes,
             IncludeItemTypes = includeItemTypes,
             MediaTypes = mediaTypes,
@@ -123,7 +128,7 @@ public class YearsController : BaseTesserafinApiController
             }
             else
             {
-                items = recursive ? folder.GetRecursiveChildren(user, query, out totalCount, _itemSortService) : folder.GetChildren(user, true, null, _itemSortService).Where(Filter).ToArray();
+                items = recursive ? folder.GetRecursiveChildren(user, query, out totalCount, _itemSortService) : folder.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService).Where(Filter).ToArray();
             }
         }
         else

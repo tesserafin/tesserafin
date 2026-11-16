@@ -401,6 +401,7 @@ public sealed class VisibleContentProbeTests
                 _config.Object,
                 new Tesserafin.Controller.LiveTv.ActiveRecordings(),
                 Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(It.IsAny<BaseItem>()) == new LibraryOptions()));
+            Scope = scope;
             Probe = new VisibleContentProbe(lookup.Object, injectedRepository.Object, scope);
 
             _libraryManager.Setup(l => l.GetItemById(It.IsAny<Guid>())).Callback(RecordLibraryManagerCall).Returns((Guid id) => Find(id));
@@ -414,6 +415,8 @@ public sealed class VisibleContentProbeTests
         }
 
         public VisibleContentProbe Probe { get; }
+
+        public IStandaloneVisibilityService Scope { get; }
 
         public T Register<T>(T item)
             where T : BaseItem
@@ -487,7 +490,7 @@ public sealed class VisibleContentProbeTests
         public UserViewCatalog BuildCatalog(params Folder[] libraries)
         {
             var root = new Mock<Folder> { CallBase = true };
-            root.Setup(r => r.GetChildren(It.IsAny<User>(), true, null, It.IsAny<IItemSortService>())).Returns(libraries);
+            root.Setup(r => r.GetChildren(It.IsAny<User>(), true, It.IsAny<InternalItemsQuery>(), It.IsAny<IItemSortService>())).Returns(libraries);
             var rootProvider = new Mock<IUserRootFolderProvider>();
             rootProvider.Setup(p => p.GetUserRootFolder()).Returns(root.Object);
 
@@ -506,7 +509,8 @@ public sealed class VisibleContentProbeTests
                 sortService,
                 _config.Object,
                 Mock.Of<ILocalizationManager>(),
-                Probe);
+                Probe,
+                Scope);
         }
 
         private ItemQueryService NewItemQueryService() =>
@@ -519,7 +523,8 @@ public sealed class VisibleContentProbeTests
                 new Tesserafin.Server.Core.Sorting.ItemSortService(Mock.Of<IUserManager>(), Mock.Of<IUserDataManager>()),
                 Mock.Of<IItemLookupService>(),
                 Mock.Of<IItemRepository>(),
-                Mock.Of<IItemQueryScopeService>());
+                Mock.Of<IItemQueryScopeService>(),
+                Scope);
 
         private bool LegacyProbe(Folder library, User user)
         {
@@ -527,8 +532,8 @@ public sealed class VisibleContentProbeTests
             ResetChildCaches();
 
             return itemQueryService
-                .GetItemList(library, new InternalItemsQuery(user) { ParentId = library.ParentId })
-                .Any(item => item.IsVisible(user));
+                .GetItemList(library, new InternalItemsQuery(user) { ParentId = library.ParentId, Visibility = Scope })
+                .Any(item => item.IsVisible(user, false, Scope));
         }
 
         private BaseItem? Find(Guid id) => _items.GetValueOrDefault(id);
@@ -571,7 +576,7 @@ public sealed class VisibleContentProbeTests
             _visible = visible;
         }
 
-        public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService? tagVisibility) => _visible;
+        public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility) => _visible;
     }
 
     private sealed class FlagPlaylist : Playlist
@@ -583,6 +588,6 @@ public sealed class VisibleContentProbeTests
             _visible = visible;
         }
 
-        public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService? tagVisibility) => _visible;
+        public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility) => _visible;
     }
 }

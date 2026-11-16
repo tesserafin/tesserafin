@@ -87,7 +87,8 @@ public sealed class UserViewCatalogTests
             itemSortService ?? new NoOpItemSortService(),
             config ?? MakeConfig(),
             localizationManager ?? Mock.Of<ILocalizationManager>(),
-            visibleContentProbe ?? new Mock<IVisibleContentProbe>(MockBehavior.Strict).Object);
+            visibleContentProbe ?? new Mock<IVisibleContentProbe>(MockBehavior.Strict).Object,
+            Mock.Of<IStandaloneVisibilityService>());
     }
 
     // ---------------------------------------------------------------

@@ -28,7 +28,7 @@ namespace Tesserafin.Controller.Channels
 
         public override bool SupportsRawQueryItems => false;
 
-        public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
+        public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
             var blockedChannelsPreference = user.GetPreferenceValues<Guid>(PreferenceKind.BlockedChannels);
             if (blockedChannelsPreference.Length != 0)
@@ -87,13 +87,11 @@ namespace Tesserafin.Controller.Channels
         /// </summary>
         /// <param name="channelItem">The channel item, or the channel itself.</param>
         /// <param name="user">The user.</param>
-        /// <param name="tagVisibility">Where the data comes from: an <see cref="IBoxSetVisibilityService"/> also supplies the channel by id; otherwise the channel comes through the static <see cref="BaseItem.ChannelManager"/>.</param>
+        /// <param name="tagVisibility">Supplies the channel by id, and its visibility.</param>
         /// <returns><c>true</c> if the channel is visible to the user.</returns>
-        internal static bool IsChannelVisible(BaseItem channelItem, User user, ITagVisibilityService tagVisibility)
+        internal static bool IsChannelVisible(BaseItem channelItem, User user, IStandaloneVisibilityService tagVisibility)
         {
-            var channel = tagVisibility is IBoxSetVisibilityService lookup
-                ? lookup.GetItemById(channelItem.ChannelId) as Channel
-                : ChannelManager.GetChannel(channelItem.ChannelId.ToString(string.Empty));
+            var channel = tagVisibility.GetItemById(channelItem.ChannelId) as Channel;
 
             return channel.IsVisible(user, false, tagVisibility);
         }

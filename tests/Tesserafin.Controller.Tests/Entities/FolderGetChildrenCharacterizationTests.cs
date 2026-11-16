@@ -13,6 +13,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.Sorting;
+using Tesserafin.Controller.Tests.TestSupport;
 using Tesserafin.Controller.TV;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
@@ -54,7 +55,7 @@ public class FolderGetChildrenCharacterizationTests
         var folder = new Folder { Id = Guid.NewGuid(), Children = new BaseItem[] { movie, childFolder } };
         SetStatics(new Mock<ILibraryManager>().Object);
 
-        var result = folder.GetChildren(user, true, new InternalItemsQuery { IsFolder = false });
+        var result = folder.GetChildren(user, true, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, IsFolder = false });
 
         Assert.Equal(new BaseItem[] { movie }, result);
     }
@@ -68,7 +69,7 @@ public class FolderGetChildrenCharacterizationTests
         var folder = new Folder { Id = Guid.NewGuid(), Children = new BaseItem[] { first, second } };
         SetStatics(new Mock<ILibraryManager>().Object);
 
-        var result = folder.GetChildren(user, true, out var totalItemCount, new InternalItemsQuery { Limit = 1 });
+        var result = folder.GetChildren(user, true, out var totalItemCount, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, Limit = 1 });
 
         Assert.Equal(2, totalItemCount);
         Assert.Equal(new BaseItem[] { first }, result);
@@ -83,7 +84,7 @@ public class FolderGetChildrenCharacterizationTests
         var root = new Folder { Id = Guid.NewGuid(), Children = new BaseItem[] { childFolder } };
         SetStatics(new Mock<ILibraryManager>().Object);
 
-        var result = root.GetRecursiveChildren(user, new InternalItemsQuery(user), out var totalCount);
+        var result = root.GetRecursiveChildren(user, new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope }, out var totalCount);
 
         Assert.Equal(2, totalCount);
         Assert.Equal(new BaseItem[] { childFolder, grandchild }, result);
@@ -119,7 +120,7 @@ public class FolderGetChildrenCharacterizationTests
         Folder.UserViewManager = userViewManager.Object;
         UserView.TVSeriesManager = tvSeriesManager.Object;
 
-        var result = userView.GetChildren(user, true, null);
+        var result = userView.GetChildren(user, true, PermissiveVisibility.Query(user));
 
         Assert.Equal(new BaseItem[] { child }, result);
         channelManager.VerifyNoOtherCalls();
@@ -145,7 +146,7 @@ public class FolderGetChildrenCharacterizationTests
         SetStatics(libraryManager.Object);
         BaseItem.ConfigurationManager = Mock.Of<IServerConfigurationManager>(x => x.Configuration == new ServerConfiguration { DisplaySpecialsWithinSeasons = true });
 
-        var result = season.GetChildren(user, true, null);
+        var result = season.GetChildren(user, true, PermissiveVisibility.Query(user));
 
         Assert.Equal(new BaseItem[] { episode }, result);
     }
@@ -161,7 +162,7 @@ public class FolderGetChildrenCharacterizationTests
         libraryManager.Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(new List<BaseItem> { season });
         SetStatics(libraryManager.Object);
 
-        var result = series.GetChildren(user, true, null);
+        var result = series.GetChildren(user, true, PermissiveVisibility.Query(user));
 
         Assert.Equal(new BaseItem[] { season }, result);
     }
@@ -175,7 +176,7 @@ public class FolderGetChildrenCharacterizationTests
         var playlist = new Playlist { Id = Guid.NewGuid(), Children = new BaseItem[] { movie, childFolder } };
         SetStatics(new Mock<ILibraryManager>().Object);
 
-        var result = playlist.GetChildren(user, true, null);
+        var result = playlist.GetChildren(user, true, PermissiveVisibility.Query(user));
 
         Assert.Equal(new BaseItem[] { movie }, result);
     }
@@ -189,8 +190,8 @@ public class FolderGetChildrenCharacterizationTests
         var boxSet = new BoxSet { Id = Guid.NewGuid(), DisplayOrder = nameof(ItemSortBy.SortName), Children = new BaseItem[] { zulu, alpha } };
         SetStatics(CreateSortingLibraryManager().Object);
 
-        var threeArgResult = boxSet.GetChildren(user, true, null);
-        var fourArgResult = boxSet.GetChildren(user, true, out _);
+        var threeArgResult = boxSet.GetChildren(user, true, PermissiveVisibility.Query(user));
+        var fourArgResult = boxSet.GetChildren(user, true, out _, PermissiveVisibility.Query(user));
 
         Assert.Equal(new BaseItem[] { alpha, zulu }, threeArgResult);
         Assert.Equal(threeArgResult, fourArgResult);
@@ -206,7 +207,7 @@ public class FolderGetChildrenCharacterizationTests
         var libraryManager = CreateSortingLibraryManager();
         SetStatics(libraryManager.Object);
 
-        _ = boxSet.GetChildren(user, true, null);
+        _ = boxSet.GetChildren(user, true, PermissiveVisibility.Query(user));
 
         libraryManager.Verify(
             x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), user, It.Is<IEnumerable<ItemSortBy>>(s => s.SequenceEqual(new[] { ItemSortBy.SortName })), SortOrder.Ascending),
@@ -223,7 +224,7 @@ public class FolderGetChildrenCharacterizationTests
         var libraryManager = CreateSortingLibraryManager();
         SetStatics(libraryManager.Object);
 
-        var result = boxSet.GetRecursiveChildren(user, new InternalItemsQuery(user), out var totalCount);
+        var result = boxSet.GetRecursiveChildren(user, new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope }, out var totalCount);
 
         Assert.Equal(2, totalCount);
         Assert.Equal(new BaseItem[] { alpha, zulu }, result);
@@ -243,7 +244,7 @@ public class FolderGetChildrenCharacterizationTests
         SetStatics(libraryManager.Object);
         var sortService = new RecordingItemSortService();
 
-        var result = boxSet.GetChildren(user, true, null, sortService);
+        var result = boxSet.GetChildren(user, true, PermissiveVisibility.Query(user), sortService);
 
         Assert.Equal(new BaseItem[] { alpha, zulu }, result);
         Assert.Single(sortService.Calls);
@@ -265,7 +266,7 @@ public class FolderGetChildrenCharacterizationTests
         BaseItem.ConfigurationManager = Mock.Of<IServerConfigurationManager>(x => x.Configuration == new ServerConfiguration { DisplaySpecialsWithinSeasons = true });
         var sortService = new RecordingItemSortService();
 
-        var result = season.GetChildren(user, true, null, sortService);
+        var result = season.GetChildren(user, true, PermissiveVisibility.Query(user), sortService);
 
         Assert.Equal(new BaseItem[] { episode }, result);
         Assert.Single(sortService.Calls);
@@ -296,7 +297,7 @@ public class FolderGetChildrenCharacterizationTests
         var result = userView.GetChildren(
             user,
             true,
-            new InternalItemsQuery(user) { OrderBy = [(ItemSortBy.SortName, SortOrder.Ascending)] },
+            new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope, OrderBy = [(ItemSortBy.SortName, SortOrder.Ascending)] },
             sortService);
 
         Assert.Equal(new BaseItem[] { child }, result);
@@ -326,7 +327,7 @@ public class FolderGetChildrenCharacterizationTests
 
         var result = userView.GetRecursiveChildren(
             user,
-            new InternalItemsQuery(user) { OrderBy = [(ItemSortBy.SortName, SortOrder.Ascending)] },
+            new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope, OrderBy = [(ItemSortBy.SortName, SortOrder.Ascending)] },
             out var totalCount,
             sortService);
 

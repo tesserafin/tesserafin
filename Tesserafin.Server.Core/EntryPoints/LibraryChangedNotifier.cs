@@ -322,7 +322,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         newAndRemoved.AddRange(foldersRemovedFrom);
 
         var allUserRootChildren = _libraryManager.GetUserRootFolder()
-            .GetChildren(user, true, null, _itemSortService)
+            .GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService)
             .OfType<Folder>()
             .ToList();
 

@@ -1049,8 +1049,8 @@ namespace Tesserafin.Server.Core.Library
                 if (user is not null && view.ViewType != CollectionType.unknown && UserView.IsEligibleForGrouping(view.ViewType)
                     && user.GetPreference(PreferenceKind.GroupedFolders).Length > 0)
                 {
-                    return GetUserRootFolder()
-                        .GetChildren(user, true, null, _itemSortService)
+                    return _itemAccessService
+                        .GetChildren(GetUserRootFolder(), user, _itemSortService)
                         .OfType<CollectionFolder>()
                         .Where(i => i.CollectionType is null || i.CollectionType == view.ViewType)
                         .Where(i => user.IsFolderGrouped(i.Id))

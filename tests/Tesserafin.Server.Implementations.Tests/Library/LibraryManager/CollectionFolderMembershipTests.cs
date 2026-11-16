@@ -40,6 +40,7 @@ public sealed class CollectionFolderMembershipTests
     private readonly List<Folder> _libraries = [];
     private readonly ILibraryManager _libraryManager;
     private readonly ICollectionFolderResolver _resolver;
+    private readonly IStandaloneVisibilityService _scope;
     private readonly Mock<IXmlSerializer> _xml = new();
 
     public CollectionFolderMembershipTests()
@@ -64,6 +65,9 @@ public sealed class CollectionFolderMembershipTests
         fixture.Register<ICollectionFolderResolver>(() => _resolver);
         var store = new Tesserafin.Server.Core.Library.LibraryOptionsStore(_xml.Object, Mock.Of<Tesserafin.Controller.IServerApplicationPaths>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.LibraryOptionsStore>.Instance);
         fixture.Register<ILibraryOptionsStore>(() => store);
+
+        var libraryOptions = new Tesserafin.Server.Core.Library.LibraryItemOptions(_resolver, lookup, rootProvider, configuration.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), store);
+        _scope = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, _resolver, rootProvider, repository.Object, Mock.Of<Tesserafin.Model.Globalization.ILocalizationManager>(), configuration.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings(), libraryOptions);
 
         Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
 
@@ -213,8 +217,8 @@ public sealed class CollectionFolderMembershipTests
         var shows = AddLibrary("Shows", "/media/shows");
         var movie = AddMovie(Add(new Folder { Path = "/media/movies" }), "/media/movies/k.mkv");
 
-        Assert.True(movie.IsVisibleStandalone(UserWithFolders(PreferenceKind.EnabledFolders, movies.Id)));
-        Assert.False(movie.IsVisibleStandalone(UserWithFolders(PreferenceKind.EnabledFolders, shows.Id)));
+        Assert.True(movie.IsVisibleStandalone(UserWithFolders(PreferenceKind.EnabledFolders, movies.Id), _scope));
+        Assert.False(movie.IsVisibleStandalone(UserWithFolders(PreferenceKind.EnabledFolders, shows.Id), _scope));
     }
 
     [Fact]
@@ -224,8 +228,8 @@ public sealed class CollectionFolderMembershipTests
         var shows = AddLibrary("Shows", "/media/shows");
         var movie = AddMovie(Add(new Folder { Path = "/media/movies" }), "/media/movies/l.mkv");
 
-        Assert.False(movie.IsVisibleStandalone(UserWithFolders(PreferenceKind.BlockedMediaFolders, movies.Id)));
-        Assert.True(movie.IsVisibleStandalone(UserWithFolders(PreferenceKind.BlockedMediaFolders, shows.Id)));
+        Assert.False(movie.IsVisibleStandalone(UserWithFolders(PreferenceKind.BlockedMediaFolders, movies.Id), _scope));
+        Assert.True(movie.IsVisibleStandalone(UserWithFolders(PreferenceKind.BlockedMediaFolders, shows.Id), _scope));
     }
 
     [Fact]
@@ -234,7 +238,7 @@ public sealed class CollectionFolderMembershipTests
         var shows = AddLibrary("Shows", "/media/shows");
         var movie = AddMovie(Add(new Folder { Path = "/media/other" }), "/media/other/m.mkv");
 
-        Assert.True(movie.IsVisibleStandalone(UserWithFolders(PreferenceKind.EnabledFolders, shows.Id)));
+        Assert.True(movie.IsVisibleStandalone(UserWithFolders(PreferenceKind.EnabledFolders, shows.Id), _scope));
     }
 
     [Fact]

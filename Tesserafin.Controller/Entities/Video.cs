@@ -386,12 +386,7 @@ namespace Tesserafin.Controller.Entities
 
         internal override SourceType GetSourceType(IStandaloneVisibilityService scope)
         {
-            if (scope is not IRecordingVisibilityService recordings)
-            {
-                return SourceType;
-            }
-
-            return recordings.IsActiveRecording(Path) ? SourceType.LiveTV : base.SourceType;
+            return scope.IsActiveRecording(Path) ? SourceType.LiveTV : base.SourceType;
         }
 
         internal override bool GetBlockUnratedValue(User user, IStandaloneVisibilityService scope)

@@ -30,6 +30,7 @@ namespace Tesserafin.Server.Core.Collections
     public class CollectionManager : ICollectionManager
     {
         private readonly IItemWriteCommands _writes;
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly ILibraryManager _libraryManager;
         private readonly ILibraryStructureCommands _structure;
         private readonly IFileSystem _fileSystem;
@@ -55,6 +56,7 @@ namespace Tesserafin.Server.Core.Collections
         /// <param name="providerManager">The provider manager.</param>
         /// <param name="linkedChildrenService">The linked children service.</param>
         /// <param name="itemSortService">The item sort service.</param>
+        /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
         public CollectionManager(
             IItemWriteCommands writes,
             ILibraryManager libraryManager,
@@ -66,9 +68,11 @@ namespace Tesserafin.Server.Core.Collections
             ILoggerFactory loggerFactory,
             IProviderManager providerManager,
             ILinkedChildrenService linkedChildrenService,
-            IItemSortService itemSortService)
+            IItemSortService itemSortService,
+            IStandaloneVisibilityService visibility)
         {
             _writes = writes;
+            _visibility = visibility;
             _libraryManager = libraryManager;
             _structure = structure;
             _fileSystem = fileSystem;
@@ -163,7 +167,7 @@ namespace Tesserafin.Server.Core.Collections
 
             return folder is null
                 ? Enumerable.Empty<BoxSet>()
-                : folder.GetChildren(user, true, null, _itemSortService).OfType<BoxSet>();
+                : folder.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService).OfType<BoxSet>();
         }
 
         /// <inheritdoc />

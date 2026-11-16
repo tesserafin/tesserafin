@@ -95,9 +95,9 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <inheritdoc />
-        public override int GetChildCount(User user)
+        public override int GetChildCount(User user, IStandaloneVisibilityService scope)
         {
-            return GetChildren(user, true, null).Count;
+            return GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope }).Count;
         }
 
         /// <inheritdoc />
@@ -114,7 +114,7 @@ namespace Tesserafin.Controller.Entities
                 parent = LibraryManager.GetItemById(ParentId) as Folder ?? parent;
             }
 
-            return new UserViewBuilder(userViewManager, LibraryManager, Logger, UserDataManager, tvSeriesManager, channelManager, collectionManager, null)
+            return new UserViewBuilder(userViewManager, LibraryManager, Logger, UserDataManager, tvSeriesManager, channelManager, collectionManager, null, query.RequireVisibility())
                 .GetUserItems(parent, this, CollectionType, query);
         }
 
@@ -132,7 +132,7 @@ namespace Tesserafin.Controller.Entities
                 parent = LibraryManager.GetItemById(ParentId) as Folder ?? parent;
             }
 
-            return new UserViewBuilder(userViewManager, LibraryManager, Logger, UserDataManager, tvSeriesManager, channelManager, collectionManager, itemSortService)
+            return new UserViewBuilder(userViewManager, LibraryManager, Logger, UserDataManager, tvSeriesManager, channelManager, collectionManager, itemSortService, query.RequireVisibility())
                 .GetUserItems(parent, this, CollectionType, query);
         }
 
@@ -221,9 +221,9 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <inheritdoc />
-        protected override IReadOnlyList<BaseItem> GetEligibleChildrenForRecursiveChildren(User user)
+        protected override IReadOnlyList<BaseItem> GetEligibleChildrenForRecursiveChildren(User user, InternalItemsQuery query)
         {
-            return GetChildren(user, false, null);
+            return GetChildren(user, false, new InternalItemsQuery(user) { Visibility = query.RequireVisibility() });
         }
 
         public static bool IsUserSpecific(Folder folder)
