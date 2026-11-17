@@ -24,11 +24,13 @@ namespace Tesserafin.Server.Integration.Tests;
 
 public sealed class ItemPeopleCommandsEndToEndTests(TesserafinApplicationFactory factory) : IClassFixture<TesserafinApplicationFactory>
 {
+    private static string? _accessToken;
+
     [Fact]
     public async Task PersonReads_DoNotCreate_MetadataIsPaged_AndValidationRemovesOnlyUnlockedOrphans()
     {
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.AddAuthHeader(await AuthHelper.CompleteStartupAsync(client));
+        client.DefaultRequestHeaders.AddAuthHeader(_accessToken ??= await AuthHelper.CompleteStartupAsync(client));
         var commands = factory.Services.GetRequiredService<IItemPeopleCommands>();
         var writes = factory.Services.GetRequiredService<IItemWriteCommands>();
         var people = factory.Services.GetRequiredService<IItemPeopleService>();
@@ -106,7 +108,7 @@ public sealed class ItemPeopleCommandsEndToEndTests(TesserafinApplicationFactory
     public async Task Credits_CreateOnePerson_UpdateMetadata_AndClearWithoutDeletingThePerson()
     {
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.AddAuthHeader(await AuthHelper.CompleteStartupAsync(client));
+        client.DefaultRequestHeaders.AddAuthHeader(_accessToken ??= await AuthHelper.CompleteStartupAsync(client));
         var commands = factory.Services.GetRequiredService<IItemPeopleCommands>();
         var writes = factory.Services.GetRequiredService<IItemWriteCommands>();
         var people = factory.Services.GetRequiredService<IItemPeopleService>();
