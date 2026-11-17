@@ -663,3 +663,10 @@ streaming controllers (retained behind the v2 execution adapter for now).
   and batched unlocked-orphan cleanup; the scheduled task takes it and an item lookup directly.
   The three manager entry points, its people repository and its logger field are removed. Validation
   reports monotonic progress, counts missing entries and checks cancellation before root creation.
+
+- **Shared query scope.** `LibraryManager` now uses the existing `IItemQueryScopeService` for
+  parent/ancestor and visible-user-library scoping, including the named-metadata ancestor-to-library
+  projection. Its duplicate private scope methods and direct user-view-catalogue dependency are
+  removed. The shared implementation resolves top parents through explicit lookup. Manager query
+  orchestration still applies its unchanged playlist/collection refusal exclusion after user scoping;
+  that filter is not dropped or moved behind a new dependency. No deferred registration is added.
