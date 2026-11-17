@@ -671,35 +671,10 @@ namespace Tesserafin.Server.Core.Library
             => _options.GetLibraryOptions(item);
 
         public CollectionType? GetContentType(BaseItem item)
-        {
-            var configuredContentType = GetConfiguredContentType(item, false);
-            if (configuredContentType is not null)
-            {
-                return configuredContentType;
-            }
-
-            configuredContentType = GetConfiguredContentType(item, true);
-            if (configuredContentType is not null)
-            {
-                return configuredContentType;
-            }
-
-            return GetInheritedContentType(item);
-        }
+            => _options.GetContentType(item);
 
         public CollectionType? GetInheritedContentType(BaseItem item)
-        {
-            var type = GetTopFolderContentType(item);
-
-            if (type is not null)
-            {
-                return type;
-            }
-
-            return item.GetParents(this)
-                .Select(GetConfiguredContentType)
-                .LastOrDefault(i => i is not null);
-        }
+            => _options.GetInheritedContentType(item);
 
         public CollectionType? GetConfiguredContentType(BaseItem item)
         {
@@ -723,9 +698,6 @@ namespace Tesserafin.Server.Core.Library
 
         private CollectionType? GetContentTypeOverride(string path, bool inherit)
             => _options.GetConfiguredContentType(path, inherit);
-
-        private CollectionType? GetTopFolderContentType(BaseItem item)
-            => _options.GetTopFolderContentType(item);
 
         /// <inheritdoc />
         /// <remarks>

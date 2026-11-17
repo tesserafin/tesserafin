@@ -680,3 +680,13 @@ streaming controllers (retained behind the v2 execution adapter for now).
   source files are preserved on catalogue removal, and admitted refresh tasks are awaited together.
   Cancellation propagates through the entity refresh boundary. Metadata/sidecar changes remain
   separate operations; no cross-item rollback or global concurrent-refresh serialization is added.
+
+- **Owned video refresh.** `IItemWriteCommands.RefreshOwnedVideosAsync` owns multipart and local
+  alternate admission, typed construction, metadata refresh and link creation. `Video` only calls
+  the explicit command after its base bonus refresh; the unused base owned-video helper is removed.
+  The shared library-options service supplies effective collection policy without manager statics.
+  Duplicate IDs are admitted once, saved candidates are copied before edits, foreign ownership is
+  rejected, and pruned alternate paths are published only after all admitted refreshes complete.
+  Missing owned multipart rows are removed through catalogue-only deletion. Initial creates,
+  obsolete-generic cleanup, provider refresh and link writes remain distinct operations; a later
+  failure does not roll back successful earlier work. There is no global refresh serialization.

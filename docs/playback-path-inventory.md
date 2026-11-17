@@ -1088,3 +1088,27 @@ real-host journey rejects a new trailer row with SQLite, proves retry, verifies 
 SpecialFeatures over HTTP, replaces catalogue extras, preserves alternate metadata and checks every
 source byte. Metadata fetches are disabled in that deterministic lifecycle journey. HTTP/OpenAPI and
 SDK shapes are unchanged; the .NET interface additions/removals are intentional.
+
+## 36. Owned multipart and local-version refresh
+
+`Video` no longer prepares, creates, cleans up or refreshes its additional parts and local alternate
+versions. Its owned-item hook calls `IItemWriteCommands.RefreshOwnedVideosAsync` after bonus refresh.
+The obsolete protected `BaseItem.RefreshMetadataForOwnedVideo` helper is also removed. Multipart
+items keep generic `Video` identity; alternate items keep their primary's concrete type and existing
+stack-discovery policy. Effective collection-type policy moves into `ILibraryItemOptions` and the
+manager's existing read methods use that same policy. No new manager or provider dependency is added.
+
+Admission deduplicates identities before asynchronous work starts. Persisted candidates and caller
+options are copied before ownership, primary-version or inherited-metadata edits. Existing foreign
+owner/primary relationships and self-ownership are rejected. New records are saved through the
+existing graph writer; refresh uses a fresh copy of that published creation. The local-version link
+is written only after its refresh succeeds. Nonexistent local paths are pruned only after all
+admitted work completes; missing owned multipart rows use metadata-only deletion. All started tasks
+are awaited on failure or cancellation. These are distinct operations, not a cross-item transaction:
+initial creation, completed provider saves and obsolete-generic cleanup can survive a later failure.
+
+Focused tests exercise type/identity, deduplication, title inheritance, option isolation, failed
+ownership refresh/retry, foreign-owner refusal, missing parts and cancellation. A named required
+real-host journey rejects a typed alternate insert, retries through the entity refresh entry point,
+checks generic-obsolete removal, multipart metadata and HTTP sources, and compares every source byte.
+Metadata downloads are disabled for the lifecycle proof. HTTP/OpenAPI/SDK shapes are unchanged.

@@ -11,6 +11,10 @@ public interface ILibraryItemOptions
 {
     LibraryOptions GetLibraryOptions(BaseItem item);
 
+    CollectionType? GetContentType(BaseItem item);
+
+    CollectionType? GetInheritedContentType(BaseItem item);
+
     CollectionType? GetTopFolderContentType(BaseItem? item);
 
     CollectionType? GetConfiguredContentType(string path, bool inherit = false);
