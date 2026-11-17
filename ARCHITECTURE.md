@@ -698,3 +698,13 @@ streaming controllers (retained behind the v2 execution adapter for now).
   Caller snapshots change only after persistence. Manual-reference rerouting precedes the graph
   update, so failure leaves the old primary discoverable by a later scan. Catalogue deletion follows.
   Sidecar exports and later operations remain outside the graph transaction. No refresh lock is added.
+
+- **Folder child reconciliation.** Folder validation materializes filesystem discovery before
+  invoking the writer; an I/O/security failure skips the folder and cancellation propagates.
+  The internal folder-child reconciler owns comparison, staged resolved updates, catalogue-only
+  deletion, creation, version transfer and history reattachment through explicit lifecycle ports.
+  Its constructor takes lookup, filesystem and logging only. Images retain explicit prepare/commit/
+  dispose ownership. Folder keeps traversal, progress and metadata refresh. Root/child accessibility
+  checks use explicit parent lookup, and inaccessible retyped paths keep their previous identities.
+  Resolved fields/parents are staged on copies before persistence; prior successful operations and
+  sidecars are not rolled back by a later failure. There is no whole-folder transaction or new lock.

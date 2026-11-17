@@ -1479,3 +1479,35 @@ controls only discovery inputs: it runs the actual folder validation and applica
 rejects a graph update with SQLite, retries demotion, rejects reference rerouting, retries the full
 replacement scan, checks HTTP media sources/playlist references and compares all original bytes.
 HTTP/OpenAPI/SDK shapes are unchanged.
+
+## 46. Completed discovery and folder-child reconciliation
+
+`Folder` no longer compares catalogue children, writes resolved metadata, removes stale/retyped
+entries, creates new items, selects primary transfers or reattaches detached user data. The existing
+writer delegates that workflow to the internal `FolderChildReconciler`, whose constructor depends
+only on lookup, filesystem and logging. Commands, deletion and image lifecycle ports are supplied
+explicitly to the operation, avoiding a writer/reconciler constructor cycle or entity service static.
+Folder retains discovery, recursion, progression and child metadata refresh.
+
+Discovery is materialized inside the exception boundary. Partial enumeration, denied access and
+I/O failure skip reconciliation rather than becoming an empty directory; cancellation is rethrown.
+A genuinely empty successful discovery still removes stale catalogue rows, preserving source files.
+Admission deduplicates equivalent IDs and refuses conflicting identity/path/type input before writes.
+Inaccessible libraries skip all mutations, and inaccessible retyped paths retain their old identities
+without entering the refreshable subset. Accessibility resolves parents through the lookup port.
+
+`BaseItem.CopyWithResolvedMetadata` applies the existing typed resolved-field policy to a detached
+copy, including copied video part/version arrays. Updates keep the catalogue item's captured parent;
+new candidates receive the scan parent on a copy. Deletion also receives a copy and captured parent,
+so a failed port cannot prematurely detach the published source item. Unchanged items still prepare,
+commit and dispose image updates. The prior primary-transfer workflows remain required CI journeys.
+
+Focused cases cover staging/failure/retry, images/disposal, duplicate and conflicting discovery,
+inaccessible roots and retyped paths, deletion failure, history ordering, existing-primary demotion
+and cancelled admission. A named required real-host journey controls discovery only and uses real
+catalogue reads/services. It rejects lazy I/O/security/cancellation discovery, rejects a resolved-field
+SQL update and retries, replaces Movie with Video at the same path, verifies user-history/favorite
+reattachment and HTTP identity, then removes the catalogue entry while checking both media files.
+Initial creates, metadata sidecars, image commits, deletions and user-data operations remain separate;
+there is no whole-folder rollback, new global serialization or snapshot-isolation guarantee.
+HTTP/OpenAPI/SDK shapes are unchanged; the .NET command/helper/result additions are intentional.

@@ -1671,6 +1671,23 @@ namespace Tesserafin.Controller.Entities
             return list;
         }
 
+        /// <summary>Copies this item and applies resolved file metadata without changing this instance.</summary>
+        /// <param name="resolved">The same identity and concrete item type after discovery.</param>
+        /// <param name="changes">The metadata changes applied to the copy.</param>
+        /// <returns>A detached item carrying the resolved changes.</returns>
+        public BaseItem CopyWithResolvedMetadata(BaseItem resolved, out ItemUpdateType changes)
+        {
+            ArgumentNullException.ThrowIfNull(resolved);
+            if (!Id.Equals(resolved.Id) || GetType() != resolved.GetType())
+            {
+                throw new ArgumentException("Resolved metadata must have the same identity and concrete type.", nameof(resolved));
+            }
+
+            var staged = CopyForWrite();
+            changes = staged.UpdateFromResolvedItem(resolved);
+            return staged;
+        }
+
         internal virtual ItemUpdateType UpdateFromResolvedItem(BaseItem newItem)
         {
             var updateType = ItemUpdateType.None;

@@ -241,7 +241,7 @@ public sealed class ItemWriteCommandsTests
             Files.Setup(f => f.IsPathFile(It.IsAny<string>())).Returns(true);
             Linked.Setup(l => l.GetLinkedChildrenIds(It.IsAny<Guid>(), It.IsAny<int?>())).Returns([]);
             Metadata.Setup(m => m.SaveAsync(It.IsAny<BaseItem>(), It.IsAny<ItemUpdateType>(), It.IsAny<CancellationToken>(), It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
-            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, Mock.Of<ILibraryItemOptions>(), Lookup.Object, Linked.Object), Persistence.Object, Cache, Lookup.Object, Linked.Object, Metadata.Object, Files.Object, Events, new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(Mock.Of<IServerConfigurationManager>(), Mock.Of<IFileSystem>()), Mock.Of<IItemResolutionService>(), Mock.Of<IItemRepository>(), Mock.Of<ILibraryItemOptions>(), NullLogger<ItemWriteCommands>.Instance);
+            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, Mock.Of<ILibraryItemOptions>(), Lookup.Object, Linked.Object), Persistence.Object, Cache, Lookup.Object, Linked.Object, Metadata.Object, Files.Object, Events, new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(Mock.Of<IServerConfigurationManager>(), Mock.Of<IFileSystem>()), Mock.Of<IItemResolutionService>(), Mock.Of<IItemRepository>(), Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(Lookup.Object, Mock.Of<IFileSystem>(), NullLogger<FolderChildReconciler>.Instance), NullLogger<ItemWriteCommands>.Instance);
         }
 
         public Mock<IItemResolutionService> Resolution { get; } = new();

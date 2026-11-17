@@ -285,7 +285,7 @@ public sealed class OwnedVideosCommandsTests
                 .Callback((BaseItem item, MetadataRefreshOptions options, CancellationToken _) => Refreshed.Add(((Video)item, options))).ReturnsAsync(ItemUpdateType.None);
             BaseItem.ProviderManager = Provider.Object;
             BaseItem.LibraryManager = new Mock<ILibraryManager>(MockBehavior.Strict).Object;
-            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, itemOptions.Object, Lookup, Linked.Object), Persistence.Object, Cache, Lookup, Linked.Object, Mock.Of<IItemMetadataExporter>(), Files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(configuration.Object, Files.Object), Resolution.Object, Repository.Object, itemOptions.Object, NullLogger<ItemWriteCommands>.Instance);
+            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, itemOptions.Object, Lookup, Linked.Object), Persistence.Object, Cache, Lookup, Linked.Object, Mock.Of<IItemMetadataExporter>(), Files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(configuration.Object, Files.Object), Resolution.Object, Repository.Object, itemOptions.Object, new FolderChildReconciler(Lookup, Mock.Of<IFileSystem>(), NullLogger<FolderChildReconciler>.Instance), NullLogger<ItemWriteCommands>.Instance);
         }
 
         public Movie Owner { get; } = new() { Id = Guid.NewGuid(), ParentId = Guid.NewGuid(), Path = "/media/owner.mkv", Overview = "owner description", Genres = ["owner genre"] };

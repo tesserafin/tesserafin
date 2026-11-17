@@ -219,7 +219,7 @@ public sealed class PrimaryVersionTransferTests
                     Links[(item.Id, LinkedChildType.LinkedAlternateVersion)] = item.LinkedAlternateVersions.Select(child => child.ItemId!.Value).ToArray();
                 }
             });
-            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(resolution.Object, Mock.Of<ILibraryItemOptions>(), Lookup.Object, Linked.Object), Persistence.Object, this, Lookup.Object, Linked.Object, Metadata.Object, files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(Mock.Of<IServerConfigurationManager>(), files.Object), resolution.Object, Mock.Of<IItemRepository>(), Mock.Of<ILibraryItemOptions>(), NullLogger<ItemWriteCommands>.Instance);
+            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(resolution.Object, Mock.Of<ILibraryItemOptions>(), Lookup.Object, Linked.Object), Persistence.Object, this, Lookup.Object, Linked.Object, Metadata.Object, files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(Mock.Of<IServerConfigurationManager>(), files.Object), resolution.Object, Mock.Of<IItemRepository>(), Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(Lookup.Object, Mock.Of<IFileSystem>(), NullLogger<FolderChildReconciler>.Instance), NullLogger<ItemWriteCommands>.Instance);
         }
 
         public Dictionary<Guid, Video> Rows { get; } = [];

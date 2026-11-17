@@ -31,12 +31,16 @@ internal sealed partial class ItemWriteCommands(
     IItemResolutionService resolution,
     IItemRepository repository,
     ILibraryItemOptions itemOptions,
+    FolderChildReconciler childReconciler,
     ILogger<ItemWriteCommands> logger) : IItemWriteCommands
 {
     private readonly IItemResolutionService _resolution = resolution;
     private readonly IItemRepository _repository = repository;
 
     private readonly object _namedItemGate = new();
+
+    public Task<FolderChildReconciliationResult> ReconcileFolderChildrenAsync(Folder parent, IReadOnlyList<BaseItem> currentChildren, IReadOnlyList<BaseItem> discovered, IDirectoryService directoryService, bool allowRemoveRoot, IItemDeletionCommands deletions, IItemImageService images, CancellationToken cancellationToken)
+        => childReconciler.ReconcileAsync(parent, currentChildren, discovered, directoryService, allowRemoveRoot, this, deletions, images, cancellationToken);
 
     public T GetOrCreateNamedItem<T>(string name, CancellationToken cancellationToken)
         where T : BaseItem, new()
