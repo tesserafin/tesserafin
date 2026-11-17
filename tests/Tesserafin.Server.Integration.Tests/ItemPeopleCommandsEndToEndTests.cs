@@ -53,7 +53,8 @@ public sealed class ItemPeopleCommandsEndToEndTests(TesserafinApplicationFactory
             Assert.Null(people.GetPerson(name));
             var film = new Movie { Id = Guid.NewGuid(), Name = "person reads " + suffix, Path = file };
             writes.CreateItems([film], null, TestContext.Current.CancellationToken);
-            await commands.UpdateAsync(film,
+            await commands.UpdateAsync(
+                film,
                 [new PersonInfo { Name = name, Type = PersonKind.Actor }, new PersonInfo { Name = lockedName, Type = PersonKind.Actor }],
                 TestContext.Current.CancellationToken);
             var person = Assert.IsType<Person>(people.GetPerson(name));
@@ -78,7 +79,7 @@ public sealed class ItemPeopleCommandsEndToEndTests(TesserafinApplicationFactory
             await using (var database = await databases.CreateDbContextAsync(TestContext.Current.CancellationToken))
             {
                 await database.Peoples
-                    .Where(p => (p.Name == name || p.Name == lockedName) && !database.PeopleBaseItemMap.Any(m => m.PeopleId == p.Id))
+                    .Where(p => (p.Name == name || p.Name == lockedName) && !database.PeopleBaseItemMap.Any(m => m.PeopleId.Equals(p.Id)))
                     .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
             }
 
@@ -174,9 +175,9 @@ public sealed class ItemPeopleCommandsEndToEndTests(TesserafinApplicationFactory
             }
         }
     }
+
     private sealed class InlineProgress(Action<double> report) : IProgress<double>
     {
         public void Report(double value) => report(value);
     }
-
 }

@@ -46,9 +46,9 @@ public sealed class PeopleReadValidationTests
         var last = context.Store("last");
         var user = new User("user", "auth", "reset");
         var query = new InternalPeopleQuery { User = user, StartIndex = 9, Limit = 5 };
-        context.People.Setup(p => p.GetPeople(query)).Returns(new QueryResult<PersonInfo>(9, 27,
-            new[] { "first", "missing", "bad/name", "blocked", "last" }.Select(n => new PersonInfo { Name = n }).ToArray()));
-        context.Visibility.Setup(v => v.IsVisibleViaTags(It.IsAny<BaseItem>(), user, false)).Returns((BaseItem item, User _, bool _) => item.Id != blocked.Id);
+        var credits = new[] { "first", "missing", "bad/name", "blocked", "last" }.Select(n => new PersonInfo { Name = n }).ToArray();
+        context.People.Setup(p => p.GetPeople(query)).Returns(new QueryResult<PersonInfo>(9, 27, credits));
+        context.Visibility.Setup(v => v.IsVisibleViaTags(It.IsAny<BaseItem>(), user, false)).Returns((BaseItem item, User _, bool _) => !item.Id.Equals(blocked.Id));
 
         var result = context.Service.GetPeopleItems(query);
 
