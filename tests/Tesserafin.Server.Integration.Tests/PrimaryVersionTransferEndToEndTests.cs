@@ -173,6 +173,8 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
     {
         public IReadOnlyList<BaseItem> Resolved { get; init; } = [];
 
+        public override string GetClientTypeName() => nameof(Folder);
+
         protected override IEnumerable<BaseItem> GetNonCachedChildren(IDirectoryService directoryService) => Resolved;
     }
 }
