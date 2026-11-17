@@ -50,7 +50,7 @@
 #  10. ALWAYS tears down — server process AND temp directory — via a trap, on success, failure,
 #      Ctrl-C or SIGTERM alike. Pass --keep to retain the temp tree for debugging.
 #
-# MEDIA FIXTURES — five scenarios, three libraries:
+# MEDIA FIXTURES — seven scenarios, four libraries:
 #
 #   library "Movies" (CollectionType=movies) — EXACTLY TWO ITEMS, SEE THE CONTRACT NOTE BELOW
 #     Smoke Test Movie (2020)/Smoke Test Movie (2020).mp4      H264 + AAC in MP4    -> DIRECT PLAY
@@ -69,6 +69,12 @@
 #        two audio tracks that differ - 1000 Hz French, 440 Hz English and default - so a track
 #        change is audible in what is produced; a bitrate ceiling under the source's turns it into
 #        a video encode. The server lists the external subtitle first: its audio indices are 2, 3)
+#
+#   library "Series Probes" (CollectionType=tvshows)
+#     Probe Series/Season 01/Probe Series S01E01.mkv           H264 + AC-3 in MKV, 20 s  -> TRANSCODE (audio), AS AN EPISODE
+#     Probe Series/Season 01/Probe Series S01E02.ts            H264 + AAC in MPEG-TS, 20 s -> REMUX, AS AN EPISODE
+#       (the session video journey owns episodes as it owns films; two consecutive episodes so
+#        the browser proof also covers the queue moving from one to the next)
 #
 #   WHY A THIRD LIBRARY FOR THE REMUX FILM: "Remux Probe" is a `Video` (homevideos resolves
 #   nothing else), and the film playback journey only owns items of type `Movie`. A Movie cannot
@@ -236,6 +242,7 @@ MEDIA_DIR="$DATADIR/media/movies"
 # exactly-two-items shape reefin-web's library.spec.ts hard-codes (see the header).
 PROBE_DIR="$DATADIR/media/probes"
 FILM_ROOT="$DATADIR/media/films"
+SERIES_ROOT="$DATADIR/media/series"
 LOG_FILE="$DATADIR/server.log"
 mkdir -p "$CONFIG_DIR" "$MEDIA_DIR" "$PROBE_DIR"
 
@@ -390,7 +397,10 @@ FILM_SUBTITLE_FILE="$FILM_DIR/Container Film (2023).en.srt"
 DUBBED_DIR="$FILM_ROOT/Dubbed Film (2024)"
 DUBBED_FILE="$DUBBED_DIR/Dubbed Film (2024).mkv"
 DUBBED_SUBTITLE_FILE="$DUBBED_DIR/Dubbed Film (2024).en.srt"
-mkdir -p "$DIRECTPLAY_DIR" "$TRANSCODE_DIR" "$REMUX_DIR" "$FILM_DIR" "$DUBBED_DIR"
+SEASON_DIR="$SERIES_ROOT/Probe Series/Season 01"
+EPISODE1_FILE="$SEASON_DIR/Probe Series S01E01.mkv"
+EPISODE2_FILE="$SEASON_DIR/Probe Series S01E02.ts"
+mkdir -p "$DIRECTPLAY_DIR" "$TRANSCODE_DIR" "$REMUX_DIR" "$FILM_DIR" "$DUBBED_DIR" "$SEASON_DIR"
 
 banner "Synthesizing media fixtures with ffmpeg (each one ffprobe-verified)"
 
@@ -524,6 +534,32 @@ Tesserafin E2E transcode film subtitle, cue two.
 SRT
 assert_container "$DUBBED_SUBTITLE_FILE" srt
 assert_codec     "$FILM_SUBTITLE_FILE" s:0 subrip
+
+# --- 7. EPISODES: a transcode and a remux, as consecutive episodes of one series --------------
+log "fixture: $EPISODE1_FILE (transcode episode — H264 + AC-3 in Matroska, 20 s)"
+ffmpeg -hide_banner -loglevel error -y \
+    -f lavfi -i "testsrc=size=320x240:rate=15:duration=20" \
+    -f lavfi -i "sine=frequency=660:duration=20" \
+    -c:v libx264 -preset ultrafast -crf 36 -pix_fmt yuv420p \
+    -g 15 -keyint_min 15 -sc_threshold 0 \
+    -c:a ac3 -b:a 64k -ac 2 -f matroska \
+    "$EPISODE1_FILE"
+assert_container "$EPISODE1_FILE" matroska
+assert_codec     "$EPISODE1_FILE" v:0 h264
+assert_codec     "$EPISODE1_FILE" a:0 ac3
+assert_under_1mib "$EPISODE1_FILE"
+log "fixture: $EPISODE2_FILE (remux episode — H264 + AAC in MPEG-TS, 20 s)"
+ffmpeg -hide_banner -loglevel error -y \
+    -f lavfi -i "testsrc=size=320x240:rate=15:duration=20" \
+    -f lavfi -i "sine=frequency=880:duration=20" \
+    -c:v libx264 -preset ultrafast -crf 36 -pix_fmt yuv420p \
+    -g 15 -keyint_min 15 -sc_threshold 0 \
+    -c:a aac -b:a 64k -f mpegts \
+    "$EPISODE2_FILE"
+assert_container "$EPISODE2_FILE" mpegts
+assert_codec     "$EPISODE2_FILE" v:0 h264
+assert_codec     "$EPISODE2_FILE" a:0 aac
+assert_under_1mib "$EPISODE2_FILE"
 
 # ---------------------------------------------------------------------------
 # network.xml — the ONLY way to set the listen port (see this script's header).
@@ -708,6 +744,8 @@ add_library "Movies" movies "$MEDIA_DIR" false
 # The remux FILM: a mixed-content library (no collection type), where it resolves as a Movie
 # without becoming a third card of the movies grid or a second movies-typed library.
 add_library "Film Probes" "" "$FILM_ROOT" false
+# The episodes: a tvshows library, so the folders resolve as a Series, a Season and Episodes.
+add_library "Series Probes" tvshows "$SERIES_ROOT" false
 # The remux fixture lives here rather than in Movies so the movies grid keeps exactly two
 # cards. homevideos still resolves to Video items, so ffprobe metadata and external-subtitle
 # resolution work identically — only the card count of the contract library is protected.
@@ -717,7 +755,7 @@ add_library "Codec Probes" homevideos "$PROBE_DIR" true
 # ---------------------------------------------------------------------------
 # Wait for the library scan — asynchronous, so "server up" is NOT "view present".
 # ---------------------------------------------------------------------------
-banner "Waiting for the three library views to materialize in /UserViews"
+banner "Waiting for the four library views to materialize in /UserViews"
 views_ready=0
 for _ in $(seq 1 "$READY_TIMEOUT"); do
     if ! kill -0 "$SERVER_PID" 2>/dev/null; then
@@ -735,7 +773,7 @@ except Exception:
     sys.exit(1)
 types = [i.get("CollectionType") for i in items]
 names = [i.get("Name") for i in items]
-sys.exit(0 if types.count("movies") == 1 and "homevideos" in types and "Film Probes" in names else 1)
+sys.exit(0 if types.count("movies") == 1 and "homevideos" in types and "Film Probes" in names and "tvshows" in types else 1)
 ' 2>/dev/null; then
         views_ready=1
         break
@@ -748,7 +786,7 @@ if [ "$views_ready" -ne 1 ]; then
     tail -40 "$LOG_FILE" >&2 || true
     exit 1
 fi
-log "the three library views are visible in /UserViews"
+log "the four library views are visible in /UserViews"
 
 MOVIES_VIEW_ID="$(printf '%s' "$VIEWS" | python3 -c 'import json,sys; print(next(i["Id"] for i in json.load(sys.stdin)["Items"] if i.get("CollectionType") == "movies"))')"
 PROBES_VIEW_ID="$(printf '%s' "$VIEWS" | python3 -c 'import json,sys; print(next(i["Id"] for i in json.load(sys.stdin)["Items"] if i.get("CollectionType") == "homevideos"))')"
@@ -785,12 +823,17 @@ for _ in $(seq 1 "$READY_TIMEOUT"); do
     ITEMS_MOVIES="$(fetch_items "$MOVIES_VIEW_ID")"
     ITEMS_PROBES="$(fetch_items "$PROBES_VIEW_ID")"
     ITEMS_FILMS="$(fetch_items "$FILMS_VIEW_ID")"
-    if [ -z "$ITEMS_MOVIES" ] || [ -z "$ITEMS_PROBES" ] || [ -z "$ITEMS_FILMS" ]; then
+    # A tvshows view answers a recursive parentId listing with nothing; the episodes are read by
+    # type instead (no other library holds an episode).
+    ITEMS_SERIES="$(curl -fsS --max-time 15 \
+        "${BASE_URL}/Items?userId=${USER_ID}&recursive=true&includeItemTypes=Episode&fields=MediaStreams,MediaSources,Path" \
+        -H "Authorization: ${AUTH_CLIENT}, Token=\"${TOKEN}\"" 2>/dev/null || true)"
+    if [ -z "$ITEMS_MOVIES" ] || [ -z "$ITEMS_PROBES" ] || [ -z "$ITEMS_FILMS" ] || [ -z "$ITEMS_SERIES" ]; then
         CHECK_REPORT="  /Items returned nothing (movies body: ${#ITEMS_MOVIES} bytes, probes body: ${#ITEMS_PROBES} bytes, films body: ${#ITEMS_FILMS} bytes) — curl failed or the server answered non-2xx"
         sleep 1
         continue
     fi
-    if CHECK_REPORT="$(TESSERAFIN_ITEMS_MOVIES="$ITEMS_MOVIES" TESSERAFIN_ITEMS_PROBES="$ITEMS_PROBES" TESSERAFIN_ITEMS_FILMS="$ITEMS_FILMS" python3 -c '
+    if CHECK_REPORT="$(TESSERAFIN_ITEMS_MOVIES="$ITEMS_MOVIES" TESSERAFIN_ITEMS_PROBES="$ITEMS_PROBES" TESSERAFIN_ITEMS_FILMS="$ITEMS_FILMS" TESSERAFIN_ITEMS_SERIES="$ITEMS_SERIES" python3 -c '
 import json, os, sys
 
 def load(var):
@@ -802,6 +845,7 @@ def load(var):
 movies = [i for i in load("TESSERAFIN_ITEMS_MOVIES") if i.get("Type") == "Movie"]
 probes = [i for i in load("TESSERAFIN_ITEMS_PROBES") if i.get("Type") in ("Video", "Movie")]
 films = [i for i in load("TESSERAFIN_ITEMS_FILMS") if i.get("Type") in ("Video", "Movie")]
+episodes = [i for i in load("TESSERAFIN_ITEMS_SERIES") if i.get("Type") in ("Video", "Movie", "Episode")]
 
 problems = []
 
@@ -866,6 +910,22 @@ if film is not None:
                for s in film.get("MediaStreams", []) or []):
         problems.append("Container Film has no external subrip subtitle stream")
 
+# The episodes must be EPISODES of one series, in order: the session video journey owns them,
+# and the queue proof moves from the first to the second.
+episode1 = check(episodes, "Probe Series S01E01", "h264", "ac3", "mkv")
+episode2 = check(episodes, "Probe Series S01E02", "h264", "aac", "ts")
+if len(episodes) != 2:
+    problems.append("series probes library holds %d videos, expected exactly 2 episodes (names: %s)"
+                    % (len(episodes), [(i.get("Name"), i.get("Type")) for i in episodes]))
+for label, episode, number in (("S01E01", episode1, 1), ("S01E02", episode2, 2)):
+    if episode is None:
+        continue
+    if episode.get("Type") != "Episode":
+        problems.append("%s resolved as %r, expected an Episode" % (label, episode.get("Type")))
+    elif episode.get("IndexNumber") != number or episode.get("ParentIndexNumber") != 1:
+        problems.append("%s numbered S%sE%s, expected S1E%d"
+                        % (label, episode.get("ParentIndexNumber"), episode.get("IndexNumber"), number))
+
 # The external subtitle must arrive as an IsExternal subtitle stream, not merely as a
 # file sitting in the folder.
 if smoke is not None:
@@ -887,6 +947,7 @@ if problems:
 print("  movies library: %s" % sorted(i.get("Name") for i in movies))
 print("  probes library: %s" % sorted(i.get("Name") for i in probes))
 print("  film probes library: %s" % sorted(i.get("Name") for i in films))
+print("  series probes library: %s" % sorted(i.get("Name") for i in episodes))
 ' 2>&1)"; then
         items_verified=1
         break
@@ -989,7 +1050,7 @@ import json,sys
 items = json.load(sys.stdin).get("Items", [])
 types = [i.get("CollectionType") for i in items]
 names = [i.get("Name") for i in items]
-sys.exit(0 if types.count("movies") == 1 and "homevideos" not in types and "Film Probes" not in names else 1)
+sys.exit(0 if types.count("movies") == 1 and "homevideos" not in types and "Film Probes" not in names and "tvshows" not in types else 1)
 ' 2>/dev/null; then
         restricted_ok=1
         break
