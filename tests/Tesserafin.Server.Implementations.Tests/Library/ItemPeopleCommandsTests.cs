@@ -63,8 +63,10 @@ public sealed class ItemPeopleCommandsTests
                 throw new IOException("catalogue failure");
             });
 
-        await Assert.ThrowsAsync<IOException>(() => context.Commands.UpdateAsync(context.Item,
-            [new PersonInfo { Name = "Alice", ImageUrl = "https://example.test/portrait.jpg", ProviderIds = new() { ["Imdb"] = "new" } }], TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<IOException>(() => context.Commands.UpdateAsync(
+            context.Item,
+            [new PersonInfo { Name = "Alice", ImageUrl = "https://example.test/portrait.jpg", ProviderIds = new() { ["Imdb"] = "new" } }],
+            TestContext.Current.CancellationToken));
 
         Assert.Equal("old", original.GetProviderId("Imdb"));
         Assert.Empty(original.ImageInfos);

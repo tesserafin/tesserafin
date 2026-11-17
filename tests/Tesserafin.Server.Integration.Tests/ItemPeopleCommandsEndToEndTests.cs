@@ -36,9 +36,11 @@ public sealed class ItemPeopleCommandsEndToEndTests(TesserafinApplicationFactory
         changes.ItemUpdated += Updated;
         try
         {
-            await commands.UpdateAsync(item,
+            await commands.UpdateAsync(
+                item,
                 [new PersonInfo { Name = name, Type = PersonKind.Actor, Role = "Lead", ProviderIds = new() { ["Imdb"] = "nm111" } },
-                 new PersonInfo { Name = name, Type = PersonKind.Director }], TestContext.Current.CancellationToken);
+                 new PersonInfo { Name = name, Type = PersonKind.Director }],
+                TestContext.Current.CancellationToken);
 
             var person = Assert.IsType<Person>(manager.GetPerson(name));
             Assert.Equal(new[] { person.Id }, added);
@@ -47,8 +49,10 @@ public sealed class ItemPeopleCommandsEndToEndTests(TesserafinApplicationFactory
             Assert.NotEqual(default, person.DateLastSaved);
             Assert.Empty(updated);
 
-            await commands.UpdateAsync(item,
-                [new PersonInfo { Name = name, Type = PersonKind.Actor, ProviderIds = new() { ["Imdb"] = "nm222" } }], TestContext.Current.CancellationToken);
+            await commands.UpdateAsync(
+                item,
+                [new PersonInfo { Name = name, Type = PersonKind.Actor, ProviderIds = new() { ["Imdb"] = "nm222" } }],
+                TestContext.Current.CancellationToken);
 
             Assert.Single(people.GetPeople(item));
             Assert.Equal(new[] { person.Id }, updated);
