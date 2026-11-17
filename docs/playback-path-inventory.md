@@ -1059,3 +1059,32 @@ ancestors, unknown ancestors, empty libraries and removed manager copies. A name
 journey compares visible/withheld library lists, totals, counts and filter values, then checks the
 HTTP listing. The broader inherited authorization journeys remain active. No new snapshot isolation
 or per-query compound-filter performance claim is made.
+
+## 35. Owned bonus discovery and refresh ownership
+
+The manager's `FindExtras` entry point and private resolver overload are deleted. Its bonus resolver,
+naming, directory-service and ignore-rule constructor dependencies move into the existing filesystem
+resolution service. The latter exposes `FindExtras` for trailers, special features and theme media;
+existing naming cases migrate to that port. Persisted bonus records are copied before classification,
+so merely discovering an extra cannot change its published type or mixed-folder flag.
+
+`IItemWriteCommands.RefreshExtrasAsync` owns catalogue reconciliation and calls its new shared
+`RefreshOwnedMetadataAsync` for inherited title metadata and refresh. `BaseItem` loses its private
+extra lifecycle and owned-metadata helper; its and `Video`'s remaining owned-video paths call the
+explicit writer directly. The manager loses 99 lines (894 remain), and BaseItem loses 128 net lines.
+No new entity static, metadata-provider constructor edge or manager compatibility bridge is added.
+
+Reconciliation compares only actual extras; non-extra owned versions do not trigger a spurious save
+and are never candidates for removal. Repeated discovery IDs are refreshed once. Staging completes
+before asynchronous refresh admission; all started tasks are awaited even when a later refresh
+observes cancellation. Catalogue-only removal preserves original sources. Inherited metadata arrays
+are copied, caller options stay unchanged, and owned-refresh cancellation propagates instead of being
+logged as a successful owner refresh. Previously completed deletes/refreshes and sidecar writes are
+not rolled back after later failure. There is no new global refresh lock or snapshot-isolation claim.
+
+Focused tests cover detached discovery, unchanged extra sets with alternate versions, inheritance,
+failed refresh publication, cancellation/admission/draining and ownership removals. A named required
+real-host journey rejects a new trailer row with SQLite, proves retry, verifies LocalTrailers and
+SpecialFeatures over HTTP, replaces catalogue extras, preserves alternate metadata and checks every
+source byte. Metadata fetches are disabled in that deterministic lifecycle journey. HTTP/OpenAPI and
+SDK shapes are unchanged; the .NET interface additions/removals are intentional.

@@ -46,7 +46,6 @@ using Tesserafin.Server.Core.Library.Validators;
 using Episode = Tesserafin.Controller.Entities.TV.Episode;
 using Genre = Tesserafin.Controller.Entities.Genre;
 using Person = Tesserafin.Controller.Entities.Person;
-using VideoResolver = Tesserafin.Naming.Video.VideoResolver;
 
 namespace Tesserafin.Server.Core.Library
 {
@@ -74,8 +73,6 @@ namespace Tesserafin.Server.Core.Library
         private readonly IItemSortService _itemSortService;
         private readonly IItemNamingService _itemNamingService;
         private readonly IItemPeopleService _itemPeopleService;
-        private readonly NamingOptions _namingOptions;
-        private readonly ExtraResolver _extraResolver;
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemCacheStore _itemCacheStore;
         private readonly IItemAccessService _itemAccessService;
@@ -84,7 +81,6 @@ namespace Tesserafin.Server.Core.Library
         private readonly ICollectionFolderResolver _collectionFolderResolver;
         private readonly IMediaStreamLanguageService _mediaStreamLanguageService;
 
-        private readonly DotIgnoreIgnoreRule _dotIgnoreIgnoreRule;
         private readonly ILibraryRootFolderProvider _roots;
 
         /// <summary>
@@ -92,7 +88,6 @@ namespace Tesserafin.Server.Core.Library
         /// </summary>
         /// <param name="resolution">Filesystem resolution.</param>
         /// <param name="options">Library options and content policy.</param>
-        /// <param name="loggerFactory">The logger factory.</param>
         /// <param name="userManager">The user manager.</param>
         /// <param name="configurationManager">The configuration manager.</param>
         /// <param name="fileSystem">The file system.</param>
@@ -104,8 +99,6 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="itemSortService">The item sort service.</param>
         /// <param name="itemNamingService">The item naming service.</param>
         /// <param name="itemPeopleService">The item people service.</param>
-        /// <param name="namingOptions">The naming options.</param>
-        /// <param name="directoryService">The directory service.</param>
         /// <param name="mediaStreamLanguageService">The media stream language service.</param>
         /// <param name="itemLookupService">The item lookup service (read side of the item lookup cache; see PR75/PR76).</param>
         /// <param name="itemCacheStore">The item cache lifecycle port (register/invalidate side of the same cache; see PR76).</param>
@@ -113,12 +106,10 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="userViewFactory">The user-view factory leaf (named/shadow view creation; see PR106b). <see cref="GetNamedView(User, string, CollectionType?, string)"/> and the other overloads delegate to it - a leaf dependency, not a cycle: <c>UserViewFactory</c> never references <see cref="ILibraryManager"/>.</param>
         /// <param name="userRootFolderProvider">The user root folder provider leaf (construction/cache of the per-server <see cref="UserRootFolder"/>; see PR107). <see cref="GetUserRootFolder"/> and this class's internal callers delegate to it - a leaf dependency, not a cycle: <c>UserRootFolderProvider</c> never references <see cref="ILibraryManager"/>. <see cref="LibraryManager"/> no longer implements <see cref="IUserRootFolderProvider"/> itself (it used to be aliased onto it via a DI factory cast - RFC <c>docs/rfc-di-query-user-views-v2.md</c> §0/§1's "piège n°1").</param>
         /// <param name="collectionFolderResolver">The library membership leaf (<see cref="GetCollectionFolders(BaseItem)"/> and its overload delegate to it; see DEBT-SERVER-2) - a leaf dependency, not a cycle: <c>CollectionFolderResolver</c> never references <see cref="ILibraryManager"/>.</param>
-        /// <param name="dotIgnoreIgnoreRule">The ignore rules.</param>
         /// <param name="roots">Application aggregate root ownership.</param>
         public LibraryManager(
             IItemResolutionService resolution,
             ILibraryItemOptions options,
-            ILoggerFactory loggerFactory,
             IUserManager userManager,
             IServerConfigurationManager configurationManager,
             IFileSystem fileSystem,
@@ -130,8 +121,6 @@ namespace Tesserafin.Server.Core.Library
             IItemSortService itemSortService,
             IItemNamingService itemNamingService,
             IItemPeopleService itemPeopleService,
-            NamingOptions namingOptions,
-            IDirectoryService directoryService,
             IMediaStreamLanguageService mediaStreamLanguageService,
             IItemLookupService itemLookupService,
             IItemCacheStore itemCacheStore,
@@ -139,7 +128,6 @@ namespace Tesserafin.Server.Core.Library
             IUserViewFactory userViewFactory,
             IUserRootFolderProvider userRootFolderProvider,
             ICollectionFolderResolver collectionFolderResolver,
-            DotIgnoreIgnoreRule dotIgnoreIgnoreRule,
             ILibraryRootFolderProvider roots)
         {
             _resolution = resolution;
@@ -163,11 +151,8 @@ namespace Tesserafin.Server.Core.Library
             _userViewFactory = userViewFactory;
             _userRootFolderProvider = userRootFolderProvider;
             _collectionFolderResolver = collectionFolderResolver;
-            _dotIgnoreIgnoreRule = dotIgnoreIgnoreRule;
             _roots = roots;
 
-            _namingOptions = namingOptions;
-            _extraResolver = new ExtraResolver(loggerFactory.CreateLogger<ExtraResolver>(), namingOptions, directoryService);
 
             _mediaStreamLanguageService = mediaStreamLanguageService;
         }
@@ -198,9 +183,6 @@ namespace Tesserafin.Server.Core.Library
 
         public List<FileSystemMetadata> NormalizeRootPathList(IEnumerable<FileSystemMetadata> paths)
             => _resolution.NormalizeRootPathList(paths);
-
-        private BaseItem? ResolvePath(FileSystemMetadata fileInfo, IDirectoryService directoryService, IItemResolver[]? resolvers, Folder? parent = null, CollectionType? collectionType = null, LibraryOptions? libraryOptions = null)
-            => _resolution.ResolvePath(fileInfo, directoryService, resolvers, parent, collectionType, libraryOptions);
 
         public bool AreEqualPaths(string first, string second) => _fileSystem.AreEqual(first, second);
 
@@ -234,7 +216,6 @@ namespace Tesserafin.Server.Core.Library
 
         public IEnumerable<BaseItem> ResolvePaths(
             IEnumerable<FileSystemMetadata> files,
-            IDirectoryService directoryService,
             Folder parent,
             LibraryOptions libraryOptions,
             CollectionType? collectionType,
@@ -856,86 +837,6 @@ namespace Tesserafin.Server.Core.Library
         public ItemLookupInfo ParseName(string name)
         {
             return _itemNamingService.ParseName(name);
-        }
-
-        public IEnumerable<BaseItem> FindExtras(BaseItem owner, IReadOnlyList<FileSystemMetadata> fileSystemChildren, IDirectoryService directoryService)
-        {
-            // Apply .ignore rules
-            var filtered = fileSystemChildren.Where(c => !_dotIgnoreIgnoreRule.ShouldIgnore(c, owner)).ToList();
-            var isFolder = owner.IsFolder || (owner is Video video && (video.VideoType == VideoType.BluRay || video.VideoType == VideoType.Dvd));
-            var ownerVideoInfo = VideoResolver.Resolve(owner.Path, isFolder, _namingOptions, libraryRoot: owner.ContainingFolderPath);
-            if (ownerVideoInfo is null)
-            {
-                yield break;
-            }
-
-            var count = filtered.Count;
-            for (var i = 0; i < count; i++)
-            {
-                var current = filtered[i];
-                if (current.IsDirectory && _namingOptions.AllExtrasTypesFolderNames.ContainsKey(current.Name))
-                {
-                    var filesInSubFolder = _fileSystem.GetFiles(current.FullName, null, false, false);
-                    var filesInSubFolderList = filesInSubFolder.ToList();
-
-                    bool subFolderIsMixedFolder = filesInSubFolderList.Count > 1;
-
-                    foreach (var file in filesInSubFolderList)
-                    {
-                        if (!_extraResolver.TryGetExtraTypeForOwner(file.FullName, ownerVideoInfo, out var extraType))
-                        {
-                            continue;
-                        }
-
-                        var extra = GetExtra(file, extraType.Value, subFolderIsMixedFolder);
-                        if (extra is not null)
-                        {
-                            yield return extra;
-                        }
-                    }
-                }
-                else if (!current.IsDirectory && _extraResolver.TryGetExtraTypeForOwner(current.FullName, ownerVideoInfo, out var extraType))
-                {
-                    var extra = GetExtra(current, extraType.Value, false);
-                    if (extra is not null)
-                    {
-                        yield return extra;
-                    }
-                }
-            }
-
-            BaseItem? GetExtra(FileSystemMetadata file, ExtraType extraType, bool isInMixedFolder)
-            {
-                var extra = ResolvePath(_fileSystem.GetFileInfo(file.FullName), directoryService, _extraResolver.GetResolversForExtraType(extraType));
-                if (extra is not Video && extra is not Audio)
-                {
-                    return null;
-                }
-
-                // Try to retrieve it from the db. If we don't find it, use the resolved version
-                var itemById = GetItemById(extra.Id);
-                if (itemById is not null)
-                {
-                    extra = itemById;
-                }
-
-                // Only update extra type if it is more specific then the currently known extra type
-                if (extra.ExtraType is null or ExtraType.Unknown || extraType != ExtraType.Unknown)
-                {
-                    extra.ExtraType = extraType;
-                }
-
-                // Only return items that are actual extras (have ExtraType set)
-                // Note: OwnerId and ParentId are set by RefreshExtras, not here,
-                // so that RefreshExtras can detect when they need updating and set ForceSave.
-                if (extra.ExtraType is not null)
-                {
-                    extra.IsInMixedFolder = isInMixedFolder;
-                    return extra;
-                }
-
-                return null;
-            }
         }
 
         public string GetPathAfterNetworkSubstitution(string path, BaseItem? ownerItem)

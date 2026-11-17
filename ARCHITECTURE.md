@@ -670,3 +670,13 @@ streaming controllers (retained behind the v2 execution adapter for now).
   removed. The shared implementation resolves top parents through explicit lookup. Manager query
   orchestration still applies its unchanged playlist/collection refusal exclusion after user scoping;
   that filter is not dropped or moved behind a new dependency. No deferred registration is added.
+
+- **Owned bonus lifecycle.** Filesystem discovery of trailers, special features and theme media now
+  belongs to `IItemResolutionService`, with the existing naming and `.ignore` rules. Persisted
+  candidates are copied before extra-type/mixed-folder classification. The existing writer owns
+  extra reconciliation and owned-item metadata refresh, including title-metadata inheritance.
+  `BaseItem` and `Video` pass their existing explicit write/deletion ports, without new entity statics
+  or manager forwarding methods. Bonus IDs are deduplicated, non-extra owned versions are excluded,
+  source files are preserved on catalogue removal, and admitted refresh tasks are awaited together.
+  Cancellation propagates through the entity refresh boundary. Metadata/sidecar changes remain
+  separate operations; no cross-item rollback or global concurrent-refresh serialization is added.

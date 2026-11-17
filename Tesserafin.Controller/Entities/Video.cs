@@ -637,7 +637,7 @@ namespace Tesserafin.Controller.Entities
                 video.OwnerId = Id;
             }
 
-            await RefreshMetadataForOwnedItem(deletions, writes, video, copyTitleMetadata, newOptions, cancellationToken).ConfigureAwait(false);
+            await writes.RefreshOwnedMetadataAsync(this, video, copyTitleMetadata, deletions, newOptions, cancellationToken).ConfigureAwait(false);
         }
 
         public override IEnumerable<FileSystemMetadata> GetDeletePaths()

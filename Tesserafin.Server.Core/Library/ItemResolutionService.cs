@@ -9,12 +9,14 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Resolvers;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Configuration;
+using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Naming.Common;
 using Tesserafin.Naming.Video;
@@ -30,7 +32,10 @@ internal sealed class ItemResolutionService(
     ILibraryItemOptions options,
     IItemLookupService lookup,
     NamingOptions namingOptions,
-    ILogger<ItemResolutionService> logger) : IItemResolutionService
+    ILogger<ItemResolutionService> logger,
+    ILoggerFactory loggerFactory,
+    IDirectoryService directoryService,
+    DotIgnoreIgnoreRule dotIgnore) : IItemResolutionService
 {
     private readonly IServerConfigurationManager _configurationManager = configuration;
     private readonly IFileSystem _fileSystem = files;
@@ -38,11 +43,95 @@ internal sealed class ItemResolutionService(
     private readonly NamingOptions _namingOptions = namingOptions;
     private readonly ILogger<ItemResolutionService> _logger = logger;
 
+    private readonly ExtraResolver _extraResolver = new(loggerFactory.CreateLogger<ExtraResolver>(), namingOptions, directoryService);
+    private readonly DotIgnoreIgnoreRule _dotIgnoreIgnoreRule = dotIgnore;
+
     private IResolverIgnoreRule[] EntityResolutionIgnoreRules { get; set; } = [];
 
     private IItemResolver[] EntityResolvers { get; set; } = [];
 
     private IMultiItemResolver[] MultiItemResolvers { get; set; } = [];
+
+    /// <inheritdoc />
+    public IEnumerable<BaseItem> FindExtras(BaseItem owner, IReadOnlyList<FileSystemMetadata> fileSystemChildren, IDirectoryService directoryService)
+    {
+        // Apply .ignore rules
+        var filtered = fileSystemChildren.Where(c => !_dotIgnoreIgnoreRule.ShouldIgnore(c, owner)).ToList();
+        var isFolder = owner.IsFolder || (owner is Video video && (video.VideoType == VideoType.BluRay || video.VideoType == VideoType.Dvd));
+        var ownerVideoInfo = VideoResolver.Resolve(owner.Path, isFolder, _namingOptions, libraryRoot: owner.ContainingFolderPath);
+        if (ownerVideoInfo is null)
+        {
+            yield break;
+        }
+
+        var count = filtered.Count;
+        for (var i = 0; i < count; i++)
+        {
+            var current = filtered[i];
+            if (current.IsDirectory && _namingOptions.AllExtrasTypesFolderNames.ContainsKey(current.Name))
+            {
+                var filesInSubFolder = _fileSystem.GetFiles(current.FullName, null, false, false);
+                var filesInSubFolderList = filesInSubFolder.ToList();
+
+                bool subFolderIsMixedFolder = filesInSubFolderList.Count > 1;
+
+                foreach (var file in filesInSubFolderList)
+                {
+                    if (!_extraResolver.TryGetExtraTypeForOwner(file.FullName, ownerVideoInfo, out var extraType))
+                    {
+                        continue;
+                    }
+
+                    var extra = GetExtra(file, extraType.Value, subFolderIsMixedFolder);
+                    if (extra is not null)
+                    {
+                        yield return extra;
+                    }
+                }
+            }
+            else if (!current.IsDirectory && _extraResolver.TryGetExtraTypeForOwner(current.FullName, ownerVideoInfo, out var extraType))
+            {
+                var extra = GetExtra(current, extraType.Value, false);
+                if (extra is not null)
+                {
+                    yield return extra;
+                }
+            }
+        }
+
+        BaseItem? GetExtra(FileSystemMetadata file, ExtraType extraType, bool isInMixedFolder)
+        {
+            var extra = ResolvePath(_fileSystem.GetFileInfo(file.FullName), directoryService, _extraResolver.GetResolversForExtraType(extraType));
+            if (extra is not Video && extra is not Audio)
+            {
+                return null;
+            }
+
+            // Try to retrieve it from the db. If we don't find it, use the resolved version
+            var itemById = GetItemById(extra.Id);
+            if (itemById is not null)
+            {
+                extra = itemById.CopyForWrite();
+            }
+
+            // Only update extra type if it is more specific then the currently known extra type
+            if (extra.ExtraType is null or ExtraType.Unknown || extraType != ExtraType.Unknown)
+            {
+                extra.ExtraType = extraType;
+            }
+
+            // Only return items that are actual extras (have ExtraType set)
+            // Note: OwnerId and ParentId are set by RefreshExtras, not here,
+            // so that RefreshExtras can detect when they need updating and set ForceSave.
+            if (extra.ExtraType is not null)
+            {
+                extra.IsInMixedFolder = isInMixedFolder;
+                return extra;
+            }
+
+            return null;
+        }
+    }
 
     public void AddParts(IEnumerable<IResolverIgnoreRule> rules, IEnumerable<IItemResolver> resolvers)
     {
