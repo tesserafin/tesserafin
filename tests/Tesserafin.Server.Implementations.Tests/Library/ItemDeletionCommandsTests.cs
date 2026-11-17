@@ -47,7 +47,7 @@ public sealed class ItemDeletionCommandsTests
         Assert.Equal(0, notifications);
         context.Persistence.Verify(p => p.DeleteItem(It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
         Assert.Empty(context.Cache.Removed);
-        context.Library.Verify(l => l.RerouteLinkedChildReferencesAsync(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
+        context.Writes.Verify(w => w.RerouteLinkedChildReferencesAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
         context.Files.Setup(f => f.DeleteFile(item.Path)).Callback(() => File.Delete(item.Path));
         await context.Commands.DeleteAsync(item, new DeleteOptions { DeleteFileLocation = true }, parent, TestContext.Current.CancellationToken);
         Assert.False(File.Exists(item.Path));
@@ -55,7 +55,7 @@ public sealed class ItemDeletionCommandsTests
         Assert.Null(alternate.PrimaryVersionId);
         Assert.True(alternate.Saved);
         Assert.Equal(1, notifications);
-        context.Library.Verify(l => l.RerouteLinkedChildReferencesAsync(item.Id, alternate.Id), Times.Once);
+        context.Writes.Verify(w => w.RerouteLinkedChildReferencesAsync(item.Id, alternate.Id, CancellationToken.None), Times.Once);
         context.Persistence.Verify(p => p.DeleteItem(It.Is<IReadOnlyList<Guid>>(ids => ids.Contains(item.Id))), Times.Once);
     }
 
@@ -120,7 +120,7 @@ public sealed class ItemDeletionCommandsTests
         Assert.True(remaining.Saved);
         Assert.DoesNotContain(survivor.Path, survivor.LocalAlternateVersions);
         Assert.DoesNotContain(missing.Path, survivor.LocalAlternateVersions);
-        context.Library.Verify(l => l.RerouteLinkedChildReferencesAsync(item.Id, survivor.Id), Times.Once);
+        context.Writes.Verify(w => w.RerouteLinkedChildReferencesAsync(item.Id, survivor.Id, CancellationToken.None), Times.Once);
         context.Persistence.Verify(p => p.DeleteItem(It.Is<IReadOnlyList<Guid>>(ids => ids.Contains(missing.Id))), Times.Once);
         Assert.True(File.Exists(survivor.Path));
         Assert.True(File.Exists(remaining.Path));
@@ -225,6 +225,8 @@ public sealed class ItemDeletionCommandsTests
             fixture.Register<IItemChangePublisher>(() => Changes);
             Configuration = fixture.Freeze<Mock<IServerConfigurationManager>>();
             Library = fixture.Freeze<Mock<ILibraryManager>>();
+            Writes = fixture.Freeze<Mock<IItemWriteCommands>>();
+            Writes.Setup(w => w.RerouteLinkedChildReferencesAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
             Items = fixture.Freeze<Mock<IItemLookupService>>();
             Persistence = fixture.Freeze<Mock<IItemPersistenceService>>();
             fixture.Inject<IItemCacheStore>(Cache);
@@ -246,6 +248,8 @@ public sealed class ItemDeletionCommandsTests
         public Mock<IServerConfigurationManager> Configuration { get; }
 
         public Mock<ILibraryManager> Library { get; }
+
+        public Mock<IItemWriteCommands> Writes { get; }
 
         public Mock<IItemLookupService> Items { get; }
 

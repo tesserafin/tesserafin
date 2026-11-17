@@ -609,3 +609,14 @@ streaming controllers (retained behind the v2 execution adapter for now).
   saved. There is no manager, provider-manager or service-locator dependency in the command.
   Credit mappings, person writes and sidecar files do not form a single transaction; cancellation
   stops further work but does not undo a mapping replacement that already committed.
+
+- **Linked item writes.** Link upserts and manual reference rerouting are owned by
+  `IItemWriteCommands`; the corresponding manager methods and its metadata exporter dependency
+  are removed. Scan reconciliation, version grouping and deletion promotion use the writer
+  directly. Rerouting's update and duplicate removal share one SQL transaction. Cache repair
+  follows commit, affects manual references only, and drops the source when the target is
+  already present. All affected folder caches are reconciled before cancellable sidecar exports.
+  Cache-repair failures evict every affected parent; exports are skipped.
+  Upserts invalidate their parent's lookup entry only after persistence succeeds. No whole-item
+  save is used for these link mutations. Sidecar exports remain outside the SQL transaction;
+  cancellation during export does not roll back committed links or their cache reconciliation.

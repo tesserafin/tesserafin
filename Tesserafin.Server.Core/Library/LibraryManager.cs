@@ -61,7 +61,6 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     internal class LibraryManager : ILibraryManager, IItemLookupService
     {
-        private readonly IItemMetadataExporter _metadata;
         private readonly IItemResolutionService _resolution;
         private readonly ILibraryItemOptions _options;
         private readonly ILogger<LibraryManager> _logger;
@@ -98,7 +97,6 @@ namespace Tesserafin.Server.Core.Library
         /// </summary>
         /// <param name="resolution">Filesystem resolution.</param>
         /// <param name="options">Library options and content policy.</param>
-        /// <param name="metadata">Explicit metadata export.</param>
         /// <param name="appHost">The application host.</param>
         /// <param name="loggerFactory">The logger factory.</param>
         /// <param name="userManager">The user manager.</param>
@@ -137,7 +135,6 @@ namespace Tesserafin.Server.Core.Library
         public LibraryManager(
             IItemResolutionService resolution,
             ILibraryItemOptions options,
-            IItemMetadataExporter metadata,
             IServerApplicationHost appHost,
             ILoggerFactory loggerFactory,
             IUserManager userManager,
@@ -168,7 +165,6 @@ namespace Tesserafin.Server.Core.Library
         {
             _resolution = resolution;
             _options = options;
-            _metadata = metadata;
             _appHost = appHost;
             _logger = loggerFactory.CreateLogger<LibraryManager>();
             _userManager = userManager;
@@ -1223,12 +1219,6 @@ namespace Tesserafin.Server.Core.Library
         }
 
         /// <inheritdoc />
-        public void UpsertLinkedChild(Guid parentId, Guid childId, Tesserafin.Controller.Entities.LinkedChildType childType)
-        {
-            _linkedChildrenService.UpsertLinkedChild(parentId, childId, childType);
-        }
-
-        /// <inheritdoc />
         public IEnumerable<BaseItem> Sort(IEnumerable<BaseItem> items, User? user, IEnumerable<ItemSortBy> sortBy, SortOrder sortOrder)
         {
             return _itemSortService.Sort(items, user, sortBy, sortOrder);
@@ -1573,29 +1563,6 @@ namespace Tesserafin.Server.Core.Library
         public IReadOnlyDictionary<Guid, IReadOnlyList<string>> GetPeopleNamesByItems(IReadOnlyList<Guid> itemIds, IReadOnlyList<string> personTypes)
         {
             return _itemPeopleService.GetPeopleNamesByItems(itemIds, personTypes);
-        }
-
-        /// <inheritdoc />
-        public async Task RerouteLinkedChildReferencesAsync(Guid fromChildId, Guid toChildId)
-        {
-            var affectedParentIds = _linkedChildrenService.RerouteLinkedChildren(fromChildId, toChildId);
-
-            // Update in-memory LinkedChildren and re-save metadata (NFO) for affected parents
-            foreach (var parentId in affectedParentIds)
-            {
-                if (GetItemById(parentId) is Folder parent)
-                {
-                    foreach (var lc in parent.LinkedChildren)
-                    {
-                        if (lc.ItemId.HasValue && lc.ItemId.Value.Equals(fromChildId))
-                        {
-                            lc.ItemId = toChildId;
-                        }
-                    }
-
-                    await _metadata.SaveAsync(parent, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
-                }
-            }
         }
 
         /// <inheritdoc />

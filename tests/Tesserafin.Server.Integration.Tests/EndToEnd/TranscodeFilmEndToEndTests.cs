@@ -390,7 +390,7 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
         var (client, userId) = await SignInAsync("transcode-version");
         var itemId = await SeedFilmAsync("libx264", Ac3);
         var versionId = await SeedFilmAsync("libx264", Ac3, tags: [Tag]);
-        _libraryManager.UpsertLinkedChild(itemId, versionId, LinkedChildType.LinkedAlternateVersion);
+        _factory.Services.GetRequiredService<IItemWriteCommands>().UpsertLinkedChild(itemId, versionId, LinkedChildType.LinkedAlternateVersion, TestContext.Current.CancellationToken);
 
         var (capabilities, constraints) = EndToEndCapabilityPresets.BrowserRemuxOverHls();
         var session = await CreateSessionAsync(client, itemId, userId, "transcode-version-ps", capabilities, constraints, versionId.ToString("N"));

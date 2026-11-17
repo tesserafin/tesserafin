@@ -234,7 +234,7 @@ public class VideosController : BaseTesserafinApiController
             await item.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
             // Re-route any playlist/collection references from this item to the primary
-            await _libraryManager.RerouteLinkedChildReferencesAsync(item.Id, primaryVersion.Id).ConfigureAwait(false);
+            await _writes.RerouteLinkedChildReferencesAsync(item.Id, primaryVersion.Id, HttpContext.RequestAborted).ConfigureAwait(false);
 
             if (!alternateVersionsOfPrimary.Any(i => i.ItemId.HasValue && i.ItemId.Value.Equals(item.Id)))
             {

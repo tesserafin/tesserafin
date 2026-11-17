@@ -552,7 +552,7 @@ namespace Tesserafin.Controller.Entities
             // was created after the primary video was first saved
             if (LibraryManager.GetItemById(id) is Video video)
             {
-                LibraryManager.UpsertLinkedChild(Id, video.Id, LinkedChildType.LocalAlternateVersion);
+                writes.UpsertLinkedChild(Id, video.Id, LinkedChildType.LocalAlternateVersion, cancellationToken);
 
                 // Ensure PrimaryVersionId is set for existing alternate versions that may not have it
                 if (!video.PrimaryVersionId.HasValue)

@@ -916,3 +916,20 @@ construction has explicit filesystem/root inputs, sharing the policy with active
 Cancellation is checked before mapping replacement and between people. Mappings and people remain
 separate commits; there is no cross-record or filesystem/SQL rollback guarantee. HTTP and OpenAPI
 shapes remain unchanged. The real-host creation/update/clear journey is required by name in CI.
+
+## 29. Linked item mutation ownership
+
+`UpsertLinkedChild` and `RerouteLinkedChildReferencesAsync` are removed from `ILibraryManager`
+and its implementation without forwarding members. The existing `IItemWriteCommands` owns
+both operations and the manager no longer injects `IItemMetadataExporter`. Callers in scan
+reconciliation, local alternate preparation, version grouping and deletion promotion use that
+write port. Read-side alternate queries remain active on the manager.
+
+Rerouting updates manual references and removes collisions in one database transaction. Its
+cache reconciliation preserves nonmanual links and removes duplicate targets before sidecar
+export; all parents are repaired before the first cancellable export. Cancellation before
+admission writes nothing; after SQL commit it cannot undo the link changes. Metadata files are
+outside that transaction. Upserts invalidate the parent lookup entry after a successful save.
+A real-host trigger rejects the second SQL mutation to prove rollback, then a retry checks the
+database, warmed parent caches, duplicate elimination, shortcut isolation and source bytes.
+The journey is required by name in CI. HTTP/OpenAPI shapes are unchanged.

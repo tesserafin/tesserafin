@@ -196,14 +196,6 @@ namespace Tesserafin.Controller.Library
         IEnumerable<Video> GetLinkedAlternateVersions(Video video);
 
         /// <summary>
-        /// Creates or updates a LinkedChild entry linking a parent to a child item.
-        /// </summary>
-        /// <param name="parentId">The parent item ID.</param>
-        /// <param name="childId">The child item ID.</param>
-        /// <param name="childType">The type of linked child relationship.</param>
-        void UpsertLinkedChild(Guid parentId, Guid childId, LinkedChildType childType);
-
-        /// <summary>
         /// Adds the parts.
         /// </summary>
         /// <param name="rules">The rules.</param>
@@ -563,15 +555,6 @@ namespace Tesserafin.Controller.Library
         void ConfigureUserAccess(InternalItemsQuery query, User user);
 
         BaseItem GetParentItem(Guid? parentId, Guid? userId);
-
-        /// <summary>
-        /// Re-routes LinkedChildren references from one child to another.
-        /// Used when video versions change to maintain playlist/BoxSet integrity.
-        /// </summary>
-        /// <param name="fromChildId">The child ID to re-route from.</param>
-        /// <param name="toChildId">The child ID to re-route to.</param>
-        /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-        Task RerouteLinkedChildReferencesAsync(Guid fromChildId, Guid toChildId);
 
         /// <summary>
         /// Gets legacy query filters for filtering UI.

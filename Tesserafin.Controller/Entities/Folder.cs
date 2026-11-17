@@ -605,7 +605,7 @@ namespace Tesserafin.Controller.Entities
                         newPrimary.Id);
 
                     // Reroute collection/playlist references from old primary to new primary
-                    await LibraryManager.RerouteLinkedChildReferencesAsync(oldPrimary.Id, newPrimary.Id).ConfigureAwait(false);
+                    await writes.RerouteLinkedChildReferencesAsync(oldPrimary.Id, newPrimary.Id, cancellationToken).ConfigureAwait(false);
 
                     // Transfer alternates from old primary to new primary
                     var localAlternateIds = LibraryManager.GetLocalAlternateVersionIds(oldPrimary).ToHashSet();
@@ -690,7 +690,7 @@ namespace Tesserafin.Controller.Entities
                     await oldPrimary.UpdateToRepositoryAsync(writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
 
                     // Re-route playlist/collection references from old primary to new primary
-                    await LibraryManager.RerouteLinkedChildReferencesAsync(oldPrimary.Id, newPrimary.Id).ConfigureAwait(false);
+                    await writes.RerouteLinkedChildReferencesAsync(oldPrimary.Id, newPrimary.Id, cancellationToken).ConfigureAwait(false);
                 }
 
                 // After removing items, reattach any detached user data to remaining children

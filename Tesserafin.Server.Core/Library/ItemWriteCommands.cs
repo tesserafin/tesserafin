@@ -138,6 +138,73 @@ internal sealed class ItemWriteCommands(
         }
     }
 
+    public void UpsertLinkedChild(Guid parentId, Guid childId, LinkedChildType childType, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (parentId.Equals(Guid.Empty) || childId.Equals(Guid.Empty))
+        {
+            throw new ArgumentException("Linked items must have nonempty identities.");
+        }
+
+        if (!Enum.IsDefined(childType))
+        {
+            throw new ArgumentOutOfRangeException(nameof(childType));
+        }
+
+        linkedChildren.UpsertLinkedChild(parentId, childId, childType);
+        cache.Remove(parentId);
+    }
+
+    public async Task RerouteLinkedChildReferencesAsync(Guid fromChildId, Guid toChildId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (fromChildId.Equals(Guid.Empty) || toChildId.Equals(Guid.Empty))
+        {
+            throw new ArgumentException("Linked items must have nonempty identities.");
+        }
+
+        if (fromChildId.Equals(toChildId))
+        {
+            return;
+        }
+
+        var affectedParentIds = linkedChildren.RerouteLinkedChildren(fromChildId, toChildId);
+        var parents = new List<Folder>();
+        // Complete cache reconciliation for every parent before any cancellable sidecar export.
+        try
+        {
+            foreach (var id in affectedParentIds.Distinct())
+            {
+                if (lookup.GetItemById(id) is not Folder parent)
+                {
+                    cache.Remove(id);
+                    continue;
+                }
+
+                var alreadyLinked = parent.LinkedChildren.Any(link => link.Type == LinkedChildType.Manual && link.ItemId == toChildId);
+                parent.LinkedChildren = parent.LinkedChildren
+                    .Where(link => !(alreadyLinked && link.Type == LinkedChildType.Manual && link.ItemId == fromChildId))
+                    .Select(link => link.Type == LinkedChildType.Manual && link.ItemId == fromChildId
+                        ? new LinkedChild { ItemId = toChildId, Type = LinkedChildType.Manual }
+                        : link)
+                    .ToArray();
+                parent.Children = null;
+                parent.UserData = null;
+                parents.Add(parent);
+            }
+        }
+        catch
+        {
+            cache.RemoveRange(affectedParentIds);
+            throw;
+        }
+
+        foreach (var parent in parents)
+        {
+            await metadata.SaveAsync(parent, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     public Task ReattachUserDataAsync(BaseItem item, CancellationToken cancellationToken)
         => persistence.ReattachUserDataAsync(item, cancellationToken);
 

@@ -520,7 +520,7 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
             secondAudioTrack: true);
         var itemId = SeedFilm(_fixturePath, _streams);
         var versionId = SeedFilm(versionPath, _twoAudioStreams, versionTags);
-        _libraryManager.UpsertLinkedChild(itemId, versionId, LinkedChildType.LinkedAlternateVersion);
+        _factory.Services.GetRequiredService<IItemWriteCommands>().UpsertLinkedChild(itemId, versionId, LinkedChildType.LinkedAlternateVersion, TestContext.Current.CancellationToken);
         return (itemId, versionId);
     }
 

@@ -116,6 +116,7 @@ public class LinkedChildrenService : ILinkedChildrenService
     public IReadOnlyList<Guid> RerouteLinkedChildren(Guid fromChildId, Guid toChildId)
     {
         using var context = _dbProvider.CreateDbContext();
+        using var transaction = context.Database.BeginTransaction();
 
         var affectedParentIds = context.LinkedChildren
             .Where(lc => lc.ChildId == fromChildId && lc.ChildType == DbLinkedChildType.Manual)
@@ -144,6 +145,8 @@ public class LinkedChildrenService : ILinkedChildrenService
                 && lc.ChildType == DbLinkedChildType.Manual
                 && parentsWithTarget.Contains(lc.ParentId))
             .ExecuteDelete();
+
+        transaction.Commit();
 
         return affectedParentIds;
     }

@@ -331,7 +331,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
                 await newPrimary.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
                 // Re-route playlist/collection references from deleted primary to new primary
-                await _library.RerouteLinkedChildReferencesAsync(video.Id, newPrimary.Id).ConfigureAwait(false);
+                await _writes.RerouteLinkedChildReferencesAsync(video.Id, newPrimary.Id, CancellationToken.None).ConfigureAwait(false);
 
                 // Update remaining alternates to point to new primary
                 foreach (var alternate in alternateVersions.Skip(1))
@@ -346,7 +346,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         else if (item is Video alternateVideo && alternateVideo.PrimaryVersionId.HasValue)
         {
             // If deleting an alternate version, re-route references to its primary
-            await _library.RerouteLinkedChildReferencesAsync(alternateVideo.Id, alternateVideo.PrimaryVersionId.Value).ConfigureAwait(false);
+            await _writes.RerouteLinkedChildReferencesAsync(alternateVideo.Id, alternateVideo.PrimaryVersionId.Value, CancellationToken.None).ConfigureAwait(false);
 
             // Remove deleted alternate from primary's LinkedAlternateVersions
             if (_items.GetItemById(alternateVideo.PrimaryVersionId.Value) is Video primaryVideo)

@@ -359,6 +359,7 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.ItemDeletionCommandsEndToEndTests.ItemChanges_AreSharedAndFollowCatalogueAndCachePublication
           --require Tesserafin.Server.Integration.Tests.ItemWriteCommandsEndToEndTests.VersionGraph_RollsBackFailedCreation_Retries_UpdatesAndPromotesMultipartAlternate
           --require Tesserafin.Server.Integration.Tests.ItemPeopleCommandsEndToEndTests.Credits_CreateOnePerson_UpdateMetadata_AndClearWithoutDeletingThePerson
+          --require Tesserafin.Server.Integration.Tests.ItemLinkWriteCommandsEndToEndTests.Reroute_RollsBackBothSqlMutations_ThenReconcilesDeduplicatedCacheAndPreservesSources
           --require Tesserafin.Server.Integration.Tests.ItemImageProcessingEndToEndTests.ImageInfos_LocalizesAndPersistsDimensionsAndBlurHash_WithoutSavingTheWholeItem
           --require Tesserafin.Server.Integration.Tests.ItemImageProcessingEndToEndTests.ImageGet_UsesThePreparedImage_AndConcurrentRequestsPublishOneManagedFile
           --require Tesserafin.Server.Integration.Tests.ItemImageProcessingEndToEndTests.DatabaseFailure_RollsBackRows_LeavesCacheUnchanged_CleansStagedFiles_AndAllowsRetry
