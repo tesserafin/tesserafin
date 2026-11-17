@@ -22,18 +22,9 @@ namespace Tesserafin.Server.Core.Library
     /// <see cref="IItemQueryScopeService"/>.
     /// </summary>
     /// <remarks>
-    /// Extracted in PR85b from <see cref="LibraryManager"/>'s private
-    /// <c>SetTopParentIdsOrAncestors</c>/<c>AddUserToQuery</c>/<c>GetTopParentIdsForQuery</c>
-    /// helpers, copied verbatim (not moved) - <see cref="LibraryManager"/> keeps its own copies
-    /// during the transition to avoid re-forming a DI cycle
-    /// (<c>LibraryManager -&gt; IItemQueryService -&gt; IUserViewManager -&gt; ILibraryManager</c>);
-    /// see <c>docs/pr85b-item-query-scope-service.md</c>. <b>Updated PR110</b>: this service now
-    /// depends on <see cref="IUserViewCatalog"/> instead of <c>IUserViewManager</c> - the narrower
-    /// leaf whose implementation (<c>UserViewCatalog</c>) never references <see cref="ILibraryManager"/>,
-    /// <c>IUserViewManager</c>, <c>IChannelManager</c> or <c>ILiveTvManager</c> in its own eager
-    /// construction graph (RFC <c>docs/rfc-di-query-user-views-v2.md</c> §9/§10.7). This service is
-    /// therefore a fully cycle-free leaf: it holds no direct or transitive edge back into the
-    /// query/user-views/channel/live-tv SCC.
+    /// Shared by the manager and query service. The user-view catalogue and root/lookup ports
+    /// keep construction independent of the manager and of deferred query/service factories.
+    /// Compound playlist/collection refusal filtering remains the manager's query concern.
     /// </remarks>
     internal sealed class ItemQueryScopeService : IItemQueryScopeService
     {
@@ -63,6 +54,48 @@ namespace Tesserafin.Server.Core.Library
             _userViewCatalog = userViewCatalog;
             _itemSortService = itemSortService;
             _rootFolderProvider = rootFolderProvider;
+        }
+
+        /// <inheritdoc />
+        public void SetTopParentOrAncestorIds(InternalItemsQuery query)
+        {
+            var ancestorIds = query.AncestorIds;
+            int len = ancestorIds.Length;
+            if (len == 0)
+            {
+                return;
+            }
+
+            var parents = new BaseItem[len];
+            for (int i = 0; i < len; i++)
+            {
+                parents[i] = _itemLookupService.GetItemById(ancestorIds[i]) ?? throw new ArgumentException($"Failed to find parent with id: {ancestorIds[i]}");
+
+                // As in SetTopParentIdsOrAncestors: an ancestor its user may not see, or the root
+                // of every library, scopes the query to nothing.
+                if (query.User is not null
+                    && (parents[i] is AggregateFolder || _itemAccessService.GetVisibleItemById<BaseItem>(ancestorIds[i], query.User) is null))
+                {
+                    query.TopParentIds = [Guid.NewGuid()];
+                    query.AncestorIds = [];
+                    return;
+                }
+
+                if (parents[i] is not (ICollectionFolder or UserView))
+                {
+                    return;
+                }
+            }
+
+            // Optimize by querying against top level views
+            query.TopParentIds = parents.SelectMany(i => GetTopParentIdsForQuery(i, query.User)).ToArray();
+            query.AncestorIds = [];
+
+            // Prevent searching in all libraries due to empty filter
+            if (query.TopParentIds.Length == 0)
+            {
+                query.TopParentIds = [Guid.NewGuid()];
+            }
         }
 
         /// <inheritdoc />

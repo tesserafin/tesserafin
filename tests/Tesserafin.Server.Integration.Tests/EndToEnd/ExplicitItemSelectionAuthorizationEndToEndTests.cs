@@ -248,6 +248,53 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
         }
     }
 
+    /// <summary>Shared scoping preserves item/count/filter boundaries for visible and withheld libraries.</summary>
+    /// <returns>The HTTP and catalogue journey.</returns>
+    [Fact(Timeout = 120_000)]
+    public async Task SharedScope_ListTotalsAndFilterValues_StayInsideTheSelectedVisibleLibrary()
+    {
+        var manager = _factory.Services.GetRequiredService<ILibraryManager>();
+        var user = _factory.Services.GetRequiredService<IUserManager>().GetUserById(_restrictedId);
+        Assert.NotNull(user);
+        var list = manager.GetItemList(Items(_openLibrary));
+        Assert.Equal(_visible, Assert.Single(list).Id);
+        var page = manager.GetItemsResult(Items(_openLibrary));
+        Assert.Equal(_visible, Assert.Single(page.Items).Id);
+        Assert.Equal(1, page.TotalRecordCount);
+        Assert.Equal(1, manager.GetCount(Items(_openLibrary)));
+        Assert.Empty(manager.GetItemList(Items(_withheldLibrary)));
+        Assert.Equal(0, manager.GetCount(Items(_withheldLibrary)));
+        Assert.Empty(manager.GetItemsResult(Items(_withheldLibrary)).Items);
+
+        var filters = manager.GetQueryFiltersLegacy(Filters(_openLibrary));
+        Assert.Contains("open-" + _suffix + "-genre", filters.Genres);
+        Assert.DoesNotContain("withheld-" + _suffix + "-genre", filters.Genres);
+        var withheldFilters = manager.GetQueryFiltersLegacy(Filters(_withheldLibrary));
+        Assert.Empty(withheldFilters.Genres);
+        Assert.Empty(withheldFilters.Tags);
+        var reply = await SendAsync(_restricted, "GET", $"Items?parentId={_openLibrary}&recursive=true&includeItemTypes=Movie", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, reply.Status);
+        Assert.Contains(_visibleName, reply.Body, StringComparison.Ordinal);
+        AssertNothingOfTheWithheldItem("shared scope listing", reply.Body);
+        using var document = JsonDocument.Parse(reply.Body);
+        Assert.Equal(1, document.RootElement.GetProperty("TotalRecordCount").GetInt32());
+        Assert.Single(document.RootElement.GetProperty("Items").EnumerateArray());
+
+        InternalItemsQuery Items(Guid parent) => new(user)
+        {
+            ParentId = parent,
+            Recursive = true,
+            IncludeItemTypes = [BaseItemKind.Movie]
+        };
+
+        InternalItemsQuery Filters(Guid ancestor) => new(user)
+        {
+            AncestorIds = [ancestor],
+            Recursive = true,
+            IncludeItemTypes = [BaseItemKind.Movie]
+        };
+    }
+
     /// <summary>
     /// The harness restricts what it says it restricts: the user is refused the item by the route
     /// that names one item, and an unrestricted listing does not carry it.

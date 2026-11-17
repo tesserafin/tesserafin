@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Moq;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
@@ -44,6 +45,93 @@ public class ItemQueryScopeServiceTests
             _userViewCatalogMock.Object,
             _itemSortServiceMock.Object,
             _rootFolderProviderMock.Object);
+    }
+
+    [Fact]
+    public void NamedAncestors_VisibleLibrariesAndLinkedViews_ResolvePhysicalFolders()
+    {
+        var physical = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        var library = new CollectionFolder { Id = Guid.NewGuid(), PhysicalFolderIds = physical };
+        var view = new UserView { Id = Guid.NewGuid(), DisplayParentId = library.Id };
+        var user = new User("test-user", "provider", "provider");
+        _itemLookupServiceMock.Setup(l => l.GetItemById(library.Id)).Returns(library);
+        _itemLookupServiceMock.Setup(l => l.GetItemById(view.Id)).Returns(view);
+        _itemAccessServiceMock.Setup(a => a.GetVisibleItemById<BaseItem>(view.Id, user)).Returns(view);
+        var query = new InternalItemsQuery(user) { AncestorIds = [view.Id] };
+
+        _scopeService.SetTopParentOrAncestorIds(query);
+
+        Assert.Equal(physical, query.TopParentIds);
+        Assert.Empty(query.AncestorIds);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NamedAncestors_HiddenLibraryOrAggregateRoot_CannotBroadenAUserQuery(bool aggregate)
+    {
+        BaseItem parent = aggregate ? new AggregateFolder { Id = Guid.NewGuid() } : new CollectionFolder { Id = Guid.NewGuid(), PhysicalFolderIds = [Guid.NewGuid()] };
+        _itemLookupServiceMock.Setup(l => l.GetItemById(parent.Id)).Returns(parent);
+        var query = new InternalItemsQuery(new User("test-user", "provider", "provider")) { AncestorIds = [parent.Id] };
+
+        _scopeService.SetTopParentOrAncestorIds(query);
+
+        Assert.Empty(query.AncestorIds);
+        var sentinel = Assert.Single(query.TopParentIds);
+        Assert.NotEqual(Guid.Empty, sentinel);
+        Assert.NotEqual(parent.Id, sentinel);
+    }
+
+    [Fact]
+    public void NamedAncestors_MixedLibraryAndOrdinaryAncestor_PreservesTheOriginalFilter()
+    {
+        var library = new CollectionFolder { Id = Guid.NewGuid(), PhysicalFolderIds = [Guid.NewGuid()] };
+        var folder = new Folder { Id = Guid.NewGuid() };
+        _itemLookupServiceMock.Setup(l => l.GetItemById(library.Id)).Returns(library);
+        _itemLookupServiceMock.Setup(l => l.GetItemById(folder.Id)).Returns(folder);
+        var original = new[] { library.Id, folder.Id };
+        var query = new InternalItemsQuery { AncestorIds = original };
+
+        _scopeService.SetTopParentOrAncestorIds(query);
+
+        Assert.Same(original, query.AncestorIds);
+        Assert.Empty(query.TopParentIds);
+    }
+
+    [Fact]
+    public void NamedAncestors_UnknownId_IsRejectedRatherThanIgnored()
+    {
+        var query = new InternalItemsQuery { AncestorIds = [Guid.NewGuid()] };
+
+        Assert.Throws<ArgumentException>(() => _scopeService.SetTopParentOrAncestorIds(query));
+
+        Assert.Empty(query.TopParentIds);
+        Assert.Single(query.AncestorIds);
+    }
+
+    [Fact]
+    public void NamedAncestors_EmptyLibrary_UsesANonemptySentinel()
+    {
+        var library = new CollectionFolder { Id = Guid.NewGuid() };
+        _itemLookupServiceMock.Setup(l => l.GetItemById(library.Id)).Returns(library);
+        var query = new InternalItemsQuery { AncestorIds = [library.Id] };
+
+        _scopeService.SetTopParentOrAncestorIds(query);
+
+        Assert.Empty(query.AncestorIds);
+        Assert.NotEqual(Guid.Empty, Assert.Single(query.TopParentIds));
+    }
+
+    [Fact]
+    public void Ownership_ManagerUsesTheSharedScope_AndHasNoPrivateParentScopeCopies()
+    {
+        var manager = typeof(Tesserafin.Server.Core.Library.LibraryManager);
+        var dependencies = manager.GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToArray();
+        Assert.Contains(typeof(IItemQueryScopeService), dependencies);
+        Assert.DoesNotContain(typeof(IUserViewCatalog), dependencies);
+        var removed = new[] { "SetTopParentIdsOrAncestors", "SetTopParentOrAncestorIds", "SetTopParentIdsToUserViews", "GetTopParentIdsForQuery" };
+        Assert.DoesNotContain(manager.GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic), m => removed.Contains(m.Name));
+        Assert.DoesNotContain(typeof(ItemQueryScopeService).GetConstructors().Single().GetParameters(), p => p.ParameterType == typeof(ILibraryManager));
     }
 
     // ---------------------------------------------------------------

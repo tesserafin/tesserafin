@@ -1035,3 +1035,27 @@ Focused tests cover lookup without materialization, page isolation/order/visibil
 601 orphan records split 500/101, progress bounds and removed manager dependencies. A named required
 real-host HTTP/maintenance journey covers missing person reads, credit creation, paging, repeated
 reads, unlocked orphan deletion, locked-person retention and unchanged source-media bytes.
+
+## 34. Shared parent and user query scopes
+
+The manager's temporary copies of parent/user scope logic are removed. It now injects the existing
+`IItemQueryScopeService`, replacing its direct `IUserViewCatalog` dependency, and delegates parent,
+recursive, latest, next-up, count and named-metadata aggregate scoping to it. The former named-read
+ancestor projection joins the same service, whose constructor dependencies remain unchanged.
+
+Unknown ancestors still throw; inaccessible library/aggregate roots and scopes resolving to no
+physical libraries still use a nonempty sentinel. Ordinary ancestor filters remain intact. Linked
+playlist/collection children retain per-child access filtering. User views, external-content flags,
+grouped folders and top-parent traversal use the existing shared implementation; top-parent lookup
+there uses the explicit lookup port rather than entity manager statics.
+
+The manager keeps its existing compound playlist/collection refusal exclusion verbatim and invokes
+it after shared user scoping. There is no new manager/repository cycle, lazy registration, HTTP or
+OpenAPI shape change. The manager loses 213 lines and is now 993 lines. Existing characterization
+fixtures compose the real scope service over their existing ports instead of an auto-mock.
+
+New tests cover visible view translation, hidden library/aggregate sentinels, mixed ordinary
+ancestors, unknown ancestors, empty libraries and removed manager copies. A named required real-host
+journey compares visible/withheld library lists, totals, counts and filter values, then checks the
+HTTP listing. The broader inherited authorization journeys remain active. No new snapshot isolation
+or per-query compound-filter performance claim is made.

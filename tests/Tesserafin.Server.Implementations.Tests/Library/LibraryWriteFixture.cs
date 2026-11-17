@@ -7,6 +7,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Controller.Sorting;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.IO;
 using Tesserafin.Naming.Common;
@@ -24,6 +25,12 @@ internal static class LibraryWriteFixture
             Mock.Get(configuration).Setup(c => c.GetConfiguration("metadata")).Returns(new MetadataConfiguration());
         }
 
+        fixture.Inject<IItemQueryScopeService>(new ItemQueryScopeService(
+            fixture.Create<IItemLookupService>(),
+            fixture.Create<IItemAccessService>(),
+            fixture.Create<IUserViewCatalog>(),
+            fixture.Create<IItemSortService>(),
+            fixture.Create<IUserRootFolderProvider>()));
         var options = new LibraryItemOptions(fixture.Create<ICollectionFolderResolver>(), fixture.Create<IItemLookupService>(), fixture.Create<IUserRootFolderProvider>(), configuration, fixture.Create<IFileSystem>());
         fixture.Inject<ILibraryItemOptions>(options);
         var resolution = new ItemResolutionService(configuration, fixture.Create<IFileSystem>(), fixture.Create<IServerApplicationHost>(), options, fixture.Create<IItemLookupService>(), fixture.Create<NamingOptions>(), NullLogger<ItemResolutionService>.Instance);
