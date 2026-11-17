@@ -112,12 +112,14 @@ public sealed class PlaybackIntroServiceTests
         context.Resolution.Setup(r => r.ResolvePath(wrongType, null, null, null)).Returns(new Folder());
         context.Service.AddParts([context.Provider(
             new IntroInfo { ItemId = Guid.NewGuid() },
+            new IntroInfo { ItemId = Guid.Empty },
             new IntroInfo(),
             new IntroInfo { Path = file.FullName },
             new IntroInfo { Path = wrongType.FullName }).Object]);
 
         Assert.Empty(await context.GetAsync());
         context.Access.Verify(a => a.GetVisibleItemById<Video>(unresolved.Id, context.User), Times.Once);
+        context.Access.Verify(a => a.GetVisibleItemById<Video>(Guid.Empty, context.User), Times.Never);
     }
 
     [Fact]

@@ -66,6 +66,7 @@ public sealed class PlaybackIntroServiceEndToEndTests(TesserafinApplicationFacto
                     new() { Path = savedPath },
                     new() { ItemId = hidden.Id },
                     new() { ItemId = Guid.NewGuid() },
+                    new() { ItemId = Guid.Empty },
                     new() { ItemId = nonVideo.Id },
                     new() { Path = unsavedPath },
                     new(),

@@ -66,7 +66,7 @@ internal sealed class PlaybackIntroService(
     {
         if (info.ItemId.HasValue)
         {
-            return access.GetVisibleItemById<Video>(info.ItemId.Value, user);
+            return info.ItemId.Value.Equals(Guid.Empty) ? null : access.GetVisibleItemById<Video>(info.ItemId.Value, user);
         }
 
         if (string.IsNullOrEmpty(info.Path))
