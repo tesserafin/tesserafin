@@ -1,3 +1,5 @@
+#pragma warning disable CA1002, CS1591
+
 using System;
 using System.Collections.Generic;
 using System.Threading;
