@@ -926,8 +926,8 @@ reconciliation, local alternate preparation, version grouping and deletion promo
 write port. Read-side alternate queries remain active on the manager.
 
 Rerouting updates manual references and removes collisions in one database transaction. Its
-cache reconciliation preserves nonmanual links and removes duplicate targets before sidecar
-export; all parents are repaired before the first cancellable export. Cancellation before
+cache reconciliation reloads the persisted ordered links, repairing stale arrays and preserving
+nonmanual links before sidecar export; all parents are repaired before the first cancellable export. Cancellation before
 admission writes nothing; after SQL commit it cannot undo the link changes. Metadata files are
 outside that transaction. Upserts invalidate the parent lookup entry after a successful save.
 A real-host trigger rejects the second SQL mutation to prove rollback, then a retry checks the

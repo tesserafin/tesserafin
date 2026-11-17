@@ -42,6 +42,8 @@ public sealed class ItemLinkWriteCommandsEndToEndTests(TesserafinApplicationFact
         Assert.NotSame(first, cachedFirst);
         Assert.Equal(source.Id, Assert.Single(cachedFirst.LinkedChildren).ItemId);
         Assert.Equal(2, cachedDedupe.LinkedChildren.Length);
+        // A stale, already-published parent must be repaired from SQL, not patched from its old array.
+        cachedFirst.LinkedChildren = [];
         var beforeFirst = cachedFirst.LinkedChildren;
         var beforeDedupe = cachedDedupe.LinkedChildren;
         var beforeShortcut = cachedShortcut.LinkedChildren;

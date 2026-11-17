@@ -40,6 +40,21 @@ public class LinkedChildrenService : ILinkedChildrenService
         _queryHelpers = queryHelpers;
     }
 
+    /// <inheritdoc />
+    public IReadOnlyList<Tesserafin.Controller.Entities.LinkedChild> GetLinkedChildren(Guid parentId)
+    {
+        using var context = _dbProvider.CreateDbContext();
+        return context.LinkedChildren.AsNoTracking()
+            .Where(link => link.ParentId == parentId)
+            .OrderBy(link => link.SortOrder)
+            .Select(link => new Tesserafin.Controller.Entities.LinkedChild
+            {
+                ItemId = link.ChildId,
+                Type = (LinkedChildType)link.ChildType
+            })
+            .ToArray();
+    }
+
     /// <inheritdoc/>
     public IReadOnlyList<Guid> GetLinkedChildrenIds(Guid parentId, int? childType = null)
     {

@@ -614,8 +614,8 @@ streaming controllers (retained behind the v2 execution adapter for now).
   `IItemWriteCommands`; the corresponding manager methods and its metadata exporter dependency
   are removed. Scan reconciliation, version grouping and deletion promotion use the writer
   directly. Rerouting's update and duplicate removal share one SQL transaction. Cache repair
-  follows commit, affects manual references only, and drops the source when the target is
-  already present. All affected folder caches are reconciled before cancellable sidecar exports.
+  follows commit and reloads canonical ordered links, repairing incomplete published arrays.
+  SQL changes manual references only and deduplicates existing targets. All affected folder caches are reconciled before cancellable sidecar exports.
   Cache-repair failures evict every affected parent; exports are skipped.
   Upserts invalidate their parent's lookup entry only after persistence succeeds. No whole-item
   save is used for these link mutations. Sidecar exports remain outside the SQL transaction;

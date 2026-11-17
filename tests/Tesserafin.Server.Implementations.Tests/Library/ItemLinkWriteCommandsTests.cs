@@ -49,7 +49,7 @@ public sealed class ItemLinkWriteCommandsTests
     }
 
     [Fact]
-    public async Task Reroute_ChangesOnlyManualLinks_DeduplicatesAndReconcilesAllParentsBeforeExport()
+    public async Task Reroute_ReloadsCanonicalLinksAndReconcilesAllParentsBeforeExport()
     {
         var context = new Context();
         var source = Guid.NewGuid();
@@ -60,6 +60,8 @@ public sealed class ItemLinkWriteCommandsTests
         var existingTarget = new LinkedChild { ItemId = target, Type = LinkedChildType.Manual };
         var second = context.Parent(new LinkedChild { ItemId = source, Type = LinkedChildType.Manual }, existingTarget);
         context.Linked.Setup(l => l.RerouteLinkedChildren(source, target)).Returns([first.Id, second.Id, first.Id]);
+        context.Linked.Setup(l => l.GetLinkedChildren(first.Id)).Returns([new LinkedChild { ItemId = target, Type = LinkedChildType.Manual }, shortcut]);
+        context.Linked.Setup(l => l.GetLinkedChildren(second.Id)).Returns([existingTarget]);
         context.Metadata.Setup(m => m.SaveAsync(It.IsAny<BaseItem>(), ItemUpdateType.MetadataEdit, It.IsAny<CancellationToken>(), It.IsAny<IEnumerable<string>>()))
             .Callback(() =>
             {
@@ -121,6 +123,8 @@ public sealed class ItemLinkWriteCommandsTests
         var first = context.Parent(new LinkedChild { ItemId = source, Type = LinkedChildType.Manual });
         var second = context.Parent(new LinkedChild { ItemId = source, Type = LinkedChildType.Manual });
         context.Linked.Setup(l => l.RerouteLinkedChildren(source, target)).Returns([first.Id, second.Id]);
+        context.Linked.Setup(l => l.GetLinkedChildren(first.Id)).Returns([new LinkedChild { ItemId = target, Type = LinkedChildType.Manual }]);
+        context.Linked.Setup(l => l.GetLinkedChildren(second.Id)).Returns([new LinkedChild { ItemId = target, Type = LinkedChildType.Manual }]);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         context.Metadata.Setup(m => m.SaveAsync(It.IsAny<BaseItem>(), It.IsAny<ItemUpdateType>(), cancellation.Token, It.IsAny<IEnumerable<string>>()))
             .Returns(async (BaseItem _, ItemUpdateType _, CancellationToken token, IEnumerable<string> _) =>

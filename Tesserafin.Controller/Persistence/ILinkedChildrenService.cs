@@ -11,6 +11,11 @@ namespace Tesserafin.Controller.Persistence;
 /// </summary>
 public interface ILinkedChildrenService
 {
+    /// <summary>Reads the persisted links, including their types and catalogue order.</summary>
+    /// <param name="parentId">The parent item ID.</param>
+    /// <returns>The canonical linked children.</returns>
+    IReadOnlyList<Tesserafin.Controller.Entities.LinkedChild> GetLinkedChildren(Guid parentId);
+
     /// <summary>
     /// Gets the IDs of linked children for the specified parent.
     /// </summary>

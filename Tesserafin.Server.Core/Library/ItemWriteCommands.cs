@@ -181,13 +181,7 @@ internal sealed class ItemWriteCommands(
                     continue;
                 }
 
-                var alreadyLinked = parent.LinkedChildren.Any(link => link.Type == LinkedChildType.Manual && link.ItemId == toChildId);
-                parent.LinkedChildren = parent.LinkedChildren
-                    .Where(link => !(alreadyLinked && link.Type == LinkedChildType.Manual && link.ItemId == fromChildId))
-                    .Select(link => link.Type == LinkedChildType.Manual && link.ItemId == fromChildId
-                        ? new LinkedChild { ItemId = toChildId, Type = LinkedChildType.Manual }
-                        : link)
-                    .ToArray();
+                parent.LinkedChildren = linkedChildren.GetLinkedChildren(id).ToArray();
                 parent.Children = null;
                 parent.UserData = null;
                 parents.Add(parent);
