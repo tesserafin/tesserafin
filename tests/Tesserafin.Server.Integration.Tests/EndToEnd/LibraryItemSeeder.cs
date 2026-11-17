@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Model.Entities;
@@ -56,10 +57,11 @@ public static class LibraryItemSeeder
     /// <param name="tags">The item's tags, for a test that restricts a user by tag.</param>
     /// <param name="parentId">The folder the item is in, for a test that restricts a user by library.</param>
     /// <param name="configure">Anything else a test wants the item to carry before it is saved.</param>
-    /// <param name="film">
-    /// <see langword="false"/> seeds a plain <see cref="Video"/> instead of a <see cref="Movie"/>: a
-    /// video that is not a film keeps the pre-consolidation playback chain (docs/playback-path-inventory.md §4).
-    /// <paramref name="configure"/> is not applied to it.
+    /// <param name="kind">
+    /// What the item is. <see cref="SeededVideoKind.Episode"/> seeds an episode of its own new
+    /// series (the series takes <paramref name="parentId"/>); <see cref="SeededVideoKind.Other"/> seeds
+    /// a plain <see cref="Video"/>, which keeps the pre-consolidation playback chain
+    /// (docs/playback-path-inventory.md §4). <paramref name="configure"/> applies to a film only.
     /// </param>
     /// <returns>The new item's id.</returns>
     public static Guid SeedVideo(
@@ -73,16 +75,44 @@ public static class LibraryItemSeeder
         string[]? tags = null,
         Guid parentId = default,
         Action<Movie>? configure = null,
-        bool film = true)
+        SeededVideoKind kind = SeededVideoKind.Film)
     {
         ArgumentNullException.ThrowIfNull(writes);
         ArgumentNullException.ThrowIfNull(mediaStreamRepository);
         ArgumentNullException.ThrowIfNull(streams);
 
-        var movie = Fill(film ? new Movie() : new Video());
+        var movie = Fill(kind switch
+        {
+            SeededVideoKind.Film => new Movie(),
+            SeededVideoKind.Episode => new Episode(),
+            _ => new Video(),
+        });
         if (movie is Movie seededFilm)
         {
             configure?.Invoke(seededFilm);
+        }
+
+        if (movie is Episode episode)
+        {
+            // A real episode is never a library's direct child: it sits under its series, which
+            // takes the folder the caller named.
+            var series = new Series
+            {
+                Id = Guid.NewGuid(),
+                Name = name + " series",
+                Path = Path.Combine(Path.GetDirectoryName(mediaPath)!, "series-" + Guid.NewGuid().ToString("N")),
+                ParentId = parentId,
+                DateCreated = DateTime.UtcNow,
+                DateModified = DateTime.UtcNow,
+            };
+            series.PresentationUniqueKey = series.CreatePresentationUniqueKey();
+            writes.CreateItems([series], null, CancellationToken.None);
+            episode.ParentId = series.Id;
+            episode.SeriesId = series.Id;
+            episode.SeriesName = series.Name;
+            episode.SeriesPresentationUniqueKey = series.PresentationUniqueKey;
+            episode.ParentIndexNumber = 1;
+            episode.IndexNumber = 1;
         }
 
         Video Fill(Video video)

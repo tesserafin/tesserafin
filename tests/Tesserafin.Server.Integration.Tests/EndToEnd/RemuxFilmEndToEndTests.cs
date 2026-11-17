@@ -109,12 +109,17 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
     }
 
     [Fact]
-    public async Task RemuxFilm_StartSeekStop_CopiesBothStreamsInOneSessionAndOneJob()
+    public Task RemuxFilm_StartSeekStop_CopiesBothStreamsInOneSessionAndOneJob() => StartSeekStop_CopiesBothStreamsInOneSessionAndOneJobAsync(SeededVideoKind.Film, "remux-start");
+
+    [Fact]
+    public Task RemuxEpisode_StartSeekStop_CopiesBothStreamsInOneSessionAndOneJob() => StartSeekStop_CopiesBothStreamsInOneSessionAndOneJobAsync(SeededVideoKind.Episode, "remux-episode-start");
+
+    private async Task StartSeekStop_CopiesBothStreamsInOneSessionAndOneJobAsync(SeededVideoKind kind, string name)
     {
-        const string PlaySession = "remux-start-ps";
-        var (client, userId) = await SignInAsync("remux-start");
-        var itemId = SeedFilm(_fixturePath, _streams);
-        var session = await CreateSessionAsync(client, itemId, userId, PlaySession);
+        var playSession = name + "-ps";
+        var (client, userId) = await SignInAsync(name);
+        var itemId = SeedVideo(_fixturePath, _streams, kind: kind);
+        var session = await CreateSessionAsync(client, itemId, userId, playSession);
 
         // Decision: the engine's, and a remux into what the client declared first (fMP4 over HLS).
         Assert.Equal(PlaybackMethod.Remux, session.Method);
@@ -167,10 +172,10 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
         Assert.DoesNotContain("-codec:a:0 aac", command, StringComparison.Ordinal);
 
         // One session, the one the client created, still holding the engine's decision.
-        var tracked = Assert.Single(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, PlaySession, StringComparison.Ordinal));
+        var tracked = Assert.Single(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, playSession, StringComparison.Ordinal));
         Assert.Equal(session.Id, tracked.Id.Value);
         Assert.Null(tracked.Plan.StreamInfo);
-        var job = _transcodeManager.GetTranscodingJob(PlaySession);
+        var job = _transcodeManager.GetTranscodingJob(playSession);
         Assert.NotNull(job);
         Assert.Equal(userId, job.UserId);
         var jobPlaylist = job.Path!;
@@ -183,8 +188,8 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
 
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, descriptor.Url));
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, playlist.Segments[0]));
-        Assert.Null(_transcodeManager.GetTranscodingJob(PlaySession));
-        Assert.DoesNotContain(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, PlaySession, StringComparison.Ordinal));
+        Assert.Null(_transcodeManager.GetTranscodingJob(playSession));
+        Assert.DoesNotContain(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, playSession, StringComparison.Ordinal));
         await WaitUntilAsync(() => !File.Exists(jobPlaylist) && !Directory.EnumerateFiles(Path.GetDirectoryName(jobPlaylist)!, Path.GetFileNameWithoutExtension(jobPlaylist) + "*").Any(), "the job's output to be removed");
         Assert.Single(FfmpegLogs(itemId));
     }
@@ -194,7 +199,7 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
     {
         const string PlaySession = "remux-capability-ps";
         var (client, userId) = await SignInAsync("remux-capability");
-        var itemId = SeedFilm(_fixturePath, _streams);
+        var itemId = SeedVideo(_fixturePath, _streams);
         var session = await CreateSessionAsync(client, itemId, userId, PlaySession);
         var descriptor = await GetDescriptorAsync(client, session.Id);
         var capability = await MintMediaCapabilityAsync(client, itemId, itemId.ToString("N"), PlaySession);
@@ -224,7 +229,7 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
         const string PlaySession = "remux-owner-ps";
         var (owner, ownerId) = await SignInAsync("remux-owner");
         var (intruder, intruderId) = await SignInAsync("remux-intruder");
-        var itemId = SeedFilm(_fixturePath, _streams);
+        var itemId = SeedVideo(_fixturePath, _streams);
         var session = await CreateSessionAsync(owner, itemId, ownerId, PlaySession);
         var descriptor = await GetDescriptorAsync(owner, session.Id);
         var playlist = await ReadPlaylistAsync(owner, descriptor.Url);
@@ -434,8 +439,8 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
     {
         const string PlaySession = "remux-options-ps";
         var (client, userId) = await SignInAsync("remux-options");
-        var itemId = SeedFilm(_fixturePath, _streams);
-        var otherItemId = SeedFilm(_fixturePath, _streams);
+        var itemId = SeedVideo(_fixturePath, _streams);
+        var otherItemId = SeedVideo(_fixturePath, _streams);
         var session = await CreateSessionAsync(client, itemId, userId, PlaySession);
         var descriptor = await GetDescriptorAsync(client, session.Id);
 
@@ -469,7 +474,7 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
         try
         {
             var (client, userId) = await SignInAsync("remux-resume");
-            var itemId = SeedFilm(_fixturePath, _streams);
+            var itemId = SeedVideo(_fixturePath, _streams);
             var first = await CreateSessionAsync(client, itemId, userId, "remux-resume-1");
             var position = TimeSpan.FromSeconds(FixtureSeconds / 2).Ticks;
 
@@ -499,16 +504,17 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
         }
     }
 
-    private Guid SeedFilm(string path, MediaStream[] streams, string[]? tags = null) =>
+    private Guid SeedVideo(string path, MediaStream[] streams, string[]? tags = null, SeededVideoKind kind = SeededVideoKind.Film) =>
         LibraryItemSeeder.SeedVideo(
             _factory.Services.GetRequiredService<IItemWriteCommands>(),
             _mediaStreamRepository,
             path,
             "mkv",
             streams,
-            $"Consolidation remux film {Guid.NewGuid()}",
+            $"Consolidation remux {kind} {Guid.NewGuid()}",
             runTimeTicks: TimeSpan.FromSeconds(FixtureSeconds).Ticks,
-            tags: tags);
+            tags: tags,
+            kind: kind);
 
     private async Task<(Guid ItemId, Guid VersionId)> SeedFilmWithAlternateVersionAsync(string[]? versionTags)
     {
@@ -518,8 +524,8 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
             durationSeconds: FixtureSeconds,
             keyframeEverySecond: true,
             secondAudioTrack: true);
-        var itemId = SeedFilm(_fixturePath, _streams);
-        var versionId = SeedFilm(versionPath, _twoAudioStreams, versionTags);
+        var itemId = SeedVideo(_fixturePath, _streams);
+        var versionId = SeedVideo(versionPath, _twoAudioStreams, versionTags);
         _factory.Services.GetRequiredService<IItemWriteCommands>().UpsertLinkedChild(itemId, versionId, LinkedChildType.LinkedAlternateVersion, TestContext.Current.CancellationToken);
         return (itemId, versionId);
     }

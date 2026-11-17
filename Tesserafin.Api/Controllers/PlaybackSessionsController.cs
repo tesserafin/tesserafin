@@ -16,6 +16,7 @@ using Tesserafin.Api.Playback;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Net.PlaybackCredentials;
@@ -146,7 +147,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
 
         using var attemptScope = BeginAttemptScope(request.PlaybackAttemptId);
 
-        var (kind, options, isFilm) = await ResolveOptions(request, HttpContext.RequestAborted).ConfigureAwait(false);
+        var (kind, options, isEngineVideo) = await ResolveOptions(request, HttpContext.RequestAborted).ConfigureAwait(false);
 
         // Issue #75: the ambient scope carrying the two request-scoped facts the shadow run cannot
         // recover on its own. Content-Length is read from the HEADER only - request buffering stays
@@ -156,7 +157,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         // shadow mode is off (the default) the shadow run never executes and this scope costs one
         // AsyncLocal write and produces nothing.
         PlaybackSession? session;
-        using (BeginEngineFilmScope(isFilm, request))
+        using (BeginLocalVideoScope(isEngineVideo, request))
         using (_shadowDiagnosticsStore.BeginCapture(new ShadowCaptureInputs(request.Capabilities, HttpContext.Request.ContentLength, ReadCapturedScan())))
         {
             session = _playbackSessionManager.Create(
@@ -234,7 +235,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             return authorization;
         }
 
-        var (kind, options, isFilm) = await ResolveOptions(request, HttpContext.RequestAborted).ConfigureAwait(false);
+        var (kind, options, isEngineVideo) = await ResolveOptions(request, HttpContext.RequestAborted).ConfigureAwait(false);
 
         // PR #38 (docs/design-playback-v2-lifecycle.md, decided in 2cf777d2): the session was just
         // proven to exist above, so a null here can only mean re-planning produced NO viable plan -
@@ -247,7 +248,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         // Issue #75: same ambient scope as the POST - a PUT re-plans with a complete new body, so it
         // carries its own declared capabilities and its own Content-Length.
         PlaybackSession? session;
-        using (BeginEngineFilmScope(isFilm, request))
+        using (BeginLocalVideoScope(isEngineVideo, request))
         using (_shadowDiagnosticsStore.BeginCapture(new ShadowCaptureInputs(request.Capabilities, HttpContext.Request.ContentLength, ReadCapturedScan())))
         {
             session = _playbackSessionManager.Patch(id, new PlaybackSessionRequest(kind, options), request.PlaybackAttemptId);
@@ -422,14 +423,14 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             return Conflict("Session has no PlaySessionId - PUT a replacement request supplying one before requesting a stream URL.");
         }
 
-        // Consolidation step 1: a film the engine alone decided - a direct play, or a remux or a
+        // Consolidation step 1: a local film or episode the engine alone decided - a direct play, or a remux or a
         // transcode this server executes from the plan - has no legacy StreamInfo at all. Its descriptor is
         // minted from the retained execution plan and names the session's own file or HLS route;
         // nothing below (kill switch, resolver, StreamInfo.ToUrl) applies.
         if (session.Plan.StreamInfo is null
             && _v2PlanStore.TryGet(session.Id, out var engineDecided)
             && engineDecided is { ExecutionPlan: { } enginePlan }
-            && EngineFilmDescriptorMapper.CanMap(enginePlan)
+            && LocalVideoDescriptorMapper.CanMap(enginePlan)
             && session.Request?.Options is { } engineOptions)
         {
             if (string.IsNullOrEmpty(User.GetToken()))
@@ -437,7 +438,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
                 return Forbid();
             }
 
-            return Ok(EngineFilmDescriptorMapper.Map(session.Id, session.PlaySessionId, engineOptions.ItemId, enginePlan, engineDecided.Decision.EngineVersion));
+            return Ok(LocalVideoDescriptorMapper.Map(session.Id, session.PlaySessionId, engineOptions.ItemId, enginePlan, engineDecided.Decision.EngineVersion));
         }
 
         var options = session.Request?.Options;
@@ -609,7 +610,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             ? value as ContractStructuralScan
             : null;
 
-    private async Task<(PlaybackMediaKind Kind, MediaOptions Options, bool IsFilm)> ResolveOptions(PlaybackPlanRequestBase request, CancellationToken cancellationToken)
+    private async Task<(PlaybackMediaKind Kind, MediaOptions Options, bool IsEngineVideo)> ResolveOptions(PlaybackPlanRequestBase request, CancellationToken cancellationToken)
     {
         var userId = RequestHelpers.GetUserId(User, request.UserId);
         var user = _userManager.GetUserById(userId) ?? throw new ResourceNotFoundException();
@@ -645,7 +646,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         }
 
         var kind = item.MediaType == MediaType.Audio ? PlaybackMediaKind.Audio : PlaybackMediaKind.Video;
-        return (kind, options, kind == PlaybackMediaKind.Video && item is Movie);
+        return (kind, options, kind == PlaybackMediaKind.Video && item is Movie or Episode);
     }
 
     /// <summary>
@@ -656,8 +657,8 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     /// <c>RequestCorrelationMiddleware</c> (issue #42), so lines emitted here carry BOTH the attempt
     /// id (same on a retry) and the request id (different on a retry).
     /// </summary>
-    private static IDisposable? BeginEngineFilmScope(bool isFilm, PlaybackPlanRequestBase request)
-        => isFilm ? EngineFilmPlanner.BeginRequest(new EngineFilmRequest(request.Capabilities, request.Constraints)) : null;
+    private static IDisposable? BeginLocalVideoScope(bool isEngineVideo, PlaybackPlanRequestBase request)
+        => isEngineVideo ? LocalVideoPlanner.BeginRequest(new LocalVideoRequest(request.Capabilities, request.Constraints)) : null;
 
     private IDisposable? BeginAttemptScope(string? playbackAttemptId)
     {

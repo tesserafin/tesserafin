@@ -15,7 +15,7 @@ namespace Tesserafin.Api.Models.PlaybackSessionDtos;
 /// verbatim). No credential is written into either URL: a descriptor names a resource, and the
 /// client authenticates each request for it with its own session (an <c>Authorization</c> header)
 /// or a <c>playbackCapability</c> it mints. This is the same contract as the session-owned routes
-/// <see cref="EngineFilmDescriptorMapper"/> names.
+/// <see cref="LocalVideoDescriptorMapper"/> names.
 /// </summary>
 public static class PlaybackSessionStreamDescriptorMapper
 {

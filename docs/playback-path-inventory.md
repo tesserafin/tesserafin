@@ -77,11 +77,11 @@ Chain as built:
 Web, film (Type Movie, file system) on the local HTML player
   -> POST /Playback/Sessions          generated SDK, configured from TesserafinApi (not @jellyfin/sdk)
      server: PlaybackSessionsController opens the film scope (item is Movie)
-             EngineFilmPlanner: every candidate source is a local file -> the engine decides
+             LocalVideoPlanner: every candidate source is a local file -> the engine decides
              from the DECLARED capabilities/constraints (no DeviceProfile round trip);
              DirectPlay + executable plan -> V2PlanRecord published, PlaybackPlan(DirectPlay),
              StreamInfo = null; StreamBuilder is never constructed
-  -> GET /Playback/Sessions/{id}/Stream    EngineFilmDescriptorMapper, from the retained plan
+  -> GET /Playback/Sessions/{id}/Stream    LocalVideoDescriptorMapper, from the retained plan
   -> GET|HEAD /Playback/Sessions/{id}/File?itemId&mediaSourceId&playSessionId
      PlaybackSessionFilesController: MediaDelivery + Media capability; per request: session
      exists, caller owns it, item/source/play session match the plan, owner still sees the
@@ -131,7 +131,7 @@ Chain as built:
 ```
 Web, film (Type Movie, file system) on the local HTML player
   -> POST /Playback/Sessions          same request as §4
-     server: EngineFilmPlanner, per candidate source (each with its own user track defaults):
+     server: LocalVideoPlanner, per candidate source (each with its own user track defaults):
              a direct play wins; otherwise the first EXECUTABLE remux
              engine v8: a remux is delivered through the first declared OutputProfile that can
              carry BOTH copied codecs over a protocol the client supports (container + protocol
@@ -139,7 +139,7 @@ Web, film (Type Movie, file system) on the local HTML player
              executable = Remux, HLS, fMP4 or TS, only RemuxContainer/CopyVideo/CopyAudio (+ text
              subtitle extraction/conversion), subtitle none or External
              -> V2PlanRecord published, PlaybackPlan(DirectStream), StreamInfo = null
-  -> GET /Playback/Sessions/{id}/Stream    EngineFilmDescriptorMapper, from the retained plan:
+  -> GET /Playback/Sessions/{id}/Stream    LocalVideoDescriptorMapper, from the retained plan:
              /Playback/Sessions/{id}/Hls/main.m3u8?itemId&mediaSourceId&playSessionId  (Protocol Hls)
              no codec, container, stream index, offset or credential in the url
   -> GET /Playback/Sessions/{id}/Hls/main.m3u8
@@ -209,7 +209,7 @@ third pipeline:
 
 ```
 POST /Playback/Sessions          same request as §4
-  server: EngineFilmPlanner, per candidate source: a direct play wins, then the first executable
+  server: LocalVideoPlanner, per candidate source: a direct play wins, then the first executable
           remux (§5), then the first EXECUTABLE TRANSCODE
           executable = Transcode, HLS, fMP4 or TS; each stream copied or encoded, video to H.264,
           audio to AAC (down-mix allowed); output in the source's video range; subtitle none or
@@ -222,12 +222,12 @@ POST /Playback/Sessions          same request as §4
           AllowAudioStreamCopy) is re-encoded inside a transcode too, and a remux demoted by such
           a prohibition re-encodes the forbidden stream only
           -> V2PlanRecord published, PlaybackPlan(Transcode, reasons), StreamInfo = null
-GET /Playback/Sessions/{id}/Stream    EngineFilmDescriptorMapper: the same url as a remux,
+GET /Playback/Sessions/{id}/Stream    LocalVideoDescriptorMapper: the same url as a remux,
           /Playback/Sessions/{id}/Hls/main.m3u8?itemId&mediaSourceId&playSessionId
           no codec, bitrate, resolution, stream index, offset or credential in the url
 GET /Playback/Sessions/{id}/Hls/main.m3u8, .../Hls/hls1/main/{n}.{mp4|ts}
           PlaybackSessionDeliveryGuard as §5 (owner only, plan/ids match, item and version still
-          visible), now for any plan EngineFilmPlanner.IsExecutableHlsOutput accepts
+          visible), now for any plan LocalVideoPlanner.IsExecutableHlsOutput accepts
           EnginePlanEncodingRequest.Build renders the executor's input from the retained plan:
             source and stream indices; per stream "copy" or the plan's target codec
             VideoBitRate = the plan's video ceiling narrowed to (total ceiling - audio share)

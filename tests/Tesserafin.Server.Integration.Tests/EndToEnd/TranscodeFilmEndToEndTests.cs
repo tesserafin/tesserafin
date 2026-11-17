@@ -98,12 +98,17 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
     }
 
     [Fact]
-    public async Task TranscodeFilm_AudioTheClientDoesNotDecode_CopiesVideoAndEncodesAudioInOneSessionAndOneJob()
+    public Task TranscodeFilm_AudioTheClientDoesNotDecode_CopiesVideoAndEncodesAudioInOneSessionAndOneJob() => AudioTheClientDoesNotDecode_CopiesVideoAndEncodesAudioInOneSessionAndOneJobAsync(SeededVideoKind.Film, "transcode-audio");
+
+    [Fact]
+    public Task TranscodeEpisode_AudioTheClientDoesNotDecode_CopiesVideoAndEncodesAudioInOneSessionAndOneJob() => AudioTheClientDoesNotDecode_CopiesVideoAndEncodesAudioInOneSessionAndOneJobAsync(SeededVideoKind.Episode, "transcode-episode-audio");
+
+    private async Task AudioTheClientDoesNotDecode_CopiesVideoAndEncodesAudioInOneSessionAndOneJobAsync(SeededVideoKind kind, string name)
     {
-        const string PlaySession = "transcode-audio-ps";
-        var (client, userId) = await SignInAsync("transcode-audio");
-        var itemId = await SeedFilmAsync("libx264", Ac3);
-        var session = await CreateSessionAsync(client, itemId, userId, PlaySession);
+        var playSession = name + "-ps";
+        var (client, userId) = await SignInAsync(name);
+        var itemId = await SeedVideoAsync("libx264", Ac3, kind: kind);
+        var session = await CreateSessionAsync(client, itemId, userId, playSession);
 
         // Decision: the engine's. Only the audio is the problem, so only the audio is encoded.
         Assert.Equal(PlaybackMethod.Transcode, session.Method);
@@ -148,10 +153,10 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
 
         // One session, the one the client created, holding the engine's plan and no StreamInfo;
         // one job, its owner's.
-        var tracked = Assert.Single(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, PlaySession, StringComparison.Ordinal));
+        var tracked = Assert.Single(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, playSession, StringComparison.Ordinal));
         Assert.Equal(session.Id, tracked.Id.Value);
         Assert.Null(tracked.Plan.StreamInfo);
-        var job = _transcodeManager.GetTranscodingJob(PlaySession);
+        var job = _transcodeManager.GetTranscodingJob(playSession);
         Assert.NotNull(job);
         Assert.Equal(userId, job.UserId);
         var jobPlaylist = job.Path!;
@@ -160,8 +165,8 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
         await StopAsync(client, session.Id);
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, descriptor.Url));
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, playlist.Segments[0]));
-        Assert.Null(_transcodeManager.GetTranscodingJob(PlaySession));
-        Assert.DoesNotContain(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, PlaySession, StringComparison.Ordinal));
+        Assert.Null(_transcodeManager.GetTranscodingJob(playSession));
+        Assert.DoesNotContain(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, playSession, StringComparison.Ordinal));
         await WaitUntilAsync(() => !File.Exists(jobPlaylist) && !Directory.EnumerateFiles(Path.GetDirectoryName(jobPlaylist)!, Path.GetFileNameWithoutExtension(jobPlaylist) + "*").Any(), "the job's output to be removed");
     }
 
@@ -169,7 +174,7 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
     public async Task TranscodeFilm_VideoTheClientDoesNotDecode_EncodesH264AndCopiesAudio()
     {
         var (client, userId) = await SignInAsync("transcode-video");
-        var itemId = await SeedFilmAsync(Mpeg4, "aac");
+        var itemId = await SeedVideoAsync(Mpeg4, "aac");
         var session = await CreateSessionAsync(client, itemId, userId, "transcode-video-ps");
 
         Assert.Equal(PlaybackMethod.Transcode, session.Method);
@@ -191,7 +196,7 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
     public async Task TranscodeFilm_BitrateAndResolutionCeilings_AreThePlansAndReachTheEncoder()
     {
         var (client, userId) = await SignInAsync("transcode-ceilings");
-        var itemId = await SeedFilmAsync("libx264", "aac", videoBitrate: 2_000_000, audioBitrate: 128_000);
+        var itemId = await SeedVideoAsync("libx264", "aac", videoBitrate: 2_000_000, audioBitrate: 128_000);
 
         // A bitrate ceiling under the source's: the video is encoded, the audio still copied, and
         // the encoder is given what is left of the ceiling once the copied audio is counted.
@@ -230,19 +235,24 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
     }
 
     [Fact]
-    public async Task TranscodeFilm_AudioTrackChanged_ReplansTheSameSessionAndLeavesNoJobBehind()
+    public Task TranscodeFilm_AudioTrackChanged_ReplansTheSameSessionAndLeavesNoJobBehind() => AudioTrackChanged_ReplansTheSameSessionAndLeavesNoJobBehindAsync(SeededVideoKind.Film, "transcode-track");
+
+    [Fact]
+    public Task TranscodeEpisode_AudioTrackChanged_ReplansTheSameSessionAndLeavesNoJobBehind() => AudioTrackChanged_ReplansTheSameSessionAndLeavesNoJobBehindAsync(SeededVideoKind.Episode, "transcode-episode-track");
+
+    private async Task AudioTrackChanged_ReplansTheSameSessionAndLeavesNoJobBehindAsync(SeededVideoKind kind, string name)
     {
-        const string PlaySession = "transcode-track-ps";
-        var (client, userId) = await SignInAsync("transcode-track");
-        var itemId = await SeedFilmAsync("libx264", Ac3, secondAudioTrack: true);
+        var playSession = name + "-ps";
+        var (client, userId) = await SignInAsync(name);
+        var itemId = await SeedVideoAsync("libx264", Ac3, secondAudioTrack: true, kind: kind);
         var (capabilities, constraints) = EndToEndCapabilityPresets.BrowserRemuxOverHls();
 
         // The user's default is the second track (index 2).
-        var session = await CreateSessionAsync(client, itemId, userId, PlaySession);
+        var session = await CreateSessionAsync(client, itemId, userId, playSession);
         Assert.Equal(2, session.SelectedStreams.Audio);
         var playlist = await ReadPlaylistAsync(client, (await GetDescriptorAsync(client, session.Id)).Url);
         Assert.NotEmpty(await GetBytesAsync(client, playlist.Segments[0]));
-        var firstJob = _transcodeManager.GetTranscodingJob(PlaySession);
+        var firstJob = _transcodeManager.GetTranscodingJob(playSession);
         Assert.NotNull(firstJob);
 
         // Same session, same play session, the other track.
@@ -261,7 +271,7 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
         }
 
         // The first plan's job is gone; what is served now was produced for the new plan.
-        Assert.Null(_transcodeManager.GetTranscodingJob(PlaySession));
+        Assert.Null(_transcodeManager.GetTranscodingJob(playSession));
         var again = await ReadPlaylistAsync(client, (await GetDescriptorAsync(client, session.Id)).Url);
         Assert.NotEmpty(await GetBytesAsync(client, again.Init));
         Assert.NotEmpty(await GetBytesAsync(client, again.Segments[0]));
@@ -270,11 +280,11 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
         Assert.Single(commands, command => command.Contains("-map 0:2 ", StringComparison.Ordinal));
         Assert.Single(commands, command => command.Contains("-map 0:1 ", StringComparison.Ordinal));
         Assert.All(commands, command => Assert.Contains("-codec:v:0 copy", command, StringComparison.Ordinal));
-        Assert.Single(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, PlaySession, StringComparison.Ordinal));
-        Assert.NotNull(_transcodeManager.GetTranscodingJob(PlaySession));
+        Assert.Single(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, playSession, StringComparison.Ordinal));
+        Assert.NotNull(_transcodeManager.GetTranscodingJob(playSession));
 
         await StopAsync(client, session.Id);
-        Assert.Null(_transcodeManager.GetTranscodingJob(PlaySession));
+        Assert.Null(_transcodeManager.GetTranscodingJob(playSession));
     }
 
     [Fact]
@@ -285,7 +295,7 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
 
         // Annex-B H.264 in AVI: the engine sees two decodable codecs in an undeclared container and
         // plans a remux; the executor knows that bitstream cannot be copied into MP4 segments.
-        var itemId = await SeedFilmAsync("libx264", "aac", avi: true);
+        var itemId = await SeedVideoAsync("libx264", "aac", avi: true);
         var (capabilities, constraints) = EndToEndCapabilityPresets.BrowserRemuxOverHls();
         var session = await CreateSessionAsync(client, itemId, userId, PlaySession);
         Assert.Equal(PlaybackMethod.Remux, session.Method);
@@ -328,7 +338,7 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
         const string PlaySession = "transcode-owner-ps";
         var (owner, ownerId) = await SignInAsync("transcode-owner");
         var (intruder, _) = await SignInAsync("transcode-intruder");
-        var itemId = await SeedFilmAsync("libx264", Ac3);
+        var itemId = await SeedVideoAsync("libx264", Ac3);
         var session = await CreateSessionAsync(owner, itemId, ownerId, PlaySession);
         var descriptor = await GetDescriptorAsync(owner, session.Id);
         var playlist = await ReadPlaylistAsync(owner, descriptor.Url);
@@ -366,7 +376,7 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
     {
         const string PlaySession = "transcode-capability-ps";
         var (client, userId) = await SignInAsync("transcode-capability");
-        var itemId = await SeedFilmAsync("libx264", Ac3);
+        var itemId = await SeedVideoAsync("libx264", Ac3);
         var session = await CreateSessionAsync(client, itemId, userId, PlaySession);
         var descriptor = await GetDescriptorAsync(client, session.Id);
         var capability = await MintMediaCapabilityAsync(client, itemId, itemId.ToString("N"), PlaySession);
@@ -388,8 +398,8 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
     {
         const string Tag = "transcode-version-withdrawn";
         var (client, userId) = await SignInAsync("transcode-version");
-        var itemId = await SeedFilmAsync("libx264", Ac3);
-        var versionId = await SeedFilmAsync("libx264", Ac3, tags: [Tag]);
+        var itemId = await SeedVideoAsync("libx264", Ac3);
+        var versionId = await SeedVideoAsync("libx264", Ac3, tags: [Tag]);
         _factory.Services.GetRequiredService<IItemWriteCommands>().UpsertLinkedChild(itemId, versionId, LinkedChildType.LinkedAlternateVersion, TestContext.Current.CancellationToken);
 
         var (capabilities, constraints) = EndToEndCapabilityPresets.BrowserRemuxOverHls();
@@ -424,7 +434,7 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
     public async Task TranscodeFilm_EncodingOptionsInTheQuery_ChangeNothing()
     {
         var (client, userId) = await SignInAsync("transcode-options");
-        var itemId = await SeedFilmAsync(Mpeg4, "aac");
+        var itemId = await SeedVideoAsync(Mpeg4, "aac");
         var session = await CreateSessionAsync(client, itemId, userId, "transcode-options-ps");
         var descriptor = await GetDescriptorAsync(client, session.Id);
 
@@ -458,7 +468,7 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
         const string Kept = "transcode-kept-ps";
         var (phone, userId) = await SignInAsync("transcode-revoke");
         var tablet = await SignInAgainAsync("transcode-revoke", "tablet-transcode-revoke");
-        var itemId = await SeedFilmAsync("libx264", Ac3);
+        var itemId = await SeedVideoAsync("libx264", Ac3);
 
         var revoked = await CreateSessionAsync(phone, itemId, userId, Revoked);
         var kept = await CreateSessionAsync(tablet, itemId, userId, Kept);
@@ -499,14 +509,15 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
     [GeneratedRegex(@"-maxrate (\d+)")]
     private static partial Regex MaxRate();
 
-    private async Task<Guid> SeedFilmAsync(
+    private async Task<Guid> SeedVideoAsync(
         string videoEncoder,
         string audioEncoder,
         bool secondAudioTrack = false,
         bool avi = false,
         int? videoBitrate = null,
         int? audioBitrate = null,
-        string[]? tags = null)
+        string[]? tags = null,
+        SeededVideoKind kind = SeededVideoKind.Film)
     {
         var path = await EndToEndMediaFixtures.CreateFilmAsync(
             _workDir,
@@ -544,9 +555,10 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
             path,
             avi ? "avi" : "mkv",
             streams,
-            $"Consolidation transcode film {Guid.NewGuid()}",
+            $"Consolidation transcode {kind} {Guid.NewGuid()}",
             runTimeTicks: TimeSpan.FromSeconds(FixtureSeconds).Ticks,
-            tags: tags);
+            tags: tags,
+            kind: kind);
     }
 
     private async Task<List<string>> FfmpegCommandsAsync(Guid mediaSourceId)

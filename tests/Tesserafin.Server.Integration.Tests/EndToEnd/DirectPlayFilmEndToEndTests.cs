@@ -101,11 +101,16 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
     }
 
     [Fact]
-    public async Task Film_StartAndSeek_ServesRangesFromTheSessionFile()
+    public Task Film_StartAndSeek_ServesRangesFromTheSessionFile() => StartAndSeek_ServesRangesFromTheSessionFileAsync(SeededVideoKind.Film, "film-start");
+
+    [Fact]
+    public Task Episode_StartAndSeek_ServesRangesFromTheSessionFile() => StartAndSeek_ServesRangesFromTheSessionFileAsync(SeededVideoKind.Episode, "episode-start");
+
+    private async Task StartAndSeek_ServesRangesFromTheSessionFileAsync(SeededVideoKind kind, string name)
     {
-        var (client, userId) = await SignInAsync("film-start");
-        var itemId = SeedFilm();
-        var session = await CreateSessionAsync(client, itemId, userId, "film-start-ps");
+        var (client, userId) = await SignInAsync(name);
+        var itemId = SeedVideo(kind: kind);
+        var session = await CreateSessionAsync(client, itemId, userId, name + "-ps");
 
         Assert.Equal(PlaybackMethod.DirectPlay, session.Method);
         Assert.Equal(PlaybackEngine.EngineVersion, session.DecisionVersion);
@@ -148,8 +153,8 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
     public async Task Film_ParametersThatDoNotMatchTheSession_AreNotServed()
     {
         var (client, userId) = await SignInAsync("film-params");
-        var itemId = SeedFilm();
-        var otherItemId = SeedFilm();
+        var itemId = SeedVideo();
+        var otherItemId = SeedVideo();
         var session = await CreateSessionAsync(client, itemId, userId, "film-params-ps");
         var descriptor = await GetDescriptorAsync(client, session.Id);
 
@@ -162,7 +167,7 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
     public async Task Film_Stop_DeletesTheSessionAndRevokesItsCapability()
     {
         var (client, userId) = await SignInAsync("film-stop");
-        var itemId = SeedFilm();
+        var itemId = SeedVideo();
         var session = await CreateSessionAsync(client, itemId, userId, "film-stop-ps");
         var descriptor = await GetDescriptorAsync(client, session.Id);
         var capability = await MintMediaCapabilityAsync(client, itemId, "film-stop-ps");
@@ -187,7 +192,7 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
     {
         var (owner, ownerId) = await SignInAsync("film-owner");
         var (intruder, _) = await SignInAsync("film-intruder");
-        var itemId = SeedFilm();
+        var itemId = SeedVideo();
         var session = await CreateSessionAsync(owner, itemId, ownerId, "film-owner-ps");
         var descriptor = await GetDescriptorAsync(owner, session.Id);
 
@@ -217,7 +222,7 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
     {
         const string Tag = "film-withdrawn";
         var (client, userId) = await SignInAsync("film-withdrawn");
-        var itemId = SeedFilm(tags: [Tag]);
+        var itemId = SeedVideo(tags: [Tag]);
         var session = await CreateSessionAsync(client, itemId, userId, "film-withdrawn-ps");
         var descriptor = await GetDescriptorAsync(client, session.Id);
         await AssertRangeAsync(client, descriptor.Url, 0, 9);
@@ -236,7 +241,7 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
         try
         {
             var (client, userId) = await SignInAsync("film-resume");
-            var itemId = SeedFilm();
+            var itemId = SeedVideo();
             var first = await CreateSessionAsync(client, itemId, userId, "film-resume-1");
             var position = TimeSpan.FromSeconds(FixtureSeconds / 2).Ticks;
 
@@ -307,16 +312,17 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
         Assert.True(saved.IsSuccessStatusCode, FormattableString.Invariant($"POST Users/Configuration: {(int)saved.StatusCode}"));
     }
 
-    private Guid SeedFilm(string[]? tags = null) =>
+    private Guid SeedVideo(string[]? tags = null, SeededVideoKind kind = SeededVideoKind.Film) =>
         LibraryItemSeeder.SeedVideo(
             _factory.Services.GetRequiredService<IItemWriteCommands>(),
             _mediaStreamRepository,
             _fixturePath,
             "mp4",
             _streams,
-            $"Consolidation film {Guid.NewGuid()}",
+            $"Consolidation {kind} {Guid.NewGuid()}",
             runTimeTicks: TimeSpan.FromSeconds(FixtureSeconds).Ticks,
-            tags: tags);
+            tags: tags,
+            kind: kind);
 
     private static async Task<PlaybackSessionResponse> CreateSessionAsync(HttpClient client, Guid itemId, Guid userId, string playSessionId)
     {
@@ -425,11 +431,11 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
             base.ConfigureWebHost(builder);
             builder.ConfigureTestServices(services =>
             {
-                services.AddSingleton<IPlaybackSessionPlanner>(provider => new EngineFilmPlanner(
+                services.AddSingleton<IPlaybackSessionPlanner>(provider => new LocalVideoPlanner(
                     new LegacyChainReached(),
                     provider.GetRequiredService<IPlaybackEngine>(),
                     provider.GetRequiredService<IV2PlanStore>(),
-                    provider.GetRequiredService<ILogger<EngineFilmPlanner>>()));
+                    provider.GetRequiredService<ILogger<LocalVideoPlanner>>()));
                 services.AddSingleton<IPlaybackLiveStreamResolver, LegacyChainReached>();
             });
         }

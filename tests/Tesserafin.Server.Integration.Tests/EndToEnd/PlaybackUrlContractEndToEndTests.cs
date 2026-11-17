@@ -204,7 +204,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         // Not a film: a film's transcode over HLS is decided and executed by the engine alone, from
         // the session's own route (TranscodeFilmEndToEndTests). This is the existing chain's
         // contract - master playlist, then variant, then segment - which every other video keeps.
-        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 non-film transcode fixture {Guid.NewGuid()}", film: false);
+        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 non-film transcode fixture {Guid.NewGuid()}", kind: SeededVideoKind.Other);
         var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHls();
 
         var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-transcode-hls", cancellationToken: TestContext.Current.CancellationToken);
@@ -278,7 +278,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         // Not a film: since consolidation step 1 a film's direct play is decided by the engine alone
         // and has no legacy fallback for the kill switch to restore (docs/playback-path-inventory.md §4).
         // The kill switch still governs every journey that has not migrated.
-        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 non-film fixture {Guid.NewGuid()}", film: false);
+        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 non-film fixture {Guid.NewGuid()}", kind: SeededVideoKind.Other);
         var (capabilities, constraints) = EndToEndCapabilityPresets.DirectPlay();
 
         // V2 mode (not merely Canary): every session is v2-authoritative, no cohort-hash dependency -
@@ -400,7 +400,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         var mkvPath = await EndToEndMediaFixtures.CreateH264AacMkvAsync(_workDir);
         // Not a film: a film's remux over HLS is decided and executed by the engine alone and has no
         // legacy path left to assert (RemuxFilmEndToEndTests). Every other video still has this one.
-        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, mkvPath, "mkv", _baseStreams, $"Issue 374 fixture {Guid.NewGuid()}", film: false);
+        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, mkvPath, "mkv", _baseStreams, $"Issue 374 fixture {Guid.NewGuid()}", kind: SeededVideoKind.Other);
 
         var (capabilities, constraints) = EndToEndCapabilityPresets.Remux();
         var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-374-remux", cancellationToken: TestContext.Current.CancellationToken);

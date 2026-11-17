@@ -67,36 +67,36 @@ public sealed class EnginePlanEncodingRequestTests
     [Fact]
     public void A_transcode_of_one_stream_or_both_to_h264_and_aac_over_hls_is_executable()
     {
-        Assert.True(EngineFilmPlanner.IsExecutableTranscode(_audioOnly));
-        Assert.True(EngineFilmPlanner.IsExecutableTranscode(VideoOnly));
-        Assert.True(EngineFilmPlanner.IsExecutableTranscode(_audioOnly with { Transforms = [TransformKind.TranscodeVideo, TransformKind.TranscodeAudio, TransformKind.Downmix] }));
-        Assert.True(EngineFilmPlanner.IsExecutableTranscode(_audioOnly with { Container = "ts" }));
-        Assert.True(EngineFilmPlanner.IsExecutableTranscode(_audioOnly with
+        Assert.True(LocalVideoPlanner.IsExecutableTranscode(_audioOnly));
+        Assert.True(LocalVideoPlanner.IsExecutableTranscode(VideoOnly));
+        Assert.True(LocalVideoPlanner.IsExecutableTranscode(_audioOnly with { Transforms = [TransformKind.TranscodeVideo, TransformKind.TranscodeAudio, TransformKind.Downmix] }));
+        Assert.True(LocalVideoPlanner.IsExecutableTranscode(_audioOnly with { Container = "ts" }));
+        Assert.True(LocalVideoPlanner.IsExecutableTranscode(_audioOnly with
         {
             SubtitleStreamIndex = 2,
             SubtitleDelivery = Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External,
             SubtitleFormat = "vtt",
             Transforms = [.. _audioOnly.Transforms, TransformKind.ConvertSubtitle, TransformKind.ExtractSubtitle],
         }));
-        Assert.True(EngineFilmPlanner.IsExecutableHlsOutput(_audioOnly));
-        Assert.False(EngineFilmPlanner.IsExecutableRemux(_audioOnly));
+        Assert.True(LocalVideoPlanner.IsExecutableHlsOutput(_audioOnly));
+        Assert.False(LocalVideoPlanner.IsExecutableRemux(_audioOnly));
     }
 
     [Fact]
     public void Tone_mapping_burn_in_another_target_codec_or_another_delivery_is_not_executable_from_here()
     {
-        Assert.False(EngineFilmPlanner.IsExecutableTranscode(VideoOnly with { Transforms = [.. VideoOnly.Transforms, TransformKind.Tonemap] }));
-        Assert.False(EngineFilmPlanner.IsExecutableTranscode(VideoOnly with { VideoRange = "SDR" }));
-        Assert.False(EngineFilmPlanner.IsExecutableTranscode(VideoOnly with { Transforms = [.. VideoOnly.Transforms, TransformKind.BurnInSubtitle] }));
-        Assert.False(EngineFilmPlanner.IsExecutableTranscode(VideoOnly with { SubtitleStreamIndex = 2, SubtitleDelivery = Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Burn }));
-        Assert.False(EngineFilmPlanner.IsExecutableTranscode(VideoOnly with { VideoCodec = "hevc" }));
-        Assert.False(EngineFilmPlanner.IsExecutableTranscode(_audioOnly with { AudioCodec = "mp3" }));
-        Assert.False(EngineFilmPlanner.IsExecutableTranscode(_audioOnly with { Protocol = StreamingProtocol.Http }));
-        Assert.False(EngineFilmPlanner.IsExecutableTranscode(_audioOnly with { Container = "mkv" }));
-        Assert.False(EngineFilmPlanner.IsExecutableTranscode(_audioOnly with { Method = PlaybackMethod.Remux }));
-        Assert.False(EngineFilmPlanner.IsExecutableTranscode(_audioOnly with { Transforms = [TransformKind.RemuxContainer, TransformKind.CopyVideo, TransformKind.CopyAudio] }));
-        Assert.False(EngineFilmPlanner.IsExecutableTranscode(_audioOnly with { VideoStreamIndex = null }));
-        Assert.False(EngineFilmPlanner.IsExecutableTranscode(null));
+        Assert.False(LocalVideoPlanner.IsExecutableTranscode(VideoOnly with { Transforms = [.. VideoOnly.Transforms, TransformKind.Tonemap] }));
+        Assert.False(LocalVideoPlanner.IsExecutableTranscode(VideoOnly with { VideoRange = "SDR" }));
+        Assert.False(LocalVideoPlanner.IsExecutableTranscode(VideoOnly with { Transforms = [.. VideoOnly.Transforms, TransformKind.BurnInSubtitle] }));
+        Assert.False(LocalVideoPlanner.IsExecutableTranscode(VideoOnly with { SubtitleStreamIndex = 2, SubtitleDelivery = Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Burn }));
+        Assert.False(LocalVideoPlanner.IsExecutableTranscode(VideoOnly with { VideoCodec = "hevc" }));
+        Assert.False(LocalVideoPlanner.IsExecutableTranscode(_audioOnly with { AudioCodec = "mp3" }));
+        Assert.False(LocalVideoPlanner.IsExecutableTranscode(_audioOnly with { Protocol = StreamingProtocol.Http }));
+        Assert.False(LocalVideoPlanner.IsExecutableTranscode(_audioOnly with { Container = "mkv" }));
+        Assert.False(LocalVideoPlanner.IsExecutableTranscode(_audioOnly with { Method = PlaybackMethod.Remux }));
+        Assert.False(LocalVideoPlanner.IsExecutableTranscode(_audioOnly with { Transforms = [TransformKind.RemuxContainer, TransformKind.CopyVideo, TransformKind.CopyAudio] }));
+        Assert.False(LocalVideoPlanner.IsExecutableTranscode(_audioOnly with { VideoStreamIndex = null }));
+        Assert.False(LocalVideoPlanner.IsExecutableTranscode(null));
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public sealed class EnginePlanEncodingRequestTests
     {
         var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
         var store = new InMemoryV2PlanStore();
-        var planner = new EngineFilmPlanner(inner.Object, new PlaybackEngine(), store, NullLogger<EngineFilmPlanner>.Instance);
+        var planner = new LocalVideoPlanner(inner.Object, new PlaybackEngine(), store, NullLogger<LocalVideoPlanner>.Instance);
         var options = new MediaOptions
         {
             ItemId = Guid.NewGuid(),
@@ -114,7 +114,7 @@ public sealed class EnginePlanEncodingRequestTests
         };
 
         PlaybackPlan? plan;
-        using (EngineFilmPlanner.BeginRequest(new EngineFilmRequest(Browser(), _allowed)))
+        using (LocalVideoPlanner.BeginRequest(new LocalVideoRequest(Browser(), _allowed)))
         {
             plan = planner.PlanVideo(options);
         }
@@ -134,7 +134,7 @@ public sealed class EnginePlanEncodingRequestTests
             OutputProfiles = [new PlaybackOutputProfile(MediaKind.Video, StreamingProtocol.Hls, "mp4", ["av1", "hevc", "h264"], ["aac"], null, null, null)],
         };
 
-        var executable = EngineFilmPlanner.WithExecutableTargetsFirst(chrome);
+        var executable = LocalVideoPlanner.WithExecutableTargetsFirst(chrome);
 
         Assert.Equal(["h264", "av1", "hevc"], executable.OutputProfiles[0].VideoCodecs);
         Assert.Equal(["aac"], executable.OutputProfiles[0].AudioCodecs);
@@ -142,7 +142,7 @@ public sealed class EnginePlanEncodingRequestTests
 
         var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
         var store = new InMemoryV2PlanStore();
-        var planner = new EngineFilmPlanner(inner.Object, new PlaybackEngine(), store, NullLogger<EngineFilmPlanner>.Instance);
+        var planner = new LocalVideoPlanner(inner.Object, new PlaybackEngine(), store, NullLogger<LocalVideoPlanner>.Instance);
         var options = new MediaOptions
         {
             ItemId = Guid.NewGuid(),
@@ -154,7 +154,7 @@ public sealed class EnginePlanEncodingRequestTests
         // MPEG-4 Part 2 is decoded by no browser: the video is encoded, to H.264, and the plan is
         // one the session's HLS route executes. Without the reordering it would be AV1, which it
         // does not - and the film would fall to the legacy planner (a strict mock here).
-        using (EngineFilmPlanner.BeginRequest(new EngineFilmRequest(chrome, _allowed)))
+        using (LocalVideoPlanner.BeginRequest(new LocalVideoRequest(chrome, _allowed)))
         {
             Assert.Equal(PlayMethod.Transcode, planner.PlanVideo(options)!.PlayMethod);
         }
