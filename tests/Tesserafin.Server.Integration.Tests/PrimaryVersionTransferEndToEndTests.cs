@@ -55,6 +55,7 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
             var linked = Movie("linked");
             local.OwnerId = previous.Id;
             local.SetPrimaryVersionId(previous.Id);
+            linked.ParentId = Guid.Empty;
             linked.SetPrimaryVersionId(previous.Id);
             previous.LocalAlternateVersions = [local.Path];
             previous.LinkedAlternateVersions = [new LinkedChild { ItemId = linked.Id, Type = LinkedChildType.LinkedAlternateVersion }];
@@ -64,8 +65,8 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
             writes.CreateItem(playlist, null);
             writes.UpsertLinkedChild(playlist.Id, previous.Id, LinkedChildType.Manual, TestContext.Current.CancellationToken);
             var replacement = Movie("replacement");
-            replacement.LocalAlternateVersions = [previous.Path];
-            var scan = new ControlledScanFolder { Id = folder.Id, Path = root, Existing = [previous], Resolved = [replacement] };
+            replacement.LocalAlternateVersions = [previous.Path, local.Path];
+            var scan = new ControlledScanFolder { Id = folder.Id, Path = root, Resolved = [replacement] };
             await using (var database = await databases.CreateDbContextAsync(TestContext.Current.CancellationToken))
             {
                 await database.Database.ExecuteSqlRawAsync("CREATE TRIGGER reject_primary_transfer BEFORE UPDATE OF OwnerId ON BaseItems WHEN OLD.Name = 'primary transfer local' AND NEW.OwnerId <> OLD.OwnerId BEGIN SELECT RAISE(ABORT, 'primary transfer rejected'); END;", TestContext.Current.CancellationToken);
@@ -79,7 +80,8 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
                 Assert.Equal(previous.Id, originalLocal.OwnerId);
                 Assert.Equal(Guid.Empty, previous.OwnerId);
                 Assert.Equal(local.Path, Assert.Single(previous.LocalAlternateVersions));
-                Assert.Equal(previous.Id, Assert.Single(links.GetLinkedChildrenIds(playlist.Id, (int)LinkedChildType.Manual)));
+                // Rerouting precedes the graph save and can survive its failure.
+                Assert.Equal(replacement.Id, Assert.Single(links.GetLinkedChildrenIds(playlist.Id, (int)LinkedChildType.Manual)));
             }
             finally
             {
@@ -96,9 +98,8 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
             Assert.Equal(replacement.Id, Assert.Single(links.GetLinkedChildrenIds(playlist.Id, (int)LinkedChildType.Manual)));
 
             var final = Movie("final");
-            final.LocalAlternateVersions = [local.Path];
-            var replacementSnapshot = Assert.IsType<Movie>(lookup.GetItemById(replacement.Id));
-            var finalScan = new ControlledScanFolder { Id = folder.Id, Path = root, Existing = [replacementSnapshot], Resolved = [final] };
+            final.LocalAlternateVersions = [local.Path, previous.Path];
+            var finalScan = new ControlledScanFolder { Id = folder.Id, Path = root, Resolved = [final] };
             await using (var database = await databases.CreateDbContextAsync(TestContext.Current.CancellationToken))
             {
                 await database.Database.ExecuteSqlRawAsync("CREATE TRIGGER reject_transfer_reroute BEFORE UPDATE OF ChildId ON LinkedChildren WHEN OLD.ChildType = 0 BEGIN SELECT RAISE(ABORT, 'transfer reroute rejected'); END;", TestContext.Current.CancellationToken);
@@ -108,8 +109,8 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
             {
                 var failure = await Assert.ThrowsAnyAsync<Exception>(() => ScanAsync(finalScan));
                 Assert.Contains("transfer reroute rejected", failure.ToString(), StringComparison.Ordinal);
-                Assert.Equal(final.Id, Assert.IsType<Movie>(repository.RetrieveItem(replacement.Id)).PrimaryVersionId);
-                Assert.Equal(final.Id, repository.RetrieveItem(local.Id).OwnerId);
+                Assert.Null(Assert.IsType<Movie>(repository.RetrieveItem(replacement.Id)).PrimaryVersionId);
+                Assert.Equal(replacement.Id, repository.RetrieveItem(local.Id).OwnerId);
                 Assert.Equal(replacement.Id, Assert.Single(links.GetLinkedChildrenIds(playlist.Id, (int)LinkedChildType.Manual)));
             }
             finally
@@ -118,8 +119,8 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
                 await database.Database.ExecuteSqlRawAsync("DROP TRIGGER reject_transfer_reroute;", TestContext.Current.CancellationToken);
             }
 
-            // Retry the folder scan, not only the command. The pending old entry now carries
-            // its successor, so ordinary catalogue deletion also knows where to reroute.
+            // Retry the folder scan, not only the command. Both saved primaries remain visible
+            // until the transfer can finish, so the existing replacement is selected again.
             await ScanAsync(finalScan);
             Assert.Null(repository.RetrieveItem(replacement.Id));
             Assert.Null(lookup.GetItemById(replacement.Id));
@@ -152,9 +153,13 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
             };
 
             Task ScanAsync(ControlledScanFolder target) => target.ValidateChildren(
-                deletions, writes, images, new Progress<double>(),
+                deletions,
+                writes,
+                images,
+                new Progress<double>(),
                 new MetadataRefreshOptions(new DirectoryService(files)) { MetadataRefreshMode = MetadataRefreshMode.None, ImageRefreshMode = MetadataRefreshMode.None },
-                recursive: false, cancellationToken: TestContext.Current.CancellationToken);
+                recursive: false,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
         finally
         {
@@ -166,11 +171,7 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
     // metadata, reference and HTTP services are the real application services.
     private sealed class ControlledScanFolder : Folder
     {
-        public IReadOnlyList<BaseItem> Existing { get; init; } = [];
-
         public IReadOnlyList<BaseItem> Resolved { get; init; } = [];
-
-        protected override IReadOnlyList<BaseItem> LoadChildren() => Existing;
 
         protected override IEnumerable<BaseItem> GetNonCachedChildren(IDirectoryService directoryService) => Resolved;
     }

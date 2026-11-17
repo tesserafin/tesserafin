@@ -1461,13 +1461,16 @@ Local alternates move to the new owner; linked alternates retain empty ownership
 processed once and unrelated ownership/primary relationships are refused before export or save.
 The new primary keeps both sets of version relationships; the old primary's outgoing lists clear in
 the same graph save that moves ownership, preventing orphan cleanup from deleting transferred rows.
+Selection includes already-saved valid primaries, so a scan retries a transfer after the replacement's
+initial creation survived a failed graph update; the catalogue read path remains real in the journey.
 Caller snapshots and published cache entries stay unchanged on failed graph persistence. Bulk graph
 updates do not propagate one version's descriptive metadata over the others.
 
-Manual playlist/collection references are rerouted after that save. A removed old primary keeps a
-successor ID while pending deletion, allowing a full subsequent scan to finish reference rerouting
-through the deletion command if the separate reroute fails. Catalogue-only deletion preserves source
-media. Initial scan creation, sidecar export, graph persistence, reroute and deletion are distinct
+Manual playlist/collection references are rerouted before the graph save. A reroute failure leaves
+the old primary discoverable by a later full scan; a graph failure can leave references pointing to
+the already-saved replacement while the old version graph stays intact. Both cases retry against
+saved valid primaries. Catalogue-only deletion follows the graph save and preserves source media.
+Initial scan creation, sidecar export, graph persistence, reroute and deletion are distinct
 operations; no whole-scan transaction, global serialization or snapshot isolation is introduced.
 
 Focused tests cover one-batch publication, failure/retry, local versus linked ownership, captured
