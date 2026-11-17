@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
@@ -51,6 +52,39 @@ internal sealed class ItemResolutionService(
     private IItemResolver[] EntityResolvers { get; set; } = [];
 
     private IMultiItemResolver[] MultiItemResolvers { get; set; } = [];
+
+    public IReadOnlyList<ResolvedShortcutTarget> ResolveShortcutTargets(Folder owner, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var result = new List<ResolvedShortcutTarget>();
+        foreach (var file in fileSystemChildren.Where(file => !file.IsDirectory && _fileSystem.IsShortcut(file.FullName)).OrderBy(file => file.FullName, StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _logger.LogDebug("Resolving shortcut {Path}", file.FullName);
+            var raw = _fileSystem.ResolveShortcut(file.FullName);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                throw new IOException($"Shortcut has no target: {file.FullName}");
+            }
+
+            var expanded = _appHost.ExpandVirtualPath(raw);
+            if (string.IsNullOrWhiteSpace(expanded))
+            {
+                throw new IOException($"Shortcut has no target: {file.FullName}");
+            }
+
+            var target = _fileSystem.MakeAbsolutePath(owner.ContainingFolderPath, expanded);
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                throw new IOException($"Shortcut has no absolute target: {file.FullName}");
+            }
+
+            result.Add(new ResolvedShortcutTarget(file.FullName, target));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return result;
+    }
 
     /// <inheritdoc />
     public IEnumerable<BaseItem> FindExtras(BaseItem owner, IReadOnlyList<FileSystemMetadata> fileSystemChildren, IDirectoryService directoryService)

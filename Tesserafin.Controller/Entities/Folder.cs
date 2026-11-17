@@ -1646,7 +1646,7 @@ namespace Tesserafin.Controller.Entities
 
             if (IsFileProtocol)
             {
-                if (RefreshLinkedChildren(fileSystemChildren))
+                if (await RefreshLinkedChildrenAsync(writes, fileSystemChildren, cancellationToken).ConfigureAwait(false))
                 {
                     changesFound = true;
                 }
@@ -1657,63 +1657,15 @@ namespace Tesserafin.Controller.Entities
             return baseHasChanges || changesFound;
         }
 
-        /// <summary>
-        /// Refreshes the linked children.
-        /// </summary>
-        /// <param name="fileSystemChildren">The enumerable of file system metadata.</param>
-        /// <returns><c>true</c> if the linked children were updated, <c>false</c> otherwise.</returns>
-        protected virtual bool RefreshLinkedChildren(IEnumerable<FileSystemMetadata> fileSystemChildren)
-        {
-            if (SupportsShortcutChildren)
-            {
-                var newShortcutLinks = fileSystemChildren
-                    .Where(i => !i.IsDirectory && FileSystem.IsShortcut(i.FullName))
-                    .Select(i =>
-                    {
-                        try
-                        {
-                            Logger.LogDebug("Found shortcut at {0}", i.FullName);
-
-                            var resolvedPath = CollectionFolder.ApplicationHost.ExpandVirtualPath(FileSystem.ResolveShortcut(i.FullName));
-
-                            if (!string.IsNullOrEmpty(resolvedPath))
-                            {
-#pragma warning disable CS0618 // Type or member is obsolete - shortcuts require Path for lazy ItemId resolution
-                                return new LinkedChild
-                                {
-                                    Path = resolvedPath,
-                                    Type = LinkedChildType.Shortcut
-                                };
-#pragma warning restore CS0618
-                            }
-
-                            Logger.LogError("Error resolving shortcut {0}", i.FullName);
-
-                            return null;
-                        }
-                        catch (IOException ex)
-                        {
-                            Logger.LogError(ex, "Error resolving shortcut {0}", i.FullName);
-                            return null;
-                        }
-                    })
-                    .Where(i => i is not null)
-                    .ToList();
-
-                var currentShortcutLinks = LinkedChildren.Where(i => i.Type == LinkedChildType.Shortcut).ToList();
-
-                if (!newShortcutLinks.SequenceEqual(currentShortcutLinks, new LinkedChildComparer(FileSystem)))
-                {
-                    Logger.LogInformation("Shortcut links have changed for {0}", Path);
-
-                    newShortcutLinks.AddRange(LinkedChildren.Where(i => i.Type == LinkedChildType.Manual));
-                    LinkedChildren = newShortcutLinks.ToArray();
-                    return true;
-                }
-            }
-
-            return false;
-        }
+        /// <summary>Refreshes links through their explicit write owner.</summary>
+        /// <param name="writes">The item write owner.</param>
+        /// <param name="fileSystemChildren">Completed filesystem discovery.</param>
+        /// <param name="cancellationToken">The refresh cancellation token.</param>
+        /// <returns>Whether linked children changed.</returns>
+        protected virtual Task<bool> RefreshLinkedChildrenAsync(IItemWriteCommands writes, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+            => SupportsShortcutChildren
+                ? writes.RefreshShortcutLinksAsync(this, fileSystemChildren, cancellationToken)
+                : Task.FromResult(false);
 
         public override bool IsPlayed(User user, UserItemData userItemData)
         {

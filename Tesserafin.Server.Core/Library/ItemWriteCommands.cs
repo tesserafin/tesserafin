@@ -39,6 +39,96 @@ internal sealed partial class ItemWriteCommands(
 
     private readonly object _namedItemGate = new();
 
+    public async Task<bool> RefreshShortcutLinksAsync(Folder owner, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (owner.Id.Equals(Guid.Empty))
+        {
+            throw new ArgumentException("Shortcut owner must have an identity.", nameof(owner));
+        }
+
+        // Finish every file read before examining or changing the catalogue. One unreadable
+        // shortcut must not become an authoritative removal of the remaining links.
+        var targets = _resolution.ResolveShortcutTargets(owner, fileSystemChildren, cancellationToken);
+        var saved = lookup.GetItemById(owner.Id) as Folder;
+        var current = saved is null ? owner.LinkedChildren : linkedChildren.GetLinkedChildren(owner.Id);
+        var manual = current.Where(link => link.Type != LinkedChildType.Shortcut).Select(CopyFolderLink).ToArray();
+        var shortcuts = new List<LinkedChild>();
+        foreach (var target in targets)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var item = _repository.GetItemList(ItemPathQuery.Create(target.TargetPath, null)).FirstOrDefault();
+            if ((item is not null && item.Id.Equals(owner.Id)) || files.AreEqual(target.TargetPath, owner.Path))
+            {
+                throw new InvalidOperationException("A folder cannot link to itself through a shortcut.");
+            }
+
+            // A path is current discovery state while its target is not scanned yet. Keep it
+            // without materializing an item; known targets use their persisted identity.
+#pragma warning disable CS0618 // Unscanned shortcut targets still require their discovery path.
+            var candidate = new LinkedChild { ItemId = item?.Id, Path = target.TargetPath, Type = LinkedChildType.Shortcut };
+#pragma warning restore CS0618
+            if (!manual.Any(link => SameFolderTarget(link, candidate)) && !shortcuts.Any(link => SameFolderTarget(link, candidate)))
+            {
+                shortcuts.Add(candidate);
+            }
+        }
+
+        var desired = shortcuts.Concat(manual).ToArray();
+        if (desired.Length == current.Count && desired.All(link => current.Any(existing => SameFolderLink(link, existing))))
+        {
+            // Repair a stale caller from links that are already committed, without resaving
+            // the item or letting a later metadata save overwrite canonical manual links.
+            if (owner.LinkedChildren.Length != desired.Length || !owner.LinkedChildren.All(link => desired.Any(existing => SameFolderLink(link, existing))))
+            {
+                owner.LinkedChildren = desired;
+            }
+
+            return false;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var staged = (Folder)owner.CopyForWrite();
+        staged.LinkedChildren = desired;
+        logger.LogInformation("Saving shortcut links for {Path}", owner.Path);
+        await UpdateItemAsync(staged, owner.GetParent(lookup), ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+        owner.LinkedChildren = staged.LinkedChildren;
+        owner.DateLastSaved = staged.DateLastSaved;
+        return true;
+    }
+
+    private bool SameFolderLink(LinkedChild left, LinkedChild right)
+    {
+        if (left.Type != right.Type)
+        {
+            return false;
+        }
+
+        var leftId = left.ItemId.GetValueOrDefault();
+        var rightId = right.ItemId.GetValueOrDefault();
+        if (!leftId.Equals(Guid.Empty) || !rightId.Equals(Guid.Empty))
+        {
+            return !leftId.Equals(Guid.Empty) && leftId.Equals(rightId);
+        }
+
+        return SameFolderTarget(left, right);
+    }
+
+#pragma warning disable CS0618 // Preserve discovery paths until their shortcut targets are scanned.
+    private bool SameFolderTarget(LinkedChild left, LinkedChild right)
+    {
+        if (left.ItemId.HasValue && right.ItemId.HasValue && !left.ItemId.Value.Equals(Guid.Empty) && !right.ItemId.Value.Equals(Guid.Empty))
+        {
+            return left.ItemId.Value.Equals(right.ItemId.Value);
+        }
+
+        return !string.IsNullOrEmpty(left.Path) && !string.IsNullOrEmpty(right.Path) && files.AreEqual(left.Path, right.Path);
+    }
+
+    private static LinkedChild CopyFolderLink(LinkedChild source)
+        => new() { ItemId = source.ItemId, Type = source.Type, Path = source.Path, LibraryItemId = source.LibraryItemId };
+#pragma warning restore CS0618
+
     public Task<FolderChildReconciliationResult> ReconcileFolderChildrenAsync(Folder parent, IReadOnlyList<BaseItem> currentChildren, IReadOnlyList<BaseItem> discovered, IDirectoryService directoryService, bool allowRemoveRoot, IItemDeletionCommands deletions, IItemImageService images, CancellationToken cancellationToken)
         => childReconciler.ReconcileAsync(parent, currentChildren, discovered, directoryService, allowRemoveRoot, this, deletions, images, cancellationToken);
 

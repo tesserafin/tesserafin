@@ -263,9 +263,10 @@ namespace Tesserafin.Controller.Entities
             return totalProgresses / foldersWithProgress;
         }
 
-        protected override bool RefreshLinkedChildren(IEnumerable<FileSystemMetadata> fileSystemChildren)
+        protected override Task<bool> RefreshLinkedChildrenAsync(IItemWriteCommands writes, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
-            return RefreshLinkedChildrenInternal(true);
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(RefreshLinkedChildrenInternal(true));
         }
 
         private bool RefreshLinkedChildrenInternal(bool setFolders)
