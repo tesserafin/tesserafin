@@ -64,6 +64,18 @@ public interface IItemWriteCommands
     /// <returns>Version transfer and reference rerouting.</returns>
     Task DemotePrimaryVersionAsync(Video previous, Video replacement, CancellationToken cancellationToken);
 
+    /// <summary>Reconciles one completed discovery snapshot with the folder's current catalogue.</summary>
+    /// <param name="parent">The scanned folder.</param>
+    /// <param name="currentChildren">The current catalogue snapshot.</param>
+    /// <param name="discovered">A completed filesystem discovery snapshot.</param>
+    /// <param name="directoryService">Storage accessibility and image directory access.</param>
+    /// <param name="allowRemoveRoot">Whether collection folders are checked for removal.</param>
+    /// <param name="deletions">Explicit catalogue deletion operations.</param>
+    /// <param name="images">Explicit image refresh preparation and commit.</param>
+    /// <param name="cancellationToken">Cancels admission and reconciliation operations.</param>
+    /// <returns>Retained and refreshable children, or an inaccessible-storage skip.</returns>
+    Task<FolderChildReconciliationResult> ReconcileFolderChildrenAsync(Folder parent, IReadOnlyList<BaseItem> currentChildren, IReadOnlyList<BaseItem> discovered, IDirectoryService directoryService, bool allowRemoveRoot, IItemDeletionCommands deletions, IItemImageService images, CancellationToken cancellationToken);
+
     void CreateItem(BaseItem item, BaseItem? parent);
 
     void CreateItems(IReadOnlyList<BaseItem> items, BaseItem? parent, CancellationToken cancellationToken);

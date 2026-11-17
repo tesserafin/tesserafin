@@ -454,13 +454,13 @@ namespace Tesserafin.Controller.Entities
             {
                 if (!AdditionalParts.SequenceEqual(newVideo.AdditionalParts, StringComparer.Ordinal))
                 {
-                    AdditionalParts = newVideo.AdditionalParts;
+                    AdditionalParts = newVideo.AdditionalParts.ToArray();
                     updateType |= ItemUpdateType.MetadataImport;
                 }
 
                 if (!LocalAlternateVersions.SequenceEqual(newVideo.LocalAlternateVersions, StringComparer.Ordinal))
                 {
-                    LocalAlternateVersions = newVideo.LocalAlternateVersions;
+                    LocalAlternateVersions = newVideo.LocalAlternateVersions.ToArray();
                     updateType |= ItemUpdateType.MetadataImport;
                 }
 
