@@ -1112,3 +1112,31 @@ ownership refresh/retry, foreign-owner refusal, missing parts and cancellation. 
 real-host journey rejects a typed alternate insert, retries through the entity refresh entry point,
 checks generic-obsolete removal, multipart metadata and HTTP sources, and compares every source byte.
 Metadata downloads are disabled for the lifecycle proof. HTTP/OpenAPI/SDK shapes are unchanged.
+
+## 37. Scan-time primary-version transfer
+
+Folder validation retains discovery, accessibility and primary-change detection, but no longer
+rewrites alternate ownership, clears version arrays or reroutes references itself. Explicit
+`DemotePrimaryVersionAsync` and `ReplacePrimaryVersionAsync` commands use the existing graph planner
+and bulk writer. They read the saved primaries and typed links through lookup/persistence ports,
+without manager or provider dependencies. The scan no longer detaches a deferred old primary early.
+
+Local alternates move to the new owner; linked alternates retain empty ownership. Duplicate IDs are
+processed once and unrelated ownership/primary relationships are refused before export or save.
+The new primary keeps both sets of version relationships; the old primary's outgoing lists clear in
+the same graph save that moves ownership, preventing orphan cleanup from deleting transferred rows.
+Caller snapshots and published cache entries stay unchanged on failed graph persistence. Bulk graph
+updates do not propagate one version's descriptive metadata over the others.
+
+Manual playlist/collection references are rerouted after that save. A removed old primary keeps a
+successor ID while pending deletion, allowing a full subsequent scan to finish reference rerouting
+through the deletion command if the separate reroute fails. Catalogue-only deletion preserves source
+media. Initial scan creation, sidecar export, graph persistence, reroute and deletion are distinct
+operations; no whole-scan transaction, global serialization or snapshot isolation is introduced.
+
+Focused tests cover one-batch publication, failure/retry, local versus linked ownership, captured
+parent, reroute failure, invalid identities and cancelled admission. A required real-host journey
+controls only discovery inputs: it runs the actual folder validation and application services,
+rejects a graph update with SQLite, retries demotion, rejects reference rerouting, retries the full
+replacement scan, checks HTTP media sources/playlist references and compares all original bytes.
+HTTP/OpenAPI/SDK shapes are unchanged.

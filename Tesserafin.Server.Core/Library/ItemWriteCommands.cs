@@ -179,6 +179,48 @@ internal sealed partial class ItemWriteCommands(
         }
     }
 
+    public async Task ReplacePrimaryVersionAsync(Video previous, Video replacement, Folder parent, IItemDeletionCommands deletions, CancellationToken cancellationToken)
+    {
+        var plan = versions.PreparePrimaryTransfer(previous, replacement, true, cancellationToken);
+        if (plan is null)
+        {
+            return;
+        }
+
+        await CommitPrimaryTransferAsync(plan, previous, replacement, cancellationToken).ConfigureAwait(false);
+        await RerouteLinkedChildReferencesAsync(previous.Id, replacement.Id, cancellationToken).ConfigureAwait(false);
+        // The committed old row has no outgoing version links, so deletion cannot promote an
+        // obsolete alternate. Keep the scan's captured parent and preserve every media source.
+        await deletions.DeleteAsync(plan.Previous, new DeleteOptions { DeleteFileLocation = false }, parent, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task DemotePrimaryVersionAsync(Video previous, Video replacement, CancellationToken cancellationToken)
+    {
+        var plan = versions.PreparePrimaryTransfer(previous, replacement, false, cancellationToken)
+            ?? throw new InvalidOperationException("Previous primary must already be saved.");
+        await CommitPrimaryTransferAsync(plan, previous, replacement, cancellationToken).ConfigureAwait(false);
+        await RerouteLinkedChildReferencesAsync(previous.Id, replacement.Id, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task CommitPrimaryTransferAsync(PrimaryVersionTransferPlan plan, Video previous, Video replacement, CancellationToken cancellationToken)
+    {
+        // One graph save moves ownership before the persistence layer removes the old links.
+        // Exported sidecars remain outside that database transaction, as for all item updates.
+        await UpdateItemsAsync(plan.Items, null, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+        CopyPrimaryState(plan.Previous, previous);
+        CopyPrimaryState(plan.Replacement, replacement);
+    }
+
+    private static void CopyPrimaryState(Video source, Video target)
+    {
+        target.LocalAlternateVersions = source.LocalAlternateVersions;
+        target.LinkedAlternateVersions = source.LinkedAlternateVersions;
+        target.OwnerId = source.OwnerId;
+        target.PrimaryVersionId = source.PrimaryVersionId;
+        target.PresentationUniqueKey = source.PresentationUniqueKey;
+        target.DateLastSaved = source.DateLastSaved;
+    }
+
     public async Task<bool> RefreshOwnedVideosAsync(Video owner, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
