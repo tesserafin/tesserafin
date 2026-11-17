@@ -20,13 +20,16 @@ public sealed partial class BaseItemRepository
     /// <inheritdoc />
     public async Task<IReadOnlyList<int>> GetProductionYearsAsync(CancellationToken cancellationToken)
     {
-        await using var context = await _dbProvider.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        return await context.BaseItems.AsNoTracking()
-            .Where(item => item.ProductionYear.HasValue && item.ProductionYear > 0)
-            .Select(item => item.ProductionYear!.Value)
-            .Distinct()
-            .Order()
-            .ToArrayAsync(cancellationToken).ConfigureAwait(false);
+        var context = await _dbProvider.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await using (context.ConfigureAwait(false))
+        {
+            return await context.BaseItems.AsNoTracking()
+                .Where(item => item.ProductionYear.HasValue && item.ProductionYear > 0)
+                .Select(item => item.ProductionYear!.Value)
+                .Distinct()
+                .Order()
+                .ToArrayAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
