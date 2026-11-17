@@ -52,7 +52,7 @@ namespace Tesserafin.Providers.Manager
     /// </summary>
     public class ProviderManager : IProviderManager, IDisposable
     {
-        private readonly ILimitedConcurrencyLibraryScheduler _scheduler;
+        private readonly IFolderValidationServices _validation;
         private readonly IItemWriteCommands _writes;
         private readonly IItemMetadataExporter _metadataExporter;
         private readonly IItemImageService _images;
@@ -98,7 +98,7 @@ namespace Tesserafin.Providers.Manager
         /// <param name="metadataExporter">Metadata saver selection and execution.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="deletions">Item deletion operations.</param>
-        /// <param name="scheduler">Runs folder validation work with bounded concurrency.</param>
+        /// <param name="validation">The services folder validation runs with.</param>
         /// <param name="libraryOptions">The persisted library options, whose updates invalidate cached provider choices.</param>
         /// <param name="httpClientFactory">The Http client factory.</param>
         /// <param name="subtitleManager">The subtitle manager.</param>
@@ -119,7 +119,7 @@ namespace Tesserafin.Providers.Manager
             IItemMetadataExporter metadataExporter,
             IItemImageService images,
             IItemDeletionCommands deletions,
-            ILimitedConcurrencyLibraryScheduler scheduler,
+            IFolderValidationServices validation,
             ILibraryOptionsStore libraryOptions,
             IHttpClientFactory httpClientFactory,
             ISubtitleManager subtitleManager,
@@ -136,7 +136,7 @@ namespace Tesserafin.Providers.Manager
             IMediaSegmentManager mediaSegmentManager,
             ISimilarItemsManager similarItemsManager)
         {
-            _scheduler = scheduler;
+            _validation = validation;
             _writes = writes;
             _metadataExporter = metadataExporter;
             _images = images;
@@ -1032,7 +1032,7 @@ namespace Tesserafin.Providers.Manager
                     await RefreshCollectionFolderChildren(options, collectionFolder, cancellationToken).ConfigureAwait(false);
                     break;
                 case Folder folder:
-                    await folder.ValidateChildren(_deletions, _writes, _images, _scheduler, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await folder.ValidateChildren(_validation, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
                     break;
             }
         }
@@ -1043,7 +1043,7 @@ namespace Tesserafin.Providers.Manager
             {
                 await child.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
 
-                await child.ValidateChildren(_deletions, _writes, _images, _scheduler, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                await child.ValidateChildren(_validation, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -1066,7 +1066,7 @@ namespace Tesserafin.Providers.Manager
                 .Where(i => i is not null)
                 .Distinct();
 
-            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_deletions, _writes, _images, _scheduler, new Progress<double>(), options, true, false, cancellationToken));
+            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_validation, new Progress<double>(), options, true, false, cancellationToken));
 
             await Task.WhenAll(musicArtistRefreshTasks).ConfigureAwait(false);
 

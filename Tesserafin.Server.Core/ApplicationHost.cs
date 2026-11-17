@@ -566,6 +566,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddTransient(provider => new Lazy<IUserViewManager>(provider.GetRequiredService<IUserViewManager>));
             serviceCollection.AddTransient(provider => new Lazy<ITVSeriesManager>(provider.GetRequiredService<ITVSeriesManager>));
             serviceCollection.AddSingleton<IItemListingServices, ItemListingServices>();
+            serviceCollection.AddSingleton<IFolderValidationServices, FolderValidationServices>();
 
             // LiveTvPresenceProvider (PR108) needs the registered ILiveTvService count to reproduce
             // LiveTvManager.IsLiveTvEnabled, but the in-tree DefaultLiveTvService implementation
