@@ -125,7 +125,7 @@ public sealed class ItemPeopleCommandsTests
     [Fact]
     public void Ownership_RemovesTheManagerWriteFacades_AndHasNoManagerOrProviderDependency()
     {
-        var dependencies = typeof(ItemPeopleCommands).GetConstructors().Single().GetParameters().Select(p => p.ParameterType);
+        var dependencies = typeof(ItemPeopleCommands).GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToArray();
         Assert.DoesNotContain(typeof(ILibraryManager), dependencies);
         Assert.DoesNotContain(typeof(IProviderManager), dependencies);
         Assert.DoesNotContain(typeof(IServiceProvider), dependencies);
