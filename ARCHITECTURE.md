@@ -654,3 +654,12 @@ streaming controllers (retained behind the v2 execution adapter for now).
   `Folder.GetRefreshProgress`, so metadata provider statics are not an indirect dependency.
   The user-root catalogue resolves cached library IDs through the injected item lookup. Existing
   definition commands remain the write boundary. HTTP/OpenAPI and SDK shapes are unchanged.
+
+- **Person reads and maintenance.** The existing `IItemPeopleService` owns persisted person lookup
+  and credit-page expansion. Paths and identities use configured filesystem/root inputs; reads
+  never materialize a person. Page expansion keeps repository ordering/paging metadata, isolates
+  malformed names and applies the entity visibility rule with an explicit scope. API, DTO and NFO
+  readers use this port. `PeopleValidator` owns managed-root preparation, credited-person refresh
+  and batched unlocked-orphan cleanup; the scheduled task takes it and an item lookup directly.
+  The three manager entry points, its people repository and its logger field are removed. Validation
+  reports monotonic progress, counts missing entries and checks cancellation before root creation.

@@ -50,6 +50,7 @@ public class ImageController : BaseTesserafinApiController
     private readonly IUserManager _userManager;
     private readonly INamedItemCatalog _namedItems;
     private readonly ILibraryManager _libraryManager;
+    private readonly IItemPeopleService _people;
     private readonly IProviderManager _providerManager;
     private readonly IImageProcessor _imageProcessor;
     private readonly IFileSystem _fileSystem;
@@ -65,6 +66,7 @@ public class ImageController : BaseTesserafinApiController
     /// <param name="chapterManager">Instance of the <see cref="IChapterManager"/> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="namedItems">Read-only named catalogue.</param>
+    /// <param name="people">Read-only people catalogue.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="imageProcessor">Instance of the <see cref="IImageProcessor"/> interface.</param>
@@ -79,6 +81,7 @@ public class ImageController : BaseTesserafinApiController
         IUserManager userManager,
         INamedItemCatalog namedItems,
         ILibraryManager libraryManager,
+        IItemPeopleService people,
         IProviderManager providerManager,
         IImageProcessor imageProcessor,
         IFileSystem fileSystem,
@@ -92,6 +95,7 @@ public class ImageController : BaseTesserafinApiController
         _userManager = userManager;
         _namedItems = namedItems;
         _libraryManager = libraryManager;
+        _people = people;
         _providerManager = providerManager;
         _imageProcessor = imageProcessor;
         _fileSystem = fileSystem;
@@ -1215,7 +1219,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? foregroundLayer,
         [FromQuery] int? imageIndex)
     {
-        var item = _libraryManager.GetPerson(name);
+        var item = _people.GetPerson(name);
         if (item is null)
         {
             return NotFound();
@@ -1293,7 +1297,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? backgroundColor,
         [FromQuery] string? foregroundLayer)
     {
-        var item = _libraryManager.GetPerson(name);
+        var item = _people.GetPerson(name);
         if (item is null)
         {
             return NotFound();

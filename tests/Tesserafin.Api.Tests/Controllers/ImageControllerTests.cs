@@ -85,6 +85,7 @@ public static class ImageControllerTests
             Mock.Of<IUserManager>(),
             Mock.Of<INamedItemCatalog>(),
             library.Object,
+            Mock.Of<IItemPeopleService>(),
             Mock.Of<IProviderManager>(),
             processor.Object,
             Mock.Of<IFileSystem>(),

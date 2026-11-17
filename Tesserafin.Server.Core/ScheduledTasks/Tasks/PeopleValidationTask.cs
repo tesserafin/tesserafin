@@ -16,6 +16,7 @@ using Tesserafin.Database.Implementations;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.Tasks;
+using Tesserafin.Server.Core.Library.Validators;
 
 namespace Tesserafin.Server.Core.ScheduledTasks.Tasks;
 
@@ -27,7 +28,8 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
     private readonly IProviderManager _providers;
-    private readonly ILibraryManager _libraryManager;
+    private readonly IItemLookupService _lookup;
+    private readonly PeopleValidator _validator;
     private readonly ILibraryScanCoordinator _scans;
     private readonly ILocalizationManager _localization;
     private readonly IDbContextFactory<TesserafinDbContext> _dbContextFactory;
@@ -41,8 +43,9 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
     /// <param name="providers">The provider manager for metadata refreshes.</param>
+    /// <param name="lookup">Item lookup for person image refresh.</param>
+    /// <param name="validator">People validation ownership.</param>
     /// <param name="scans">Library scan scheduling and state.</param>
-    /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="localization">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="dbContextFactory">Instance of the <see cref="IDbContextFactory{TContext}"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
@@ -52,7 +55,8 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
         IProviderManager providers,
-        ILibraryManager libraryManager,
+        IItemLookupService lookup,
+        PeopleValidator validator,
         ILibraryScanCoordinator scans,
         ILocalizationManager localization,
         IDbContextFactory<TesserafinDbContext> dbContextFactory,
@@ -63,7 +67,8 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
         _writes = writes;
         _deletions = deletions;
         _providers = providers;
-        _libraryManager = libraryManager;
+        _lookup = lookup;
+        _validator = validator;
         _scans = scans;
         _localization = localization;
         _dbContextFactory = dbContextFactory;
@@ -179,7 +184,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
         // Phase 2: Validate people (33-66%). Runs after orphaned PeopleBaseItemMap entries are
         // cleaned up above, so dead people are removed in a single pass instead of requiring a second run.
         IProgress<double> validateProgress = new Progress<double>((val) => progress.Report((val / 3) + 33));
-        await _libraryManager.ValidatePeopleAsync(_deletions, _writes, validateProgress, cancellationToken).ConfigureAwait(false);
+        await _validator.ValidatePeople(cancellationToken, validateProgress).ConfigureAwait(false);
 
         // Phase 3: Refresh images for people missing them (66-100%)
         IProgress<double> refreshProgress = new Progress<double>((val) => progress.Report((val / 3) + 66));
@@ -249,7 +254,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     {
         try
         {
-            if (_libraryManager.GetItemById(personId) is not Person item)
+            if (_lookup.GetItemById(personId) is not Person item)
             {
                 return false;
             }

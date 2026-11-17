@@ -63,10 +63,8 @@ namespace Tesserafin.Server.Core.Library
     {
         private readonly IItemResolutionService _resolution;
         private readonly ILibraryItemOptions _options;
-        private readonly ILogger<LibraryManager> _logger;
         private readonly IUserManager _userManager;
         private readonly IServerConfigurationManager _configurationManager;
-        private readonly Lazy<IProviderManager> _providerManagerFactory;
         private readonly IUserViewCatalog _userViewCatalog;
         private readonly IFileSystem _fileSystem;
         private readonly IItemRepository _itemRepository;
@@ -77,7 +75,6 @@ namespace Tesserafin.Server.Core.Library
         private readonly IItemNamingService _itemNamingService;
         private readonly IItemPeopleService _itemPeopleService;
         private readonly NamingOptions _namingOptions;
-        private readonly IPeopleRepository _peopleRepository;
         private readonly ExtraResolver _extraResolver;
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemCacheStore _itemCacheStore;
@@ -99,7 +96,6 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="userManager">The user manager.</param>
         /// <param name="configurationManager">The configuration manager.</param>
         /// <param name="fileSystem">The file system.</param>
-        /// <param name="providerManagerFactory">The provider manager.</param>
         /// <param name="userViewCatalog">
         /// The user-views catalog leaf (sole real implementation of <c>GetUserViews</c>; see PR106-109).
         /// Replaces the former <c>Lazy&lt;IUserViewManager&gt;</c> - injected directly (not
@@ -118,7 +114,6 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="itemPeopleService">The item people service.</param>
         /// <param name="namingOptions">The naming options.</param>
         /// <param name="directoryService">The directory service.</param>
-        /// <param name="peopleRepository">The people repository.</param>
         /// <param name="mediaStreamLanguageService">The media stream language service.</param>
         /// <param name="itemLookupService">The item lookup service (read side of the item lookup cache; see PR75/PR76).</param>
         /// <param name="itemCacheStore">The item cache lifecycle port (register/invalidate side of the same cache; see PR76).</param>
@@ -135,7 +130,6 @@ namespace Tesserafin.Server.Core.Library
             IUserManager userManager,
             IServerConfigurationManager configurationManager,
             IFileSystem fileSystem,
-            Lazy<IProviderManager> providerManagerFactory,
             IUserViewCatalog userViewCatalog,
             IItemRepository itemRepository,
             INextUpService nextUpService,
@@ -146,7 +140,6 @@ namespace Tesserafin.Server.Core.Library
             IItemPeopleService itemPeopleService,
             NamingOptions namingOptions,
             IDirectoryService directoryService,
-            IPeopleRepository peopleRepository,
             IMediaStreamLanguageService mediaStreamLanguageService,
             IItemLookupService itemLookupService,
             IItemCacheStore itemCacheStore,
@@ -159,11 +152,9 @@ namespace Tesserafin.Server.Core.Library
         {
             _resolution = resolution;
             _options = options;
-            _logger = loggerFactory.CreateLogger<LibraryManager>();
             _userManager = userManager;
             _configurationManager = configurationManager;
             _fileSystem = fileSystem;
-            _providerManagerFactory = providerManagerFactory;
             _userViewCatalog = userViewCatalog;
             _itemRepository = itemRepository;
             _nextUpService = nextUpService;
@@ -184,7 +175,6 @@ namespace Tesserafin.Server.Core.Library
             _roots = roots;
 
             _namingOptions = namingOptions;
-            _peopleRepository = peopleRepository;
             _extraResolver = new ExtraResolver(loggerFactory.CreateLogger<ExtraResolver>(), namingOptions, directoryService);
 
             _mediaStreamLanguageService = mediaStreamLanguageService;
@@ -195,8 +185,6 @@ namespace Tesserafin.Server.Core.Library
         /// </summary>
         /// <value>The root folder.</value>
         public AggregateFolder RootFolder => _roots.GetRootFolder();
-
-        private IProviderManager ProviderManager => _providerManagerFactory.Value;
 
         /// <summary>
         /// Adds the parts.
@@ -285,38 +273,9 @@ namespace Tesserafin.Server.Core.Library
                 .FirstOrDefault();
         }
 
-        /// <inheritdoc />
-        public Person? GetPerson(string name)
-        {
-            var path = Person.GetPath(name);
-            var id = GetItemByNameId<Person>(path);
-            if (GetItemById(id) is Person item)
-            {
-                return item;
-            }
-
-            return null;
-        }
-
         public IReadOnlyDictionary<string, MusicArtist[]> GetArtists(IReadOnlyList<string> names)
         {
             return _linkedChildrenService.FindArtists(names);
-        }
-
-        private Guid GetItemByNameId<T>(string path)
-              where T : BaseItem, new()
-        {
-            var forceCaseInsensitiveId = _configurationManager.Configuration.EnableNormalizedItemByNameIds;
-            return GetNewItemIdInternal(path, typeof(T), forceCaseInsensitiveId);
-        }
-
-        /// <inheritdoc />
-        public Task ValidatePeopleAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, IProgress<double> progress, CancellationToken cancellationToken)
-        {
-            // Ensure the location is available.
-            Directory.CreateDirectory(_configurationManager.ApplicationPaths.PeoplePath);
-
-            return new PeopleValidator(writes, deletions, ProviderManager, this, _itemPeopleService, _logger, _fileSystem).ValidatePeople(cancellationToken, progress);
         }
 
         /// <inheritdoc />
@@ -1213,35 +1172,6 @@ namespace Tesserafin.Server.Core.Library
         public IReadOnlyList<PersonInfo> GetPeople(BaseItem item)
         {
             return _itemPeopleService.GetPeople(item);
-        }
-
-        public QueryResult<BaseItem> GetPeopleItems(InternalPeopleQuery query)
-        {
-            var queryResult = _peopleRepository.GetPeople(query);
-            var baseItems = queryResult.Items.Select(i =>
-                {
-                    try
-                    {
-                        return GetPerson(i.Name);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "error retrieving BaseItem for person: {0}", i.Name);
-                        return null;
-                    }
-                })
-                .Where(i => i is not null)
-                .Where(i => query.User is null || _itemAccessService.IsVisible(i!, query.User))
-                .OfType<BaseItem>()
-                .ToList()
-                .AsReadOnly();
-
-            return new QueryResult<BaseItem>
-            {
-                StartIndex = queryResult.StartIndex,
-                TotalRecordCount = queryResult.TotalRecordCount,
-                Items = baseItems,
-            };
         }
 
         public IReadOnlyList<string> GetPeopleNames(InternalPeopleQuery query)

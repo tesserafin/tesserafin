@@ -74,6 +74,8 @@ public sealed class LibraryStructureReaderTests
         Assert.Null(manager.GetMethod("GetVirtualFolders", Type.EmptyTypes));
         Assert.DoesNotContain(typeof(ILibraryManager).GetMethods(), m => m.Name == "GetVirtualFolders");
         var managerDependencies = manager.GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToArray();
+        Assert.DoesNotContain(typeof(IProviderManager), managerDependencies);
+        Assert.DoesNotContain(typeof(Lazy<IProviderManager>), managerDependencies);
         Assert.DoesNotContain(typeof(IServerApplicationHost), managerDependencies);
         var dependencies = typeof(LibraryStructureReader).GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToArray();
         foreach (var forbidden in new[] { typeof(ILibraryManager), typeof(IProviderManager), typeof(Lazy<IProviderManager>), typeof(IItemWriteCommands), typeof(ILibraryStructureCommands), typeof(IServiceProvider) })
