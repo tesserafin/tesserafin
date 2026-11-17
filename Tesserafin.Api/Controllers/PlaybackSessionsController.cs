@@ -16,6 +16,7 @@ using Tesserafin.Api.Playback;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Net.PlaybackCredentials;
 using Tesserafin.Data.Enums;
@@ -55,6 +56,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     private readonly IMediaEncoder _mediaEncoder;
     private readonly IShadowDiagnosticsStore _shadowDiagnosticsStore;
     private readonly ILogger<PlaybackSessionsController> _logger;
+    private readonly IRecordingsManager? _recordingsManager;
     private readonly ITranscodeManager? _transcodeManager;
     private readonly IPlaybackCredentialService? _credentialService;
 
@@ -95,6 +97,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     /// </param>
     /// <param name="transcodeManager">#301: ends the session's own jobs when the session is deleted.</param>
     /// <param name="credentialService">#301: revokes the session's capabilities when the session is deleted.</param>
+    /// <param name="recordingsManager">Tells a Live TV recording still being written from a library video; none is active when null.</param>
     public PlaybackSessionsController(
         IPlaybackSessionManager playbackSessionManager,
         IItemAccessService itemAccessService,
@@ -107,8 +110,10 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         ILogger<PlaybackSessionsController>? logger = null,
         IShadowDiagnosticsStore? shadowDiagnosticsStore = null,
         ITranscodeManager? transcodeManager = null,
-        IPlaybackCredentialService? credentialService = null)
+        IPlaybackCredentialService? credentialService = null,
+        IRecordingsManager? recordingsManager = null)
     {
+        _recordingsManager = recordingsManager;
         _transcodeManager = transcodeManager;
         _credentialService = credentialService;
         _logger = logger ?? NullLogger<PlaybackSessionsController>.Instance;
@@ -644,7 +649,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         }
 
         var kind = item.MediaType == MediaType.Audio ? PlaybackMediaKind.Audio : PlaybackMediaKind.Video;
-        return (kind, options, kind == PlaybackMediaKind.Video && item is Video { SourceType: SourceType.Library });
+        return (kind, options, kind == PlaybackMediaKind.Video && IsLibraryVideo(item));
     }
 
     /// <summary>
@@ -655,6 +660,16 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     /// <c>RequestCorrelationMiddleware</c> (issue #42), so lines emitted here carry BOTH the attempt
     /// id (same on a retry) and the request id (different on a retry).
     /// </summary>
+    /// <summary>
+    /// Whether <paramref name="item"/> is a library video the local video journey may decide: any
+    /// <see cref="Video"/> family (film, episode, home video, music video, trailer) that is neither a
+    /// channel-plugin item nor a Live TV recording still being written.
+    /// </summary>
+    private bool IsLibraryVideo(BaseItem item)
+        => item is Video video
+            && video.ChannelId.IsEmpty()
+            && (string.IsNullOrEmpty(video.Path) || _recordingsManager?.GetActiveRecordingInfo(video.Path) is null);
+
     private static IDisposable? BeginLocalVideoScope(bool isEngineVideo, PlaybackPlanRequestBase request)
         => isEngineVideo ? LocalVideoPlanner.BeginRequest(new LocalVideoRequest(request.Capabilities, request.Constraints)) : null;
 

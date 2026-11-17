@@ -16,6 +16,7 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Net.PlaybackCredentials;
 using Tesserafin.Data.Entities;
@@ -25,9 +26,11 @@ using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.MediaInfo;
 using Tesserafin.Model.Session;
 using Tesserafin.Playback.Decision;
 using Tesserafin.Playback.Dlna;
+using Tesserafin.Playback.Engine;
 using Tesserafin.Playback.Execution;
 using Tesserafin.Playback.Shadow;
 using Xunit;
@@ -219,6 +222,61 @@ public class PlaybackSessionsControllerTests
         var deleted = await controller.DeletePlaybackSession(new PlaybackSessionId(response.Id));
 
         Assert.IsType<NoContentResult>(deleted);
+    }
+
+    /// <summary>
+    /// Consolidation step 1 (docs/playback-path-inventory.md §7): every library video is offered to
+    /// the local video planner, and so reaches the engine; a channel-plugin item and a Live TV
+    /// recording still being written are not, and go to the existing chain unchanged.
+    /// </summary>
+    /// <param name="kind">Which video the session is for.</param>
+    /// <param name="offered">Whether the engine must be asked.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
+    [Theory]
+    [InlineData("library", true)]
+    [InlineData("channel", false)]
+    [InlineData("recording", false)]
+    public async Task CreatePlaybackSession_OffersOnlyLibraryVideosToTheLocalVideoPlanner(string kind, bool offered)
+    {
+        const string MediaPath = "/media/home.mkv";
+        var item = new Video { Id = _itemId, Path = MediaPath, ChannelId = kind == "channel" ? Guid.NewGuid() : Guid.Empty };
+        SetUpItemAndUser(item);
+        _mediaSourceManager
+            .Setup(m => m.GetPlaybackMediaSources(item, It.IsAny<User>(), true, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new MediaSourceInfo { Id = _itemId.ToString("N"), Protocol = MediaProtocol.File, Path = MediaPath }]);
+        var recordings = new Mock<IRecordingsManager>();
+        if (kind == "recording")
+        {
+            recordings.Setup(r => r.GetActiveRecordingInfo(MediaPath)).Returns(new ActiveRecordingInfo { Path = MediaPath });
+        }
+
+        var engine = new Mock<IPlaybackEngine>();
+        engine
+            .Setup(e => e.Decide(It.IsAny<PlaybackRequestContext>(), It.IsAny<Tesserafin.Playback.Decision.ClientCapabilities>(), It.IsAny<IReadOnlyList<MediaSourceSnapshot>>(), It.IsAny<PlaybackConstraints>()))
+            .Throws(new InvalidOperationException("offered to the engine"));
+        var inner = new Mock<IPlaybackSessionPlanner>();
+        using var manager = new PlaybackSessionManager(
+            new LocalVideoPlanner(inner.Object, engine.Object, _v2PlanStore.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalVideoPlanner>.Instance),
+            new Mock<ITranscodeManager>().Object,
+            new Mock<Tesserafin.Controller.Session.ISessionManager>().Object);
+        var controller = new PlaybackSessionsController(
+            manager,
+            _itemLookupService.Object,
+            _userManager.Object,
+            _mediaSourceManager.Object,
+            _v2PlanStore.Object,
+            _liveStreamResolver.Object,
+            _liveWiringDiagnosticsStore.Object,
+            _mediaEncoder.Object,
+            recordingsManager: recordings.Object);
+        SetIdentity(controller, _userId);
+
+        await Record.ExceptionAsync(() => controller.CreatePlaybackSession(CreateRequest()));
+
+        engine.Verify(
+            e => e.Decide(It.IsAny<PlaybackRequestContext>(), It.IsAny<Tesserafin.Playback.Decision.ClientCapabilities>(), It.IsAny<IReadOnlyList<MediaSourceSnapshot>>(), It.IsAny<PlaybackConstraints>()),
+            offered ? Times.Once() : Times.Never());
+        inner.Verify(p => p.PlanVideo(It.IsAny<MediaOptions>()), offered ? Times.Never() : Times.Once());
     }
 
     [Fact]
