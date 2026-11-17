@@ -12,6 +12,7 @@ using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Data.Entities;
 using Tesserafin.Extensions;
@@ -445,8 +446,9 @@ public static class BaseItemMapper
     /// <param name="logger">Logger.</param>
     /// <param name="appHost">The application server Host.</param>
     /// <param name="skipDeserialization">If only mapping should be processed.</param>
+    /// <param name="readServices">The catalogue reads attached to the item; <c>null</c> when it is only mapped.</param>
     /// <returns>A mapped BaseItem, or null if the item type is unknown.</returns>
-    public static BaseItemDto? DeserializeBaseItem(BaseItemEntity baseItemEntity, ILogger logger, IServerApplicationHost? appHost, bool skipDeserialization = false)
+    public static BaseItemDto? DeserializeBaseItem(BaseItemEntity baseItemEntity, ILogger logger, IServerApplicationHost? appHost, bool skipDeserialization = false, IItemReadServices? readServices = null)
     {
         var type = GetType(baseItemEntity.Type);
         if (type is null)
@@ -476,7 +478,9 @@ public static class BaseItemMapper
             dto = Activator.CreateInstance(type) as BaseItemDto ?? throw new InvalidOperationException("Cannot deserialize unknown type.");
         }
 
-        return Map(baseItemEntity, dto, appHost);
+        var item = Map(baseItemEntity, dto, appHost);
+        item.ReadServices = readServices;
+        return item;
     }
 
     private static string? GetPathToSave(string path, IServerApplicationHost appHost)

@@ -55,7 +55,8 @@ public sealed class BaseItemRepositoryGroupingTests : IDisposable
             new Mock<IServerApplicationHost>().Object,
             itemTypeLookup,
             serverConfigurationManager.Object,
-            NullLogger<BaseItemRepository>.Instance);
+            NullLogger<BaseItemRepository>.Instance,
+            new Tesserafin.Controller.LiveTv.ActiveRecordings());
     }
 
     public void Dispose()
@@ -104,6 +105,21 @@ public sealed class BaseItemRepositoryGroupingTests : IDisposable
 
         var item = Assert.Single(result);
         Assert.Equal(firstId, item.Id);
+    }
+
+    [Fact]
+    public void GetItemList_AttachesTheCatalogueReadsToEveryLoadedItem()
+    {
+        var id = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        using (var ctx = CreateDbContext())
+        {
+            ctx.BaseItems.Add(CreateMovieEntity(id, "Movie", id.ToString("N"), null));
+            ctx.SaveChanges();
+        }
+
+        var item = Assert.Single(_repository.GetItemList(CreateQuery()));
+
+        Assert.NotNull(item.ReadServices);
     }
 
     private static InternalItemsQuery CreateQuery()

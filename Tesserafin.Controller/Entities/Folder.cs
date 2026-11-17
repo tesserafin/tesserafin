@@ -868,12 +868,7 @@ namespace Tesserafin.Controller.Entities
         /// <returns>IEnumerable{BaseItem}.</returns>
         protected IReadOnlyList<BaseItem> GetCachedChildren()
         {
-            return ItemRepository.GetItemList(new InternalItemsQuery
-            {
-                Parent = this,
-                GroupByPresentationUniqueKey = false,
-                DtoOptions = new DtoOptions(true)
-            });
+            return RequireReadServices().GetChildren(this);
         }
 
         public virtual int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
@@ -1989,7 +1984,7 @@ namespace Tesserafin.Controller.Entities
 
         public override bool IsPlayed(User user, UserItemData userItemData)
         {
-            return ItemRepository.GetIsPlayed(user, Id, true);
+            return RequireReadServices().IsPlayed(user, Id);
         }
 
         public override bool IsUnplayed(User user, UserItemData userItemData)

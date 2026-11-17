@@ -277,7 +277,6 @@ namespace Tesserafin.Server.Implementations.Tests.Library
 
             BaseItem.MediaSourceManager = mediaSourceManager.Object;
             BaseItem.LibraryManager = libraryManager.Object;
-            Video.RecordingsManager = recordingsManager.Object;
 
             return (primary, alt1, alt2);
         }

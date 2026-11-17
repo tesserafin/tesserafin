@@ -46,7 +46,8 @@ public sealed class ContentPackItemDeletionTests : IDisposable
         _service = new ItemPersistenceService(
             factory.Object,
             new Mock<IServerApplicationHost>().Object,
-            NullLogger<ItemPersistenceService>.Instance);
+            NullLogger<ItemPersistenceService>.Instance,
+            Mock.Of<Tesserafin.Controller.Library.IItemReadServices>());
     }
 
     public void Dispose()

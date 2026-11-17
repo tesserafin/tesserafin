@@ -368,29 +368,21 @@ public class FolderGetChildrenCharacterizationTests
         var cachedLast = new CollectionFolder { Id = last.Id, Name = "Last" };
         var root = new UserRootFolder { Id = Guid.NewGuid() };
 
-        var repository = new Mock<IItemRepository>();
-        repository.Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(new BaseItem[] { first, missing, last });
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(x => x.GetChildren(root)).Returns(new BaseItem[] { first, missing, last });
+        root.ReadServices = reads.Object;
         var libraryManager = new Mock<ILibraryManager>();
         libraryManager.Setup(x => x.GetItemById(first.Id)).Returns(cachedFirst);
         libraryManager.Setup(x => x.GetItemById(last.Id)).Returns(cachedLast);
         SetStatics(libraryManager.Object);
-        var previousRepository = BaseItem.ItemRepository;
-        BaseItem.ItemRepository = repository.Object;
-        try
-        {
-            Assert.Equal(new BaseItem[] { first, missing, last }, root.Children);
-            Assert.Equal(new BaseItem[] { cachedFirst, cachedLast }, root.Children);
+        Assert.Equal(new BaseItem[] { first, missing, last }, root.Children);
+        Assert.Equal(new BaseItem[] { cachedFirst, cachedLast }, root.Children);
 
-            var replaced = new CollectionFolder { Id = last.Id, Name = "Last" };
-            libraryManager.Setup(x => x.GetItemById(last.Id)).Returns(replaced);
-            Assert.Equal(new BaseItem[] { cachedFirst, replaced }, root.Children);
+        var replaced = new CollectionFolder { Id = last.Id, Name = "Last" };
+        libraryManager.Setup(x => x.GetItemById(last.Id)).Returns(replaced);
+        Assert.Equal(new BaseItem[] { cachedFirst, replaced }, root.Children);
 
-            repository.Verify(x => x.GetItemList(It.IsAny<InternalItemsQuery>()), Times.Once);
-        }
-        finally
-        {
-            BaseItem.ItemRepository = previousRepository;
-        }
+        reads.Verify(x => x.GetChildren(root), Times.Once);
     }
 
     private sealed class RecordingItemSortService : IItemSortService

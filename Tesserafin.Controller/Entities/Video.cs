@@ -166,8 +166,6 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public override bool HasLocalAlternateVersions => LibraryManager.GetLocalAlternateVersionIds(this).Any();
 
-        public static IRecordingsManager RecordingsManager { get; set; }
-
         [JsonIgnore]
         public override SourceType SourceType
         {
@@ -382,7 +380,8 @@ namespace Tesserafin.Controller.Entities
 
         protected override bool IsActiveRecording()
         {
-            return RecordingsManager.GetActiveRecordingInfo(Path) is not null;
+            // An item not yet loaded from or saved to the catalogue has no read services and is not known to be recording.
+            return ReadServices?.IsActiveRecording(Path) ?? false;
         }
 
         internal override SourceType GetSourceType(IStandaloneVisibilityService scope)

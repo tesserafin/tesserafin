@@ -94,6 +94,7 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     internal sealed class UserRootFolderProvider : IUserRootFolderProvider
     {
+        private readonly IItemReadServices _readServices;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly IFileSystem _fileSystem;
         private readonly IItemStore _itemStore;
@@ -112,13 +113,16 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="itemStore">The item store leaf (id generation only; see PR106a).</param>
         /// <param name="itemLookupService">The item lookup service (cache lookup; see PR75/PR76).</param>
         /// <param name="logger">The logger.</param>
+        /// <param name="readServices">The catalogue reads attached to a root folder created before it is first saved.</param>
         public UserRootFolderProvider(
             IServerConfigurationManager configurationManager,
             IFileSystem fileSystem,
             IItemStore itemStore,
             IItemLookupService itemLookupService,
-            ILogger<UserRootFolderProvider> logger)
+            ILogger<UserRootFolderProvider> logger,
+            IItemReadServices readServices)
         {
+            _readServices = readServices;
             _configurationManager = configurationManager;
             _fileSystem = fileSystem;
             _itemStore = itemStore;
@@ -157,6 +161,8 @@ namespace Tesserafin.Server.Core.Library
                             tmpItem = ResolveUserRootFolder(userRootPath);
                         }
 
+                        tmpItem.ReadServices ??= _readServices;
+
                         // In case program data folder was moved
                         if (!string.Equals(tmpItem.Path, userRootPath, StringComparison.Ordinal))
                         {
@@ -187,7 +193,7 @@ namespace Tesserafin.Server.Core.Library
 
             // FolderResolver.Resolve(args) -> new Folder() (ResolverPriority.Last; the only resolver
             // that ever claims an internal, non-media directory like this one).
-            var folder = new Folder();
+            var folder = new Folder { ReadServices = _readServices };
 
             // GenericFolderResolver<Folder>.SetInitialItemValues: item.IsRoot = args.Parent is null.
             // The historical call site (LibraryManager.cs:1198) never passes a parent.

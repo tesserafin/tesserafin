@@ -72,7 +72,6 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
 
         // Same DeepCopy-reflection hazard as UserRootFolderProviderTests: Children/SortName getters
         // touched by DeepCopy<Folder, UserRootFolder>() read these process-wide statics.
-        BaseItem.ItemRepository = Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>());
 
         _itemRepositoryMock = fixture.Freeze<Mock<IItemRepository>>();
         _itemRepositoryMock.Setup(i => i.RetrieveItem(It.IsAny<Guid>())).Returns<BaseItem>(null);
@@ -119,7 +118,8 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
             _fileSystem,
             _itemStore,
             _itemLookupService,
-            NullLogger<Tesserafin.Server.Core.Library.UserRootFolderProvider>.Instance);
+            NullLogger<Tesserafin.Server.Core.Library.UserRootFolderProvider>.Instance,
+            new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings()));
         fixture.Register(() => _provider);
         fixture.Register<IUserRootFolderProvider>(() => _provider);
 
@@ -164,6 +164,7 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
     {
         var resolved = _libraryManager.ResolvePath(_fileSystem.GetDirectoryInfo(_userRootPath)) as Folder;
         Assert.NotNull(resolved);
+        resolved!.ReadServices = new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings());
         return resolved.DeepCopy<Folder, UserRootFolder>();
     }
 

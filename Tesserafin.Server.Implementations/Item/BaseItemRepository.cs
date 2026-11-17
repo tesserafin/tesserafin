@@ -7,6 +7,8 @@ using Tesserafin.Controller;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
@@ -34,6 +36,8 @@ public sealed partial class BaseItemRepository
     /// </summary>
     public static readonly Guid PlaceholderId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
+    private readonly IItemReadServices _readServices;
+
     private readonly IDbContextFactory<TesserafinDbContext> _dbProvider;
     private readonly IServerApplicationHost _appHost;
     private readonly IItemTypeLookup _itemTypeLookup;
@@ -54,13 +58,16 @@ public sealed partial class BaseItemRepository
     /// <param name="itemTypeLookup">The static type lookup.</param>
     /// <param name="serverConfigurationManager">The server Configuration manager.</param>
     /// <param name="logger">System logger.</param>
+    /// <param name="activeRecordings">The recordings in progress, for the catalogue reads attached to every loaded item.</param>
     public BaseItemRepository(
         IDbContextFactory<TesserafinDbContext> dbProvider,
         IServerApplicationHost appHost,
         IItemTypeLookup itemTypeLookup,
         IServerConfigurationManager serverConfigurationManager,
-        ILogger<BaseItemRepository> logger)
+        ILogger<BaseItemRepository> logger,
+        ActiveRecordings activeRecordings)
     {
+        _readServices = new ItemReadServices(this, activeRecordings);
         _dbProvider = dbProvider;
         _appHost = appHost;
         _itemTypeLookup = itemTypeLookup;
@@ -237,6 +244,7 @@ public sealed partial class BaseItemRepository
             entity,
             _logger,
             _appHost,
-            skipDeserialization || (_serverConfigurationManager.Configuration.SkipDeserializationForBasicTypes && (typeToSerialise == typeof(Channel) || typeToSerialise == typeof(UserRootFolder))));
+            skipDeserialization || (_serverConfigurationManager.Configuration.SkipDeserializationForBasicTypes && (typeToSerialise == typeof(Channel) || typeToSerialise == typeof(UserRootFolder))),
+            _readServices);
     }
 }

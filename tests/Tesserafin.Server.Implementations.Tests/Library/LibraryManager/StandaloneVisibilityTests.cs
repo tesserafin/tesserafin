@@ -47,6 +47,8 @@ public sealed class StandaloneVisibilityTests
     private readonly List<Folder> _libraries = [];
     private readonly Dictionary<string, LibraryOptions> _options = [];
     private readonly ActiveRecordings _activeRecordings = new();
+    private readonly Mock<IItemRepository> _repository;
+    private readonly IItemReadServices _readServices;
     private readonly IItemAccessService _access;
     private readonly IServerConfigurationManager _configuration;
     private readonly Tesserafin.Server.Core.Library.LibraryManager _manager;
@@ -101,13 +103,11 @@ public sealed class StandaloneVisibilityTests
         _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, localization.Object, configuration.Object, _activeRecordings, libraryOptions));
 
         BaseItem.LibraryManager = manager;
-        BaseItem.ItemRepository = repository.Object;
+        _repository = repository;
+        _readServices = new Tesserafin.Server.Implementations.Item.ItemReadServices(repository.Object, _activeRecordings);
         BaseItem.ConfigurationManager = configuration.Object;
         BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>(m => m.GetPathProtocol(It.IsAny<string>()) == MediaProtocol.File);
         // The static answers from the same recordings as the service (Record).
-        Video.RecordingsManager = Mock.Of<IRecordingsManager>();
-        Mock.Get(Video.RecordingsManager).Setup(r => r.GetActiveRecordingInfo(It.IsAny<string>()))
-            .Returns((string path) => _activeRecordings.GetActiveRecordingInfo(path));
 
         var fileSystem = new Mock<Tesserafin.Model.IO.IFileSystem>();
         fileSystem.Setup(f => f.ContainsSubPath(It.IsAny<string>(), It.IsAny<string>()))
@@ -1059,7 +1059,6 @@ public sealed class StandaloneVisibilityTests
         // Every static the check could read throws on any call.
         ThrowingStatic();
         BaseItem.ConfigurationManager = new Mock<IServerConfigurationManager>(MockBehavior.Strict).Object;
-        Video.RecordingsManager = new Mock<IRecordingsManager>(MockBehavior.Strict).Object;
 
         Assert.Equal(expected, items.Select(i => Decisions(i, users)));
 
@@ -1105,7 +1104,7 @@ public sealed class StandaloneVisibilityTests
     /// </summary>
     private void LegacyLinkedChildSearch()
     {
-        Mock.Get(BaseItem.ItemRepository).Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.Path != null)))
+        _repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.Path != null)))
             .Returns((InternalItemsQuery q) => _items.Values.Where(i => i.Path == q.Path).OrderByDescending(i => i.DateCreated).Take(1).ToList());
         Mock.Get(BaseItem.FileSystem).Setup(f => f.MakeAbsolutePath(It.IsAny<string>(), It.IsAny<string>()))
             .Returns((string folder, string file) => System.IO.Path.GetFullPath(file, folder));
@@ -1157,7 +1156,7 @@ public sealed class StandaloneVisibilityTests
         _aggregateRoots.Setup(p => p.GetRootFolder()).Returns(aggregate);
 
         var userRoot = Add(new UserRootFolder { Path = "/config/data/root/default" });
-        Mock.Get(BaseItem.ItemRepository).Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.ParentId.Equals(userRoot.Id)))).Returns(_libraries);
+        _repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.ParentId.Equals(userRoot.Id)))).Returns(_libraries);
         _root = userRoot;
         Assert.Equal(_libraries, userRoot.Children);
 
@@ -1251,6 +1250,7 @@ public sealed class StandaloneVisibilityTests
             item.Id = Guid.NewGuid();
         }
 
+        item.ReadServices = _readServices;
         _items[item.Id] = item;
         return item;
     }

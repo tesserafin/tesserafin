@@ -359,6 +359,7 @@ public sealed class VisibleContentProbeTests
         private readonly Guid _rootId = Guid.NewGuid();
         private readonly Mock<IServerConfigurationManager> _config = new();
         private readonly Mock<IItemRepository> _staticRepository = new();
+        private readonly IItemReadServices _entityReads;
         private readonly Mock<ILibraryManager> _libraryManager = new(MockBehavior.Strict);
         private readonly List<System.Diagnostics.StackTrace> _libraryManagerCalls = new();
         private bool _recordLibraryManagerCalls;
@@ -382,7 +383,7 @@ public sealed class VisibleContentProbeTests
                 .Returns(new ParentalRatingScore(17, null));
 
             BackRepository(_staticRepository);
-            BaseItem.ItemRepository = _staticRepository.Object;
+            _entityReads = new Tesserafin.Server.Implementations.Item.ItemReadServices(_staticRepository.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings());
 
             var injectedRepository = new Mock<IItemRepository>();
             BackRepository(injectedRepository);
@@ -425,6 +426,7 @@ public sealed class VisibleContentProbeTests
                 item.Id = Guid.NewGuid();
             }
 
+            item.ReadServices = _entityReads;
             _items[item.Id] = item;
             return item;
         }

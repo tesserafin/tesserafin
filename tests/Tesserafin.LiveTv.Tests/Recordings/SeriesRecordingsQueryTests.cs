@@ -51,7 +51,8 @@ public sealed class SeriesRecordingsQueryTests : IDisposable
             Mock.Of<IServerApplicationHost>(),
             _types,
             configuration.Object,
-            NullLogger<BaseItemRepository>.Instance);
+            NullLogger<BaseItemRepository>.Instance,
+            new Tesserafin.Controller.LiveTv.ActiveRecordings());
     }
 
     public void Dispose() => _connection.Dispose();

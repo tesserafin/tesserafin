@@ -181,7 +181,6 @@ public class BaseItemTests
 
         var recordingsManager = new Mock<IRecordingsManager>();
         recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-        Video.RecordingsManager = recordingsManager.Object;
 
         BaseItem.MediaSourceManager = mediaSourceManager.Object;
         BaseItem.LibraryManager = libraryManager.Object;
@@ -239,7 +238,6 @@ public class BaseItemTests
         // behind — see BaseItemStaticStateFixture for why leaking statics between tests is fragile.
         var recordingsManager = new Mock<IRecordingsManager>();
         recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-        Video.RecordingsManager = recordingsManager.Object;
 
         Assert.True(movie.GetEnableMediaSourceDisplay(channelManager.Object));
         channelManager.Verify(x => x.EnableMediaSourceDisplay(It.IsAny<BaseItem>()), Times.Never);
@@ -261,7 +259,6 @@ public class BaseItemTests
         // behind — see BaseItemStaticStateFixture for why leaking statics between tests is fragile.
         var recordingsManager = new Mock<IRecordingsManager>();
         recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-        Video.RecordingsManager = recordingsManager.Object;
 
         Assert.Equal(channelManagerResult, channelItem.GetEnableMediaSourceDisplay(channelManager.Object));
     }
@@ -280,7 +277,6 @@ public class BaseItemTests
         var segmentManager = new Mock<IMediaSegmentManager>(MockBehavior.Strict);
 
         // Video.SourceType reads the static Video.RecordingsManager; set it here, as above.
-        Video.RecordingsManager = Mock.Of<IRecordingsManager>();
 
         var result = channelItem.GetMediaSources(false, mediaSourceManager.Object, segmentManager.Object, channelManager.Object);
 
@@ -323,7 +319,6 @@ public class BaseItemTests
         // behind — see BaseItemStaticStateFixture for why leaking statics between tests is fragile.
         var recordingsManager = new Mock<IRecordingsManager>();
         recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-        Video.RecordingsManager = recordingsManager.Object;
 
         var result = channelItem.GetMediaSources(false, mediaSourceManager.Object, segmentManager.Object, channelManager.Object);
 

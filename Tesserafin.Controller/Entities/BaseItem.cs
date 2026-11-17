@@ -473,11 +473,16 @@ namespace Tesserafin.Controller.Entities
 
         public static IProviderManager ProviderManager { get; set; }
 
-        public static IItemRepository ItemRepository { get; set; }
-
         public static IChapterManager ChapterManager { get; set; }
 
         public static IFileSystem FileSystem { get; set; }
+
+        /// <summary>
+        /// Gets or sets the catalogue reads this item performs on itself (children, played state, active recording).
+        /// The catalogue attaches them when it loads or saves the item.
+        /// </summary>
+        [JsonIgnore]
+        public IItemReadServices ReadServices { get; set; }
 
         public static IUserDataManager UserDataManager { get; set; }
 
@@ -831,6 +836,14 @@ namespace Tesserafin.Controller.Entities
         {
             return Id.ToString("N", CultureInfo.InvariantCulture);
         }
+
+        /// <summary>
+        /// Gets the attached catalogue reads.
+        /// </summary>
+        /// <returns>The read services.</returns>
+        /// <exception cref="InvalidOperationException">The item was neither loaded from nor saved to the catalogue.</exception>
+        protected IItemReadServices RequireReadServices()
+            => ReadServices ?? throw new InvalidOperationException($"{GetType().Name} {Id} has no catalogue read services: it was neither loaded from nor saved to the catalogue.");
 
         public virtual bool CanDelete(IChannelManager channels)
         {

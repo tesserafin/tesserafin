@@ -9,13 +9,11 @@
     "BaseItem.ChapterManager",
     "BaseItem.ConfigurationManager",
     "BaseItem.FileSystem",
-    "BaseItem.ItemRepository",
     "BaseItem.LibraryManager",
     "BaseItem.MediaSourceManager",
     "BaseItem.ProviderManager",
     "BaseItem.UserDataManager",
-    "CollectionFolder.ApplicationHost",
-    "Video.RecordingsManager"
+    "CollectionFolder.ApplicationHost"
   ],
   "forbiddenDependencies": [],
   "streamBuilderFiles": [

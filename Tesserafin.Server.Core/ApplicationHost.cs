@@ -532,6 +532,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemRepository>(sp => sp.GetRequiredService<BaseItemRepository>());
             serviceCollection.AddSingleton<IItemQueryHelpers>(sp => sp.GetRequiredService<BaseItemRepository>());
             serviceCollection.AddSingleton<IItemPersistenceService, ItemPersistenceService>();
+            serviceCollection.AddSingleton<IItemReadServices, ItemReadServices>();
             serviceCollection.AddSingleton<INextUpService, NextUpService>();
             serviceCollection.AddSingleton<IItemCountService, ItemCountService>();
             serviceCollection.AddSingleton<ILinkedChildrenService, LinkedChildrenService>();
@@ -830,14 +831,12 @@ namespace Tesserafin.Server.Core
             BaseItem.ChapterManager = Resolve<IChapterManager>();
             BaseItem.ConfigurationManager = ConfigurationManager;
             BaseItem.FileSystem = Resolve<IFileSystem>();
-            BaseItem.ItemRepository = Resolve<IItemRepository>();
             BaseItem.LibraryManager = Resolve<ILibraryManager>();
             BaseItem.Logger = Resolve<ILogger<BaseItem>>();
             BaseItem.MediaSourceManager = Resolve<IMediaSourceManager>();
             BaseItem.ProviderManager = Resolve<IProviderManager>();
             BaseItem.UserDataManager = Resolve<IUserDataManager>();
             CollectionFolder.ApplicationHost = this;
-            Video.RecordingsManager = Resolve<IRecordingsManager>();
         }
 
         /// <summary>

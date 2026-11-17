@@ -1271,3 +1271,23 @@ Still static: `BaseItem.ChannelManager`, behind `CanDelete()` (15 overrides) and
 
 `BaseItem.ChannelManager` and its `ApplicationHost` assignment are deleted, as is the dependency test's locator
 entry. `entityStaticServices` goes from 11 to 10.
+
+## 38. Entities read the catalogue through attached services (consolidation step 5, phase C)
+
+`Folder.LoadChildren`/`IsPlayed` read `BaseItem.ItemRepository`, and `Video.SourceType` read `Video.RecordingsManager`.
+The catalogue now attaches `IItemReadServices` to each item (`BaseItem.ReadServices`); this per-instance design was
+owner-chosen. The services cover children, folder played state and active recording, and are attached:
+
+- by `BaseItemMapper.DeserializeBaseItem`, when the repository loads an item. The repository builds its own
+  `ItemReadServices` from itself and `ActiveRecordings`, so no deferred edge enters the user-view catalog graph;
+- by `ItemPersistenceService.SaveItems`, when an item is saved;
+- by `UserRootFolderProvider`, on the root it creates before the first save and on the intermediate folder that
+  its `DeepCopy` reads by reflection.
+
+A folder without read services fails loudly when its children are loaded. A video not yet loaded from or saved to
+the catalogue is not treated as an active recording; `ItemWriteCommands` and `ItemImageService` still check the
+registry directly.
+
+`BaseItem.ItemRepository` and `Video.RecordingsManager` are deleted with their `ApplicationHost` assignments;
+`entityStaticServices` goes from 10 to 8. Remaining statics: `ChapterManager`, `ConfigurationManager`, `FileSystem`,
+`LibraryManager`, `MediaSourceManager`, `ProviderManager`, `UserDataManager` and `CollectionFolder.ApplicationHost`.

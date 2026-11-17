@@ -39,7 +39,6 @@ public sealed class EpisodeEmbeddedInfoProbeTests
 
     public EpisodeEmbeddedInfoProbeTests()
     {
-        Video.RecordingsManager = Mock.Of<IRecordingsManager>();
         _sources.Setup(s => s.GetStaticMediaSources(It.IsAny<BaseItem>(), false, null)).Returns([new MediaSourceInfo { Path = "/tv/e.mp4" }]);
         _service = new ProbeService(_encoder.Object, _sources.Object);
     }

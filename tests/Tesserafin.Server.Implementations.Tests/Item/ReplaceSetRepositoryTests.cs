@@ -133,7 +133,7 @@ public abstract class ReplaceSetRepositoryTests : IDisposable
     public void SaveImagesAsync_FailedSave_KeepsThePreviousImages()
     {
         AssertReplaceIsAtomic(
-            (factory, item, paths) => new ItemPersistenceService(factory, Mock.Of<IServerApplicationHost>(), NullLogger<ItemPersistenceService>.Instance)
+            (factory, item, paths) => new ItemPersistenceService(factory, Mock.Of<IServerApplicationHost>(), NullLogger<ItemPersistenceService>.Instance, Mock.Of<Tesserafin.Controller.Library.IItemReadServices>())
                 .SaveImagesAsync(item, paths.Select(path => new ItemImageInfo { Path = path, Type = ImageType.Primary, DateModified = DateTime.UnixEpoch }).ToArray())
                 .GetAwaiter().GetResult(),
             (context, item) => context.BaseItemImageInfos.Where(e => e.ItemId.Equals(item)).Select(e => e.Path).OrderBy(path => path).ToArray(),
@@ -146,7 +146,7 @@ public abstract class ReplaceSetRepositoryTests : IDisposable
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var interceptor = new CancelAfterImageDelete(cancellation);
-        var service = new ItemPersistenceService(_database.Factory(interceptor), Mock.Of<IServerApplicationHost>(), NullLogger<ItemPersistenceService>.Instance);
+        var service = new ItemPersistenceService(_database.Factory(interceptor), Mock.Of<IServerApplicationHost>(), NullLogger<ItemPersistenceService>.Instance, Mock.Of<Tesserafin.Controller.Library.IItemReadServices>());
         var images = new[] { new ItemImageInfo { Path = "next.png", Type = ImageType.Primary, DateModified = DateTime.UnixEpoch } };
         Assert.True(await service.SaveImagesAsync(_itemId, images, cancellation.Token));
         Assert.True(interceptor.Cancelled);
