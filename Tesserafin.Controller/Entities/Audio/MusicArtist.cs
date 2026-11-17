@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.IO;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Providers;
@@ -84,7 +85,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return 1;
         }
 
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             return !IsAccessedByName;
         }

@@ -152,7 +152,7 @@ namespace Tesserafin.Controller.LiveTv
             return System.IO.Path.Combine(basePath, "livetv", Id.ToString("N", CultureInfo.InvariantCulture), "metadata");
         }
 
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             return false;
         }

@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LibraryTaskScheduler;
@@ -55,7 +56,7 @@ namespace Tesserafin.Controller.Entities
 
         public string[] PhysicalLocationsList { get; set; }
 
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             return false;
         }

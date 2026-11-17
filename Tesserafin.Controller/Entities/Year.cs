@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.IO;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Library;
 
 namespace Tesserafin.Controller.Entities
@@ -32,7 +33,7 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public override string ContainingFolderPath => Path;
 
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             return false;
         }

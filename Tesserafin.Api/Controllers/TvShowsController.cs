@@ -30,6 +30,7 @@ namespace Tesserafin.Api.Controllers;
 [Tags("Show")]
 public class TvShowsController : BaseTesserafinApiController
 {
+    private readonly IItemListingServices _listing;
     private readonly IUserManager _userManager;
     private readonly ILibraryManager _libraryManager;
     private readonly IDtoService _dtoService;
@@ -46,14 +47,17 @@ public class TvShowsController : BaseTesserafinApiController
     /// <param name="tvSeriesManager">Instance of the <see cref="ITVSeriesManager"/> interface.</param>
     /// <param name="itemQueryService">Instance of the <see cref="IItemQueryService"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
+    /// <param name="listing">Sort and channel services for episode listing.</param>
     public TvShowsController(
         IUserManager userManager,
         ILibraryManager libraryManager,
         IDtoService dtoService,
         ITVSeriesManager tvSeriesManager,
         IItemQueryService itemQueryService,
-        IItemSortService itemSortService)
+        IItemSortService itemSortService,
+        IItemListingServices listing)
     {
+        _listing = listing;
         _userManager = userManager;
         _libraryManager = libraryManager;
         _dtoService = dtoService;
@@ -246,7 +250,7 @@ public class TvShowsController : BaseTesserafinApiController
                 return NotFound("No season exists with Id " + seasonId);
             }
 
-            episodes = seasonItem.GetEpisodes(user, dtoOptions, shouldIncludeMissingEpisodes, _itemSortService);
+            episodes = seasonItem.GetEpisodes(user, dtoOptions, shouldIncludeMissingEpisodes, _listing);
         }
         else if (season.HasValue) // Season number was supplied. Get episodes by season number
         {
@@ -262,7 +266,7 @@ public class TvShowsController : BaseTesserafinApiController
 
             episodes = seasonItem is null ?
                 new List<BaseItem>()
-                : ((Season)seasonItem).GetEpisodes(user, dtoOptions, shouldIncludeMissingEpisodes, _itemSortService);
+                : ((Season)seasonItem).GetEpisodes(user, dtoOptions, shouldIncludeMissingEpisodes, _listing);
         }
         else // No season number or season id was supplied. Returning all episodes.
         {
@@ -271,7 +275,7 @@ public class TvShowsController : BaseTesserafinApiController
                 return NotFound("Series not found");
             }
 
-            episodes = series.GetEpisodes(user, dtoOptions, shouldIncludeMissingEpisodes, _itemSortService).ToList();
+            episodes = series.GetEpisodes(user, dtoOptions, shouldIncludeMissingEpisodes, _listing).ToList();
         }
 
         // Filter after the fact in case the ui doesn't want them

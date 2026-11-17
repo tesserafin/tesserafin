@@ -220,7 +220,7 @@ namespace Tesserafin.Controller.Entities.TV
 
             var user = query.User;
 
-            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true, itemSortService), user, query, UserDataManager, LibraryManager);
+            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true, query.Listing), user, query, UserDataManager, LibraryManager);
 
             return PostFilterAndSort(items, query, collectionManager, itemSortService);
         }
@@ -243,11 +243,11 @@ namespace Tesserafin.Controller.Entities.TV
         /// <param name="user">The user.</param>
         /// <param name="options">The options to use.</param>
         /// <param name="shouldIncludeMissingEpisodes">If missing episodes should be included.</param>
-        /// <param name="itemSortService">Sort service; falls back to the obsolete static <c>LibraryManager.Sort</c> facade when <c>null</c> (see docs/major-rewrite-plan-v13.md § PR50/N).</param>
+        /// <param name="listing">Listing services (sort, channels); the sort falls back to the obsolete static <c>LibraryManager.Sort</c> facade when <c>null</c> (see docs/major-rewrite-plan-v13.md § PR50/N).</param>
         /// <returns>Set of episodes.</returns>
-        public List<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+        public List<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
-            return GetEpisodes(Series, user, options, shouldIncludeMissingEpisodes, itemSortService);
+            return GetEpisodes(Series, user, options, shouldIncludeMissingEpisodes, listing);
         }
 
         public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes)
@@ -255,9 +255,9 @@ namespace Tesserafin.Controller.Entities.TV
             return GetEpisodes(series, user, options, shouldIncludeMissingEpisodes, null);
         }
 
-        public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+        public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
-            return GetEpisodes(series, user, null, options, shouldIncludeMissingEpisodes, itemSortService);
+            return GetEpisodes(series, user, null, options, shouldIncludeMissingEpisodes, listing);
         }
 
         public List<BaseItem> GetEpisodes(Series series, User user, IEnumerable<Episode> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes)
@@ -265,14 +265,14 @@ namespace Tesserafin.Controller.Entities.TV
             return GetEpisodes(series, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, null);
         }
 
-        public List<BaseItem> GetEpisodes(Series series, User user, IEnumerable<Episode> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+        public List<BaseItem> GetEpisodes(Series series, User user, IEnumerable<Episode> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
             if (series is null)
             {
                 return [];
             }
 
-            return series.GetSeasonEpisodes(this, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, itemSortService);
+            return series.GetSeasonEpisodes(this, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, listing);
         }
 
         public List<BaseItem> GetEpisodes()
@@ -290,7 +290,7 @@ namespace Tesserafin.Controller.Entities.TV
 
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query, IItemSortService itemSortService)
         {
-            return GetEpisodes(user, new DtoOptions(true), true, itemSortService);
+            return GetEpisodes(user, new DtoOptions(true), true, query.Listing);
         }
 
         protected override bool GetBlockUnratedValue(User user)

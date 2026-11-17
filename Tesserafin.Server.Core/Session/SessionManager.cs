@@ -49,6 +49,7 @@ namespace Tesserafin.Server.Core.Session
     /// </summary>
     public sealed class SessionManager : ISessionManager, IDeviceLoggedOutSource, IAsyncDisposable
     {
+        private readonly IItemListingServices _listing;
         private readonly IStandaloneVisibilityService _visibility;
         private readonly IUserDataManager _userDataManager;
         private readonly IServerConfigurationManager _config;
@@ -101,6 +102,7 @@ namespace Tesserafin.Server.Core.Session
         /// <param name="credentialService">Instance of the <see cref="IPlaybackCredentialService"/> interface.</param>
         /// <param name="playedStateService">Marks the other versions of a video played to completion.</param>
         /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
+        /// <param name="listing">Sort and channel services for episode listing.</param>
         public SessionManager(
             ILogger<SessionManager> logger,
             IEventManager eventManager,
@@ -119,8 +121,10 @@ namespace Tesserafin.Server.Core.Session
             IItemSortService itemSortService,
             IPlaybackCredentialService credentialService,
             IItemPlayedStateService playedStateService,
-            IStandaloneVisibilityService visibility)
+            IStandaloneVisibilityService visibility,
+            IItemListingServices listing)
         {
+            _listing = listing;
             _visibility = visibility;
             _logger = logger;
             _eventManager = eventManager;
@@ -1454,7 +1458,7 @@ namespace Tesserafin.Server.Core.Session
                                 EnableImages = false
                             },
                             user.DisplayMissingEpisodes,
-                            _itemSortService)
+                            _listing)
                         .Where(i => !i.IsVirtualItem)
                         .SkipWhile(i => !i.Id.Equals(episode.Id))
                         .ToList();

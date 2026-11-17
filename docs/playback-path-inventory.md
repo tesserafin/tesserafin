@@ -1250,3 +1250,24 @@ Deleted: `Folder.CollectionManager`, `Folder.UserViewManager`, `UserView.TVSerie
 
 Still static: `BaseItem.ChannelManager`, behind `CanDelete()` (15 overrides) and the channel branch of
 `Series.GetSeasonEpisodes`, which is reached through the `Season` episode chain without a query.
+
+## 37. `BaseItem.ChannelManager` removed (consolidation step 5, phase B)
+
+- **Folder validation takes one port.** `Folder.ValidateChildren` and every `ValidateChildrenInternal` override take
+  `IFolderValidationServices` instead of four explicit ports (deletions, writes, images, scheduler).
+  - The port also carries the channel manager, resolved lazily because it validates folders itself.
+  - `ProviderManager` and `LibraryScanTraversal` inject it.
+- **`CanDelete` takes the channel manager.** `CanDelete(IChannelManager)` and its 15 overrides, plus
+  `CanDelete(User, IChannelManager)` and `CanDelete(User, folders, IChannelManager)`, receive the channel manager
+  that decides whether a channel item may be removed.
+  - Folder validation passes `services.Channels`.
+  - `DtoService` passes its deferred channel manager; `LibraryController` injects one.
+- **The episode family takes the listing services.** `Season.GetEpisodes` and `Series.GetEpisodes`/`GetSeasonEpisodes`
+  take `IItemListingServices` instead of `IItemSortService`: its sort, and its channels for a channel series.
+  - `Season.GetChildren`/`GetItemsInternal` pass `query.Listing`.
+  - `TvShowsController`, `SessionManager`, `SeriesMetadataService` and `SeasonMetadataService` inject the services.
+  - A channel series listed without them yields no episodes: the channel failure is swallowed as before, and there
+    is no static fallback.
+
+`BaseItem.ChannelManager` and its `ApplicationHost` assignment are deleted, as is the dependency test's locator
+entry. `entityStaticServices` goes from 11 to 10.

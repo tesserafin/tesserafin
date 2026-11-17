@@ -194,14 +194,14 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             if (IsRoot)
             {
                 return false;
             }
 
-            return base.CanDelete();
+            return base.CanDelete(channels);
         }
 
         public override bool RequiresRefresh()
@@ -522,7 +522,7 @@ namespace Tesserafin.Controller.Entities
                 {
                     foreach (var item in itemsRemoved)
                     {
-                        if (!item.CanDelete())
+                        if (!item.CanDelete(services.Channels))
                         {
                             Logger.LogDebug("Item marked as non-removable, skipping: {Path}", item.Path ?? item.Name);
                             continue;

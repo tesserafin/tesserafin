@@ -115,7 +115,6 @@ public class FolderGetChildrenCharacterizationTests
         SetStatics(libraryManager.Object);
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
-        BaseItem.ChannelManager = channelManager.Object;
         var listing = Mock.Of<IItemListingServices>(l =>
             l.Channels == channelManager.Object
             && l.Collections == collectionManager.Object
@@ -268,7 +267,9 @@ public class FolderGetChildrenCharacterizationTests
         BaseItem.ConfigurationManager = Mock.Of<IServerConfigurationManager>(x => x.Configuration == new ServerConfiguration { DisplaySpecialsWithinSeasons = true });
         var sortService = new RecordingItemSortService();
 
-        var result = season.GetChildren(user, true, PermissiveVisibility.Query(user), sortService);
+        var query = PermissiveVisibility.Query(user);
+        query.Listing = Mock.Of<IItemListingServices>(l => l.Sort == sortService);
+        var result = season.GetChildren(user, true, query, sortService);
 
         Assert.Equal(new BaseItem[] { episode }, result);
         Assert.Single(sortService.Calls);
@@ -290,7 +291,6 @@ public class FolderGetChildrenCharacterizationTests
         SetStatics(libraryManager.Object);
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
-        BaseItem.ChannelManager = channelManager.Object;
         var listing = Mock.Of<IItemListingServices>(l =>
             l.Channels == channelManager.Object
             && l.Collections == collectionManager.Object
@@ -323,7 +323,6 @@ public class FolderGetChildrenCharacterizationTests
         SetStatics(libraryManager.Object);
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
-        BaseItem.ChannelManager = channelManager.Object;
         var listing = Mock.Of<IItemListingServices>(l =>
             l.Channels == channelManager.Object
             && l.Collections == collectionManager.Object

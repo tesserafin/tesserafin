@@ -18,6 +18,7 @@ using Tesserafin.Api.ModelBinders;
 using Tesserafin.Api.Models.LibraryDtos;
 using Tesserafin.Common.Api;
 using Tesserafin.Common.Extensions;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
@@ -48,6 +49,7 @@ namespace Tesserafin.Api.Controllers;
 [Route("")]
 public class LibraryController : BaseTesserafinApiController
 {
+    private readonly IChannelManager _channelManager;
     private readonly IItemListingServices _listing;
     private readonly IStandaloneVisibilityService _visibility;
     private readonly IItemDeletionCommands _deletions;
@@ -84,6 +86,7 @@ public class LibraryController : BaseTesserafinApiController
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
     /// <param name="listing">Supplies a folder's own listing logic (user views, channels, collections, next up).</param>
+    /// <param name="channelManager">Decides whether a channel item may be deleted.</param>
     public LibraryController(
         IItemDeletionCommands deletions,
         IProviderManager providerManager,
@@ -100,8 +103,10 @@ public class LibraryController : BaseTesserafinApiController
         IServerConfigurationManager serverConfigurationManager,
         IItemSortService itemSortService,
         IStandaloneVisibilityService visibility,
-        IItemListingServices listing)
+        IItemListingServices listing,
+        IChannelManager channelManager)
     {
+        _channelManager = channelManager;
         _listing = listing;
         _visibility = visibility;
         _deletions = deletions;
@@ -410,7 +415,7 @@ public class LibraryController : BaseTesserafinApiController
             return NotFound();
         }
 
-        if (user is not null && !item.CanDelete(user))
+        if (user is not null && !item.CanDelete(user, _channelManager))
         {
             return Unauthorized("Unauthorized access");
         }
@@ -456,7 +461,7 @@ public class LibraryController : BaseTesserafinApiController
                 return NotFound();
             }
 
-            if (user is not null && !item.CanDelete(user))
+            if (user is not null && !item.CanDelete(user, _channelManager))
             {
                 return Unauthorized("Unauthorized access");
             }

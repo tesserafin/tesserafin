@@ -27,6 +27,7 @@ namespace Tesserafin.Providers.TV;
 /// </summary>
 public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 {
+    private readonly IItemListingServices _listing;
     private readonly IItemDeletionCommands _deletions;
     private readonly ILocalizationManager _localizationManager;
     private readonly IItemSortService _itemSortService;
@@ -47,6 +48,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
+    /// <param name="listing">Sort and channel services for episode listing.</param>
     public SeriesMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -60,9 +62,11 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         ILocalizationManager localizationManager,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
-        IItemSortService itemSortService)
+        IItemSortService itemSortService,
+        IItemListingServices listing)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
+        _listing = listing;
         _deletions = deletions;
         _localizationManager = localizationManager;
         _itemSortService = itemSortService;
@@ -206,7 +210,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             var seasonNumber = virtualSeason.IndexNumber;
             // If there's a physical season with the same number or no episodes in the season, delete it
             if ((seasonNumber.HasValue && physicalSeasonNumbers.Contains(seasonNumber.Value))
-                || virtualSeason.GetEpisodes(null, new DtoOptions(true), true, _itemSortService).Count == 0)
+                || virtualSeason.GetEpisodes(null, new DtoOptions(true), true, _listing).Count == 0)
             {
                 Logger.LogInformation("Removing virtual season {SeasonNumber} in series {SeriesName}", virtualSeason.IndexNumber, series.Name);
 
@@ -224,7 +228,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 
     private async Task RemoveObsoleteEpisodes(Series series, CancellationToken cancellationToken)
     {
-        var episodesBySeason = series.GetEpisodes(null, new DtoOptions(), true, _itemSortService)
+        var episodesBySeason = series.GetEpisodes(null, new DtoOptions(), true, _listing)
                         .OfType<Episode>()
                         .GroupBy(e => e.ParentIndexNumber)
                         .ToList();

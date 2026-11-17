@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.IO;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
@@ -73,7 +74,7 @@ namespace Tesserafin.Controller.Entities
             return LibraryManager.GetItemList(query);
         }
 
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             return false;
         }

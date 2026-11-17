@@ -481,8 +481,6 @@ namespace Tesserafin.Controller.Entities
 
         public static IUserDataManager UserDataManager { get; set; }
 
-        public static IChannelManager ChannelManager { get; set; }
-
         public static IMediaSourceManager MediaSourceManager { get; set; }
 
         /// <summary>
@@ -834,11 +832,11 @@ namespace Tesserafin.Controller.Entities
             return Id.ToString("N", CultureInfo.InvariantCulture);
         }
 
-        public virtual bool CanDelete()
+        public virtual bool CanDelete(IChannelManager channels)
         {
             if (SourceType == SourceType.Channel)
             {
-                return ChannelManager.CanDelete(this);
+                return channels.CanDelete(this);
             }
 
             return IsFileProtocol;
@@ -891,16 +889,16 @@ namespace Tesserafin.Controller.Entities
             return ownerId.IsEmpty() ? null : lookup.GetItemById(ownerId);
         }
 
-        public bool CanDelete(User user, List<Folder> allCollectionFolders)
+        public bool CanDelete(User user, List<Folder> allCollectionFolders, IChannelManager channels)
         {
-            return CanDelete() && IsAuthorizedToDelete(user, allCollectionFolders);
+            return CanDelete(channels) && IsAuthorizedToDelete(user, allCollectionFolders);
         }
 
-        public virtual bool CanDelete(User user)
+        public virtual bool CanDelete(User user, IChannelManager channels)
         {
             var allCollectionFolders = LibraryManager.GetUserRootFolder().Children.OfType<Folder>().ToList();
 
-            return CanDelete(user, allCollectionFolders);
+            return CanDelete(user, allCollectionFolders, channels);
         }
 
         public virtual bool CanDownload()

@@ -101,8 +101,6 @@ public sealed class StandaloneVisibilityTests
         _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, localization.Object, configuration.Object, _activeRecordings, libraryOptions));
 
         BaseItem.LibraryManager = manager;
-        BaseItem.ChannelManager = Mock.Of<IChannelManager>();
-        Mock.Get(BaseItem.ChannelManager).Setup(c => c.GetChannel(It.IsAny<string>())).Returns((string id) => (manager.GetItemById(id) as Channel)!);
         BaseItem.ItemRepository = repository.Object;
         BaseItem.ConfigurationManager = configuration.Object;
         BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>(m => m.GetPathProtocol(It.IsAny<string>()) == MediaProtocol.File);
@@ -1060,7 +1058,6 @@ public sealed class StandaloneVisibilityTests
 
         // Every static the check could read throws on any call.
         ThrowingStatic();
-        BaseItem.ChannelManager = new Mock<IChannelManager>(MockBehavior.Strict).Object;
         BaseItem.ConfigurationManager = new Mock<IServerConfigurationManager>(MockBehavior.Strict).Object;
         Video.RecordingsManager = new Mock<IRecordingsManager>(MockBehavior.Strict).Object;
 
@@ -1092,7 +1089,6 @@ public sealed class StandaloneVisibilityTests
 
         // Both statics of the channel branch throw on any call: the channel lookup and the library manager.
         ThrowingStatic();
-        BaseItem.ChannelManager = new Mock<IChannelManager>(MockBehavior.Strict).Object;
 
         Assert.Equal(expected, Decisions(item, users));
         Assert.Equal(expected, Decisions(channel, users));

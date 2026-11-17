@@ -248,8 +248,8 @@ public sealed class CollectionFolderMembershipTests
         var shows = AddLibrary("Shows", "/media/shows");
         var movie = AddMovie(Add(new Folder { Path = "/media/movies" }), "/media/movies/n.mkv");
 
-        Assert.True(movie.CanDelete(UserWithFolders(PreferenceKind.EnableContentDeletionFromFolders, movies.Id), _libraries));
-        Assert.False(movie.CanDelete(UserWithFolders(PreferenceKind.EnableContentDeletionFromFolders, shows.Id), _libraries));
+        Assert.True(movie.CanDelete(UserWithFolders(PreferenceKind.EnableContentDeletionFromFolders, movies.Id), _libraries, Mock.Of<Tesserafin.Controller.Channels.IChannelManager>()));
+        Assert.False(movie.CanDelete(UserWithFolders(PreferenceKind.EnableContentDeletionFromFolders, shows.Id), _libraries, Mock.Of<Tesserafin.Controller.Channels.IChannelManager>()));
     }
 
     private static User UserWithFolders(PreferenceKind kind, Guid folderId)

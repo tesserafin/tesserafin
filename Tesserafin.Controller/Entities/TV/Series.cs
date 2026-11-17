@@ -249,7 +249,7 @@ namespace Tesserafin.Controller.Entities.TV
             return GetEpisodes(user, options, shouldIncludeMissingEpisodes, null);
         }
 
-        public IEnumerable<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+        public IEnumerable<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
             var seriesKey = GetUniqueSeriesKey(this);
 
@@ -272,7 +272,7 @@ namespace Tesserafin.Controller.Entities.TV
             var allSeriesEpisodes = allItems.OfType<Episode>().ToList();
 
             var allEpisodes = allItems.OfType<Season>()
-                .SelectMany(i => i.GetEpisodes(this, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, itemSortService))
+                .SelectMany(i => i.GetEpisodes(this, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, listing))
                 .Reverse();
 
             // Specials could appear twice based on above - once in season 0, once in the aired season
@@ -353,7 +353,7 @@ namespace Tesserafin.Controller.Entities.TV
             return GetSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, null);
         }
 
-        public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+        public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
             var queryFromSeries = ConfigurationManager.Configuration.DisplaySpecialsWithinSeasons;
 
@@ -383,7 +383,8 @@ namespace Tesserafin.Controller.Entities.TV
                 {
                     query.Parent = parentSeason;
                     query.ChannelIds = [ChannelId];
-                    allItems = [.. ChannelManager.GetChannelItemsInternal(query, new Progress<double>(), CancellationToken.None).GetAwaiter().GetResult().Items];
+                    var channels = (listing ?? throw new InvalidOperationException("Listing a channel series needs the listing services.")).Channels;
+                    allItems = [.. channels.GetChannelItemsInternal(query, new Progress<double>(), CancellationToken.None).GetAwaiter().GetResult().Items];
                 }
                 catch
                 {
@@ -396,7 +397,7 @@ namespace Tesserafin.Controller.Entities.TV
                 allItems = LibraryManager.GetItemList(query);
             }
 
-            return GetSeasonEpisodes(parentSeason, user, allItems, options, shouldIncludeMissingEpisodes, itemSortService);
+            return GetSeasonEpisodes(parentSeason, user, allItems, options, shouldIncludeMissingEpisodes, listing);
         }
 
         public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, IEnumerable<BaseItem> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes)
@@ -404,11 +405,11 @@ namespace Tesserafin.Controller.Entities.TV
             return GetSeasonEpisodes(parentSeason, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, null);
         }
 
-        public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, IEnumerable<BaseItem> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+        public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, IEnumerable<BaseItem> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
             if (allSeriesEpisodes is null)
             {
-                return GetSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, itemSortService);
+                return GetSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, listing);
             }
 
             var episodes = FilterEpisodesBySeason(allSeriesEpisodes, parentSeason, ConfigurationManager.Configuration.DisplaySpecialsWithinSeasons);
@@ -420,9 +421,9 @@ namespace Tesserafin.Controller.Entities.TV
             // contract has no service to give) keep falling back to the obsolete static facade.
             // The pragma below therefore survives this tranche on purpose -- see
             // docs/major-rewrite-plan-v13.md § PR49/N and § PR50/N.
-            if (itemSortService is not null)
+            if (listing is not null)
             {
-                return itemSortService.Sort(episodes, user, new[] { sortBy }, SortOrder.Ascending).ToList();
+                return listing.Sort.Sort(episodes, user, new[] { sortBy }, SortOrder.Ascending).ToList();
             }
 
 #pragma warning disable CS0618 // static LibraryManager.Sort facade left in place pending Folder.GetChildren/Series.GetEpisodes cascade, see docs/major-rewrite-plan-v13.md § PR49/N

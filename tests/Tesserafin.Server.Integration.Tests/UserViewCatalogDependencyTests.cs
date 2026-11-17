@@ -62,7 +62,6 @@ namespace Tesserafin.Server.Integration.Tests
         private static readonly (Type Type, string Name)[] _staticLocators =
         [
             (typeof(BaseItem), nameof(BaseItem.LibraryManager)),
-            (typeof(BaseItem), nameof(BaseItem.ChannelManager)),
         ];
 
         private static readonly Lazy<IServiceCollection> _registrations = new(BuildRegistrations);

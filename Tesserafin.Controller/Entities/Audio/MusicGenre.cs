@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.IO;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Library;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
@@ -57,7 +58,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return 1;
         }
 
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             return false;
         }

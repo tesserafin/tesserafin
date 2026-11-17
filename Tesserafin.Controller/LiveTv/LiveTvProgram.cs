@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json.Serialization;
 using Tesserafin.Common.Configuration;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
@@ -217,7 +218,7 @@ namespace Tesserafin.Controller.LiveTv
             return System.IO.Path.Combine(basePath, "livetv", Id.ToString("N", CultureInfo.InvariantCulture));
         }
 
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             return false;
         }

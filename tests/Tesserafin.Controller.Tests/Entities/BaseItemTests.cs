@@ -196,10 +196,10 @@ public class BaseItemTests
 
         // Resuming the 1080p alternate must default to the 1080p source, not the higher-resolution
         // 2160p primary that the width ordering would otherwise place first.
-        Assert.Equal(alt1.Id.ToString("N"), alt1.GetMediaSources(false, BaseItem.MediaSourceManager, Mock.Of<IMediaSegmentManager>(), BaseItem.ChannelManager)[0].Id);
+        Assert.Equal(alt1.Id.ToString("N"), alt1.GetMediaSources(false, BaseItem.MediaSourceManager, Mock.Of<IMediaSegmentManager>(), Mock.Of<IChannelManager>())[0].Id);
 
         // Opening the primary still defaults to the primary's own (here highest-resolution) source.
-        Assert.Equal(primary.Id.ToString("N"), primary.GetMediaSources(false, BaseItem.MediaSourceManager, Mock.Of<IMediaSegmentManager>(), BaseItem.ChannelManager)[0].Id);
+        Assert.Equal(primary.Id.ToString("N"), primary.GetMediaSources(false, BaseItem.MediaSourceManager, Mock.Of<IMediaSegmentManager>(), Mock.Of<IChannelManager>())[0].Id);
     }
 
     [Fact]

@@ -10,6 +10,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
@@ -401,14 +402,14 @@ namespace Tesserafin.Controller.Entities
             return user.GetPreferenceValues<UnratedItem>(PreferenceKind.BlockUnratedItems).Contains(type);
         }
 
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             if (IsActiveRecording())
             {
                 return false;
             }
 
-            return base.CanDelete();
+            return base.CanDelete(channels);
         }
 
         public IEnumerable<Guid> GetAdditionalPartIds()

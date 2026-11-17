@@ -6,7 +6,6 @@
     "Tesserafin.Server.Core/ApplicationHost.cs"
   ],
   "entityStaticServices": [
-    "BaseItem.ChannelManager",
     "BaseItem.ChapterManager",
     "BaseItem.ConfigurationManager",
     "BaseItem.FileSystem",

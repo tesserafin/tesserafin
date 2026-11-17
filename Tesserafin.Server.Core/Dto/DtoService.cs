@@ -401,10 +401,10 @@ namespace Tesserafin.Server.Core.Dto
             if (options.ContainsField(ItemFields.CanDelete))
             {
                 dto.CanDelete = user is null
-                    ? item.CanDelete()
+                    ? item.CanDelete(_channelManagerFactory.Value)
                     : allCollectionFolders is not null
-                        ? item.CanDelete(user, allCollectionFolders)
-                        : item.CanDelete(user);
+                        ? item.CanDelete(user, allCollectionFolders, _channelManagerFactory.Value)
+                        : item.CanDelete(user, _channelManagerFactory.Value);
             }
 
             if (options.ContainsField(ItemFields.CanDownload))

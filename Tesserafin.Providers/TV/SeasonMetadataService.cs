@@ -23,6 +23,7 @@ namespace Tesserafin.Providers.TV;
 /// </summary>
 public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 {
+    private readonly IItemListingServices _listing;
     private readonly IItemSortService _itemSortService;
 
     /// <summary>
@@ -40,6 +41,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
+    /// <param name="listing">Sort and channel services for episode listing.</param>
     public SeasonMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -52,9 +54,11 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
         IItemSortService itemSortService,
-        ILocalizationManager localizationManager)
+        ILocalizationManager localizationManager,
+        IItemListingServices listing)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
+        _listing = listing;
         _itemSortService = itemSortService;
     }
 
@@ -103,7 +107,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 
     /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(Season item)
-        => item.GetEpisodes(null, new DtoOptions(true), true, _itemSortService);
+        => item.GetEpisodes(null, new DtoOptions(true), true, _listing);
 
     /// <inheritdoc />
     protected override ItemUpdateType UpdateMetadataFromChildren(Season item, IReadOnlyList<BaseItem> children, bool isFullRefresh, ItemUpdateType currentUpdateType)

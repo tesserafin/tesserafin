@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
@@ -259,7 +260,7 @@ namespace Tesserafin.Controller.Playlists
             return shares.Any(s => s.UserId.Equals(userId));
         }
 
-        public override bool CanDelete(User user)
+        public override bool CanDelete(User user, IChannelManager channels)
         {
             return user.HasPermission(PermissionKind.IsAdministrator) || user.Id.Equals(OwnerUserId);
         }
