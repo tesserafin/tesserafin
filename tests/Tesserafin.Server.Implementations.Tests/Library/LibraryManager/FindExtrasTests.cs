@@ -51,7 +51,6 @@ public class FindExtrasTests
         _libraryManager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 fixture.Create<IEnumerable<IResolverIgnoreRule>>(),
                 new List<IItemResolver> { new AudioResolver(fixture.Create<NamingOptions>()) },
-                fixture.Create<IEnumerable<IIntroProvider>>(),
                 fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
 

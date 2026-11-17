@@ -67,7 +67,6 @@ public sealed class CollectionFolderMembershipTests
         var manager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 Array.Empty<IResolverIgnoreRule>(),
                 Array.Empty<IItemResolver>(),
-                Array.Empty<IIntroProvider>(),
                 fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
         _libraryManager = manager;

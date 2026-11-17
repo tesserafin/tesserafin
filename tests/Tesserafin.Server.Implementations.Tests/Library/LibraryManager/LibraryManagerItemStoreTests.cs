@@ -81,7 +81,6 @@ public class LibraryManagerItemStoreTests
         _libraryManager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 fixture.Create<IEnumerable<IResolverIgnoreRule>>(),
                 fixture.Create<IEnumerable<IItemResolver>>(),
-                fixture.Create<IEnumerable<IIntroProvider>>(),
                 fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
     }

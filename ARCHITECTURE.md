@@ -620,3 +620,13 @@ streaming controllers (retained behind the v2 execution adapter for now).
   Upserts invalidate their parent's lookup entry only after persistence succeeds. No whole-item
   save is used for these link mutations. Sidecar exports remain outside the SQL transaction;
   cancellation during export does not roll back committed links or their cache reconciliation.
+
+- **Playback intros.** `IPlaybackIntroService` owns provider registration, concurrent collection and
+  filesystem candidate resolution. The manager's intro methods and registration parameter are
+  removed; HTTP calls the service directly with request cancellation. Provider results are
+  materialized within the failure boundary, retaining registration/candidate order even when
+  providers complete out of order. Only saved videos visible through `IItemAccessService` are
+  returned, including path candidates; no intro candidate is saved implicitly. Results are fully
+  resolved before returning. Provider failures are isolated; request cancellation propagates
+  through the new cancellable provider contract. This is pre-playback intro selection, not episode
+  intro/credits detection. HTTP/OpenAPI shapes are unchanged.

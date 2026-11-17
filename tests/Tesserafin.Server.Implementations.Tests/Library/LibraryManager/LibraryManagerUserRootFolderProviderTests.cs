@@ -133,7 +133,6 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
         _libraryManager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 Array.Empty<IResolverIgnoreRule>(),
                 new IItemResolver[] { new FolderResolver() },
-                Array.Empty<IIntroProvider>(),
                 fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
 

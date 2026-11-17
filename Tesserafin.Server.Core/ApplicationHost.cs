@@ -585,6 +585,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemStore, ItemStore>();
             serviceCollection.AddSingleton<ILibraryItemOptions, LibraryItemOptions>();
             serviceCollection.AddSingleton<IItemResolutionService, ItemResolutionService>();
+            serviceCollection.AddSingleton<IPlaybackIntroService, PlaybackIntroService>();
             serviceCollection.AddSingleton<IItemMetadataExporter, ItemMetadataExporter>();
             serviceCollection.AddSingleton<ItemVersionGraphPlanner>();
             serviceCollection.AddSingleton<IItemWriteCommands, ItemWriteCommands>();
@@ -854,8 +855,8 @@ namespace Tesserafin.Server.Core
             Resolve<ILibraryManager>().AddParts(
                 GetExports<IResolverIgnoreRule>(),
                 GetExports<IItemResolver>(),
-                GetExports<IIntroProvider>(),
                 GetExports<IBaseItemComparer>());
+            Resolve<IPlaybackIntroService>().AddParts(GetExports<IIntroProvider>());
             Resolve<ILibraryScanCoordinator>().SetPostScanTasks(GetExports<ILibraryPostScanTask>());
 
             Resolve<IItemMetadataExporter>().AddParts(GetExports<IMetadataSaver>());

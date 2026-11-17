@@ -172,14 +172,6 @@ namespace Tesserafin.Controller.Library
             where T : BaseItem;
 
         /// <summary>
-        /// Gets the intros.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        /// <param name="user">The user.</param>
-        /// <returns>IEnumerable{System.String}.</returns>
-        Task<IEnumerable<Video>> GetIntros(BaseItem item, User user);
-
-        /// <summary>
         /// Gets the IDs of local alternate versions for a video.
         /// Local alternate versions are alternate quality versions at different file paths.
         /// </summary>
@@ -200,12 +192,10 @@ namespace Tesserafin.Controller.Library
         /// </summary>
         /// <param name="rules">The rules.</param>
         /// <param name="resolvers">The resolvers.</param>
-        /// <param name="introProviders">The intro providers.</param>
         /// <param name="itemComparers">The item comparers.</param>
         void AddParts(
             IEnumerable<IResolverIgnoreRule> rules,
             IEnumerable<IItemResolver> resolvers,
-            IEnumerable<IIntroProvider> introProviders,
             IEnumerable<IBaseItemComparer> itemComparers);
 
         /// <summary>

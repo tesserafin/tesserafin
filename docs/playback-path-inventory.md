@@ -933,3 +933,25 @@ outside that transaction. Upserts invalidate the parent lookup entry after a suc
 A real-host trigger rejects the second SQL mutation to prove rollback, then a retry checks the
 database, warmed parent caches, duplicate elimination, shortcut isolation and source bytes.
 The journey is required by name in CI. HTTP/OpenAPI shapes are unchanged.
+
+## 30. Playback intro selection ownership
+
+`IPlaybackIntroService` replaces `LibraryManager.GetIntros`, its private provider/error loop and
+path resolver. `ILibraryManager.AddParts` no longer accepts intro providers; the composition root
+registers them with the dedicated service. The HTTP controller passes `RequestAborted`. The
+provider contract is now `GetIntrosAsync(item, user, cancellationToken)` without a compatibility
+bridge. The service depends on explicit access, resolution, filesystem and logging ports.
+
+Providers run concurrently; registration order and candidate order determine playback order.
+Each provider's enumerable is materialized inside its exception boundary, so deferred failures
+cannot break another provider or leak a partial provider result. Filesystem resolution runs before
+the service returns, not during DTO enumeration. Candidates are never saved. ID and path
+references both resolve to persisted videos through the requesting user's access policy; hidden,
+missing and nonvideo entries are excluded. Visibility is checked again on every request.
+Request cancellation is cooperative and propagates instead of becoming an empty successful list.
+
+The required real-host HTTP journey exercises ID/path resolution, saved metadata, provider failure,
+unpersisted and nonvideo candidates, and visibility changes between requests. Unit tests cover
+ordering with reversed provider completion, request registration snapshots, deferred failures,
+eager resolution and cancellation. No playback byte-serving, episode intro detection, HTTP or
+OpenAPI contract change is included in this slice.

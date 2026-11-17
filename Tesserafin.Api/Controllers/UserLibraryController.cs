@@ -36,6 +36,7 @@ public class UserLibraryController : BaseTesserafinApiController
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IPlaybackIntroService _intros;
     private readonly IUserManager _userManager;
     private readonly IUserDataManager _userDataRepository;
     private readonly ILibraryManager _libraryManager;
@@ -48,6 +49,7 @@ public class UserLibraryController : BaseTesserafinApiController
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="intros">Resolves visible playback intros.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="userDataRepository">Instance of the <see cref="IUserDataManager"/> interface.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
@@ -57,6 +59,7 @@ public class UserLibraryController : BaseTesserafinApiController
     public UserLibraryController(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
+        IPlaybackIntroService intros,
         IUserManager userManager,
         IUserDataManager userDataRepository,
         ILibraryManager libraryManager,
@@ -66,6 +69,7 @@ public class UserLibraryController : BaseTesserafinApiController
     {
         _writes = writes;
         _deletions = deletions;
+        _intros = intros;
         _userManager = userManager;
         _userDataRepository = userDataRepository;
         _libraryManager = libraryManager;
@@ -189,7 +193,7 @@ public class UserLibraryController : BaseTesserafinApiController
             return NotFound();
         }
 
-        var items = await _libraryManager.GetIntros(item, user).ConfigureAwait(false);
+        var items = await _intros.GetIntrosAsync(item, user, HttpContext.RequestAborted).ConfigureAwait(false);
         var dtoOptions = new DtoOptions();
         var dtos = items.Select(i => _dtoService.GetBaseItemDto(i, dtoOptions, user)).ToArray();
 

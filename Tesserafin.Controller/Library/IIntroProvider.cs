@@ -1,6 +1,7 @@
 #nullable disable
 
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Data.Entities;
@@ -23,7 +24,8 @@ namespace Tesserafin.Controller.Library
         /// </summary>
         /// <param name="item">The item.</param>
         /// <param name="user">The user.</param>
-        /// <returns>IEnumerable{System.String}.</returns>
-        Task<IEnumerable<IntroInfo>> GetIntros(BaseItem item, User user);
+        /// <param name="cancellationToken">The request cancellation token.</param>
+        /// <returns>The ordered intro candidates.</returns>
+        Task<IEnumerable<IntroInfo>> GetIntrosAsync(BaseItem item, User user, CancellationToken cancellationToken);
     }
 }
