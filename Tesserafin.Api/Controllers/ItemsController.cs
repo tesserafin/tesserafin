@@ -37,6 +37,7 @@ namespace Tesserafin.Api.Controllers;
 public class ItemsController : BaseTesserafinApiController
 {
     private readonly IUserManager _userManager;
+    private readonly INamedItemCatalog _namedItems;
     private readonly ILibraryManager _libraryManager;
     private readonly ILocalizationManager _localization;
     private readonly IDtoService _dtoService;
@@ -51,6 +52,7 @@ public class ItemsController : BaseTesserafinApiController
     /// Initializes a new instance of the <see cref="ItemsController"/> class.
     /// </summary>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
+    /// <param name="namedItems">Read-only named catalogue.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="localization">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
@@ -62,6 +64,7 @@ public class ItemsController : BaseTesserafinApiController
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     public ItemsController(
         IUserManager userManager,
+        INamedItemCatalog namedItems,
         ILibraryManager libraryManager,
         ILocalizationManager localization,
         IDtoService dtoService,
@@ -73,6 +76,7 @@ public class ItemsController : BaseTesserafinApiController
         IItemSortService itemSortService)
     {
         _userManager = userManager;
+        _namedItems = namedItems;
         _libraryManager = libraryManager;
         _localization = localization;
         _dtoService = dtoService;
@@ -539,13 +543,13 @@ public class ItemsController : BaseTesserafinApiController
             {
                 try
                 {
-                    return _libraryManager.GetArtist(i, new DtoOptions(false));
+                    return _namedItems.GetId<MusicArtist>(i);
                 }
                 catch
                 {
-                    return null;
+                    return Guid.Empty;
                 }
-            }).Where(i => i is not null).Select(i => i!.Id).ToArray();
+            }).Where(i => !i.IsEmpty()).ToArray();
         }
 
         // ExcludeArtistIds
@@ -575,13 +579,13 @@ public class ItemsController : BaseTesserafinApiController
             {
                 try
                 {
-                    return _libraryManager.GetStudio(i);
+                    return _namedItems.GetId<Studio>(i);
                 }
                 catch
                 {
-                    return null;
+                    return Guid.Empty;
                 }
-            }).Where(i => i is not null).Select(i => i!.Id).ToArray();
+            }).Where(i => !i.IsEmpty()).ToArray();
         }
 
         // Apply default sorting if none requested

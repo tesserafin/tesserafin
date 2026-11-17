@@ -587,6 +587,8 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemResolutionService, ItemResolutionService>();
             serviceCollection.AddSingleton<IPlaybackIntroService, PlaybackIntroService>();
             serviceCollection.AddSingleton<IItemMetadataExporter, ItemMetadataExporter>();
+            serviceCollection.AddSingleton<NamedItemIdentity>();
+            serviceCollection.AddSingleton<INamedItemCatalog, NamedItemCatalog>();
             serviceCollection.AddSingleton<ItemVersionGraphPlanner>();
             serviceCollection.AddSingleton<IItemWriteCommands, ItemWriteCommands>();
             serviceCollection.AddSingleton<IItemPeopleCommands, ItemPeopleCommands>();

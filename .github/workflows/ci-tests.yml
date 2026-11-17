@@ -361,6 +361,9 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.ItemPeopleCommandsEndToEndTests.Credits_CreateOnePerson_UpdateMetadata_AndClearWithoutDeletingThePerson
           --require Tesserafin.Server.Integration.Tests.ItemLinkWriteCommandsEndToEndTests.Reroute_RollsBackBothSqlMutations_ThenReconcilesDeduplicatedCacheAndPreservesSources
           --require Tesserafin.Server.Integration.Tests.PlaybackIntroServiceEndToEndTests.HttpIntros_ResolveSavedVideos_FilterVisibility_AndIsolateProviderFailure_WithoutSavingCandidates
+          --require Tesserafin.Server.Integration.Tests.NamedItemCatalogEndToEndTests.HttpReadsAndUnknownFilters_DoNotMaterializeNames_ExplicitWritesBecomeVisible
+          --require Tesserafin.Server.Integration.Tests.NamedItemCatalogEndToEndTests.NamedWrite_FailedSqlCanRetry_AndConcurrentCreationPublishesOnce
+          --require Tesserafin.Server.Integration.Tests.NamedItemCatalogEndToEndTests.AlbumArtistReads_DoNotCreate_RealFoldersWin_AndPostScanMaterializesProductionYears
           --require Tesserafin.Server.Integration.Tests.ItemImageProcessingEndToEndTests.ImageInfos_LocalizesAndPersistsDimensionsAndBlurHash_WithoutSavingTheWholeItem
           --require Tesserafin.Server.Integration.Tests.ItemImageProcessingEndToEndTests.ImageGet_UsesThePreparedImage_AndConcurrentRequestsPublishOneManagedFile
           --require Tesserafin.Server.Integration.Tests.ItemImageProcessingEndToEndTests.DatabaseFailure_RollsBackRows_LeavesCacheUnchanged_CleansStagedFiles_AndAllowsRetry

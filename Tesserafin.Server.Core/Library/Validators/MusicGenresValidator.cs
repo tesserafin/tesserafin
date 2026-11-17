@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Enums;
@@ -68,7 +69,7 @@ public class MusicGenresValidator
         {
             try
             {
-                var item = _libraryManager.GetMusicGenre(name);
+                var item = _writes.GetOrCreateNamedItem<MusicGenre>(name, cancellationToken);
                 if (!existingMusicGenreIds.Contains(item.Id))
                 {
                     await item.RefreshMetadata(_deletions, _writes, cancellationToken).ConfigureAwait(false);

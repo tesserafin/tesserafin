@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -29,6 +30,7 @@ namespace Tesserafin.Api.Controllers;
 [Tags("Year")]
 public class YearsController : BaseTesserafinApiController
 {
+    private readonly INamedItemCatalog _namedItems;
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
     private readonly IDtoService _dtoService;
@@ -37,16 +39,19 @@ public class YearsController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="YearsController"/> class.
     /// </summary>
+    /// <param name="namedItems">Read-only named catalogue.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     public YearsController(
+        INamedItemCatalog namedItems,
         ILibraryManager libraryManager,
         IUserManager userManager,
         IDtoService dtoService,
         IItemSortService itemSortService)
     {
+        _namedItems = namedItems;
         _libraryManager = libraryManager;
         _userManager = userManager;
         _dtoService = dtoService;
@@ -180,7 +185,7 @@ public class YearsController : BaseTesserafinApiController
     public ActionResult<BaseItemDto> GetYear([FromRoute, Required] int year, [FromQuery] Guid? userId)
     {
         userId = RequestHelpers.GetUserId(User, userId);
-        var item = _libraryManager.GetYear(year);
+        var item = _namedItems.Find<Year>(year.ToString(CultureInfo.InvariantCulture));
         if (item is null)
         {
             return NotFound();
@@ -227,6 +232,7 @@ public class YearsController : BaseTesserafinApiController
             .Select(i => i.ProductionYear ?? 0)
             .Where(i => i > 0)
             .Distinct()
-            .Select(_libraryManager.GetYear);
+            .Select(year => _namedItems.Find<Year>(year.ToString(CultureInfo.InvariantCulture)))
+            .OfType<Year>();
     }
 }

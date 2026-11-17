@@ -43,6 +43,7 @@ public class DtoServiceTests
 
         _dtoService = new DtoService(
             NullLogger<DtoService>.Instance,
+            Mock.Of<INamedItemCatalog>(),
             _libraryManagerMock.Object,
             _itemPeopleServiceMock.Object,
             new Mock<IUserDataManager>().Object,

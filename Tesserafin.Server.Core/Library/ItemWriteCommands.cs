@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,8 +25,41 @@ internal sealed class ItemWriteCommands(
     IFileSystem files,
     IItemChangePublisher changes,
     ActiveRecordings recordings,
+    INamedItemCatalog catalog,
+    NamedItemIdentity namedItems,
     ILogger<ItemWriteCommands> logger) : IItemWriteCommands
 {
+    private readonly object _namedItemGate = new();
+
+    public T GetOrCreateNamedItem<T>(string name, CancellationToken cancellationToken)
+        where T : BaseItem, new()
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var path = namedItems.GetPath<T>(name);
+        // Admission is limited to named materialization; this is not a lock on general item writes.
+        lock (_namedItemGate)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var existing = catalog.Find<T>(name);
+            if (existing is not null)
+            {
+                return existing;
+            }
+
+            var directory = Directory.CreateDirectory(path);
+            var item = new T
+            {
+                Id = namedItems.GetId<T>(name),
+                Name = NamedItemIdentity.NormalizeName<T>(name),
+                Path = path,
+                DateCreated = directory.CreationTimeUtc,
+                DateModified = directory.LastWriteTimeUtc
+            };
+            CreateItems([item], null, cancellationToken);
+            return item;
+        }
+    }
+
     public void CreateItem(BaseItem item, BaseItem? parent) => CreateItems([item], parent, CancellationToken.None);
 
     public void CreateItems(IReadOnlyList<BaseItem> items, BaseItem? parent, CancellationToken cancellationToken)

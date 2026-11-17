@@ -126,6 +126,7 @@ public class DtoServiceImageInheritanceTests
 
         return new DtoService(
             logger.Object,
+            Mock.Of<INamedItemCatalog>(),
             libraryManager.Object,
             itemPeopleService.Object,
             userDataManager.Object,

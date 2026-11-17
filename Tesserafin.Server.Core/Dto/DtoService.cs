@@ -113,6 +113,7 @@ namespace Tesserafin.Server.Core.Dto
         }.ToFrozenDictionary();
 
         private readonly ILogger<DtoService> _logger;
+        private readonly INamedItemCatalog _namedItems;
         private readonly ILibraryManager _libraryManager;
         private readonly IItemPeopleService _itemPeopleService;
         private readonly IUserDataManager _userDataRepository;
@@ -131,6 +132,7 @@ namespace Tesserafin.Server.Core.Dto
 
         public DtoService(
             ILogger<DtoService> logger,
+            INamedItemCatalog namedItems,
             ILibraryManager libraryManager,
             IItemPeopleService itemPeopleService,
             IUserDataManager userDataRepository,
@@ -145,6 +147,7 @@ namespace Tesserafin.Server.Core.Dto
             IItemCountService itemCountService)
         {
             _logger = logger;
+            _namedItems = namedItems;
             _libraryManager = libraryManager;
             _itemPeopleService = itemPeopleService;
             _userDataRepository = userDataRepository;
@@ -864,7 +867,7 @@ namespace Tesserafin.Server.Core.Dto
                 .Select(i => new NameGuidPair
                 {
                     Name = i,
-                    Id = _libraryManager.GetStudioId(i)
+                    Id = _namedItems.GetId<Studio>(i)
                 })
                 .ToArray();
         }
@@ -885,10 +888,10 @@ namespace Tesserafin.Server.Core.Dto
         {
             if (owner is IHasMusicGenres)
             {
-                return _libraryManager.GetMusicGenreId(name);
+                return _namedItems.GetId<MusicGenre>(name);
             }
 
-            return _libraryManager.GetGenreId(name);
+            return _namedItems.GetId<Genre>(name);
         }
 
         private string? GetTagAndFillBlurhash(BaseItemDto dto, BaseItem item, ImageType imageType, int imageIndex = 0)
@@ -1548,7 +1551,7 @@ namespace Tesserafin.Server.Core.Dto
         {
             if (currentItem is MusicAlbum musicAlbum)
             {
-                var artist = musicAlbum.GetMusicArtist(new DtoOptions(false));
+                var artist = musicAlbum.GetMusicArtist();
                 if (artist is not null)
                 {
                     return artist;

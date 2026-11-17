@@ -19,11 +19,13 @@ namespace Tesserafin.Server.Core.Library
 {
     public class MusicManager : IMusicManager
     {
+        private readonly INamedItemCatalog _namedItems;
         private readonly ILibraryManager _libraryManager;
         private readonly IItemSortService _itemSortService;
 
-        public MusicManager(ILibraryManager libraryManager, IItemSortService itemSortService)
+        public MusicManager(INamedItemCatalog namedItems, ILibraryManager libraryManager, IItemSortService itemSortService)
         {
+            _namedItems = namedItems;
             _libraryManager = libraryManager;
             _itemSortService = itemSortService;
         }
@@ -77,7 +79,7 @@ namespace Tesserafin.Server.Core.Library
             {
                 try
                 {
-                    return _libraryManager.GetMusicGenre(i).Id;
+                    return _namedItems.GetId<MusicGenre>(i);
                 }
                 catch
                 {

@@ -24,6 +24,7 @@ using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
@@ -45,6 +46,7 @@ public class ImageController : BaseTesserafinApiController
     private readonly IItemWriteCommands _writes;
     private readonly IItemImageService _images;
     private readonly IUserManager _userManager;
+    private readonly INamedItemCatalog _namedItems;
     private readonly ILibraryManager _libraryManager;
     private readonly IProviderManager _providerManager;
     private readonly IImageProcessor _imageProcessor;
@@ -59,6 +61,7 @@ public class ImageController : BaseTesserafinApiController
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="images">Explicit image preparation and commit lifecycle.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
+    /// <param name="namedItems">Read-only named catalogue.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="imageProcessor">Instance of the <see cref="IImageProcessor"/> interface.</param>
@@ -70,6 +73,7 @@ public class ImageController : BaseTesserafinApiController
         IItemWriteCommands writes,
         IItemImageService images,
         IUserManager userManager,
+        INamedItemCatalog namedItems,
         ILibraryManager libraryManager,
         IProviderManager providerManager,
         IImageProcessor imageProcessor,
@@ -81,6 +85,7 @@ public class ImageController : BaseTesserafinApiController
         _writes = writes;
         _images = images;
         _userManager = userManager;
+        _namedItems = namedItems;
         _libraryManager = libraryManager;
         _providerManager = providerManager;
         _imageProcessor = imageProcessor;
@@ -815,7 +820,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? foregroundLayer,
         [FromRoute, Required] int imageIndex)
     {
-        var item = _libraryManager.GetArtist(name);
+        var item = _namedItems.Find<MusicArtist>(name);
         if (item is null)
         {
             return NotFound();
@@ -893,7 +898,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? foregroundLayer,
         [FromQuery] int? imageIndex)
     {
-        var item = _libraryManager.GetGenre(name);
+        var item = _namedItems.Find<Genre>(name);
         if (item is null)
         {
             return NotFound();
@@ -971,7 +976,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? backgroundColor,
         [FromQuery] string? foregroundLayer)
     {
-        var item = _libraryManager.GetGenre(name);
+        var item = _namedItems.Find<Genre>(name);
         if (item is null)
         {
             return NotFound();
@@ -1049,7 +1054,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? foregroundLayer,
         [FromQuery] int? imageIndex)
     {
-        var item = _libraryManager.GetMusicGenre(name);
+        var item = _namedItems.Find<MusicGenre>(name);
         if (item is null)
         {
             return NotFound();
@@ -1127,7 +1132,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? backgroundColor,
         [FromQuery] string? foregroundLayer)
     {
-        var item = _libraryManager.GetMusicGenre(name);
+        var item = _namedItems.Find<MusicGenre>(name);
         if (item is null)
         {
             return NotFound();
@@ -1361,7 +1366,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? foregroundLayer,
         [FromQuery] int? imageIndex)
     {
-        var item = _libraryManager.GetStudio(name);
+        var item = _namedItems.Find<Studio>(name);
         if (item is null)
         {
             return NotFound();
@@ -1439,7 +1444,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? backgroundColor,
         [FromQuery] string? foregroundLayer)
     {
-        var item = _libraryManager.GetStudio(name);
+        var item = _namedItems.Find<Studio>(name);
         if (item is null)
         {
             return NotFound();

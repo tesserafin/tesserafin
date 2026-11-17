@@ -30,7 +30,10 @@ internal static class LibraryWriteFixture
         fixture.Inject<IItemResolutionService>(resolution);
         var versions = new ItemVersionGraphPlanner(resolution, options, fixture.Create<IItemLookupService>());
         fixture.Inject(versions);
-        var writes = new ItemWriteCommands(versions, fixture.Create<IItemPersistenceService>(), fixture.Create<IItemCacheStore>(), fixture.Create<IItemLookupService>(), fixture.Create<ILinkedChildrenService>(), fixture.Create<IItemMetadataExporter>(), fixture.Create<IFileSystem>(), fixture.Create<IItemChangePublisher>(), new ActiveRecordings(), NullLogger<ItemWriteCommands>.Instance);
+        var namedItems = new NamedItemIdentity(configuration, fixture.Create<IFileSystem>());
+        var catalog = new NamedItemCatalog(namedItems, fixture.Create<IItemLookupService>(), fixture.Create<ILinkedChildrenService>());
+        fixture.Inject<INamedItemCatalog>(catalog);
+        var writes = new ItemWriteCommands(versions, fixture.Create<IItemPersistenceService>(), fixture.Create<IItemCacheStore>(), fixture.Create<IItemLookupService>(), fixture.Create<ILinkedChildrenService>(), fixture.Create<IItemMetadataExporter>(), fixture.Create<IFileSystem>(), fixture.Create<IItemChangePublisher>(), new ActiveRecordings(), catalog, namedItems, NullLogger<ItemWriteCommands>.Instance);
         fixture.Inject<IItemWriteCommands>(writes);
         return writes;
     }

@@ -83,7 +83,7 @@ public class GenresValidator
                 }
 
                 // Fall back to GetGenre if not found (creates new item if needed)
-                item ??= _libraryManager.GetGenre(name);
+                item ??= _writes.GetOrCreateNamedItem<Genre>(name, cancellationToken);
 
                 if (!existingGenreIds.Contains(item.Id))
                 {

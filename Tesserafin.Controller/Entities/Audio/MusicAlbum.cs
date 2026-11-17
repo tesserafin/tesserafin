@@ -44,7 +44,7 @@ namespace Tesserafin.Controller.Entities.Audio
         public override bool SupportsInheritedParentImages => true;
 
         [JsonIgnore]
-        public MusicArtist MusicArtist => GetMusicArtist(new DtoOptions(true));
+        public MusicArtist MusicArtist => GetMusicArtist();
 
         [JsonIgnore]
         public override bool SupportsPlayedStatus => false;
@@ -65,7 +65,7 @@ namespace Tesserafin.Controller.Entities.Audio
         [JsonIgnore]
         public IEnumerable<Audio> Tracks => GetRecursiveChildren(i => i is Audio).Cast<Audio>();
 
-        public MusicArtist GetMusicArtist(DtoOptions options)
+        public MusicArtist GetMusicArtist()
         {
             var parents = GetParents();
             foreach (var parent in parents)
@@ -79,7 +79,9 @@ namespace Tesserafin.Controller.Entities.Audio
             var name = AlbumArtist;
             if (!string.IsNullOrEmpty(name))
             {
-                return LibraryManager.GetArtist(name, options);
+                return LibraryManager.GetArtists([name]).TryGetValue(name, out var artists)
+                    ? artists.OrderBy(artist => artist.IsAccessedByName ? 1 : 0).ThenBy(artist => artist.Id).FirstOrDefault()
+                    : null;
             }
 
             return null;
@@ -138,7 +140,7 @@ namespace Tesserafin.Controller.Entities.Audio
 
             id.AlbumArtists = AlbumArtists;
 
-            var artist = GetMusicArtist(new DtoOptions(false));
+            var artist = GetMusicArtist();
 
             if (artist is not null)
             {
@@ -212,7 +214,7 @@ namespace Tesserafin.Controller.Entities.Audio
                     continue;
                 }
 
-                var artist = LibraryManager.GetArtist(i);
+                var artist = writes.GetOrCreateNamedItem<MusicArtist>(i, cancellationToken);
 
                 if (!artist.IsAccessedByName)
                 {

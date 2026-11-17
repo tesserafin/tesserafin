@@ -280,6 +280,17 @@ namespace Tesserafin.Controller.Entities
             return new QueryResult<BaseItem>(items);
         }
 
+        private Genre FindGenre(string name)
+        {
+            return _libraryManager.GetItemList(new InternalItemsQuery
+            {
+                IncludeItemTypes = [BaseItemKind.Genre],
+                Name = name,
+                UseRawName = true,
+                Limit = 1
+            }).OfType<Genre>().FirstOrDefault();
+        }
+
         private QueryResult<BaseItem> GetMovieGenres(Folder parent, User user, InternalItemsQuery query)
         {
             var genres = parent.QueryRecursive(new InternalItemsQuery(user)
@@ -294,7 +305,7 @@ namespace Tesserafin.Controller.Entities
                 {
                     try
                     {
-                        return _libraryManager.GetGenre(i);
+                        return FindGenre(i);
                     }
                     catch (Exception ex)
                     {
@@ -422,7 +433,7 @@ namespace Tesserafin.Controller.Entities
                 {
                     try
                     {
-                        return _libraryManager.GetGenre(i);
+                        return FindGenre(i);
                     }
                     catch (Exception ex)
                     {
