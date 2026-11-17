@@ -16,6 +16,7 @@ using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
+using Tesserafin.Model.MediaInfo;
 using Tesserafin.Server.Core.Library;
 using Xunit;
 
@@ -137,6 +138,28 @@ public sealed class OwnedExtrasCommandsTests
     }
 
     [Fact]
+    public async Task EntityRefresh_PropagatesOwnedRefreshCancellation_WithoutRefreshingTheOwner()
+    {
+        using var context = new Context();
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        var previous = BaseItem.MediaSourceManager;
+        try
+        {
+            BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>(m => m.GetPathProtocol(It.IsAny<string>()) == MediaProtocol.File);
+            var owner = new CancelledOwner { Path = "/Owner.mkv" };
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => owner.RefreshMetadata(context.Deletions.Object, context.Commands, context.Options(), cancellation.Token));
+
+            context.Provider.VerifyNoOtherCalls();
+        }
+        finally
+        {
+            BaseItem.MediaSourceManager = previous;
+        }
+    }
+
+    [Fact]
     public void Ownership_ManagerAndEntityHaveNoBonusLifecycle_AndResolutionHasNoWriter()
     {
         Assert.DoesNotContain(typeof(ILibraryManager).GetMethods(), m => m.Name == "FindExtras");
@@ -146,6 +169,14 @@ public sealed class OwnedExtrasCommandsTests
         Assert.DoesNotContain(typeof(IItemWriteCommands), dependencies);
         Assert.DoesNotContain(typeof(ILibraryManager), dependencies);
         Assert.DoesNotContain(typeof(IProviderManager), dependencies);
+    }
+
+    private sealed class CancelledOwner : BaseItem
+    {
+        protected override bool SupportsOwnedItems => true;
+
+        protected override Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+            => Task.FromCanceled<bool>(cancellationToken);
     }
 
     private sealed class Context : IDisposable
