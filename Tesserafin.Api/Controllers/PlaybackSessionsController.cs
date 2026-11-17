@@ -15,8 +15,6 @@ using Tesserafin.Api.Models.PlaybackSessionDtos;
 using Tesserafin.Api.Playback;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Entities;
-using Tesserafin.Controller.Entities.Movies;
-using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Net.PlaybackCredentials;
@@ -423,7 +421,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             return Conflict("Session has no PlaySessionId - PUT a replacement request supplying one before requesting a stream URL.");
         }
 
-        // Consolidation step 1: a local film or episode the engine alone decided - a direct play, or a remux or a
+        // Consolidation step 1: a local library video the engine alone decided - a direct play, or a remux or a
         // transcode this server executes from the plan - has no legacy StreamInfo at all. Its descriptor is
         // minted from the retained execution plan and names the session's own file or HLS route;
         // nothing below (kill switch, resolver, StreamInfo.ToUrl) applies.
@@ -646,7 +644,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         }
 
         var kind = item.MediaType == MediaType.Audio ? PlaybackMediaKind.Audio : PlaybackMediaKind.Video;
-        return (kind, options, kind == PlaybackMediaKind.Video && item is Movie or Episode);
+        return (kind, options, kind == PlaybackMediaKind.Video && item is Video { SourceType: SourceType.Library });
     }
 
     /// <summary>

@@ -106,6 +106,12 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
     [Fact]
     public Task Episode_StartAndSeek_ServesRangesFromTheSessionFile() => StartAndSeek_ServesRangesFromTheSessionFileAsync(SeededVideoKind.Episode, "episode-start");
 
+    [Fact]
+    public Task HomeVideo_StartAndSeek_ServesRangesFromTheSessionFile() => StartAndSeek_ServesRangesFromTheSessionFileAsync(SeededVideoKind.HomeVideo, "home-video-start");
+
+    [Fact]
+    public Task MusicVideo_StartAndSeek_ServesRangesFromTheSessionFile() => StartAndSeek_ServesRangesFromTheSessionFileAsync(SeededVideoKind.MusicVideo, "music-video-start");
+
     private async Task StartAndSeek_ServesRangesFromTheSessionFileAsync(SeededVideoKind kind, string name)
     {
         var (client, userId) = await SignInAsync(name);

@@ -15,6 +15,9 @@ public enum SeededVideoKind
     /// <summary>An <see cref="Episode"/> of its own new series.</summary>
     Episode,
 
-    /// <summary>A plain <see cref="Video"/>, outside every migrated journey.</summary>
-    Other,
+    /// <summary>A plain <see cref="Video"/>: what a home videos library resolves.</summary>
+    HomeVideo,
+
+    /// <summary>A <see cref="MusicVideo"/>.</summary>
+    MusicVideo,
 }

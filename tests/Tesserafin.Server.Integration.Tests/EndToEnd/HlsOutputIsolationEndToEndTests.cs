@@ -91,10 +91,7 @@ public sealed class HlsOutputIsolationEndToEndTests : IClassFixture<HlsIsolation
             "mp4",
             _streams,
             "POLISH-2-R4 fixture " + suffix,
-            Seconds * TimeSpan.TicksPerSecond,
-            // Not a film: these are the existing chain's HLS routes (/Videos/{id}/master.m3u8 ...),
-            // which a film's transcode no longer reaches; its isolation is TranscodeFilmEndToEndTests.
-            kind: SeededVideoKind.Other);
+            Seconds * TimeSpan.TicksPerSecond);
 
         _transcodes = _factory.Services.GetRequiredService<IServerConfigurationManager>().GetTranscodePath();
         _fileSystem = (FailingRemovals)_factory.Services.GetRequiredService<IFileSystem>();
@@ -303,7 +300,9 @@ public sealed class HlsOutputIsolationEndToEndTests : IClassFixture<HlsIsolation
     /// </summary>
     private async Task<List<string>> PlayToSegmentsAsync(HttpClient client, Guid userId, string playSession)
     {
-        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHls();
+        // The existing chain's HLS routes (/Videos/{id}/master.m3u8 ...) for a target the session
+        // journey does not execute; that journey's own isolation is TranscodeFilmEndToEndTests.
+        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHlsToAnUnexecutedTarget();
         using var planned = await client.PostAsJsonAsync(
             "Playback/Sessions",
             new CreatePlaybackSessionRequest(_item, userId, capabilities, constraints, MediaSourceId: null, PlaySessionId: playSession),

@@ -103,6 +103,9 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
     [Fact]
     public Task TranscodeEpisode_AudioTheClientDoesNotDecode_CopiesVideoAndEncodesAudioInOneSessionAndOneJob() => AudioTheClientDoesNotDecode_CopiesVideoAndEncodesAudioInOneSessionAndOneJobAsync(SeededVideoKind.Episode, "transcode-episode-audio");
 
+    [Fact]
+    public Task TranscodeHomeVideo_AudioTheClientDoesNotDecode_CopiesVideoAndEncodesAudioInOneSessionAndOneJob() => AudioTheClientDoesNotDecode_CopiesVideoAndEncodesAudioInOneSessionAndOneJobAsync(SeededVideoKind.HomeVideo, "transcode-home-video-audio");
+
     private async Task AudioTheClientDoesNotDecode_CopiesVideoAndEncodesAudioInOneSessionAndOneJobAsync(SeededVideoKind kind, string name)
     {
         var playSession = name + "-ps";

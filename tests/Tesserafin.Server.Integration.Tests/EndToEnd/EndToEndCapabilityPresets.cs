@@ -209,6 +209,26 @@ public static class EndToEndCapabilityPresets
     }
 
     /// <summary>
+    /// <see cref="TranscodeHls"/> with MP3 as the only audio target of its HLS output. The engine's
+    /// answer is a transcode to MP3, which the local video journey does not execute from the session
+    /// (it encodes audio to AAC only, docs/playback-path-inventory.md §6), so a session with these
+    /// capabilities is planned by the existing chain and served from <c>/Videos/{id}/master.m3u8</c>:
+    /// the subject for that chain's own contracts while it still has consumers.
+    /// </summary>
+    /// <returns>HLS-transcode capabilities whose audio target the session journey does not execute.</returns>
+    public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) TranscodeHlsToAnUnexecutedTarget()
+    {
+        var (capabilities, constraints) = TranscodeHls();
+        var outputProfiles = new List<PlaybackOutputProfile>
+        {
+            new(MediaKind.Video, StreamingProtocol.Hls, "ts", [FixtureVideoCodec], ["mp3"], null, null, null),
+        };
+
+        // The audio must be re-encoded too, or the AAC source is copied and the target never matters.
+        return (capabilities with { OutputProfiles = outputProfiles }, constraints with { AllowAudioStreamCopy = false });
+    }
+
+    /// <summary>
     /// What a browser declares for the consolidation remux journey: H.264/AAC decodable in
     /// <c>mp4</c> only, HLS supported, and two video output profiles in its own preference order -
     /// fMP4 segments first, MPEG-TS second. Against a Matroska source the engine's answer is a

@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +20,7 @@ using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Playback.Decision;
+using Tesserafin.Playback.Dlna;
 using Xunit;
 
 namespace Tesserafin.Server.Integration.Tests.EndToEnd;
@@ -201,11 +203,11 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     [Fact(Timeout = 90_000)]
     public async Task Transcode_Hls_PostThenGetStream_ServesManifestAndSegment()
     {
-        // Not a film: a film's transcode over HLS is decided and executed by the engine alone, from
-        // the session's own route (TranscodeFilmEndToEndTests). This is the existing chain's
-        // contract - master playlist, then variant, then segment - which every other video keeps.
-        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 non-film transcode fixture {Guid.NewGuid()}", kind: SeededVideoKind.Other);
-        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHls();
+        // A transcode the local video journey executes from the session never reaches this chain
+        // (TranscodeFilmEndToEndTests). This is the existing chain's contract - master playlist, then
+        // variant, then segment - for a target that journey does not execute (MP3 audio).
+        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 transcode fixture {Guid.NewGuid()}");
+        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHlsToAnUnexecutedTarget();
 
         var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-transcode-hls", cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackMethod.Transcode, session.Method);
@@ -275,11 +277,11 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     [Fact]
     public async Task KillSwitch_ForcesLegacyOnNextRequest_UrlStillServable()
     {
-        // Not a film: since consolidation step 1 a film's direct play is decided by the engine alone
-        // and has no legacy fallback for the kill switch to restore (docs/playback-path-inventory.md §4).
-        // The kill switch still governs every journey that has not migrated.
-        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 non-film fixture {Guid.NewGuid()}", kind: SeededVideoKind.Other);
-        var (capabilities, constraints) = EndToEndCapabilityPresets.DirectPlay();
+        // Since consolidation step 1 a local video the session journey executes has no legacy
+        // fallback for the kill switch to restore (docs/playback-path-inventory.md §4 to §7). The kill
+        // switch still governs every plan that journey does not execute: here, an MP3 audio target.
+        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 kill switch fixture {Guid.NewGuid()}");
+        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHlsToAnUnexecutedTarget();
 
         // V2 mode (not merely Canary): every session is v2-authoritative, no cohort-hash dependency -
         // the simplest way to get a REAL "before" state where v2 actually served this session, so the
@@ -390,30 +392,45 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     }
 
     /// <summary>
-    /// #374: the default (legacy) path must not answer a Remux with the source container the client
+    /// #374: the existing chain must not answer a Remux with the source container the client
     /// declared unplayable. Asserted down to what a demuxer says the served segment is.
     /// </summary>
+    /// <remarks>
+    /// Driven through <c>POST Items/{id}/PlaybackInfo</c>, the chain's remaining caller for a local
+    /// video (every native client start that is not Sessions): a session remux of a local video is
+    /// executed by the session journey and never reaches this chain (RemuxFilmEndToEndTests).
+    /// </remarks>
     /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
     [Fact(Timeout = 90_000)]
     public async Task Remux_LegacyPath_UndeclaredSourceContainer_ServesDeclaredOutputNotSourceFile()
     {
         var mkvPath = await EndToEndMediaFixtures.CreateH264AacMkvAsync(_workDir);
-        // Not a film: a film's remux over HLS is decided and executed by the engine alone and has no
-        // legacy path left to assert (RemuxFilmEndToEndTests). Every other video still has this one.
-        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, mkvPath, "mkv", _baseStreams, $"Issue 374 fixture {Guid.NewGuid()}", kind: SeededVideoKind.Other);
+        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, mkvPath, "mkv", _baseStreams, $"Issue 374 fixture {Guid.NewGuid()}");
 
         var (capabilities, constraints) = EndToEndCapabilityPresets.Remux();
-        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-374-remux", cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal(PlaybackMethod.Remux, session.Method);
+        var request = new JsonObject
+        {
+            ["UserId"] = _userId,
+            ["DeviceProfile"] = JsonSerializer.SerializeToNode(ReverseDlnaAdapter.ToDeviceProfile(capabilities), JsonDefaults.Options),
+            ["EnableDirectPlay"] = constraints.AllowDirectPlay,
+            ["EnableDirectStream"] = constraints.AllowDirectStream,
+            ["EnableTranscoding"] = constraints.AllowTranscoding,
+            ["AllowVideoStreamCopy"] = constraints.AllowVideoStreamCopy,
+            ["AllowAudioStreamCopy"] = constraints.AllowAudioStreamCopy,
+        };
+        using var content = new StringContent(request.ToJsonString(), Encoding.UTF8, "application/json");
+        using var response = await _client.PostAsync(FormattableString.Invariant($"Items/{itemId}/PlaybackInfo"), content, TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.True(response.IsSuccessStatusCode, $"POST Items/{{id}}/PlaybackInfo: {(int)response.StatusCode} {Truncate(body)}");
+        var source = JsonNode.Parse(body)!["MediaSources"]!.AsArray()[0]!;
+        Assert.Equal("hls", source["TranscodingSubProtocol"]?.GetValue<string>(), StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("ts", source["TranscodingContainer"]?.GetValue<string>(), StringComparer.OrdinalIgnoreCase);
+        var url = source["TranscodingUrl"]?.GetValue<string>();
+        Assert.False(string.IsNullOrEmpty(url), $"PlaybackInfo named no transcoding url: {Truncate(body)}");
+        Assert.DoesNotContain("Static=true", url, StringComparison.OrdinalIgnoreCase);
 
-        var descriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
-        Assert.Equal(PlaybackLiveFallbackReason.KillSwitch, descriptor.FallbackReason);
-        Assert.Equal(StreamingProtocol.Hls, descriptor.Protocol);
-        Assert.Equal("ts", descriptor.Container);
-        Assert.DoesNotContain("Static=true", descriptor.Url, StringComparison.OrdinalIgnoreCase);
-
-        var master = await GetTextAsync(descriptor.Url, "#374 master");
-        var variantUrl = FirstUriLine(master, descriptor.Url);
+        var master = await GetTextAsync(url, "#374 master");
+        var variantUrl = FirstUriLine(master, url);
         Assert.NotNull(variantUrl);
         var variant = await GetTextWithRetryAsync(variantUrl, "#374 variant", TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
         var segmentUrl = FirstUriLine(variant, variantUrl);

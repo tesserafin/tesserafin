@@ -264,7 +264,7 @@ those paths: §7.
 Outside this slice: HDR tone mapping and subtitle burn-in (explicitly), a transcode over plain HTTP,
 target codecs other than H.264/AAC, other media families, the global flag and the shadow.
 
-## 7. Loop 4 slice: local episode on the same journey (delivered)
+## 7. Loop 4 slice: every local library video on the same journey
 
 Scenario: an `Episode` in a local file, played by the same client and in the same three ways as
 a film: direct play (§4), HLS remux (§5) and SDR H.264/AAC transcode (§6). Nothing about the
@@ -288,14 +288,27 @@ episode under its own series, on the host where the legacy planner and the live-
 throw; all four are required by name. Narrowing the scope back to `Movie` turns exactly these four
 red with "The legacy planner (StreamBuilder) was reached".
 
+Then every other library video family - a plain `Video` (home videos), `MusicVideo`, `Trailer` -
+takes the same journey: the scope is a video item whose `SourceType` is `Library` (channel-plugin
+items and Live TV recordings keep the existing chain). Proof: `HomeVideo_StartAndSeek_…`,
+`MusicVideo_StartAndSeek_…`, `RemuxHomeVideo_StartSeekStop_…`, `TranscodeHomeVideo_AudioTheClient…`,
+required by name.
+
+The existing chain's own contracts lost their ordinary subject (a non-film video) and were moved to
+what still reaches that chain: the HLS master/variant/segment contract, the kill switch and
+`HlsOutputIsolationEndToEndTests` plan a session whose only audio target is MP3, which the session
+journey does not execute (`EndToEndCapabilityPresets.TranscodeHlsToAnUnexecutedTarget`); the #374
+legacy remux is driven through `POST Items/{id}/PlaybackInfo`, that chain's remaining caller for a
+local video.
+
 Remaining consumers by name. Nothing is deleted globally while one of them still needs it:
 
 | Legacy path | Still reached by |
 | --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | other video families (home videos, music videos, trailers, extras), audio, Live TV, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a film or episode needing tone mapping, a burnt-in subtitle, or with no HLS output profile; a source that is not a local file |
+| `PlaybackSessionPlanner` / `StreamBuilder` | audio, Live TV, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
-| `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a film or an episode served from its session |
-| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | other video families, audio, Live TV; a film or episode the server does not serve from the session |
+| `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
+| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio, Live TV, channel-plugin items; a library video the server does not serve from the session |
 
 ## 8. Shared model boundary (consolidation step 4, candidate)
 

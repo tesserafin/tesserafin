@@ -114,6 +114,9 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
     [Fact]
     public Task RemuxEpisode_StartSeekStop_CopiesBothStreamsInOneSessionAndOneJob() => StartSeekStop_CopiesBothStreamsInOneSessionAndOneJobAsync(SeededVideoKind.Episode, "remux-episode-start");
 
+    [Fact]
+    public Task RemuxHomeVideo_StartSeekStop_CopiesBothStreamsInOneSessionAndOneJob() => StartSeekStop_CopiesBothStreamsInOneSessionAndOneJobAsync(SeededVideoKind.HomeVideo, "remux-home-video-start");
+
     private async Task StartSeekStop_CopiesBothStreamsInOneSessionAndOneJobAsync(SeededVideoKind kind, string name)
     {
         var playSession = name + "-ps";

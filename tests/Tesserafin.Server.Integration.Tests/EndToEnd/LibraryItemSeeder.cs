@@ -59,9 +59,8 @@ public static class LibraryItemSeeder
     /// <param name="configure">Anything else a test wants the item to carry before it is saved.</param>
     /// <param name="kind">
     /// What the item is. <see cref="SeededVideoKind.Episode"/> seeds an episode of its own new
-    /// series (the series takes <paramref name="parentId"/>); <see cref="SeededVideoKind.Other"/> seeds
-    /// a plain <see cref="Video"/>, which keeps the pre-consolidation playback chain
-    /// (docs/playback-path-inventory.md §4). <paramref name="configure"/> applies to a film only.
+    /// series (the series takes <paramref name="parentId"/>); <see cref="SeededVideoKind.HomeVideo"/> seeds
+    /// a plain <see cref="Video"/>. <paramref name="configure"/> applies to a film only.
     /// </param>
     /// <returns>The new item's id.</returns>
     public static Guid SeedVideo(
@@ -85,6 +84,7 @@ public static class LibraryItemSeeder
         {
             SeededVideoKind.Film => new Movie(),
             SeededVideoKind.Episode => new Episode(),
+            SeededVideoKind.MusicVideo => new MusicVideo(),
             _ => new Video(),
         });
         if (movie is Movie seededFilm)
