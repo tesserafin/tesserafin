@@ -153,7 +153,6 @@ namespace Tesserafin.Server.Core.Library
             _collectionFolderResolver = collectionFolderResolver;
             _roots = roots;
 
-
             _mediaStreamLanguageService = mediaStreamLanguageService;
         }
 
@@ -216,6 +215,7 @@ namespace Tesserafin.Server.Core.Library
 
         public IEnumerable<BaseItem> ResolvePaths(
             IEnumerable<FileSystemMetadata> files,
+            IDirectoryService directoryService,
             Folder parent,
             LibraryOptions libraryOptions,
             CollectionType? collectionType,

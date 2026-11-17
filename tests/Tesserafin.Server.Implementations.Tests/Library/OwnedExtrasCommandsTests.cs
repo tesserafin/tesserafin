@@ -17,6 +17,7 @@ using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.MediaInfo;
+using Tesserafin.Model.Providers;
 using Tesserafin.Server.Core.Library;
 using Xunit;
 
@@ -74,6 +75,7 @@ public sealed class OwnedExtrasCommandsTests
         using var context = new Context();
         var extra = new Video { Id = Guid.NewGuid(), Overview = "original" };
         var options = context.Options();
+        options.SearchResult = new RemoteSearchResult { Name = "owner lookup" };
 
         await context.Commands.RefreshOwnedMetadataAsync(context.Owner, extra, inherit, context.Deletions.Object, options, TestContext.Current.CancellationToken);
 
@@ -83,6 +85,7 @@ public sealed class OwnedExtrasCommandsTests
         Assert.NotSame(options, refresh.Options);
         Assert.False(options.ForceSave);
         Assert.Null(refresh.Options.SearchResult);
+        Assert.Equal("owner lookup", options.SearchResult.Name);
     }
 
     [Fact]
