@@ -68,7 +68,6 @@ namespace Tesserafin.Server.Core.Library
         private readonly IServerConfigurationManager _configurationManager;
         private readonly Lazy<IProviderManager> _providerManagerFactory;
         private readonly IUserViewCatalog _userViewCatalog;
-        private readonly IServerApplicationHost _appHost;
         private readonly IFileSystem _fileSystem;
         private readonly IItemRepository _itemRepository;
         private readonly INextUpService _nextUpService;
@@ -96,7 +95,6 @@ namespace Tesserafin.Server.Core.Library
         /// </summary>
         /// <param name="resolution">Filesystem resolution.</param>
         /// <param name="options">Library options and content policy.</param>
-        /// <param name="appHost">The application host.</param>
         /// <param name="loggerFactory">The logger factory.</param>
         /// <param name="userManager">The user manager.</param>
         /// <param name="configurationManager">The configuration manager.</param>
@@ -133,7 +131,6 @@ namespace Tesserafin.Server.Core.Library
         public LibraryManager(
             IItemResolutionService resolution,
             ILibraryItemOptions options,
-            IServerApplicationHost appHost,
             ILoggerFactory loggerFactory,
             IUserManager userManager,
             IServerConfigurationManager configurationManager,
@@ -162,7 +159,6 @@ namespace Tesserafin.Server.Core.Library
         {
             _resolution = resolution;
             _options = options;
-            _appHost = appHost;
             _logger = loggerFactory.CreateLogger<LibraryManager>();
             _userManager = userManager;
             _configurationManager = configurationManager;
@@ -321,76 +317,6 @@ namespace Tesserafin.Server.Core.Library
             Directory.CreateDirectory(_configurationManager.ApplicationPaths.PeoplePath);
 
             return new PeopleValidator(writes, deletions, ProviderManager, this, _itemPeopleService, _logger, _fileSystem).ValidatePeople(cancellationToken, progress);
-        }
-
-        /// <summary>
-        /// Gets the default view.
-        /// </summary>
-        /// <returns>IEnumerable{VirtualFolderInfo}.</returns>
-        public List<VirtualFolderInfo> GetVirtualFolders()
-        {
-            return GetVirtualFolders(false);
-        }
-
-        public List<VirtualFolderInfo> GetVirtualFolders(bool includeRefreshState)
-        {
-            _logger.LogDebug("Getting topLibraryFolders");
-            var topLibraryFolders = GetUserRootFolder().Children.ToList();
-
-            _logger.LogDebug("Getting refreshQueue");
-            var refreshQueue = includeRefreshState ? ProviderManager.GetRefreshQueue() : null;
-
-            return _fileSystem.GetDirectoryPaths(_configurationManager.ApplicationPaths.DefaultUserViewsPath)
-                .Select(dir => GetVirtualFolderInfo(dir, topLibraryFolders, refreshQueue))
-                .ToList();
-        }
-
-        private VirtualFolderInfo GetVirtualFolderInfo(string dir, List<BaseItem> allCollectionFolders, HashSet<Guid>? refreshQueue)
-        {
-            var info = new VirtualFolderInfo
-            {
-                Name = Path.GetFileName(dir),
-
-                Locations = LibraryPathReader.ReadLocations(dir, _fileSystem, _appHost, _logger),
-
-                CollectionType = GetCollectionType(dir)
-            };
-
-            var libraryFolder = allCollectionFolders.FirstOrDefault(i => string.Equals(i.Path, dir, StringComparison.OrdinalIgnoreCase));
-            if (libraryFolder is not null)
-            {
-                var libraryFolderId = libraryFolder.Id.ToString("N", CultureInfo.InvariantCulture);
-                info.ItemId = libraryFolderId;
-                if (libraryFolder.HasImage(ImageType.Primary))
-                {
-                    info.PrimaryImageItemId = libraryFolderId;
-                }
-
-                info.LibraryOptions = GetLibraryOptions(libraryFolder);
-
-                if (refreshQueue is not null)
-                {
-                    info.RefreshProgress = libraryFolder.GetRefreshProgress(ProviderManager);
-
-                    info.RefreshStatus = info.RefreshProgress.HasValue ? "Active" : refreshQueue.Contains(libraryFolder.Id) ? "Queued" : "Idle";
-                }
-            }
-
-            return info;
-        }
-
-        private CollectionTypeOptions? GetCollectionType(string path)
-        {
-            var files = _fileSystem.GetFilePaths(path, [".collection"], true, false);
-            foreach (ReadOnlySpan<char> file in files)
-            {
-                if (Enum.TryParse<CollectionTypeOptions>(Path.GetFileNameWithoutExtension(file), true, out var res))
-                {
-                    return res;
-                }
-            }
-
-            return null;
         }
 
         /// <inheritdoc />

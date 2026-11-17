@@ -352,6 +352,7 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.OpenApiContractTests.CommittedContract_MatchesRunningServer
           --require Tesserafin.Server.Integration.Tests.OpenApiContractTests.Contract_IsByteIdentical_AcrossColdGenerations
           --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.CompleteJourney_ChangesDefinitionAndPaths_ButNeverDeletesSourceMedia
+          --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.HttpRead_UsesTheStructureReader_ReturnsOptionsAndLocations_AndPreservesDefinitionAndSources
           --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.ConcurrentCreates_ChooseDistinctNamesAfterAdmission_AndCanBeRemovedIndependently
           --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.FailedOptionWrite_KeepsPreviouslyPublishedOptions_AndReleasesTheMutationSlot
           --require Tesserafin.Server.Integration.Tests.ItemDeletionCommandsEndToEndTests.HttpDeletion_RemovesSourceAndCachedItem_ButConservesUserHistory

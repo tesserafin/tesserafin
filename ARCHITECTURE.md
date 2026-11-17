@@ -645,3 +645,12 @@ streaming controllers (retained behind the v2 execution adapter for now).
   an empty result. The existing behavior for syntactically invalid filter values is unchanged.
   Managed directories remain outside the SQL transaction and can survive a failed create for a
   later retry. The lock does not serialize general updates, deletion, or separate server processes.
+
+- **Configured library reads.** `ILibraryStructureReader` owns virtual-folder definition projection
+  (shortcut locations, collection markers and existing catalogue options/identities). The manager's
+  two read methods and its application-host and deferred-provider constructor dependencies are
+  removed. API, system storage, recording maintenance and migrations use the reader directly.
+  The HTTP controller supplies refresh state through its injected provider; the reader never calls
+  `Folder.GetRefreshProgress`, so metadata provider statics are not an indirect dependency.
+  The user-root catalogue resolves cached library IDs through the injected item lookup. Existing
+  definition commands remain the write boundary. HTTP/OpenAPI and SDK shapes are unchanged.

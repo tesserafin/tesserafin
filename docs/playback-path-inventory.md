@@ -1323,3 +1323,25 @@ discovery/materialization. Unit tests cover all supported kinds, ID and path pol
 unsupported kinds, publication and absence of manager/write dependencies on the read side.
 Directory creation is outside the SQL transaction: an empty managed directory may remain after a
 failed save. No global general-write/deletion serialization or cross-process guarantee is made.
+
+## 40. Configured library read ownership
+
+`ILibraryStructureReader` replaces both `LibraryManager.GetVirtualFolders` overloads, with no
+forwarders. It reads definition directories, `.mblink` source locations, collection-type markers
+and existing library metadata through explicit filesystem, path-mapping, root, lookup and options
+ports. Invalid shortcut files remain isolated; locations retain their sorted order. Definitions
+not yet present in the catalogue remain visible with no item metadata. Cached user-root IDs use
+`GetLibraries(lookup)` rather than the static manager lookup.
+
+Refresh state belongs to the HTTP composition: the controller gets one provider queue snapshot
+and projects progress/Active/Queued/Idle only for known item IDs. Non-HTTP consumers receive no
+refresh state and cannot cause provider resolution. The reader never calls the entity's progress
+method. `LibraryManager` drops its final `Lazy<IProviderManager>` and its application-host dependency
+along with 80 lines. Other existing deferred provider edges, including `UserViewFactory`, remain.
+
+API, storage diagnostics, recording maintenance and the three library-reading migrations use the
+reader directly. The existing structure/scan journeys migrate to this port, and a named required
+HTTP read journey checks options, locations, repeated reads and unchanged definition/source bytes.
+Focused tests cover malformed shortcuts, unscanned definitions, refresh-state projection and
+removed manager/provider dependencies. No HTTP/OpenAPI or SDK shape change is intended. There is
+no new snapshot-isolation guarantee across concurrent definition edits, scans or provider updates.
