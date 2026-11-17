@@ -12,6 +12,10 @@ namespace Tesserafin.Controller.Library;
 public interface IItemWriteCommands
 {
     /// <summary>Explicitly materializes a supported named catalogue item, or returns its existing record.</summary>
+    /// <param name="name">The catalogue name to materialize.</param>
+    /// <param name="cancellationToken">Cancels admission and persistence.</param>
+    /// <typeparam name="T">A supported named catalogue item type.</typeparam>
+    /// <returns>The existing or newly persisted item.</returns>
     T GetOrCreateNamedItem<T>(string name, CancellationToken cancellationToken)
         where T : BaseItem, new();
 
