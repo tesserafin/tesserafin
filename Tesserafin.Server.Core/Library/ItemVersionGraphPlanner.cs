@@ -82,9 +82,7 @@ internal sealed class ItemVersionGraphPlanner(IItemResolutionService resolution,
 
         oldDraft.LocalAlternateVersions = [];
         oldDraft.LinkedAlternateVersions = [];
-        // Retain the successor even for pending removal: a later scan can safely finish deletion
-        // and reroute manual references if rerouting fails after this graph has committed.
-        oldDraft.SetPrimaryVersionId(newDraft.Id);
+        oldDraft.SetPrimaryVersionId(removePrevious ? null : newDraft.Id);
         oldDraft.OwnerId = removePrevious ? Guid.Empty : newDraft.Id;
         newDraft.SetPrimaryVersionId(null);
         newDraft.OwnerId = Guid.Empty;

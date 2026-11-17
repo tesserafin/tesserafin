@@ -74,7 +74,8 @@ public sealed class PrimaryVersionTransferTests
         Assert.Single(previous.LocalAlternateVersions);
         Assert.Empty(replacement.LocalAlternateVersions);
         Assert.Equal(0, context.CacheRegistrations);
-        context.Linked.Verify(l => l.RerouteLinkedChildren(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
+        // Reference rerouting is a separate earlier operation; the version graph stays intact.
+        context.Linked.Verify(l => l.RerouteLinkedChildren(previous.Id, replacement.Id), Times.Once);
         context.FailSave = false;
 
         await context.Commands.DemotePrimaryVersionAsync(previous, replacement, TestContext.Current.CancellationToken);
@@ -103,7 +104,7 @@ public sealed class PrimaryVersionTransferTests
                 Assert.False(options.DeleteFileLocation);
                 Assert.Equal(previous.Id, item.Id);
                 Assert.Empty(Assert.IsType<Movie>(item).LocalAlternateVersions);
-                Assert.Equal(replacement.Id, Assert.IsType<Movie>(item).PrimaryVersionId);
+                Assert.Null(Assert.IsType<Movie>(item).PrimaryVersionId);
                 Assert.Equal(replacement.Id, context.Rows[local.Id].OwnerId);
                 Assert.Empty(context.Links[(previous.Id, LinkedChildType.LocalAlternateVersion)]);
             }).Returns(Task.CompletedTask);
@@ -116,7 +117,7 @@ public sealed class PrimaryVersionTransferTests
     }
 
     [Fact]
-    public async Task FailedReferenceReroute_LeavesCommittedGraphAvailableForRetry_WithoutLosingLinkedVersions()
+    public async Task FailedReferenceReroute_LeavesGraphAndDeletionUntouched_ThenRetriesWithoutLosingLinkedVersions()
     {
         var context = new Context();
         var previous = context.Movie("previous");
@@ -130,8 +131,9 @@ public sealed class PrimaryVersionTransferTests
 
         await Assert.ThrowsAsync<IOException>(() => context.Commands.ReplacePrimaryVersionAsync(previous, replacement, new Folder(), deletions.Object, TestContext.Current.CancellationToken));
 
-        Assert.Equal(replacement.Id, context.Rows[local.Id].OwnerId);
-        Assert.Single(replacement.LinkedAlternateVersions);
+        Assert.Equal(previous.Id, context.Rows[local.Id].OwnerId);
+        Assert.Empty(replacement.LinkedAlternateVersions);
+        Assert.Single(previous.LinkedAlternateVersions);
         deletions.VerifyNoOtherCalls();
         context.Linked.Setup(l => l.RerouteLinkedChildren(previous.Id, replacement.Id)).Returns([]);
 

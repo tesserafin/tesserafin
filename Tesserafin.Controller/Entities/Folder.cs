@@ -562,7 +562,7 @@ namespace Tesserafin.Controller.Entities
                             && primaryVideo.OwnerId.IsEmpty()
                             && (primaryVideo.LocalAlternateVersions ?? []).Any(p => alternateVersionPaths.Contains(p)))
                         {
-                            var newPrimary = newItems
+                            var newPrimary = validChildren
                                 .OfType<Video>()
                                 .FirstOrDefault(v => (v.LocalAlternateVersions ?? [])
                                     .Any(p => (primaryVideo.LocalAlternateVersions ?? [])
@@ -606,7 +606,7 @@ namespace Tesserafin.Controller.Entities
                     await writes.ReplacePrimaryVersionAsync(oldPrimary, newPrimary, this, deletions, cancellationToken).ConfigureAwait(false);
                 }
 
-                // Demote old primaries that are now alternate versions of newly created primaries.
+                // Demote old primaries that are now alternate versions of the selected primaries.
                 // This handles the case where a new file is added that becomes the new primary
                 // (e.g. movie-2 added, movie-3 was primary → movie-3 needs demotion).
                 // Items in replacedPrimaries are excluded (already in actuallyRemoved).
@@ -618,7 +618,7 @@ namespace Tesserafin.Controller.Entities
                         && !string.IsNullOrEmpty(item.Path)
                         && alternateVersionPaths.Contains(item.Path))
                     {
-                        var newPrimary = newItems
+                        var newPrimary = validChildren
                             .OfType<Video>()
                             .FirstOrDefault(v => (v.LocalAlternateVersions ?? [])
                                 .Any(p => string.Equals(p, item.Path, StringComparison.OrdinalIgnoreCase)));

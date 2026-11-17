@@ -187,8 +187,10 @@ internal sealed partial class ItemWriteCommands(
             return;
         }
 
-        await CommitPrimaryTransferAsync(plan, previous, replacement, cancellationToken).ConfigureAwait(false);
+        // Finish reference rerouting first. A failure leaves the previous primary discoverable
+        // by a later scan, including when replacement creation has already committed.
         await RerouteLinkedChildReferencesAsync(previous.Id, replacement.Id, cancellationToken).ConfigureAwait(false);
+        await CommitPrimaryTransferAsync(plan, previous, replacement, cancellationToken).ConfigureAwait(false);
         // The committed old row has no outgoing version links, so deletion cannot promote an
         // obsolete alternate. Keep the scan's captured parent and preserve every media source.
         await deletions.DeleteAsync(plan.Previous, new DeleteOptions { DeleteFileLocation = false }, parent, cancellationToken).ConfigureAwait(false);
@@ -198,8 +200,10 @@ internal sealed partial class ItemWriteCommands(
     {
         var plan = versions.PreparePrimaryTransfer(previous, replacement, false, cancellationToken)
             ?? throw new InvalidOperationException("Previous primary must already be saved.");
-        await CommitPrimaryTransferAsync(plan, previous, replacement, cancellationToken).ConfigureAwait(false);
+        // Finish reference rerouting first. A failure leaves the previous primary discoverable
+        // by a later scan, including when replacement creation has already committed.
         await RerouteLinkedChildReferencesAsync(previous.Id, replacement.Id, cancellationToken).ConfigureAwait(false);
+        await CommitPrimaryTransferAsync(plan, previous, replacement, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task CommitPrimaryTransferAsync(PrimaryVersionTransferPlan plan, Video previous, Video replacement, CancellationToken cancellationToken)

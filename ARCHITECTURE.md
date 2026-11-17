@@ -695,6 +695,6 @@ streaming controllers (retained behind the v2 execution adapter for now).
   to the existing item writer. The version graph planner reads saved identities and typed links,
   stages the old/new primaries and their versions, and preserves local ownership versus independent
   linked versions. One bulk graph save moves ownership before old links can orphan-delete a source.
-  Caller snapshots change only after persistence. Manual-reference rerouting and catalogue deletion
-  follow separately; a pending removal keeps its successor ID so a later scan can finish rerouting.
+  Caller snapshots change only after persistence. Manual-reference rerouting precedes the graph
+  update, so failure leaves the old primary discoverable by a later scan. Catalogue deletion follows.
   Sidecar exports and later operations remain outside the graph transaction. No refresh lock is added.
