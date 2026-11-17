@@ -11,6 +11,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
+using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions.Json;
@@ -58,7 +59,7 @@ public sealed class PlaybackIntroServiceEndToEndTests(TesserafinApplicationFacto
                 .ThrowsAsync(new IOException("provider unavailable"));
             var provider = new Mock<IIntroProvider>();
             provider.SetupGet(p => p.Name).Returns("ordered provider");
-            provider.Setup(p => p.GetIntrosAsync(It.Is<BaseItem>(i => i.Id == main.Id), It.Is<User>(u => u.Id == viewer.Id), It.IsAny<CancellationToken>()))
+            provider.Setup(p => p.GetIntrosAsync(It.Is<BaseItem>(i => i.Id.Equals(main.Id)), It.Is<User>(u => u.Id.Equals(viewer.Id)), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new IntroInfo[]
                 {
                     new() { ItemId = byId.Id },
@@ -85,7 +86,7 @@ public sealed class PlaybackIntroServiceEndToEndTests(TesserafinApplicationFacto
             Assert.NotNull(after);
             Assert.Equal(saved.Id, Assert.Single(after.Items).Id);
             Assert.Null(repository.RetrieveItem(unsaved.Id));
-            provider.Verify(p => p.GetIntrosAsync(It.Is<BaseItem>(i => i.Id == main.Id), It.Is<User>(u => u.Id == viewer.Id), It.IsAny<CancellationToken>()), Times.Exactly(2));
+            provider.Verify(p => p.GetIntrosAsync(It.Is<BaseItem>(i => i.Id.Equals(main.Id)), It.Is<User>(u => u.Id.Equals(viewer.Id)), It.IsAny<CancellationToken>()), Times.Exactly(2));
         }
         finally
         {
