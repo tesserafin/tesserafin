@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Common.IO;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Library;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Entities
 {
@@ -87,13 +88,16 @@ namespace Tesserafin.Controller.Entities
         }
 
         public static string GetPath(string name, bool normalizeName)
+            => GetPath(name, FileSystem, ConfigurationManager.ApplicationPaths.YearPath, normalizeName);
+
+        public static string GetPath(string name, IFileSystem fileSystem, string root, bool normalizeName = true)
         {
             // Trim the period at the end because windows will have a hard time with that
             var validName = normalizeName ?
-                FileSystem.GetValidFilename(name).Trim().TrimEnd('.') :
+                fileSystem.GetValidFilename(name).Trim().TrimEnd('.') :
                 name;
 
-            return SafeDirectoryLeafName.CombineWithRoot(ConfigurationManager.ApplicationPaths.YearPath, validName, nameof(name));
+            return SafeDirectoryLeafName.CombineWithRoot(root, validName, nameof(name));
         }
 
         private string GetRebasedPath()

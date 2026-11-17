@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Data.Entities;
@@ -16,6 +17,11 @@ namespace Tesserafin.Controller.Persistence;
 /// </summary>
 public interface IItemRepository
 {
+    /// <summary>Gets the distinct positive production years present in catalogue metadata.</summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The ordered years, without loading complete media items.</returns>
+    Task<IReadOnlyList<int>> GetProductionYearsAsync(CancellationToken cancellationToken);
+
     /// <summary>
     /// Retrieves the item.
     /// </summary>

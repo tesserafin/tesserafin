@@ -189,7 +189,7 @@ public sealed class MixedListingVisibilityEndToEndTests : IDisposable
             await item.UpdateToRepositoryAsync(server.Services.GetRequiredService<IItemWriteCommands>(), ItemUpdateType.MetadataEdit, CancellationToken.None);
 
             // As the library validators leave them: one presentation key each, or the by-name listing folds them into one.
-            foreach (BaseItem byName in new BaseItem[] { library.GetGenre("mixg-" + mark), library.GetStudio("mixs-" + mark) })
+            foreach (BaseItem byName in new BaseItem[] { server.Services.GetRequiredService<IItemWriteCommands>().GetOrCreateNamedItem<Tesserafin.Controller.Entities.Genre>("mixg-" + mark, CancellationToken.None), server.Services.GetRequiredService<IItemWriteCommands>().GetOrCreateNamedItem<Studio>("mixs-" + mark, CancellationToken.None) })
             {
                 byName.PresentationUniqueKey = byName.CreatePresentationUniqueKey();
                 await byName.UpdateToRepositoryAsync(server.Services.GetRequiredService<IItemWriteCommands>(), ItemUpdateType.MetadataEdit, CancellationToken.None);

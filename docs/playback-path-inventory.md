@@ -1291,3 +1291,35 @@ registry directly.
 `BaseItem.ItemRepository` and `Video.RecordingsManager` are deleted with their `ApplicationHost` assignments;
 `entityStaticServices` goes from 10 to 8. Remaining statics: `ChapterManager`, `ConfigurationManager`, `FileSystem`,
 `LibraryManager`, `MediaSourceManager`, `ProviderManager`, `UserDataManager` and `CollectionFolder.ApplicationHost`.
+
+## 39. Named metadata reads and explicit materialization
+
+`LibraryManager.CreateItemByName`, GetArtist/GetStudio/GetGenre/GetMusicGenre/GetYear and their
+named ID helpers are removed, including the manager's last general writer dependency.
+`INamedItemCatalog.Find<T>` returns existing metadata; `GetId<T>` computes an identity without
+creating a directory or row. Artist reads prefer actual folder records over named metadata and
+use an ID tie-break. The existing batch artist read remains available to album entities; their
+getters and lookup-info construction no longer create an artist. Genre views use read queries.
+
+`IItemWriteCommands.GetOrCreateNamedItem<T>` is the explicit materialization boundary used by
+validators and album refresh. A singleton admission lock covers lookup, managed-directory
+preparation and the normal persistence/cache/notification sequence for that command only. A
+failed database write publishes no named item; retrying uses the same identity. Already existing
+names produce no second write or event. The five supported kinds share path helpers with explicit
+filesystem/root inputs, deterministic identity policy and year validation/canonicalization.
+
+HTTP reads and image lookup no longer create missing metadata. Missing names return 404; the
+contract declares that response for artist/studio/genre/music-genre detail operations. Valid
+unknown artist/studio filters use the missing deterministic identity, keeping the filter
+restrictive instead of clearing it. DTO references compute IDs without materialization. Named
+metadata becomes available through explicit writes/post-scan validation; it is not created by a
+read while a scan or validation is still incomplete. Years previously had only read-time creation;
+a dedicated post-scan task now materializes distinct positive production years projected in SQL,
+without loading every complete media item. No unused PostgreSQL/plugin abstraction is added.
+
+Three required real-host journeys cover HTTP no-write behavior and explicit visibility, SQL
+failure/retry with concurrent creation, album read isolation/folder precedence and year task
+discovery/materialization. Unit tests cover all supported kinds, ID and path policy, cancellation,
+unsupported kinds, publication and absence of manager/write dependencies on the read side.
+Directory creation is outside the SQL transaction: an empty managed directory may remain after a
+failed save. No global general-write/deletion serialization or cross-process guarantee is made.

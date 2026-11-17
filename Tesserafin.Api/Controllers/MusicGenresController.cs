@@ -27,6 +27,7 @@ namespace Tesserafin.Api.Controllers;
 [Tags("MusicGenre")]
 public class MusicGenresController : BaseTesserafinApiController
 {
+    private readonly INamedItemCatalog _namedItems;
     private readonly ILibraryManager _libraryManager;
     private readonly IDtoService _dtoService;
     private readonly IUserManager _userManager;
@@ -34,14 +35,17 @@ public class MusicGenresController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="MusicGenresController"/> class.
     /// </summary>
+    /// <param name="namedItems">Read-only named catalogue.</param>
     /// <param name="libraryManager">Instance of <see cref="ILibraryManager"/> interface.</param>
     /// <param name="userManager">Instance of <see cref="IUserManager"/> interface.</param>
     /// <param name="dtoService">Instance of <see cref="IDtoService"/> interface.</param>
     public MusicGenresController(
+        INamedItemCatalog namedItems,
         ILibraryManager libraryManager,
         IUserManager userManager,
         IDtoService dtoService)
     {
+        _namedItems = namedItems;
         _libraryManager = libraryManager;
         _userManager = userManager;
         _dtoService = dtoService;
@@ -145,6 +149,7 @@ public class MusicGenresController : BaseTesserafinApiController
     /// <returns>An <see cref="OkResult"/> containing a <see cref="BaseItemDto"/> with the music genre.</returns>
     [HttpGet("{genreName}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [Obsolete("Use GetGenre instead")]
     public ActionResult<BaseItemDto> GetMusicGenre([FromRoute, Required] string genreName, [FromQuery] Guid? userId)
     {
@@ -159,7 +164,7 @@ public class MusicGenresController : BaseTesserafinApiController
         }
         else
         {
-            item = _libraryManager.GetMusicGenre(genreName);
+            item = _namedItems.Find<MusicGenre>(genreName);
         }
 
         if (item is null)

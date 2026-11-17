@@ -19,6 +19,7 @@ using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.IO;
 using MetadataProvider = Tesserafin.Model.Entities.MetadataProvider;
 
 namespace Tesserafin.Controller.Entities.Audio
@@ -175,13 +176,16 @@ namespace Tesserafin.Controller.Entities.Audio
         }
 
         public static string GetPath(string name, bool normalizeName)
+            => GetPath(name, FileSystem, ConfigurationManager.ApplicationPaths.ArtistsPath, normalizeName);
+
+        public static string GetPath(string name, IFileSystem fileSystem, string root, bool normalizeName = true)
         {
             // Trim the period at the end because windows will have a hard time with that
             var validName = normalizeName ?
-                FileSystem.GetValidFilename(name).Trim().TrimEnd('.') :
+                fileSystem.GetValidFilename(name).Trim().TrimEnd('.') :
                 name;
 
-            return SafeDirectoryLeafName.CombineWithRoot(ConfigurationManager.ApplicationPaths.ArtistsPath, validName, nameof(name));
+            return SafeDirectoryLeafName.CombineWithRoot(root, validName, nameof(name));
         }
 
         private string GetRebasedPath()

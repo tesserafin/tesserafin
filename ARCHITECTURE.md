@@ -630,3 +630,18 @@ streaming controllers (retained behind the v2 execution adapter for now).
   resolved before returning. Provider failures are isolated; request cancellation propagates
   through the new cancellable provider contract. This is pre-playback intro selection, not episode
   intro/credits detection. HTTP/OpenAPI shapes are unchanged.
+
+- **Named metadata.** `INamedItemCatalog` reads artists, studios, genres, music genres and years;
+  identity calculation and lookup never materialize them. The old named factories/ID methods and
+  `IItemWriteCommands` constructor dependency are removed from `LibraryManager`. Explicit
+  `GetOrCreateNamedItem<T>` commands use the existing writer and its persistence/cache/event order.
+  Only named materialization is serialized within that singleton. Artist lookup prefers real
+  folders and has a stable tie-break. Paths share the entities' policy with injected filesystem
+  and configured roots, rather than reading entity service statics in the new owners.
+  Validators and album refresh materialize names; album getters, DTOs, HTTP filters and genre
+  views read only. Years are materialized from a distinct SQL projection after scan. A missing
+  named GET returns 404; four previously implicit error responses are declared in OpenAPI.
+  Empty HTTP filters do not replace an unknown valid name: its deterministic identity preserves
+  an empty result. The existing behavior for syntactically invalid filter values is unchanged.
+  Managed directories remain outside the SQL transaction and can survive a failed create for a
+  later retry. The lock does not serialize general updates, deletion, or separate server processes.

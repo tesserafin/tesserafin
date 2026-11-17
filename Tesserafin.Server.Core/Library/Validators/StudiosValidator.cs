@@ -88,7 +88,7 @@ public class StudiosValidator
                 }
 
                 // Fall back to GetStudio if not found (creates new item if needed)
-                item ??= _libraryManager.GetStudio(name);
+                item ??= _writes.GetOrCreateNamedItem<Studio>(name, cancellationToken);
 
                 if (!existingStudioIds.Contains(item.Id))
                 {

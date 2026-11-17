@@ -20393,6 +20393,9 @@
           "403": {
             "description": "Forbidden"
           },
+          "404": {
+            "description": "Not Found"
+          },
           "503": {
             "content": {
               "text/html": {}
@@ -29013,6 +29016,9 @@
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
           },
           "503": {
             "content": {
@@ -45148,6 +45154,9 @@
           "403": {
             "description": "Forbidden"
           },
+          "404": {
+            "description": "Not Found"
+          },
           "503": {
             "content": {
               "text/html": {}
@@ -56561,6 +56570,9 @@
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
           },
           "503": {
             "content": {

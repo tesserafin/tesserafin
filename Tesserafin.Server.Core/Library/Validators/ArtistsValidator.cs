@@ -82,8 +82,8 @@ public class ArtistsValidator
                     item = artists.OrderBy(i => i.IsAccessedByName ? 1 : 0).First();
                 }
 
-                // Fall back to GetArtist if not found (creates new item if needed)
-                item ??= _libraryManager.GetArtist(name);
+                // Explicitly materialize missing artist metadata.
+                item ??= _writes.GetOrCreateNamedItem<MusicArtist>(name, cancellationToken);
                 var isNew = !existingArtistIds.Contains(item.Id);
                 var neverRefreshed = item.DateLastRefreshed == default;
 

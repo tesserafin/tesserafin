@@ -1,6 +1,3 @@
-using Tesserafin.Controller.Library;
-#pragma warning disable CA1002, CS1591
-
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -8,6 +5,7 @@ using System.Threading.Tasks;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Resolvers;
 using Tesserafin.Controller.Sorting;
@@ -93,44 +91,6 @@ namespace Tesserafin.Controller.Library
         /// <param name="isFolder"><c>true</c> is the path is a directory; otherwise <c>false</c>.</param>
         /// <returns>BaseItem.</returns>
         BaseItem? FindByPath(string path, bool? isFolder);
-
-        /// <summary>
-        /// Gets the artist.
-        /// </summary>
-        /// <param name="name">The name of the artist.</param>
-        /// <returns>Task{Artist}.</returns>
-        MusicArtist GetArtist(string name);
-
-        MusicArtist GetArtist(string name, DtoOptions options);
-
-        /// <summary>
-        /// Gets a Studio.
-        /// </summary>
-        /// <param name="name">The name of the studio.</param>
-        /// <returns>Task{Studio}.</returns>
-        Studio GetStudio(string name);
-
-        /// <summary>
-        /// Gets a Genre.
-        /// </summary>
-        /// <param name="name">The name of the genre.</param>
-        /// <returns>Task{Genre}.</returns>
-        Genre GetGenre(string name);
-
-        /// <summary>
-        /// Gets the genre.
-        /// </summary>
-        /// <param name="name">The name of the music genre.</param>
-        /// <returns>Task{MusicGenre}.</returns>
-        MusicGenre GetMusicGenre(string name);
-
-        /// <summary>
-        /// Gets a Year.
-        /// </summary>
-        /// <param name="value">The value.</param>
-        /// <returns>Task{Year}.</returns>
-        /// <exception cref="ArgumentOutOfRangeException">Throws if year is invalid.</exception>
-        Year GetYear(int value);
 
         /// <summary>
         /// Validate and refresh the People sub-set of the IBN.
@@ -483,12 +443,6 @@ namespace Tesserafin.Controller.Library
         /// <param name="query">The query.</param>
         /// <returns>QueryResult&lt;BaseItem&gt;.</returns>
         QueryResult<BaseItem> GetItemsResult(InternalItemsQuery query);
-
-        Guid GetStudioId(string name);
-
-        Guid GetGenreId(string name);
-
-        Guid GetMusicGenreId(string name);
 
         QueryResult<(BaseItem Item, ItemCounts ItemCounts)> GetGenres(InternalItemsQuery query);
 

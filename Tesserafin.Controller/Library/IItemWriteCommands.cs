@@ -11,6 +11,10 @@ namespace Tesserafin.Controller.Library;
 /// <summary>Item graph writes, staged metadata and post-persistence publication.</summary>
 public interface IItemWriteCommands
 {
+    /// <summary>Explicitly materializes a supported named catalogue item, or returns its existing record.</summary>
+    T GetOrCreateNamedItem<T>(string name, CancellationToken cancellationToken)
+        where T : BaseItem, new();
+
     void CreateItem(BaseItem item, BaseItem? parent);
 
     void CreateItems(IReadOnlyList<BaseItem> items, BaseItem? parent, CancellationToken cancellationToken);
