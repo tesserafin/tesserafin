@@ -708,3 +708,13 @@ streaming controllers (retained behind the v2 execution adapter for now).
   checks use explicit parent lookup, and inaccessible retyped paths keep their previous identities.
   Resolved fields/parents are staged on copies before persistence; prior successful operations and
   sidecars are not rolled back by a later failure. There is no whole-folder transaction or new lock.
+
+- **Shortcut links.** The resolution service reads/expands a complete shortcut snapshot with its
+  injected filesystem/application host; Folder no longer performs shortcut I/O through statics.
+  The writer resolves known targets with the existing path query, preserves canonical non-shortcut
+  links and deduplicates aliases with manual links taking precedence. Missing targets retain their
+  discovery paths without implicit materialization. Saving precedes caller/cache publication;
+  unreadable targets and cancellation cannot publish a partial set. Canonical SQL comparison also
+  backfills links after a previously unscanned target appears. The asynchronous entity hook retains
+  CollectionFolder's separate physical-membership refresh. Metadata/sidecar operations remain
+  separate, and no global refresh/manual-edit lock or snapshot-isolation guarantee is added.

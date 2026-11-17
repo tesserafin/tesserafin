@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Resolvers;
@@ -14,6 +15,13 @@ namespace Tesserafin.Controller.Library;
 /// <summary>Resolves filesystem candidates without saving items or invoking metadata exporters.</summary>
 public interface IItemResolutionService : IItemResolutionPolicy
 {
+    /// <summary>Reads a complete shortcut snapshot, failing before publication on unreadable entries.</summary>
+    /// <param name="owner">The folder containing the shortcuts.</param>
+    /// <param name="fileSystemChildren">Completed discovery inputs.</param>
+    /// <param name="cancellationToken">Cancels each read and target expansion.</param>
+    /// <returns>Expanded absolute shortcut targets in deterministic source-file order.</returns>
+    IReadOnlyList<ResolvedShortcutTarget> ResolveShortcutTargets(Folder owner, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken);
+
     /// <summary>Resolves owned bonus-media candidates without saving or mutating published records.</summary>
     /// <param name="owner">The main media item.</param>
     /// <param name="fileSystemChildren">The owner's filesystem neighbours.</param>

@@ -13,6 +13,13 @@ namespace Tesserafin.Controller.Library;
 /// <summary>Item graph writes, staged metadata and post-persistence publication.</summary>
 public interface IItemWriteCommands
 {
+    /// <summary>Persists a completed shortcut-link snapshot before updating the caller's folder.</summary>
+    /// <param name="owner">The shortcut-enabled folder.</param>
+    /// <param name="fileSystemChildren">Completed discovery inputs.</param>
+    /// <param name="cancellationToken">Cancels reads, admission and persistence.</param>
+    /// <returns>Whether shortcut links changed and were saved.</returns>
+    Task<bool> RefreshShortcutLinksAsync(Folder owner, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken);
+
     /// <summary>Explicitly materializes a supported named catalogue item, or returns its existing record.</summary>
     /// <param name="name">The catalogue name to materialize.</param>
     /// <param name="cancellationToken">Cancels admission and persistence.</param>

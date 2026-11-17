@@ -1511,3 +1511,36 @@ reattachment and HTTP identity, then removes the catalogue entry while checking 
 Initial creates, metadata sidecars, image commits, deletions and user-data operations remain separate;
 there is no whole-folder rollback, new global serialization or snapshot-isolation guarantee.
 HTTP/OpenAPI/SDK shapes are unchanged; the .NET command/helper/result additions are intentional.
+
+## 47. Shortcut discovery and link publication
+
+Folder's protected refresh hook is asynchronous and delegates shortcut work to the existing writer.
+Its inline shortcut reader and app-host/file-system static calls are deleted. CollectionFolder's
+physical-membership refresh remains its separate override, with cancellation admission. General
+linked-child reads and their existing lazy target lookup remain outside this write tranche.
+
+`IItemResolutionService.ResolveShortcutTargets` reads a completed file snapshot, expands virtual and
+relative paths through injected services and returns source/target pairs in stable source order.
+An unreadable, denied or empty shortcut aborts preparation rather than silently removing a link;
+cancellation is checked around discovery. The resolver never saves or materializes targets.
+
+`RefreshShortcutLinksAsync` reads canonical stored links, preserves non-shortcut relationships and
+resolves target identities with the existing newest-at-path catalogue query. Alias targets are
+refreshed once and an existing manual relationship wins a duplicate shortcut. Self-links are refused.
+Unscanned targets retain discovery paths, without creating catalogue items. The writer compares SQL,
+so a later scanned target is persisted even if the lazy reader already cached its identity. Equivalent
+link sets do not resave the folder; a stale caller can be repaired from already-committed links.
+
+Changed links are staged on a copy and saved through the existing writer before caller publication.
+The normal metadata refresh can then continue through its explicit lifecycle. Initial graph saves,
+sidecar exports and later provider saves remain separate; there is no cross-operation rollback or
+new serialization against other manual edits. Pending paths have the existing in-memory discovery
+semantics until a target exists in SQL; no new unresolved-target table is introduced.
+
+Focused cases cover virtual/relative expansion, read failure/cancellation, save failure/retry,
+canonical manual-link retention, duplicates, self-links, pending/backfilled targets and no-op repair.
+A required real-host journey uses actual mblink files and UserRootFolder refresh, rejects a link insert
+with SQLite, retries, checks domain/HTTP reads, aborts a partial retarget, fills a later-scanned target,
+then removes shortcuts while preserving manual links and every media/source-note byte.
+HTTP/OpenAPI/SDK shapes are unchanged; .NET resolution/command DTO and protected-hook changes are
+intentional.
