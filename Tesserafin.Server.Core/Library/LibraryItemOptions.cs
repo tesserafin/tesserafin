@@ -33,6 +33,20 @@ internal sealed class LibraryItemOptions(
             : new LibraryOptions();
     }
 
+    public CollectionType? GetContentType(BaseItem item)
+        => GetConfiguredContentType(item, false)
+            ?? GetConfiguredContentType(item, true)
+            ?? GetInheritedContentType(item);
+
+    public CollectionType? GetInheritedContentType(BaseItem item)
+        => GetTopFolderContentType(item)
+            ?? item.GetParents(lookup).Select(parent => GetConfiguredContentType(parent, false)).LastOrDefault(type => type is not null);
+
+    private CollectionType? GetConfiguredContentType(BaseItem item, bool inherit)
+        => item is ICollectionFolder collection
+            ? collection.CollectionType
+            : GetConfiguredContentType(item.ContainingFolderPath, inherit);
+
     public CollectionType? GetConfiguredContentType(string path, bool inherit = false)
     {
         var nameValuePair = configuration.Configuration.ContentTypes

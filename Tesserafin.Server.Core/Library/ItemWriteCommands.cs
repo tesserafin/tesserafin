@@ -10,6 +10,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.Library;
@@ -29,6 +30,7 @@ internal sealed partial class ItemWriteCommands(
     NamedItemIdentity namedItems,
     IItemResolutionService resolution,
     IItemRepository repository,
+    ILibraryItemOptions itemOptions,
     ILogger<ItemWriteCommands> logger) : IItemWriteCommands
 {
     private readonly IItemResolutionService _resolution = resolution;
@@ -174,6 +176,140 @@ internal sealed partial class ItemWriteCommands(
             {
                 changes.Updated(item, parents[item.Id], propagated.Contains(item.Id) ? ItemUpdateType.MetadataDownload : reason);
             }
+        }
+    }
+
+    public async Task<bool> RefreshOwnedVideosAsync(Video owner, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (owner.ParentId.Equals(Guid.Empty) || !files.IsPathFile(owner.Path))
+        {
+            return false;
+        }
+
+        // Materialize admission before starting any asynchronous work. Duplicate paths must not
+        // race creation or refresh of the same catalogue item.
+        var parts = owner.AdditionalParts.Where(path => !string.IsNullOrEmpty(path))
+            .DistinctBy(path => _resolution.GetNewItemId(path, typeof(Video))).ToArray();
+        var paths = owner.LocalAlternateVersions.Where(path => !string.IsNullOrEmpty(path) && files.FileExists(path))
+            .DistinctBy(path => _resolution.GetNewItemId(path, owner.GetType())).ToArray();
+        var existingCount = linkedChildren.GetLinkedChildrenIds(owner.Id, (int)LinkedChildType.LocalAlternateVersion).Count;
+
+        await Task.WhenAll(parts.Select(path => RefreshOwnedVideoAsync(owner, path, false, deletions, options, cancellationToken))).ConfigureAwait(false);
+        await Task.WhenAll(paths.Select(path => RefreshOwnedVideoAsync(owner, path, true, deletions, options, cancellationToken))).ConfigureAwait(false);
+
+        var changed = !owner.LocalAlternateVersions.SequenceEqual(paths, StringComparer.Ordinal);
+        // Publish the pruned paths only after all admitted refreshes complete successfully.
+        if (changed)
+        {
+            owner.LocalAlternateVersions = paths;
+        }
+
+        return changed || existingCount != paths.Length;
+    }
+
+    private async Task RefreshOwnedVideoAsync(Video owner, string path, bool alternate, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var type = alternate ? owner.GetType() : typeof(Video);
+        var id = _resolution.GetNewItemId(path, type);
+        if (id.Equals(owner.Id) || files.AreEqual(path, owner.Path))
+        {
+            throw new InvalidOperationException("A video cannot own itself as a part or alternate.");
+        }
+
+        var existing = lookup.GetItemById(id);
+        if (existing is not null && (existing is not Video || existing.GetType() != type))
+        {
+            throw new InvalidOperationException("Owned video identity/type does not match its owner.");
+        }
+
+        if (existing is Video saved)
+        {
+            EnsureOwnedVideoCanAttach(owner, saved);
+        }
+
+        if (!files.FileExists(path))
+        {
+            if (existing is Video orphan && orphan.OwnerId.Equals(owner.Id))
+            {
+                logger.LogInformation("Owned video file no longer exists, removing orphaned item: {Path}", path);
+                await deletions.DeleteAsync(orphan, new DeleteOptions { DeleteFileLocation = false }, cancellationToken).ConfigureAwait(false);
+            }
+
+            return;
+        }
+
+        var parent = owner.GetParent(lookup) as Folder;
+        Video candidate;
+        if (existing is Video video)
+        {
+            candidate = video;
+        }
+        else
+        {
+            if (alternate)
+            {
+                var genericId = _resolution.GetNewItemId(path, typeof(Video));
+                if (!genericId.Equals(id) && lookup.GetItemById(genericId) is Video obsolete)
+                {
+                    EnsureOwnedVideoCanAttach(owner, obsolete);
+                }
+
+                await deletions.DeleteObsoleteAlternateAsync(path, type, cancellationToken).ConfigureAwait(false);
+            }
+
+            var resolved = _resolution.ResolveAlternateVersion(path, type, parent, itemOptions.GetContentType(owner));
+            if (resolved is null)
+            {
+                return;
+            }
+
+            if (!resolved.Id.Equals(id) || resolved.GetType() != type)
+            {
+                throw new InvalidOperationException("Resolved owned video identity/type does not match its owner.");
+            }
+
+            EnsureOwnedVideoCanAttach(owner, resolved);
+            candidate = resolved;
+        }
+
+        var staged = (Video)candidate.CopyForWrite();
+        var refresh = new MetadataRefreshOptions(options);
+        if (staged.OwnerId.Equals(Guid.Empty))
+        {
+            staged.OwnerId = owner.Id;
+            refresh.ForceSave = true;
+        }
+
+        if (alternate && !staged.PrimaryVersionId.HasValue)
+        {
+            staged.SetPrimaryVersionId(owner.Id);
+            refresh.ForceSave = true;
+        }
+
+        if (existing is null)
+        {
+            CreateItems([staged], parent, cancellationToken);
+            // Creation publishes its candidate. Refresh a new copy so provider edits cannot
+            // mutate that published record before the next successful save.
+            staged = (Video)staged.CopyForWrite();
+            refresh.ForceSave = true;
+        }
+
+        await RefreshOwnedMetadataAsync(owner, staged, !alternate, deletions, refresh, cancellationToken).ConfigureAwait(false);
+        if (alternate)
+        {
+            UpsertLinkedChild(owner.Id, staged.Id, LinkedChildType.LocalAlternateVersion, cancellationToken);
+        }
+    }
+
+    private static void EnsureOwnedVideoCanAttach(Video owner, Video candidate)
+    {
+        if ((!candidate.OwnerId.Equals(Guid.Empty) && !candidate.OwnerId.Equals(owner.Id))
+            || (candidate.PrimaryVersionId.HasValue && !candidate.PrimaryVersionId.Value.Equals(owner.Id)))
+        {
+            throw new InvalidOperationException("Owned video already belongs to another primary.");
         }
     }
 

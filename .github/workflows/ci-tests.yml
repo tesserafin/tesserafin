@@ -363,6 +363,7 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.ItemPeopleCommandsEndToEndTests.PersonReads_DoNotCreate_MetadataIsPaged_AndValidationRemovesOnlyUnlockedOrphans
           --require Tesserafin.Server.Integration.Tests.EndToEnd.ExplicitItemSelectionAuthorizationEndToEndTests.SharedScope_ListTotalsAndFilterValues_StayInsideTheSelectedVisibleLibrary
           --require Tesserafin.Server.Integration.Tests.OwnedExtrasEndToEndTests.Extras_RejectsFailedSave_Retries_RefreshesAndReconcilesCatalogue_WithoutDeletingMediaOrVersions
+          --require Tesserafin.Server.Integration.Tests.OwnedVideosEndToEndTests.OwnedVersions_RejectFailedCreation_RetryThroughEntityRefresh_ExposeMultipartSourcesAndPreserveMedia
           --require Tesserafin.Server.Integration.Tests.ItemLinkWriteCommandsEndToEndTests.Reroute_RollsBackBothSqlMutations_ThenReconcilesDeduplicatedCacheAndPreservesSources
           --require Tesserafin.Server.Integration.Tests.PlaybackIntroServiceEndToEndTests.HttpIntros_ResolveSavedVideos_FilterVisibility_AndIsolateProviderFailure_WithoutSavingCandidates
           --require Tesserafin.Server.Integration.Tests.NamedItemCatalogEndToEndTests.HttpReadsAndUnknownFilters_DoNotMaterializeNames_ExplicitWritesBecomeVisible

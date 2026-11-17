@@ -2649,36 +2649,6 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        protected async Task RefreshMetadataForOwnedVideo(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, bool copyTitleMetadata, string path, CancellationToken cancellationToken)
-        {
-            var newOptions = new MetadataRefreshOptions(options)
-            {
-                SearchResult = null
-            };
-
-            var id = LibraryManager.GetNewItemId(path, typeof(Video));
-
-            // Try to retrieve it from the db. If we don't find it, use the resolved version
-            if (LibraryManager.GetItemById(id) is not Video video)
-            {
-                video = LibraryManager.ResolvePath(FileSystem.GetFileSystemInfo(path)) as Video;
-
-                newOptions.ForceSave = true;
-            }
-
-            if (video is null)
-            {
-                return;
-            }
-
-            if (video.OwnerId.IsEmpty())
-            {
-                video.OwnerId = Id;
-            }
-
-            await writes.RefreshOwnedMetadataAsync(this, video, copyTitleMetadata, deletions, newOptions, cancellationToken).ConfigureAwait(false);
-        }
-
         public string GetEtag(User user)
         {
             var list = GetEtagValues(user);

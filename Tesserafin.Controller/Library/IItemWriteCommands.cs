@@ -40,6 +40,14 @@ public interface IItemWriteCommands
     /// <returns>The owned-item refresh task.</returns>
     Task RefreshOwnedMetadataAsync(BaseItem owner, BaseItem ownedItem, bool copyTitleMetadata, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken);
 
+    /// <summary>Refreshes typed local versions and multipart videos through explicit write ports.</summary>
+    /// <param name="owner">The owning file-backed video in the library tree.</param>
+    /// <param name="deletions">Explicit catalogue-only cleanup operations.</param>
+    /// <param name="options">Refresh options; never mutated.</param>
+    /// <param name="cancellationToken">Cancels admission and refresh work.</param>
+    /// <returns>Whether the owner's version paths or link count changed.</returns>
+    Task<bool> RefreshOwnedVideosAsync(Video owner, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken);
+
     void CreateItem(BaseItem item, BaseItem? parent);
 
     void CreateItems(IReadOnlyList<BaseItem> items, BaseItem? parent, CancellationToken cancellationToken);
