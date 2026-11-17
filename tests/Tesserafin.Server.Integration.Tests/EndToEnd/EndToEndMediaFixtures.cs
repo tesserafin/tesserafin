@@ -185,6 +185,35 @@ public static class EndToEndMediaFixtures
     }
 
     /// <summary>
+    /// Synthesizes a real MP3 file (a 1000 Hz tone, stereo) for the audio journeys.
+    /// </summary>
+    /// <param name="directory">The directory to write the fixture into.</param>
+    /// <param name="fileName">The file name (including extension) to write.</param>
+    /// <param name="durationSeconds">The duration of the fixture, in seconds.</param>
+    /// <returns>The full path to the synthesized file.</returns>
+    public static async Task<string> CreateMp3Async(string directory, string fileName = "fixture.mp3", int durationSeconds = DurationSeconds)
+    {
+        var path = Path.Combine(directory, fileName);
+        var duration = durationSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        await RunFfmpegAsync(
+        [
+            "-hide_banner",
+            "-y",
+            "-f", "lavfi", "-i", $"sine=frequency=1000:duration={duration}",
+            "-c:a", "libmp3lame", "-b:a", "128k", "-ac", "2",
+            "-f", "mp3",
+            path,
+        ]).ConfigureAwait(false);
+
+        if (!File.Exists(path) || new FileInfo(path).Length == 0)
+        {
+            throw new InvalidOperationException($"ffmpeg did not produce a non-empty fixture at {path}.");
+        }
+
+        return path;
+    }
+
+    /// <summary>
     /// Runs the REAL ffprobe binary against a file on disk and returns, per stream, its type, codec
     /// and (for video) width: what was actually produced, not what a command line or a label says.
     /// </summary>

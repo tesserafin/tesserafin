@@ -58,7 +58,7 @@ public static class EnginePlanEncodingRequest
 
     /// <summary>
     /// Renders the encoding request of an executable HLS plan
-    /// (<see cref="LocalVideoPlanner.IsExecutableHlsOutput"/>).
+    /// (<see cref="LocalMediaPlanner.IsExecutableHlsOutput"/>).
     /// </summary>
     /// <param name="plan">The retained execution plan.</param>
     /// <param name="itemId">The item the session plays.</param>
@@ -76,7 +76,7 @@ public static class EnginePlanEncodingRequest
         string? transcodeReasons)
     {
         ArgumentNullException.ThrowIfNull(plan);
-        if (!LocalVideoPlanner.IsExecutableHlsOutput(plan))
+        if (!LocalMediaPlanner.IsExecutableHlsOutput(plan))
         {
             throw new ArgumentException("Only an executable remux or transcode plan has an encoding request.", nameof(plan));
         }

@@ -77,11 +77,11 @@ Chain as built:
 Web, film (Type Movie, file system) on the local HTML player
   -> POST /Playback/Sessions          generated SDK, configured from TesserafinApi (not @jellyfin/sdk)
      server: PlaybackSessionsController opens the film scope (item is Movie)
-             LocalVideoPlanner: every candidate source is a local file -> the engine decides
+             LocalMediaPlanner: every candidate source is a local file -> the engine decides
              from the DECLARED capabilities/constraints (no DeviceProfile round trip);
              DirectPlay + executable plan -> V2PlanRecord published, PlaybackPlan(DirectPlay),
              StreamInfo = null; StreamBuilder is never constructed
-  -> GET /Playback/Sessions/{id}/Stream    LocalVideoDescriptorMapper, from the retained plan
+  -> GET /Playback/Sessions/{id}/Stream    LocalMediaDescriptorMapper, from the retained plan
   -> GET|HEAD /Playback/Sessions/{id}/File?itemId&mediaSourceId&playSessionId
      PlaybackSessionFilesController: MediaDelivery + Media capability; per request: session
      exists, caller owns it, item/source/play session match the plan, owner still sees the
@@ -131,7 +131,7 @@ Chain as built:
 ```
 Web, film (Type Movie, file system) on the local HTML player
   -> POST /Playback/Sessions          same request as §4
-     server: LocalVideoPlanner, per candidate source (each with its own user track defaults):
+     server: LocalMediaPlanner, per candidate source (each with its own user track defaults):
              a direct play wins; otherwise the first EXECUTABLE remux
              engine v8: a remux is delivered through the first declared OutputProfile that can
              carry BOTH copied codecs over a protocol the client supports (container + protocol
@@ -139,7 +139,7 @@ Web, film (Type Movie, file system) on the local HTML player
              executable = Remux, HLS, fMP4 or TS, only RemuxContainer/CopyVideo/CopyAudio (+ text
              subtitle extraction/conversion), subtitle none or External
              -> V2PlanRecord published, PlaybackPlan(DirectStream), StreamInfo = null
-  -> GET /Playback/Sessions/{id}/Stream    LocalVideoDescriptorMapper, from the retained plan:
+  -> GET /Playback/Sessions/{id}/Stream    LocalMediaDescriptorMapper, from the retained plan:
              /Playback/Sessions/{id}/Hls/main.m3u8?itemId&mediaSourceId&playSessionId  (Protocol Hls)
              no codec, container, stream index, offset or credential in the url
   -> GET /Playback/Sessions/{id}/Hls/main.m3u8
@@ -209,7 +209,7 @@ third pipeline:
 
 ```
 POST /Playback/Sessions          same request as §4
-  server: LocalVideoPlanner, per candidate source: a direct play wins, then the first executable
+  server: LocalMediaPlanner, per candidate source: a direct play wins, then the first executable
           remux (§5), then the first EXECUTABLE TRANSCODE
           executable = Transcode, HLS, fMP4 or TS; each stream copied or encoded, video to H.264,
           audio to AAC (down-mix allowed); output in the source's video range; subtitle none or
@@ -222,12 +222,12 @@ POST /Playback/Sessions          same request as §4
           AllowAudioStreamCopy) is re-encoded inside a transcode too, and a remux demoted by such
           a prohibition re-encodes the forbidden stream only
           -> V2PlanRecord published, PlaybackPlan(Transcode, reasons), StreamInfo = null
-GET /Playback/Sessions/{id}/Stream    LocalVideoDescriptorMapper: the same url as a remux,
+GET /Playback/Sessions/{id}/Stream    LocalMediaDescriptorMapper: the same url as a remux,
           /Playback/Sessions/{id}/Hls/main.m3u8?itemId&mediaSourceId&playSessionId
           no codec, bitrate, resolution, stream index, offset or credential in the url
 GET /Playback/Sessions/{id}/Hls/main.m3u8, .../Hls/hls1/main/{n}.{mp4|ts}
           PlaybackSessionDeliveryGuard as §5 (owner only, plan/ids match, item and version still
-          visible), now for any plan LocalVideoPlanner.IsExecutableHlsOutput accepts
+          visible), now for any plan LocalMediaPlanner.IsExecutableHlsOutput accepts
           EnginePlanEncodingRequest.Build renders the executor's input from the retained plan:
             source and stream indices; per stream "copy" or the plan's target codec
             VideoBitRate = the plan's video ceiling narrowed to (total ceiling - audio share)
@@ -264,21 +264,21 @@ those paths: §7.
 Outside this slice: HDR tone mapping and subtitle burn-in (explicitly), a transcode over plain HTTP,
 target codecs other than H.264/AAC, other media families, the global flag and the shadow.
 
-## 7. Loop 4 slice: every local library video on the same journey
+## 7. Loop 4 slice: every local library video, then local audio, on the same journey
 
 Scenario: an `Episode` in a local file, played by the same client and in the same three ways as
 a film: direct play (§4), HLS remux (§5) and SDR H.264/AAC transcode (§6). Nothing about the
 delivery depends on the item being a film; only the controller's scope did.
 
 ```
-POST/PUT /Playback/Sessions   PlaybackSessionsController opens the LocalVideoPlanner scope for a
+POST/PUT /Playback/Sessions   PlaybackSessionsController opens the LocalMediaPlanner scope for a
           video item that is a Movie OR an Episode (was: Movie). Every step after it - candidate
           sources, user defaults per source, version preference, executable remux/transcode,
           descriptor, delivery guard, plan-built encoding request - is §4 to §6 unchanged.
 ```
 
-Renamed without aliases: `EngineFilmPlanner` -> `LocalVideoPlanner`, `EngineFilmRequest` ->
-`LocalVideoRequest`, `EngineFilmDescriptorMapper` -> `LocalVideoDescriptorMapper`. Web:
+Renamed without aliases: `EngineFilmPlanner` -> `LocalMediaPlanner`, `EngineFilmRequest` ->
+`LocalMediaRequest`, `EngineFilmDescriptorMapper` -> `LocalMediaDescriptorMapper`. Web:
 `directPlayFilm*.ts` -> `sessionVideo*.ts`; `isSessionVideoCandidate` accepts `Movie` and
 `Episode` on the local HTML video player.
 
@@ -301,14 +301,23 @@ journey does not execute (`EndToEndCapabilityPresets.TranscodeHlsToAnUnexecutedT
 legacy remux is driven through `POST Items/{id}/PlaybackInfo`, that chain's remaining caller for a
 local video.
 
+Audio, first slice: a library `Audio` track (not a channel item) the client plays as it is is
+decided by the engine alone (`LocalMediaPlanner.PlanAudio`, `MediaKind.Audio`) and served from the
+session's file route, exactly like a video's direct play. An audio remux or transcode is not owned
+yet: the session's HLS route builds video requests, so those plans reach the existing chain
+(`/Audio/{id}/universal`, `/Audio/{id}/main.m3u8`). Renamed without aliases: `LocalVideo*` ->
+`LocalMedia*`. Proof: `DirectPlayAudioEndToEndTests` (start/seek, stop and capability revocation,
+another user), required by name; with the controller's audio scope removed all three turn red with
+"The legacy planner (StreamBuilder) was reached".
+
 Remaining consumers by name. Nothing is deleted globally while one of them still needs it:
 
 | Legacy path | Still reached by |
 | --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | audio, Live TV, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
+| `PlaybackSessionPlanner` / `StreamBuilder` | audio that needs a remux or a transcode, Live TV, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
-| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio, Live TV, channel-plugin items; a library video the server does not serve from the session |
+| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio the client does not play as it is, Live TV, channel-plugin items; a library video the server does not serve from the session |
 
 ## 8. Shared model boundary (consolidation step 4, candidate)
 

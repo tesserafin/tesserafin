@@ -120,7 +120,7 @@ public sealed class PlaybackSessionDeliveryGuard
         }
 
         var source = options.MediaSources.FirstOrDefault(s => string.Equals(s.Id, plan.SourceId, StringComparison.Ordinal));
-        if (!LocalVideoPlanner.IsLocalFileSource(source) || !System.IO.File.Exists(source!.Path))
+        if (!LocalMediaPlanner.IsLocalFileSource(source) || !System.IO.File.Exists(source!.Path))
         {
             return PlaybackSessionDelivery.NotFound;
         }

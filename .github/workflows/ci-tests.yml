@@ -371,6 +371,9 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Episode_StartAndSeek_ServesRangesFromTheSessionFile
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.HomeVideo_StartAndSeek_ServesRangesFromTheSessionFile
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.MusicVideo_StartAndSeek_ServesRangesFromTheSessionFile
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayAudioEndToEndTests.Audio_StartAndSeek_ServesRangesFromTheSessionFile
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayAudioEndToEndTests.Audio_Stop_DeletesTheSessionAndRevokesItsCapability
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayAudioEndToEndTests.Audio_AnotherUser_CanNeitherReadNorStopTheSession
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_ParametersThatDoNotMatchTheSession_AreNotServed
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_Stop_DeletesTheSessionAndRevokesItsCapability
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_AnotherUser_CanNeitherReadNorStopTheSession

@@ -236,7 +236,7 @@ public class PlaybackSessionsControllerTests
     [InlineData("library", true)]
     [InlineData("channel", false)]
     [InlineData("recording", false)]
-    public async Task CreatePlaybackSession_OffersOnlyLibraryVideosToTheLocalVideoPlanner(string kind, bool offered)
+    public async Task CreatePlaybackSession_OffersOnlyLibraryVideosToTheLocalMediaPlanner(string kind, bool offered)
     {
         const string MediaPath = "/media/home.mkv";
         var item = new Video { Id = _itemId, Path = MediaPath, ChannelId = kind == "channel" ? Guid.NewGuid() : Guid.Empty };
@@ -256,7 +256,7 @@ public class PlaybackSessionsControllerTests
             .Throws(new InvalidOperationException("offered to the engine"));
         var inner = new Mock<IPlaybackSessionPlanner>();
         using var manager = new PlaybackSessionManager(
-            new LocalVideoPlanner(inner.Object, engine.Object, _v2PlanStore.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalVideoPlanner>.Instance),
+            new LocalMediaPlanner(inner.Object, engine.Object, _v2PlanStore.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalMediaPlanner>.Instance),
             new Mock<ITranscodeManager>().Object,
             new Mock<Tesserafin.Controller.Session.ISessionManager>().Object);
         var controller = new PlaybackSessionsController(

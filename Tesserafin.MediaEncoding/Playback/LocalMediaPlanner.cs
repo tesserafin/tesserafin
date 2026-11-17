@@ -17,8 +17,8 @@ using Tesserafin.Playback.Execution;
 namespace Tesserafin.MediaEncoding.Playback;
 
 /// <summary>
-/// Consolidation step 1 (docs/playback-path-inventory.md §4 and §5): a film or an episode read from a local file
-/// is decided by the v2 engine alone. The engine receives the capabilities and constraints the
+/// Consolidation step 1 (docs/playback-path-inventory.md §4 to §7): a library video or a library
+/// audio track read from a local file is decided by the v2 engine alone. The engine receives the capabilities and constraints the
 /// client declared on <c>POST Playback/Sessions</c>, not a <c>DeviceProfile</c> round trip, and the
 /// legacy planner (<c>StreamBuilder</c>) is never invoked for it. Three answers are owned here:
 /// a direct play, served verbatim from the session's own file route; a remux this server can
@@ -35,31 +35,33 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// The declared inputs reach the planner through an ambient request scope opened by the
 /// controller around <see cref="IPlaybackSessionManager.Create"/>/<see cref="IPlaybackSessionManager.Patch"/>,
 /// the same capture pattern <see cref="IV2PlanStore"/> already uses. Without a scope (the legacy
-/// <c>PlaybackInfo</c> path, another video family, audio, Live TV), this decorator only delegates.
+/// <c>PlaybackInfo</c> path, a channel item, Live TV), this decorator only delegates. For audio only a
+/// direct play is owned here: the session's HLS route executes video plans, so an audio remux or
+/// transcode still reaches the existing chain.
 /// </remarks>
-public sealed class LocalVideoPlanner : IPlaybackSessionPlanner
+public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
 {
-    private static readonly AsyncLocal<LocalVideoRequest?> _current = new();
+    private static readonly AsyncLocal<LocalMediaRequest?> _current = new();
 
     private readonly IPlaybackSessionPlanner _inner;
     private readonly IPlaybackEngine _engine;
     private readonly IV2PlanStore _v2PlanStore;
-    private readonly ILogger<LocalVideoPlanner> _logger;
+    private readonly ILogger<LocalMediaPlanner> _logger;
     private readonly TimeProvider _timeProvider;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="LocalVideoPlanner"/> class.
+    /// Initializes a new instance of the <see cref="LocalMediaPlanner"/> class.
     /// </summary>
     /// <param name="inner">The existing chain, used for every decision this journey does not own.</param>
     /// <param name="engine">The v2 decision engine.</param>
     /// <param name="v2PlanStore">The store the decided plan is published into.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="timeProvider">The clock stamping the published record; the system clock when null.</param>
-    public LocalVideoPlanner(
+    public LocalMediaPlanner(
         IPlaybackSessionPlanner inner,
         IPlaybackEngine engine,
         IV2PlanStore v2PlanStore,
-        ILogger<LocalVideoPlanner> logger,
+        ILogger<LocalMediaPlanner> logger,
         TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(inner);
@@ -75,11 +77,11 @@ public sealed class LocalVideoPlanner : IPlaybackSessionPlanner
 
     /// <summary>
     /// Opens the scope in which a video planning call is offered to the engine first. Open it only
-    /// for a film or an episode; the scope ends when the returned handle is disposed.
+    /// for a library video or audio track; the scope ends when the returned handle is disposed.
     /// </summary>
     /// <param name="request">The capabilities and constraints the client declared.</param>
     /// <returns>The handle closing the scope.</returns>
-    public static IDisposable BeginRequest(LocalVideoRequest request)
+    public static IDisposable BeginRequest(LocalMediaRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         var previous = _current.Value;
@@ -105,16 +107,18 @@ public sealed class LocalVideoPlanner : IPlaybackSessionPlanner
             && !string.IsNullOrEmpty(source.Path);
 
     /// <inheritdoc/>
-    public PlaybackPlan? PlanAudio(MediaOptions options) => _inner.PlanAudio(options);
+    public PlaybackPlan? PlanAudio(MediaOptions options) => Plan(options, MediaKind.Audio, _inner.PlanAudio);
 
     /// <inheritdoc/>
-    public PlaybackPlan? PlanVideo(MediaOptions options)
+    public PlaybackPlan? PlanVideo(MediaOptions options) => Plan(options, MediaKind.Video, _inner.PlanVideo);
+
+    private PlaybackPlan? Plan(MediaOptions options, MediaKind kind, Func<MediaOptions, PlaybackPlan?> inner)
     {
         ArgumentNullException.ThrowIfNull(options);
         var request = _current.Value;
         if (request is null)
         {
-            return _inner.PlanVideo(options);
+            return inner(options);
         }
 
         // A version the request names and this user's source list does not hold (withdrawn, or
@@ -125,10 +129,10 @@ public sealed class LocalVideoPlanner : IPlaybackSessionPlanner
             return null;
         }
 
-        var record = TryDecide(request, options);
+        var record = TryDecide(request, options, kind);
         if (record is null)
         {
-            return _inner.PlanVideo(options);
+            return inner(options);
         }
 
         _v2PlanStore.Publish(record);
@@ -200,7 +204,7 @@ public sealed class LocalVideoPlanner : IPlaybackSessionPlanner
             && plan.Transforms.All(transform => transform is TransformKind.RemuxContainer or TransformKind.CopyVideo or TransformKind.CopyAudio or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle)
             && plan.SubtitleDelivery is null or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External;
 
-    private V2PlanRecord? TryDecide(LocalVideoRequest request, MediaOptions options)
+    private V2PlanRecord? TryDecide(LocalMediaRequest request, MediaOptions options, MediaKind kind)
     {
         var sources = options.MediaSources
             .Where(source => string.IsNullOrEmpty(options.MediaSourceId) || string.Equals(source.Id, options.MediaSourceId, StringComparison.Ordinal))
@@ -210,7 +214,7 @@ public sealed class LocalVideoPlanner : IPlaybackSessionPlanner
             return null;
         }
 
-        var context = DlnaPlaybackAdapter.ToContext(options.ItemId, options.UserId, options.MediaSourceId, MediaKind.Video, PlaybackEngine.EngineVersion);
+        var context = DlnaPlaybackAdapter.ToContext(options.ItemId, options.UserId, options.MediaSourceId, kind, PlaybackEngine.EngineVersion);
         // Resolved track indices belong to a source, not to the item. A later playable version
         // can have different indices from the first candidate. Preserve the engine's preference
         // for the first direct-play candidate - a remux is only taken when no candidate direct
@@ -317,9 +321,9 @@ public sealed class LocalVideoPlanner : IPlaybackSessionPlanner
 
     private sealed class Scope : IDisposable
     {
-        private readonly LocalVideoRequest? _previous;
+        private readonly LocalMediaRequest? _previous;
 
-        public Scope(LocalVideoRequest? previous) => _previous = previous;
+        public Scope(LocalMediaRequest? previous) => _previous = previous;
 
         public void Dispose() => _current.Value = _previous;
     }

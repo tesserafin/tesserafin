@@ -150,7 +150,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
 
         using var attemptScope = BeginAttemptScope(request.PlaybackAttemptId);
 
-        var (kind, options, isEngineVideo) = await ResolveOptions(request, HttpContext.RequestAborted).ConfigureAwait(false);
+        var (kind, options, isLocalMedia) = await ResolveOptions(request, HttpContext.RequestAborted).ConfigureAwait(false);
 
         // Issue #75: the ambient scope carrying the two request-scoped facts the shadow run cannot
         // recover on its own. Content-Length is read from the HEADER only - request buffering stays
@@ -160,7 +160,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         // shadow mode is off (the default) the shadow run never executes and this scope costs one
         // AsyncLocal write and produces nothing.
         PlaybackSession? session;
-        using (BeginLocalVideoScope(isEngineVideo, request))
+        using (BeginLocalMediaScope(isLocalMedia, request))
         using (_shadowDiagnosticsStore.BeginCapture(new ShadowCaptureInputs(request.Capabilities, HttpContext.Request.ContentLength, ReadCapturedScan())))
         {
             session = _playbackSessionManager.Create(
@@ -238,7 +238,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             return authorization;
         }
 
-        var (kind, options, isEngineVideo) = await ResolveOptions(request, HttpContext.RequestAborted).ConfigureAwait(false);
+        var (kind, options, isLocalMedia) = await ResolveOptions(request, HttpContext.RequestAborted).ConfigureAwait(false);
 
         // PR #38 (docs/design-playback-v2-lifecycle.md, decided in 2cf777d2): the session was just
         // proven to exist above, so a null here can only mean re-planning produced NO viable plan -
@@ -251,7 +251,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         // Issue #75: same ambient scope as the POST - a PUT re-plans with a complete new body, so it
         // carries its own declared capabilities and its own Content-Length.
         PlaybackSession? session;
-        using (BeginLocalVideoScope(isEngineVideo, request))
+        using (BeginLocalMediaScope(isLocalMedia, request))
         using (_shadowDiagnosticsStore.BeginCapture(new ShadowCaptureInputs(request.Capabilities, HttpContext.Request.ContentLength, ReadCapturedScan())))
         {
             session = _playbackSessionManager.Patch(id, new PlaybackSessionRequest(kind, options), request.PlaybackAttemptId);
@@ -433,7 +433,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         if (session.Plan.StreamInfo is null
             && _v2PlanStore.TryGet(session.Id, out var engineDecided)
             && engineDecided is { ExecutionPlan: { } enginePlan }
-            && LocalVideoDescriptorMapper.CanMap(enginePlan)
+            && LocalMediaDescriptorMapper.CanMap(enginePlan)
             && session.Request?.Options is { } engineOptions)
         {
             if (string.IsNullOrEmpty(User.GetToken()))
@@ -441,7 +441,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
                 return Forbid();
             }
 
-            return Ok(LocalVideoDescriptorMapper.Map(session.Id, session.PlaySessionId, engineOptions.ItemId, enginePlan, engineDecided.Decision.EngineVersion));
+            return Ok(LocalMediaDescriptorMapper.Map(session.Id, session.PlaySessionId, engineOptions.ItemId, enginePlan, engineDecided.Decision.EngineVersion));
         }
 
         var options = session.Request?.Options;
@@ -613,7 +613,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             ? value as ContractStructuralScan
             : null;
 
-    private async Task<(PlaybackMediaKind Kind, MediaOptions Options, bool IsEngineVideo)> ResolveOptions(PlaybackPlanRequestBase request, CancellationToken cancellationToken)
+    private async Task<(PlaybackMediaKind Kind, MediaOptions Options, bool IsLocalMedia)> ResolveOptions(PlaybackPlanRequestBase request, CancellationToken cancellationToken)
     {
         var userId = RequestHelpers.GetUserId(User, request.UserId);
         var user = _userManager.GetUserById(userId) ?? throw new ResourceNotFoundException();
@@ -649,17 +649,9 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         }
 
         var kind = item.MediaType == MediaType.Audio ? PlaybackMediaKind.Audio : PlaybackMediaKind.Video;
-        return (kind, options, kind == PlaybackMediaKind.Video && IsLibraryVideo(item));
+        return (kind, options, kind == PlaybackMediaKind.Video ? IsLibraryVideo(item) : IsLibraryAudio(item));
     }
 
-    /// <summary>
-    /// Issue #43: opens a structured log scope carrying the attempt id for the rest of the action,
-    /// or returns <c>null</c> when none is available — no scope is better than a scope carrying a
-    /// null value. POST/PUT pass the request's own field; GET Stream/DELETE have no body, so they
-    /// pass the id recovered from the stored session. Nests inside the per-request scope opened by
-    /// <c>RequestCorrelationMiddleware</c> (issue #42), so lines emitted here carry BOTH the attempt
-    /// id (same on a retry) and the request id (different on a retry).
-    /// </summary>
     /// <summary>
     /// Whether <paramref name="item"/> is a library video the local video journey may decide: any
     /// <see cref="Video"/> family (film, episode, home video, music video, trailer) that is neither a
@@ -670,9 +662,24 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             && video.ChannelId.IsEmpty()
             && (string.IsNullOrEmpty(video.Path) || _recordingsManager?.GetActiveRecordingInfo(video.Path) is null);
 
-    private static IDisposable? BeginLocalVideoScope(bool isEngineVideo, PlaybackPlanRequestBase request)
-        => isEngineVideo ? LocalVideoPlanner.BeginRequest(new LocalVideoRequest(request.Capabilities, request.Constraints)) : null;
+    /// <summary>
+    /// Whether <paramref name="item"/> is a library audio track the local media journey may decide:
+    /// an <see cref="Tesserafin.Controller.Entities.Audio.Audio"/> that is not a channel-plugin item.
+    /// </summary>
+    private static bool IsLibraryAudio(BaseItem item)
+        => item is Tesserafin.Controller.Entities.Audio.Audio audio && audio.ChannelId.IsEmpty();
 
+    private static IDisposable? BeginLocalMediaScope(bool isLocalMedia, PlaybackPlanRequestBase request)
+        => isLocalMedia ? LocalMediaPlanner.BeginRequest(new LocalMediaRequest(request.Capabilities, request.Constraints)) : null;
+
+    /// <summary>
+    /// Issue #43: opens a structured log scope carrying the attempt id for the rest of the action,
+    /// or returns <c>null</c> when none is available — no scope is better than a scope carrying a
+    /// null value. POST/PUT pass the request's own field; GET Stream/DELETE have no body, so they
+    /// pass the id recovered from the stored session. Nests inside the per-request scope opened by
+    /// <c>RequestCorrelationMiddleware</c> (issue #42), so lines emitted here carry BOTH the attempt
+    /// id (same on a retry) and the request id (different on a retry).
+    /// </summary>
     private IDisposable? BeginAttemptScope(string? playbackAttemptId)
     {
         if (string.IsNullOrEmpty(playbackAttemptId))

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
@@ -149,5 +150,47 @@ public static class LibraryItemSeeder
         mediaStreamRepository.SaveMediaStreams(movie.Id, streams, CancellationToken.None);
 
         return movie.Id;
+    }
+
+    /// <summary>
+    /// Creates, persists, and registers a single-source <see cref="Audio"/> track for
+    /// <paramref name="mediaPath"/>, the same way <see cref="SeedVideo"/> registers a video.
+    /// </summary>
+    /// <param name="writes">The real, DI-resolved item write commands.</param>
+    /// <param name="mediaStreamRepository">The real, DI-resolved media stream repository.</param>
+    /// <param name="mediaPath">The real file on disk to register.</param>
+    /// <param name="container">The container of <paramref name="mediaPath"/> (for example <c>"mp3"</c>).</param>
+    /// <param name="streams">The real, known media streams describing <paramref name="mediaPath"/>.</param>
+    /// <param name="name">The track's display name.</param>
+    /// <param name="runTimeTicks">The duration of <paramref name="mediaPath"/>.</param>
+    /// <returns>The new item's id.</returns>
+    public static Guid SeedAudio(
+        IItemWriteCommands writes,
+        IMediaStreamRepository mediaStreamRepository,
+        string mediaPath,
+        string container,
+        IReadOnlyList<MediaStream> streams,
+        string name,
+        long runTimeTicks)
+    {
+        ArgumentNullException.ThrowIfNull(writes);
+        ArgumentNullException.ThrowIfNull(mediaStreamRepository);
+        ArgumentNullException.ThrowIfNull(streams);
+
+        var track = new Audio
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Path = mediaPath,
+            Container = container,
+            Size = new FileInfo(mediaPath).Length,
+            RunTimeTicks = runTimeTicks,
+            DateCreated = DateTime.UtcNow,
+            DateModified = DateTime.UtcNow,
+        };
+        track.PresentationUniqueKey = track.CreatePresentationUniqueKey();
+        writes.CreateItems([track], null, CancellationToken.None);
+        mediaStreamRepository.SaveMediaStreams(track.Id, streams, CancellationToken.None);
+        return track.Id;
     }
 }

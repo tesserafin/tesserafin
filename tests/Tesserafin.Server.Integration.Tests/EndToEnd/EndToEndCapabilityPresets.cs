@@ -49,6 +49,23 @@ public static class EndToEndCapabilityPresets
         return (capabilities, constraints);
     }
 
+    /// <summary>
+    /// A client that plays MP3 audio as it is: one audio direct-play profile, no output profile.
+    /// </summary>
+    /// <returns>Audio direct-play capabilities with every delivery method allowed.</returns>
+    public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) AudioDirectPlay()
+    {
+        var decode = new DecodeCapabilities(
+            DirectPlayProfiles: [new DecodeProfile(MediaKind.Audio, ["mp3"], [], ["mp3"])],
+            VideoCodecs: [],
+            AudioCodecs: [new AudioCodecCapability("mp3", null, null, null, null)],
+            SubtitleDelivery: [],
+            SupportsHls: true,
+            SupportsDash: false);
+
+        return (new ClientCapabilities(decode, OutputProfiles: []), BaseConstraints(allowDirectPlay: true, allowDirectStream: true, allowTranscoding: true));
+    }
+
     public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) Remux()
     {
         var decode = new DecodeCapabilities(

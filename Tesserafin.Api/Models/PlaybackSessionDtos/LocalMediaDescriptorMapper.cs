@@ -10,13 +10,13 @@ namespace Tesserafin.Api.Models.PlaybackSessionDtos;
 
 /// <summary>
 /// Mints the stream descriptor of a session the v2 engine alone decided
-/// (<see cref="LocalVideoPlanner"/>), from the retained execution plan only: the session's file
+/// (<see cref="LocalMediaPlanner"/>), from the retained execution plan only: the session's file
 /// route for a direct play, the session's HLS route for a remux or a transcode. No legacy <c>StreamInfo</c> is
 /// built, no encoding parameter is written into the URL (the routes read them from the plan) and
 /// no credential either: the client presents its own <c>playbackCapability</c> (scope
 /// <c>Media</c> for the file or the HLS output, <c>Subtitles</c> for a sidecar).
 /// </summary>
-public static class LocalVideoDescriptorMapper
+public static class LocalMediaDescriptorMapper
 {
     /// <summary>
     /// Determines whether a retained plan is one this mapper has a descriptor for.
@@ -24,7 +24,7 @@ public static class LocalVideoDescriptorMapper
     /// <param name="plan">The retained execution plan.</param>
     /// <returns><see langword="true"/> for a direct play, an executable remux or an executable transcode.</returns>
     public static bool CanMap(PlaybackExecutionPlan? plan)
-        => plan is { Method: PlaybackMethod.DirectPlay } || LocalVideoPlanner.IsExecutableHlsOutput(plan);
+        => plan is { Method: PlaybackMethod.DirectPlay } || LocalMediaPlanner.IsExecutableHlsOutput(plan);
 
     /// <summary>
     /// Maps an engine-decided local video session to its descriptor.

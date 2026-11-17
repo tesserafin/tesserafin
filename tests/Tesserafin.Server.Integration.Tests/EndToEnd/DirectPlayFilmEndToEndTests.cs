@@ -437,11 +437,11 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
             base.ConfigureWebHost(builder);
             builder.ConfigureTestServices(services =>
             {
-                services.AddSingleton<IPlaybackSessionPlanner>(provider => new LocalVideoPlanner(
+                services.AddSingleton<IPlaybackSessionPlanner>(provider => new LocalMediaPlanner(
                     new LegacyChainReached(),
                     provider.GetRequiredService<IPlaybackEngine>(),
                     provider.GetRequiredService<IV2PlanStore>(),
-                    provider.GetRequiredService<ILogger<LocalVideoPlanner>>()));
+                    provider.GetRequiredService<ILogger<LocalMediaPlanner>>()));
                 services.AddSingleton<IPlaybackLiveStreamResolver, LegacyChainReached>();
             });
         }

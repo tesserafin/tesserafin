@@ -716,7 +716,7 @@ namespace Tesserafin.Server.Core
             // Consolidation step 1 (docs/playback-path-inventory.md §4): the outermost planner offers a
             // local film's or episode's planning call to the v2 engine alone first; everything it does not own reaches
             // the shadow/legacy chain below unchanged.
-            serviceCollection.AddSingleton<IPlaybackSessionPlanner>(provider => new LocalVideoPlanner(
+            serviceCollection.AddSingleton<IPlaybackSessionPlanner>(provider => new LocalMediaPlanner(
                 new ShadowPlaybackSessionPlanner(
                     provider.GetRequiredService<PlaybackSessionPlanner>(),
                     provider.GetRequiredService<IPlaybackEngine>(),
@@ -727,7 +727,7 @@ namespace Tesserafin.Server.Core
                     provider.GetRequiredService<IV2PlanStore>()),
                 provider.GetRequiredService<IPlaybackEngine>(),
                 provider.GetRequiredService<IV2PlanStore>(),
-                provider.GetRequiredService<ILogger<LocalVideoPlanner>>()));
+                provider.GetRequiredService<ILogger<LocalMediaPlanner>>()));
 
             serviceCollection.AddSingleton<IPlaybackSessionManager>(provider => new PlaybackSessionManager(
                 provider.GetRequiredService<IPlaybackSessionPlanner>(),
