@@ -101,6 +101,7 @@ using Tesserafin.Server.Core.IO;
 using Tesserafin.Server.Core.Library;
 using Tesserafin.Server.Core.Library.Search;
 using Tesserafin.Server.Core.Library.SimilarItems;
+using Tesserafin.Server.Core.Library.Validators;
 using Tesserafin.Server.Core.Localization;
 using Tesserafin.Server.Core.Playlists;
 using Tesserafin.Server.Core.Plugins;
@@ -544,6 +545,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemSortService, ItemSortService>();
             serviceCollection.AddSingleton<IItemNamingService, ItemNamingService>();
             serviceCollection.AddSingleton<IItemPeopleService, ItemPeopleService>();
+            serviceCollection.AddSingleton<PeopleValidator>();
             serviceCollection.AddSingleton<IPeopleRepository, PeopleRepository>();
             serviceCollection.AddSingleton<IChapterRepository, ChapterRepository>();
             serviceCollection.AddSingleton<IMediaAttachmentRepository, MediaAttachmentRepository>();

@@ -1009,3 +1009,29 @@ HTTP read journey checks options, locations, repeated reads and unchanged defini
 Focused tests cover malformed shortcuts, unscanned definitions, refresh-state projection and
 removed manager/provider dependencies. No HTTP/OpenAPI or SDK shape change is intended. There is
 no new snapshot-isolation guarantee across concurrent definition edits, scans or provider updates.
+
+## 33. Person read and validation ownership
+
+`IItemPeopleService.GetPerson` and `GetPeopleItems` replace the manager's person lookup and page
+expansion, without forwarding methods. Person paths and IDs use explicit filesystem/configuration
+ports and the existing identity policy shared with credit writes. Missing records stay missing.
+Expansion preserves credit-page order, start and total metadata, skips absent or malformed records,
+and passes an explicit visibility scope to the same entity rule. HTTP/OpenAPI shapes do not change.
+DTO, person-image, Persons controller and NFO actor lookup use the dedicated read service.
+
+`PeopleValidator` now owns preparation of the managed people directory and queries unreferenced,
+unlocked person items directly through the repository. `PeopleValidationTask` injects the validator
+and an item lookup, rather than the manager. The manager's validation bridge, private named-person
+ID helper, people repository dependency and logger field are deleted: 64 lines removed, 1,206 remain.
+Entity credit-list forwarding members remain for the separate entity-static migration.
+
+Cancellation before admission creates no managed directory; later cancellation propagates between
+entries/batches. Each entry, including a missing or rejected name, advances the first half of the
+progress range. Successful orphan-deletion batches advance the second half by the actual number
+of items, avoiding the old over-100 and asynchronous progress-report ordering problems. Completed
+refreshes/deletions and directory creation are not rolled back by later cancellation or failure.
+
+Focused tests cover lookup without materialization, page isolation/order/visibility, cancellation,
+601 orphan records split 500/101, progress bounds and removed manager dependencies. A named required
+real-host HTTP/maintenance journey covers missing person reads, credit creation, paging, repeated
+reads, unlocked orphan deletion, locked-person retention and unchanged source-media bytes.

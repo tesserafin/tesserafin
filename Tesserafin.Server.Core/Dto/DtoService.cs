@@ -801,7 +801,7 @@ namespace Tesserafin.Server.Core.Dto
                 {
                     try
                     {
-                        return _libraryManager.GetPerson(c);
+                        return _itemPeopleService.GetPerson(c);
                     }
                     catch (Exception ex)
                     {

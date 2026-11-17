@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.IO;
 using Tesserafin.Model.Querying;
 using Tesserafin.Server.Core.Library;
 using Xunit;
@@ -16,7 +20,7 @@ public class ItemPeopleServiceTests
     private static ItemPeopleService CreateService(out Mock<IPeopleRepository> peopleRepository)
     {
         peopleRepository = new Mock<IPeopleRepository>();
-        return new ItemPeopleService(peopleRepository.Object);
+        return new ItemPeopleService(peopleRepository.Object, Mock.Of<IItemLookupService>(), Mock.Of<IServerConfigurationManager>(), Mock.Of<IFileSystem>(), Mock.Of<IStandaloneVisibilityService>(), NullLogger<ItemPeopleService>.Instance);
     }
 
     [Fact]

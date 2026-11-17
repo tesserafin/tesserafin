@@ -80,30 +80,12 @@ namespace Tesserafin.Controller.Library
             CollectionType? collectionType = null);
 
         /// <summary>
-        /// Gets a Person.
-        /// </summary>
-        /// <param name="name">The name of the person.</param>
-        /// <returns>Task{Person}.</returns>
-        Person? GetPerson(string name);
-
-        /// <summary>
         /// Finds the by path.
         /// </summary>
         /// <param name="path">The path.</param>
         /// <param name="isFolder"><c>true</c> is the path is a directory; otherwise <c>false</c>.</param>
         /// <returns>BaseItem.</returns>
         BaseItem? FindByPath(string path, bool? isFolder);
-
-        /// <summary>
-        /// Validate and refresh the People sub-set of the IBN.
-        /// The items are stored in the db but not loaded into memory until actually requested by an operation.
-        /// </summary>
-        /// <param name="deletions">Deletion operations for validation.</param>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="progress">The progress.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>Task.</returns>
-        Task ValidatePeopleAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, IProgress<double> progress, CancellationToken cancellationToken);
 
         /// <summary>
         /// Gets the item by id, as T, and validates user access.
@@ -343,13 +325,6 @@ namespace Tesserafin.Controller.Library
         /// <param name="query">The query.</param>
         /// <returns>List&lt;PersonInfo&gt;.</returns>
         IReadOnlyList<PersonInfo> GetPeople(InternalPeopleQuery query);
-
-        /// <summary>
-        /// Gets the people items.
-        /// </summary>
-        /// <param name="query">The query.</param>
-        /// <returns>List&lt;Person&gt;.</returns>
-        QueryResult<BaseItem> GetPeopleItems(InternalPeopleQuery query);
 
         /// <summary>
         /// Gets the item ids.
