@@ -9,6 +9,7 @@ using Tesserafin.Api.Helpers;
 using Tesserafin.Api.ModelBinders;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
