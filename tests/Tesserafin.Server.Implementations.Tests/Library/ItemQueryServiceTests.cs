@@ -24,6 +24,8 @@ namespace Tesserafin.Server.Implementations.Tests.Library;
 
 public class ItemQueryServiceTests
 {
+    private static IItemListingServices Listing { get; } = Mock.Of<IItemListingServices>();
+
     private static ItemQueryService CreateService(
         out Mock<IChannelManager> channelManager,
         out Mock<ICollectionManager> collectionManager,
@@ -51,7 +53,26 @@ public class ItemQueryServiceTests
         BaseItem.ConfigurationManager = configurationManager;
         BaseItem.UserDataManager = new Mock<IUserDataManager>().Object;
 
-        return new ItemQueryService(channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object, configurationManager, itemSortService ?? new PassthroughItemSortService(), itemLookupService.Object, itemRepository.Object, scopeService.Object, PermissiveVisibility.Scope);
+        return new ItemQueryService(channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object, configurationManager, itemSortService ?? new PassthroughItemSortService(), itemLookupService.Object, itemRepository.Object, scopeService.Object, PermissiveVisibility.Scope, Listing);
+    }
+
+    [Fact]
+    public void EveryEntryPoint_HandsItsScopeAndListingServicesToTheEntity()
+    {
+        var service = CreateService(out _, out _, out _, out _, out _, out _, out _);
+        var folder = new Folder { Id = Guid.NewGuid(), Children = [] };
+        var queries = new[] { new InternalItemsQuery(), new InternalItemsQuery(), new InternalItemsQuery(), new InternalItemsQuery() };
+
+        service.GetItems(folder, queries[0]);
+        service.GetItemList(folder, queries[1]);
+        service.GetItems(queries[2]);
+        service.GetItemList(queries[3]);
+
+        Assert.All(queries, query =>
+        {
+            Assert.Same(PermissiveVisibility.Scope, query.Visibility);
+            Assert.Same(Listing, query.Listing);
+        });
     }
 
     [Fact]

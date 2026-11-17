@@ -63,8 +63,6 @@ namespace Tesserafin.Server.Integration.Tests
         [
             (typeof(BaseItem), nameof(BaseItem.LibraryManager)),
             (typeof(BaseItem), nameof(BaseItem.ChannelManager)),
-            (typeof(Folder), nameof(Folder.UserViewManager)),
-            (typeof(Folder), nameof(Folder.CollectionManager)),
         ];
 
         private static readonly Lazy<IServiceCollection> _registrations = new(BuildRegistrations);

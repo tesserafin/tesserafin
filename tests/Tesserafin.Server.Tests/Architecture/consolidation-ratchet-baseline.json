@@ -16,9 +16,6 @@
     "BaseItem.ProviderManager",
     "BaseItem.UserDataManager",
     "CollectionFolder.ApplicationHost",
-    "Folder.CollectionManager",
-    "Folder.UserViewManager",
-    "UserView.TVSeriesManager",
     "Video.RecordingsManager"
   ],
   "forbiddenDependencies": [],

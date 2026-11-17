@@ -116,11 +116,13 @@ public class FolderGetChildrenCharacterizationTests
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
         BaseItem.ChannelManager = channelManager.Object;
-        Folder.CollectionManager = collectionManager.Object;
-        Folder.UserViewManager = userViewManager.Object;
-        UserView.TVSeriesManager = tvSeriesManager.Object;
+        var listing = Mock.Of<IItemListingServices>(l =>
+            l.Channels == channelManager.Object
+            && l.Collections == collectionManager.Object
+            && l.UserViews == userViewManager.Object
+            && l.TVSeries == tvSeriesManager.Object);
 
-        var result = userView.GetChildren(user, true, PermissiveVisibility.Query(user));
+        var result = userView.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope, Listing = listing });
 
         Assert.Equal(new BaseItem[] { child }, result);
         channelManager.VerifyNoOtherCalls();
@@ -289,15 +291,17 @@ public class FolderGetChildrenCharacterizationTests
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
         BaseItem.ChannelManager = channelManager.Object;
-        Folder.CollectionManager = collectionManager.Object;
-        Folder.UserViewManager = userViewManager.Object;
-        UserView.TVSeriesManager = tvSeriesManager.Object;
+        var listing = Mock.Of<IItemListingServices>(l =>
+            l.Channels == channelManager.Object
+            && l.Collections == collectionManager.Object
+            && l.UserViews == userViewManager.Object
+            && l.TVSeries == tvSeriesManager.Object);
         var sortService = new RecordingItemSortService();
 
         var result = userView.GetChildren(
             user,
             true,
-            new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope, OrderBy = [(ItemSortBy.SortName, SortOrder.Ascending)] },
+            new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope, Listing = listing, OrderBy = [(ItemSortBy.SortName, SortOrder.Ascending)] },
             sortService);
 
         Assert.Equal(new BaseItem[] { child }, result);
@@ -320,14 +324,16 @@ public class FolderGetChildrenCharacterizationTests
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
         BaseItem.ChannelManager = channelManager.Object;
-        Folder.CollectionManager = collectionManager.Object;
-        Folder.UserViewManager = userViewManager.Object;
-        UserView.TVSeriesManager = tvSeriesManager.Object;
+        var listing = Mock.Of<IItemListingServices>(l =>
+            l.Channels == channelManager.Object
+            && l.Collections == collectionManager.Object
+            && l.UserViews == userViewManager.Object
+            && l.TVSeries == tvSeriesManager.Object);
         var sortService = new RecordingItemSortService();
 
         var result = userView.GetRecursiveChildren(
             user,
-            new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope, OrderBy = [(ItemSortBy.SortName, SortOrder.Ascending)] },
+            new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope, Listing = listing, OrderBy = [(ItemSortBy.SortName, SortOrder.Ascending)] },
             out var totalCount,
             sortService);
 

@@ -523,7 +523,8 @@ public sealed class VisibleContentProbeTests
                 Mock.Of<IItemLookupService>(),
                 Mock.Of<IItemRepository>(),
                 Mock.Of<IItemQueryScopeService>(),
-                Scope);
+                Scope,
+                Mock.Of<IItemListingServices>());
 
         private bool LegacyProbe(Folder library, User user)
         {

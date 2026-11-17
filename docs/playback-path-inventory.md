@@ -1227,3 +1227,26 @@ Still static on read paths:
 - the children listing (`UserView`/`Folder` `GetItems` with `ChannelManager`, `CollectionManager`,
   `UserViewManager` and `TVSeriesManager`), which is Phase B;
 - `Folder.LoadChildren`/`IsPlayed`, and `Video.RecordingsManager`, which are Phase C.
+
+## 36. Folder listing services on the query (consolidation step 5, phase B)
+
+`UserView.GetChildren`/`GetRecursiveChildren` and `Folder.GetChildCount` passed the `ChannelManager`,
+`CollectionManager`, `UserViewManager` and `TVSeriesManager` statics to `GetItemList`/`GetItems`.
+They now read `InternalItemsQuery.Listing` (`IItemListingServices`, owner-chosen design next to
+`Visibility`). A user-view listing without it fails through `RequireListing()`.
+
+- `ItemListingServices` (Server.Core) resolves the four managers lazily, because each of them lists folder
+  children itself. It also carries the item sort service. New `Lazy<ICollectionManager>`,
+  `Lazy<IUserViewManager>` and `Lazy<ITVSeriesManager>` registrations back it.
+- `ItemQueryService` fills `Listing` on every query. The controllers that may list a user view
+  (Items, Years, Library, UserViews) and `DtoService` (child counts) inject it. `UserViewBuilder` passes
+  the entry query's listing services on.
+- The user-view catalog and the visible content probe never take it: `UserViewCatalogDependencyTests`
+  forbids them from reaching those managers, even deferred. They only list library children.
+- `UserRootFolder` uses the `IUserViewManager` its `GetItemsInternal` already receives.
+
+Deleted: `Folder.CollectionManager`, `Folder.UserViewManager`, `UserView.TVSeriesManager` and their
+`ApplicationHost` assignments; `entityStaticServices` goes from 14 to 11.
+
+Still static: `BaseItem.ChannelManager`, behind `CanDelete()` (15 overrides) and the channel branch of
+`Series.GetSeasonEpisodes`, which is reached through the `Season` episode chain without a query.

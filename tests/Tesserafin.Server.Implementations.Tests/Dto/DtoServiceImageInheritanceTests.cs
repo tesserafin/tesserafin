@@ -140,6 +140,7 @@ public class DtoServiceImageInheritanceTests
             trickplayManager.Object,
             chapterManager.Object,
             itemCountService.Object,
-            Mock.Of<IStandaloneVisibilityService>());
+            Mock.Of<IStandaloneVisibilityService>(),
+            Mock.Of<IItemListingServices>());
     }
 }

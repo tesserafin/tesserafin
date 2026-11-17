@@ -33,6 +33,7 @@ namespace Tesserafin.Controller.Entities
         private readonly ICollectionManager _collectionManager;
         private readonly IItemSortService _itemSortService;
         private readonly IStandaloneVisibilityService _visibility;
+        private readonly IItemListingServices _listing;
 
         public UserViewBuilder(
             IUserViewManager userViewManager,
@@ -43,9 +44,11 @@ namespace Tesserafin.Controller.Entities
             IChannelManager channelManager,
             ICollectionManager collectionManager,
             IItemSortService itemSortService,
-            IStandaloneVisibilityService visibility)
+            IStandaloneVisibilityService visibility,
+            IItemListingServices listing)
         {
             _visibility = visibility;
+            _listing = listing;
             _userViewManager = userViewManager;
             _libraryManager = libraryManager;
             _logger = logger;
@@ -155,7 +158,7 @@ namespace Tesserafin.Controller.Entities
 
         private IReadOnlyList<BaseItem> GetChildren(Folder folder, User user)
         {
-            var query = new InternalItemsQuery(user) { Visibility = _visibility };
+            var query = new InternalItemsQuery(user) { Visibility = _visibility, Listing = _listing };
             return _itemSortService is null
                 ? folder.GetChildren(user, true, query)
                 : folder.GetChildren(user, true, query, _itemSortService);

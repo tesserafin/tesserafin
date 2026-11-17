@@ -118,7 +118,7 @@ namespace Tesserafin.Controller.Entities
                 return QueryRecursive(query);
             }
 
-            var result = UserViewManager.GetUserViews(new UserViewQuery
+            var result = userViewManager.GetUserViews(new UserViewQuery
             {
                 User = query.User,
                 PresetViews = query.PresetViews
@@ -137,7 +137,7 @@ namespace Tesserafin.Controller.Entities
                 return QueryRecursive(query);
             }
 
-            var result = UserViewManager.GetUserViews(new UserViewQuery
+            var result = userViewManager.GetUserViews(new UserViewQuery
             {
                 User = query.User,
                 PresetViews = query.PresetViews
@@ -146,9 +146,9 @@ namespace Tesserafin.Controller.Entities
             return UserViewBuilder.SortAndPage(result, null, query, itemSortService);
         }
 
-        public override int GetChildCount(User user, IStandaloneVisibilityService scope)
+        public override int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
         {
-            return GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope }).Count;
+            return GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope, Listing = listing }).Count;
         }
 
         protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user, InternalItemsQuery query)

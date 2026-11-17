@@ -48,6 +48,7 @@ namespace Tesserafin.Api.Controllers;
 [Route("")]
 public class LibraryController : BaseTesserafinApiController
 {
+    private readonly IItemListingServices _listing;
     private readonly IStandaloneVisibilityService _visibility;
     private readonly IItemDeletionCommands _deletions;
     private readonly IProviderManager _providerManager;
@@ -82,6 +83,7 @@ public class LibraryController : BaseTesserafinApiController
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
+    /// <param name="listing">Supplies a folder's own listing logic (user views, channels, collections, next up).</param>
     public LibraryController(
         IItemDeletionCommands deletions,
         IProviderManager providerManager,
@@ -97,8 +99,10 @@ public class LibraryController : BaseTesserafinApiController
         ILogger<LibraryController> logger,
         IServerConfigurationManager serverConfigurationManager,
         IItemSortService itemSortService,
-        IStandaloneVisibilityService visibility)
+        IStandaloneVisibilityService visibility,
+        IItemListingServices listing)
     {
+        _listing = listing;
         _visibility = visibility;
         _deletions = deletions;
         _providerManager = providerManager;
@@ -1013,7 +1017,7 @@ public class LibraryController : BaseTesserafinApiController
     private BaseItem? TranslateParentItem(BaseItem item, User user)
     {
         return item.GetParent() is AggregateFolder
-            ? _libraryManager.GetUserRootFolder().GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService)
+            ? _libraryManager.GetUserRootFolder().GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility, Listing = _listing }, _itemSortService)
                 .FirstOrDefault(i => i.PhysicalLocations.Contains(item.Path))
             : item;
     }

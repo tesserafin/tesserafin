@@ -100,9 +100,9 @@ namespace Tesserafin.Controller.Entities.Audio
             return LibraryManager.GetItemList(query);
         }
 
-        public override int GetChildCount(User user, IStandaloneVisibilityService scope)
+        public override int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
         {
-            return IsAccessedByName ? 0 : base.GetChildCount(user, scope);
+            return IsAccessedByName ? 0 : base.GetChildCount(user, scope, listing);
         }
 
         public override bool IsSaveLocalMetadataEnabled()

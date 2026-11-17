@@ -561,6 +561,11 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddTransient(provider => new Lazy<IMediaSourceManager>(provider.GetRequiredService<IMediaSourceManager>));
             serviceCollection.AddTransient(provider => new Lazy<IMediaSegmentManager>(provider.GetRequiredService<IMediaSegmentManager>));
             serviceCollection.AddTransient(provider => new Lazy<IChannelManager>(provider.GetRequiredService<IChannelManager>));
+            // Folder listing hands these to the entities on their query; each of them lists children itself.
+            serviceCollection.AddTransient(provider => new Lazy<ICollectionManager>(provider.GetRequiredService<ICollectionManager>));
+            serviceCollection.AddTransient(provider => new Lazy<IUserViewManager>(provider.GetRequiredService<IUserViewManager>));
+            serviceCollection.AddTransient(provider => new Lazy<ITVSeriesManager>(provider.GetRequiredService<ITVSeriesManager>));
+            serviceCollection.AddSingleton<IItemListingServices, ItemListingServices>();
 
             // LiveTvPresenceProvider (PR108) needs the registered ILiveTvService count to reproduce
             // LiveTvManager.IsLiveTvEnabled, but the in-tree DefaultLiveTvService implementation
@@ -832,9 +837,6 @@ namespace Tesserafin.Server.Core
             BaseItem.ProviderManager = Resolve<IProviderManager>();
             BaseItem.UserDataManager = Resolve<IUserDataManager>();
             CollectionFolder.ApplicationHost = this;
-            Folder.UserViewManager = Resolve<IUserViewManager>();
-            Folder.CollectionManager = Resolve<ICollectionManager>();
-            UserView.TVSeriesManager = Resolve<ITVSeriesManager>();
             Video.RecordingsManager = Resolve<IRecordingsManager>();
         }
 

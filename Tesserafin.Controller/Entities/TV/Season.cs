@@ -131,9 +131,9 @@ namespace Tesserafin.Controller.Entities.TV
             return list;
         }
 
-        public override int GetChildCount(User user, IStandaloneVisibilityService scope)
+        public override int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
         {
-            var result = GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope }).Count;
+            var result = GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope, Listing = listing }).Count;
 
             return result;
         }

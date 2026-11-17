@@ -187,6 +187,12 @@ namespace Tesserafin.Controller.Entities
         /// </remarks>
         public IStandaloneVisibilityService? Visibility { get; set; }
 
+        /// <summary>
+        /// Gets or sets the services a folder's own listing logic needs (user views, channels, collections,
+        /// next up), handed to the entity instead of read from static properties.
+        /// </summary>
+        public IItemListingServices? Listing { get; set; }
+
         public bool? IsFolder { get; set; }
 
         public bool? IsFavorite { get; set; }
@@ -523,6 +529,14 @@ namespace Tesserafin.Controller.Entities
         /// <exception cref="InvalidOperationException">The query carries no scope.</exception>
         public IStandaloneVisibilityService RequireVisibility()
             => Visibility ?? throw new InvalidOperationException("A user-filtered entity read needs a visibility scope on its query.");
+
+        /// <summary>
+        /// Gets the listing services this query carries.
+        /// </summary>
+        /// <returns>The services.</returns>
+        /// <exception cref="InvalidOperationException">The query carries none.</exception>
+        public IItemListingServices RequireListing()
+            => Listing ?? throw new InvalidOperationException("A folder listing needs the listing services on its query.");
 
         public void SetUser(User user)
         {

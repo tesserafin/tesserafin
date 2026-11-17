@@ -122,7 +122,7 @@ namespace Tesserafin.Controller.Entities.TV
             return series.GetPresentationUniqueKey();
         }
 
-        public override int GetChildCount(User user, IStandaloneVisibilityService scope)
+        public override int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
         {
             var seriesKey = GetUniqueSeriesKey(this);
 

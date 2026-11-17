@@ -36,6 +36,7 @@ namespace Tesserafin.Api.Controllers;
 [Tags("Library")]
 public class ItemsController : BaseTesserafinApiController
 {
+    private readonly IItemListingServices _listing;
     private readonly IStandaloneVisibilityService _visibility;
     private readonly IUserManager _userManager;
     private readonly ILibraryManager _libraryManager;
@@ -62,6 +63,7 @@ public class ItemsController : BaseTesserafinApiController
     /// <param name="itemQueryService">Instance of the <see cref="IItemQueryService"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
+    /// <param name="listing">Supplies a folder's own listing logic (user views, channels, collections, next up).</param>
     public ItemsController(
         IUserManager userManager,
         ILibraryManager libraryManager,
@@ -73,8 +75,10 @@ public class ItemsController : BaseTesserafinApiController
         ISearchManager searchManager,
         IItemQueryService itemQueryService,
         IItemSortService itemSortService,
-        IStandaloneVisibilityService visibility)
+        IStandaloneVisibilityService visibility,
+        IItemListingServices listing)
     {
+        _listing = listing;
         _visibility = visibility;
         _userManager = userManager;
         _libraryManager = libraryManager;
@@ -631,7 +635,7 @@ public class ItemsController : BaseTesserafinApiController
         }
         else
         {
-            var itemsArray = folder.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService);
+            var itemsArray = folder.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility, Listing = _listing }, _itemSortService);
             result = new QueryResult<BaseItem>(itemsArray);
         }
 
@@ -965,7 +969,7 @@ public class ItemsController : BaseTesserafinApiController
         var excludeFolderIds = user.GetPreferenceValues<Guid>(PreferenceKind.LatestItemExcludes);
         if (parentIdGuid.IsEmpty() && excludeFolderIds.Length > 0)
         {
-            ancestorIds = _libraryManager.GetUserRootFolder().GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService)
+            ancestorIds = _libraryManager.GetUserRootFolder().GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility, Listing = _listing }, _itemSortService)
                 .Where(i => i is Folder)
                 .Where(i => !excludeFolderIds.Contains(i.Id))
                 .Select(i => i.Id)

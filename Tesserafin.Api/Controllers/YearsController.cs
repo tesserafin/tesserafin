@@ -29,6 +29,7 @@ namespace Tesserafin.Api.Controllers;
 [Tags("Year")]
 public class YearsController : BaseTesserafinApiController
 {
+    private readonly IItemListingServices _listing;
     private readonly IStandaloneVisibilityService _visibility;
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
@@ -43,13 +44,16 @@ public class YearsController : BaseTesserafinApiController
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
+    /// <param name="listing">Supplies a folder's own listing logic (user views, channels, collections, next up).</param>
     public YearsController(
         ILibraryManager libraryManager,
         IUserManager userManager,
         IDtoService dtoService,
         IItemSortService itemSortService,
-        IStandaloneVisibilityService visibility)
+        IStandaloneVisibilityService visibility,
+        IItemListingServices listing)
     {
+        _listing = listing;
         _visibility = visibility;
         _libraryManager = libraryManager;
         _userManager = userManager;
@@ -108,6 +112,7 @@ public class YearsController : BaseTesserafinApiController
         var query = new InternalItemsQuery(user)
         {
             Visibility = _visibility,
+            Listing = _listing,
             ExcludeItemTypes = excludeItemTypes,
             IncludeItemTypes = includeItemTypes,
             MediaTypes = mediaTypes,
@@ -128,7 +133,7 @@ public class YearsController : BaseTesserafinApiController
             }
             else
             {
-                items = recursive ? folder.GetRecursiveChildren(user, query, out totalCount, _itemSortService) : folder.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService).Where(Filter).ToArray();
+                items = recursive ? folder.GetRecursiveChildren(user, query, out totalCount, _itemSortService) : folder.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility, Listing = _listing }, _itemSortService).Where(Filter).ToArray();
             }
         }
         else

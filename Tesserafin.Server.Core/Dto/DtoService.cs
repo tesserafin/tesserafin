@@ -112,6 +112,8 @@ namespace Tesserafin.Server.Core.Dto
             }
         }.ToFrozenDictionary();
 
+        private readonly IItemListingServices _listing;
+
         private readonly IStandaloneVisibilityService _visibility;
 
         private readonly ILogger<DtoService> _logger;
@@ -147,8 +149,10 @@ namespace Tesserafin.Server.Core.Dto
             ITrickplayManager trickplayManager,
             IChapterManager chapterManager,
             IItemCountService itemCountService,
-            IStandaloneVisibilityService visibility)
+            IStandaloneVisibilityService visibility,
+            IItemListingServices listing)
         {
+            _listing = listing;
             _visibility = visibility;
             _logger = logger;
             _libraryManager = libraryManager;
@@ -601,7 +605,7 @@ namespace Tesserafin.Server.Core.Dto
 
                     if (options.ContainsField(ItemFields.ChildCount))
                     {
-                        dto.ChildCount ??= GetChildCount(folder, user, childCountBatch, _visibility);
+                        dto.ChildCount ??= GetChildCount(folder, user, childCountBatch, _visibility, _listing);
                     }
                 }
 
@@ -660,7 +664,7 @@ namespace Tesserafin.Server.Core.Dto
             };
         }
 
-        private static int GetChildCount(Folder folder, User user, Dictionary<Guid, int>? childCountBatch, IStandaloneVisibilityService visibility)
+        private static int GetChildCount(Folder folder, User user, Dictionary<Guid, int>? childCountBatch, IStandaloneVisibilityService visibility, IItemListingServices listing)
         {
             // Right now this is too slow to calculate for top level folders on a per-user basis
             // Just return something so that apps that are expecting a value won't think the folders are empty
@@ -676,7 +680,7 @@ namespace Tesserafin.Server.Core.Dto
             }
 
             // Fall back to individual query for special cases (Series, Season, etc.)
-            return folder.GetChildCount(user, visibility);
+            return folder.GetChildCount(user, visibility, listing);
         }
 
         private static void SetBookProperties(BaseItemDto dto, Book item)

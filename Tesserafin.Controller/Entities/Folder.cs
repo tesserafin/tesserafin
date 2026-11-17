@@ -51,8 +51,6 @@ namespace Tesserafin.Controller.Entities
             LinkedChildren = Array.Empty<LinkedChild>();
         }
 
-        public static IUserViewManager UserViewManager { get; set; }
-
         /// <summary>
         /// Gets or sets a value indicating whether this instance is root.
         /// </summary>
@@ -195,8 +193,6 @@ namespace Tesserafin.Controller.Entities
                 return true;
             }
         }
-
-        public static ICollectionManager CollectionManager { get; set; }
 
         public override bool CanDelete()
         {
@@ -889,19 +885,17 @@ namespace Tesserafin.Controller.Entities
             });
         }
 
-        public virtual int GetChildCount(User user, IStandaloneVisibilityService scope)
+        public virtual int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
         {
             if (LinkedChildren.Length > 0)
             {
                 if (this is not ICollectionFolder)
                 {
-                    return GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope }).Count;
+                    return GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope, Listing = listing }).Count;
                 }
             }
 
-            // GetChildCount isn't part of the GetItemsInternal/GetItems/GetItemList chain the
-            // channelManager parameter was threaded through (out of scope: a much wider virtual
-            // with many more overrides/callers) — falls back to the static here.
+            // The listing services are the caller's (IItemListingServices), not statics.
             // Documented legitimate caller of the obsolete 5-parameter overload — see
             // docs/major-rewrite-plan-v13.md § PR28/N.
 #pragma warning disable CS0618
@@ -912,15 +906,16 @@ namespace Tesserafin.Controller.Entities
                     Limit = 0,
                     Parent = this,
                     Visibility = scope,
+                    Listing = listing,
                     DtoOptions = new DtoOptions(false)
                     {
                         EnableImages = false
                     }
                 },
-                ChannelManager,
-                CollectionManager,
-                UserViewManager,
-                UserView.TVSeriesManager);
+                listing.Channels,
+                listing.Collections,
+                listing.UserViews,
+                listing.TVSeries);
 #pragma warning restore CS0618
 
             return result.TotalRecordCount;
