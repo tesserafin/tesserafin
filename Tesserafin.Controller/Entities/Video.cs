@@ -559,7 +559,7 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        private new Task RefreshMetadataForOwnedVideo(
+        private Task RefreshMetadataForOwnedVideo(
             IItemDeletionCommands deletions,
             IItemWriteCommands writes,
             IProviderManager providers,
@@ -635,7 +635,7 @@ namespace Tesserafin.Controller.Entities
                 video.OwnerId = Id;
             }
 
-            await RefreshMetadataForOwnedItem(deletions, writes, providers, video, copyTitleMetadata, newOptions, cancellationToken).ConfigureAwait(false);
+            await writes.RefreshOwnedMetadataAsync(this, video, copyTitleMetadata, deletions, newOptions, cancellationToken).ConfigureAwait(false);
         }
 
         public override IEnumerable<FileSystemMetadata> GetDeletePaths()

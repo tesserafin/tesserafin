@@ -1532,6 +1532,10 @@ namespace Tesserafin.Controller.Entities
                         requiresSave = await RefreshedOwnedItems(deletions, writes, providers, options, GetFileSystemChildren(options.DirectoryService), cancellationToken).ConfigureAwait(false);
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     Logger.LogError(ex, "Error refreshing owned items for {Path}", Path ?? Name);
@@ -1626,73 +1630,12 @@ namespace Tesserafin.Controller.Entities
                 return false;
             }
 
-            return await RefreshExtras(deletions, writes, providers, this, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
+            return await writes.RefreshExtrasAsync(this, deletions, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
         }
 
         protected virtual FileSystemMetadata[] GetFileSystemChildren(IDirectoryService directoryService)
         {
             return directoryService.GetFileSystemEntries(ContainingFolderPath);
-        }
-
-        private async Task<bool> RefreshExtras(IItemDeletionCommands deletions, IItemWriteCommands writes, IProviderManager providers, BaseItem item, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
-        {
-            var extras = LibraryManager.FindExtras(item, fileSystemChildren, options.DirectoryService).ToArray();
-            var newExtraIds = Array.ConvertAll(extras, x => x.Id);
-
-            var currentExtraIds = LibraryManager.GetItemList(new InternalItemsQuery()
-            {
-                OwnerIds = [item.Id]
-            }).Select(e => e.Id).ToArray();
-
-            var extrasChanged = !currentExtraIds.OrderBy(x => x).SequenceEqual(newExtraIds.OrderBy(x => x));
-
-            if (!extrasChanged && !options.ReplaceAllMetadata && options.MetadataRefreshMode != MetadataRefreshMode.FullRefresh)
-            {
-                return false;
-            }
-
-            var ownerId = item.Id;
-
-            var tasks = extras.Select(i =>
-            {
-                var subOptions = new MetadataRefreshOptions(options);
-                if (!i.OwnerId.Equals(ownerId) || !i.ParentId.IsEmpty())
-                {
-                    subOptions.ForceSave = true;
-                }
-
-                i.OwnerId = ownerId;
-                i.ParentId = Guid.Empty;
-                return RefreshMetadataForOwnedItem(deletions, writes, providers, i, true, subOptions, cancellationToken);
-            });
-
-            var removedExtraIds = currentExtraIds.Where(e => !newExtraIds.Contains(e)).ToArray();
-            if (removedExtraIds.Length > 0)
-            {
-                var removedExtras = LibraryManager.GetItemList(new InternalItemsQuery()
-                {
-                    ItemIds = removedExtraIds
-                });
-                foreach (var removedExtra in removedExtras)
-                {
-                    // Only delete items that are actual extras (have ExtraType set)
-                    // Items with OwnerId but no ExtraType might be alternate versions, not extras
-                    if (removedExtra.ExtraType.HasValue)
-                    {
-                        await deletions.DeleteAsync(
-                            removedExtra,
-                            new DeleteOptions()
-                            {
-                                DeleteFileLocation = false
-                            },
-                            cancellationToken).ConfigureAwait(false);
-                    }
-                }
-            }
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-
-            return true;
         }
 
         public string GetPresentationUniqueKey()
@@ -2706,71 +2649,7 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        protected async Task RefreshMetadataForOwnedItem(IItemDeletionCommands deletions, IItemWriteCommands writes, IProviderManager providers, BaseItem ownedItem, bool copyTitleMetadata, MetadataRefreshOptions options, CancellationToken cancellationToken)
-        {
-            var newOptions = new MetadataRefreshOptions(options)
-            {
-                SearchResult = null
-            };
-
-            var item = this;
-
-            if (copyTitleMetadata)
-            {
-                // Take some data from the main item, for querying purposes
-                if (!item.Genres.SequenceEqual(ownedItem.Genres, StringComparer.Ordinal))
-                {
-                    newOptions.ForceSave = true;
-                    ownedItem.Genres = item.Genres;
-                }
-
-                if (!item.Studios.SequenceEqual(ownedItem.Studios, StringComparer.Ordinal))
-                {
-                    newOptions.ForceSave = true;
-                    ownedItem.Studios = item.Studios;
-                }
-
-                if (!item.ProductionLocations.SequenceEqual(ownedItem.ProductionLocations, StringComparer.Ordinal))
-                {
-                    newOptions.ForceSave = true;
-                    ownedItem.ProductionLocations = item.ProductionLocations;
-                }
-
-                if (item.CommunityRating != ownedItem.CommunityRating)
-                {
-                    ownedItem.CommunityRating = item.CommunityRating;
-                    newOptions.ForceSave = true;
-                }
-
-                if (item.CriticRating != ownedItem.CriticRating)
-                {
-                    ownedItem.CriticRating = item.CriticRating;
-                    newOptions.ForceSave = true;
-                }
-
-                if (!string.Equals(item.Overview, ownedItem.Overview, StringComparison.Ordinal))
-                {
-                    ownedItem.Overview = item.Overview;
-                    newOptions.ForceSave = true;
-                }
-
-                if (!string.Equals(item.OfficialRating, ownedItem.OfficialRating, StringComparison.Ordinal))
-                {
-                    ownedItem.OfficialRating = item.OfficialRating;
-                    newOptions.ForceSave = true;
-                }
-
-                if (!string.Equals(item.CustomRating, ownedItem.CustomRating, StringComparison.Ordinal))
-                {
-                    ownedItem.CustomRating = item.CustomRating;
-                    newOptions.ForceSave = true;
-                }
-            }
-
-            await ownedItem.RefreshMetadata(deletions, writes, providers, newOptions, cancellationToken).ConfigureAwait(false);
-        }
-
-        protected async Task RefreshMetadataForOwnedVideo(IItemDeletionCommands deletions, IItemWriteCommands writes, IProviderManager providers, MetadataRefreshOptions options, bool copyTitleMetadata, string path, CancellationToken cancellationToken)
+        protected async Task RefreshMetadataForOwnedVideo(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, bool copyTitleMetadata, string path, CancellationToken cancellationToken)
         {
             var newOptions = new MetadataRefreshOptions(options)
             {
@@ -2797,7 +2676,7 @@ namespace Tesserafin.Controller.Entities
                 video.OwnerId = Id;
             }
 
-            await RefreshMetadataForOwnedItem(deletions, writes, providers, video, copyTitleMetadata, newOptions, cancellationToken).ConfigureAwait(false);
+            await writes.RefreshOwnedMetadataAsync(this, video, copyTitleMetadata, deletions, newOptions, cancellationToken).ConfigureAwait(false);
         }
 
         public string GetEtag(User user)

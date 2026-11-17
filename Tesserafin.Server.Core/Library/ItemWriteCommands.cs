@@ -15,7 +15,7 @@ using Tesserafin.Model.IO;
 namespace Tesserafin.Server.Core.Library;
 
 /// <summary>Prepares item/version writes, saves their graph, then publishes cache and notifications.</summary>
-internal sealed class ItemWriteCommands(
+internal sealed partial class ItemWriteCommands(
     ItemVersionGraphPlanner versions,
     IItemPersistenceService persistence,
     IItemCacheStore cache,
@@ -27,8 +27,13 @@ internal sealed class ItemWriteCommands(
     ActiveRecordings recordings,
     INamedItemCatalog catalog,
     NamedItemIdentity namedItems,
+    IItemResolutionService resolution,
+    IItemRepository repository,
     ILogger<ItemWriteCommands> logger) : IItemWriteCommands
 {
+    private readonly IItemResolutionService _resolution = resolution;
+    private readonly IItemRepository _repository = repository;
+
     private readonly object _namedItemGate = new();
 
     public T GetOrCreateNamedItem<T>(string name, CancellationToken cancellationToken)
