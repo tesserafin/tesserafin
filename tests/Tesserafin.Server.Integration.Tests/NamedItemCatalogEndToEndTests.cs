@@ -180,13 +180,13 @@ public sealed class NamedItemCatalogEndToEndTests(TesserafinApplicationFactory f
         Assert.Null(album.GetMusicArtist());
         Assert.Null(catalog.Find<MusicArtist>(name));
         var named = writes.GetOrCreateNamedItem<MusicArtist>(name, TestContext.Current.CancellationToken);
-        Assert.Equal(named.Id, album.MusicArtist.Id);
+        Assert.Equal(named.Id, Assert.IsType<MusicArtist>(album.MusicArtist).Id);
         var folder = new MusicArtist { Id = Guid.NewGuid(), Name = name, ParentId = Guid.NewGuid(), Path = Path.Combine(Path.GetTempPath(), mark) };
         writes.CreateItems([folder], null, TestContext.Current.CancellationToken);
         Assert.Equal(folder.Id, catalog.Find<MusicArtist>(name)!.Id);
         Assert.Equal(folder.Id, catalog.GetId<MusicArtist>(name));
         Assert.Equal(folder.Id, writes.GetOrCreateNamedItem<MusicArtist>(name, TestContext.Current.CancellationToken).Id);
-        Assert.Equal(folder.Id, album.MusicArtist.Id);
+        Assert.Equal(folder.Id, Assert.IsType<MusicArtist>(album.MusicArtist).Id);
 
         const int year = 2998;
         writes.CreateItems(
