@@ -259,18 +259,43 @@ the same list as §5. Encoding options a client adds to the address change nothi
 What lost its consumer: for a local film with an HLS output profile, the legacy transcode decision
 (`PlaybackSessionPlanner`/`StreamBuilder`), the `ToStreamInfo` Transcode branch and the
 `/Videos/{id}/master.m3u8` url are no longer reached for an SDR transcode. Remaining consumers of
-those paths, by name - nothing is deleted globally while they exist:
-
-| Legacy path | Still reached by |
-| --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | non-film video (episodes, home videos), audio, Live TV, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a film needing tone mapping, a burnt-in subtitle, or with no HLS output profile; a film source that is not a local file |
-| `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
-| `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a film served from its session |
-| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | non-film video, audio, Live TV; a film the server does not serve from the session |
+those paths: §7.
 
 Outside this slice: HDR tone mapping and subtitle burn-in (explicitly), a transcode over plain HTTP,
 target codecs other than H.264/AAC, other media families, the global flag and the shadow.
 
+## 7. Loop 4 slice: local episode on the same journey (delivered)
+
+Scenario: an `Episode` in a local file, played by the same client and in the same three ways as
+a film: direct play (§4), HLS remux (§5) and SDR H.264/AAC transcode (§6). Nothing about the
+delivery depends on the item being a film; only the controller's scope did.
+
+```
+POST/PUT /Playback/Sessions   PlaybackSessionsController opens the LocalVideoPlanner scope for a
+          video item that is a Movie OR an Episode (was: Movie). Every step after it - candidate
+          sources, user defaults per source, version preference, executable remux/transcode,
+          descriptor, delivery guard, plan-built encoding request - is §4 to §6 unchanged.
+```
+
+Renamed without aliases: `EngineFilmPlanner` -> `LocalVideoPlanner`, `EngineFilmRequest` ->
+`LocalVideoRequest`, `EngineFilmDescriptorMapper` -> `LocalVideoDescriptorMapper`. Web:
+`directPlayFilm*.ts` -> `sessionVideo*.ts`; `isSessionVideoCandidate` accepts `Movie` and
+`Episode` on the local HTML video player.
+
+Proof: `Episode_StartAndSeek_…`, `RemuxEpisode_StartSeekStop_…`, `TranscodeEpisode_AudioTheClient…`
+and `TranscodeEpisode_AudioTrackChanged_…` (PUT re-plan) run the film tests' assertions on an
+episode under its own series, on the host where the legacy planner and the live-stream resolver
+throw; all four are required by name. Narrowing the scope back to `Movie` turns exactly these four
+red with "The legacy planner (StreamBuilder) was reached".
+
+Remaining consumers by name. Nothing is deleted globally while one of them still needs it:
+
+| Legacy path | Still reached by |
+| --- | --- |
+| `PlaybackSessionPlanner` / `StreamBuilder` | other video families (home videos, music videos, trailers, extras), audio, Live TV, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a film or episode needing tone mapping, a burnt-in subtitle, or with no HLS output profile; a source that is not a local file |
+| `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
+| `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a film or an episode served from its session |
+| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | other video families, audio, Live TV; a film or episode the server does not serve from the session |
 
 ## 8. Shared model boundary (consolidation step 4, candidate)
 
