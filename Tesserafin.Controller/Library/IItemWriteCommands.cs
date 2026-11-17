@@ -48,6 +48,22 @@ public interface IItemWriteCommands
     /// <returns>Whether the owner's version paths or link count changed.</returns>
     Task<bool> RefreshOwnedVideosAsync(Video owner, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken);
 
+    /// <summary>Transfers a removed primary's versions before deleting only its catalogue entry.</summary>
+    /// <param name="previous">The previous primary identity.</param>
+    /// <param name="replacement">The saved replacement primary identity.</param>
+    /// <param name="parent">The scan's captured parent.</param>
+    /// <param name="deletions">Explicit catalogue-only deletion.</param>
+    /// <param name="cancellationToken">Cancels admission and staged work.</param>
+    /// <returns>Version transfer, reference rerouting and previous-primary deletion.</returns>
+    Task ReplacePrimaryVersionAsync(Video previous, Video replacement, Folder parent, IItemDeletionCommands deletions, CancellationToken cancellationToken);
+
+    /// <summary>Transfers a primary's versions and retains it as a local alternate.</summary>
+    /// <param name="previous">The previous primary identity.</param>
+    /// <param name="replacement">The saved replacement primary identity.</param>
+    /// <param name="cancellationToken">Cancels admission and staged work.</param>
+    /// <returns>Version transfer and reference rerouting.</returns>
+    Task DemotePrimaryVersionAsync(Video previous, Video replacement, CancellationToken cancellationToken);
+
     void CreateItem(BaseItem item, BaseItem? parent);
 
     void CreateItems(IReadOnlyList<BaseItem> items, BaseItem? parent, CancellationToken cancellationToken);

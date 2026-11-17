@@ -558,7 +558,6 @@ namespace Tesserafin.Controller.Entities
                                 Logger.LogDebug("Deferring deletion of replaced primary: {Path}", item.Path);
                                 replacedPrimaries.Add((primaryVideo, newPrimary));
                                 actuallyRemoved.Add(item);
-                                item.SetParent(null);
                                 continue;
                             }
                         }
@@ -590,32 +589,7 @@ namespace Tesserafin.Controller.Entities
                         newPrimary.Name,
                         newPrimary.Id);
 
-                    // Reroute collection/playlist references from old primary to new primary
-                    await services.Writes.RerouteLinkedChildReferencesAsync(oldPrimary.Id, newPrimary.Id, cancellationToken).ConfigureAwait(false);
-
-                    // Transfer alternates from old primary to new primary
-                    var localAlternateIds = LibraryManager.GetLocalAlternateVersionIds(oldPrimary).ToHashSet();
-                    var allAlternateIds = localAlternateIds
-                        .Concat(LibraryManager.GetLinkedAlternateVersions(oldPrimary).Select(v => v.Id))
-                        .Distinct()
-                        .ToList();
-
-                    foreach (var altId in allAlternateIds)
-                    {
-                        if (LibraryManager.GetItemById(altId) is Video altVideo && !altVideo.Id.Equals(newPrimary.Id))
-                        {
-                            altVideo.SetPrimaryVersionId(newPrimary.Id);
-                            altVideo.OwnerId = localAlternateIds.Contains(altVideo.Id) ? newPrimary.Id : Guid.Empty;
-                            await altVideo.UpdateToRepositoryAsync(services.Writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
-                        }
-                    }
-
-                    // Clear alternate arrays so DeleteItem won't trigger promotion
-                    oldPrimary.LocalAlternateVersions = [];
-                    oldPrimary.LinkedAlternateVersions = [];
-
-                    // Safe to delete now — no promotion will happen
-                    await services.Deletions.DeleteAsync(oldPrimary, new DeleteOptions { DeleteFileLocation = false }, this, cancellationToken).ConfigureAwait(false);
+                    await services.Writes.ReplacePrimaryVersionAsync(oldPrimary, newPrimary, this, services.Deletions, cancellationToken).ConfigureAwait(false);
                 }
 
                 // Demote old primaries that are now alternate versions of newly created primaries.
@@ -650,33 +624,7 @@ namespace Tesserafin.Controller.Entities
                         newPrimary.Name,
                         newPrimary.Id);
 
-                    // First: update old primary's alternate items to point to new primary.
-                    // Order matters — update alternates FIRST so they don't get orphan-deleted
-                    // when old primary's arrays are cleared.
-                    var oldAlternateIds = LibraryManager.GetLocalAlternateVersionIds(oldPrimary)
-                        .Concat(LibraryManager.GetLinkedAlternateVersions(oldPrimary).Select(v => v.Id))
-                        .Distinct()
-                        .ToList();
-
-                    foreach (var altId in oldAlternateIds)
-                    {
-                        if (LibraryManager.GetItemById(altId) is Video altVideo && !altVideo.Id.Equals(newPrimary.Id))
-                        {
-                            altVideo.SetPrimaryVersionId(newPrimary.Id);
-                            altVideo.OwnerId = newPrimary.Id;
-                            await altVideo.UpdateToRepositoryAsync(services.Writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
-                        }
-                    }
-
-                    // Then: demote old primary — clear its arrays and set it as alternate of new primary
-                    oldPrimary.LocalAlternateVersions = [];
-                    oldPrimary.LinkedAlternateVersions = [];
-                    oldPrimary.SetPrimaryVersionId(newPrimary.Id);
-                    oldPrimary.OwnerId = newPrimary.Id;
-                    await oldPrimary.UpdateToRepositoryAsync(services.Writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
-
-                    // Re-route playlist/collection references from old primary to new primary
-                    await services.Writes.RerouteLinkedChildReferencesAsync(oldPrimary.Id, newPrimary.Id, cancellationToken).ConfigureAwait(false);
+                    await services.Writes.DemotePrimaryVersionAsync(oldPrimary, newPrimary, cancellationToken).ConfigureAwait(false);
                 }
 
                 // After removing items, reattach any detached user data to remaining children
