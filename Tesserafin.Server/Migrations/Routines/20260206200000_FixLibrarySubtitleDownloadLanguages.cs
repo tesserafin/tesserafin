@@ -19,6 +19,7 @@ internal class FixLibrarySubtitleDownloadLanguages : IAsyncMigrationRoutine
 {
     private readonly ILocalizationManager _localizationManager;
     private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryStructureReader _libraryStructure;
     private readonly ILogger _logger;
 
     /// <summary>
@@ -26,16 +27,19 @@ internal class FixLibrarySubtitleDownloadLanguages : IAsyncMigrationRoutine
     /// </summary>
     /// <param name="localizationManager">The Localization manager.</param>
     /// <param name="startupLogger">The startup logger for Startup UI integration.</param>
+    /// <param name="libraryStructure">Configured library reader.</param>
     /// <param name="libraryManager">The Library manager.</param>
     /// <param name="logger">The logger.</param>
     public FixLibrarySubtitleDownloadLanguages(
         ILocalizationManager localizationManager,
         IStartupLogger<FixLibrarySubtitleDownloadLanguages> startupLogger,
         ILibraryManager libraryManager,
+        ILibraryStructureReader libraryStructure,
         ILogger<FixLibrarySubtitleDownloadLanguages> logger)
     {
         _localizationManager = localizationManager;
         _libraryManager = libraryManager;
+        _libraryStructure = libraryStructure;
         _logger = startupLogger.With(logger);
     }
 
@@ -44,7 +48,7 @@ internal class FixLibrarySubtitleDownloadLanguages : IAsyncMigrationRoutine
     {
         _logger.LogInformation("Starting to fix library subtitle download languages.");
 
-        var virtualFolders = _libraryManager.GetVirtualFolders(false);
+        var virtualFolders = _libraryStructure.GetVirtualFolders();
 
         foreach (var virtualFolder in virtualFolders)
         {

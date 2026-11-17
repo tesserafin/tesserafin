@@ -15,17 +15,19 @@ internal class RemoveDownloadImagesInAdvance : IMigrationRoutine
 {
     private readonly ILogger<RemoveDownloadImagesInAdvance> _logger;
     private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryStructureReader _libraryStructure;
 
-    public RemoveDownloadImagesInAdvance(ILogger<RemoveDownloadImagesInAdvance> logger, ILibraryManager libraryManager)
+    public RemoveDownloadImagesInAdvance(ILogger<RemoveDownloadImagesInAdvance> logger, ILibraryManager libraryManager, ILibraryStructureReader libraryStructure)
     {
         _logger = logger;
         _libraryManager = libraryManager;
+        _libraryStructure = libraryStructure;
     }
 
     /// <inheritdoc/>
     public void Perform()
     {
-        var virtualFolders = _libraryManager.GetVirtualFolders(false);
+        var virtualFolders = _libraryStructure.GetVirtualFolders();
         _logger.LogInformation("Removing 'RemoveDownloadImagesInAdvance' settings in all the libraries");
         foreach (var virtualFolder in virtualFolders)
         {

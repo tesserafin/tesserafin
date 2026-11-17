@@ -22,7 +22,7 @@ public class SystemManager : ISystemManager
     private readonly IServerConfigurationManager _configurationManager;
     private readonly IStartupOptions _startupOptions;
     private readonly IInstallationManager _installationManager;
-    private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryStructureReader _libraryStructure;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SystemManager"/> class.
@@ -33,7 +33,7 @@ public class SystemManager : ISystemManager
     /// <param name="configurationManager">Instance of <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="startupOptions">Instance of <see cref="IStartupOptions"/>.</param>
     /// <param name="installationManager">Instance of <see cref="IInstallationManager"/>.</param>
-    /// <param name="libraryManager">Instance of <see cref="ILibraryManager"/>.</param>
+    /// <param name="libraryStructure">Instance of <see cref="ILibraryStructureReader"/>.</param>
     public SystemManager(
         IHostApplicationLifetime applicationLifetime,
         IServerApplicationHost applicationHost,
@@ -41,7 +41,7 @@ public class SystemManager : ISystemManager
         IServerConfigurationManager configurationManager,
         IStartupOptions startupOptions,
         IInstallationManager installationManager,
-        ILibraryManager libraryManager)
+        ILibraryStructureReader libraryStructure)
     {
         _applicationLifetime = applicationLifetime;
         _applicationHost = applicationHost;
@@ -49,7 +49,7 @@ public class SystemManager : ISystemManager
         _configurationManager = configurationManager;
         _startupOptions = startupOptions;
         _installationManager = installationManager;
-        _libraryManager = libraryManager;
+        _libraryStructure = libraryStructure;
     }
 
     /// <inheritdoc />
@@ -85,7 +85,7 @@ public class SystemManager : ISystemManager
     /// <inheritdoc/>
     public SystemStorageInfo GetSystemStorageInfo()
     {
-        var virtualFolderInfos = _libraryManager
+        var virtualFolderInfos = _libraryStructure
             .GetVirtualFolders()
             .Where(e => !string.IsNullOrWhiteSpace(e.ItemId)) // this should not be null but for some users it is.
             .Select(e => new LibraryStorageInfo()

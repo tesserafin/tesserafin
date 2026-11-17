@@ -106,14 +106,6 @@ namespace Tesserafin.Controller.Library
         Task ValidatePeopleAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, IProgress<double> progress, CancellationToken cancellationToken);
 
         /// <summary>
-        /// Gets the default view.
-        /// </summary>
-        /// <returns>IEnumerable{VirtualFolderInfo}.</returns>
-        List<VirtualFolderInfo> GetVirtualFolders();
-
-        List<VirtualFolderInfo> GetVirtualFolders(bool includeRefreshState);
-
-        /// <summary>
         /// Gets the item by id, as T, and validates user access.
         /// </summary>
         /// <param name="id">The item id.</param>

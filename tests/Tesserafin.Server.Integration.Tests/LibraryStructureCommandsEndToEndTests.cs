@@ -11,7 +11,9 @@ using Tesserafin.Api.Models.LibraryStructureDto;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Configuration;
+using Tesserafin.Model.Entities;
 using Xunit;
 
 namespace Tesserafin.Server.Integration.Tests;
@@ -19,6 +21,45 @@ namespace Tesserafin.Server.Integration.Tests;
 public sealed class LibraryStructureCommandsEndToEndTests(TesserafinApplicationFactory factory) : IClassFixture<TesserafinApplicationFactory>
 {
     private static string? _accessToken;
+
+    [Fact]
+    public async Task HttpRead_UsesTheStructureReader_ReturnsOptionsAndLocations_AndPreservesDefinitionAndSources()
+    {
+        using var client = await ClientAsync();
+        using var sources = new Sources();
+        var commands = factory.Services.GetRequiredService<ILibraryStructureCommands>();
+        var reader = factory.Services.GetRequiredService<ILibraryStructureReader>();
+        var name = "read-structure-" + Guid.NewGuid().ToString("N");
+        var options = Options(sources.First);
+        options.SaveLocalMetadata = true;
+        await commands.AddVirtualFolderAsync(name, CollectionTypeOptions.movies, options, false, TestContext.Current.CancellationToken);
+        try
+        {
+            var direct = reader.GetVirtualFolders().Single(f => f.Name == name);
+            Assert.Null(direct.RefreshStatus);
+            var root = factory.Services.GetRequiredService<IServerConfigurationManager>().ApplicationPaths.DefaultUserViewsPath;
+            var definition = Path.Combine(root, name, "options.xml");
+            var bytes = await File.ReadAllBytesAsync(definition, TestContext.Current.CancellationToken);
+            for (var i = 0; i < 2; i++)
+            {
+                var folders = await client.GetFromJsonAsync<VirtualFolderInfo[]>("Library/VirtualFolders", JsonDefaults.Options, TestContext.Current.CancellationToken);
+                var folder = Assert.Single(Assert.IsType<VirtualFolderInfo[]>(folders), f => f.Name == name);
+                Assert.Equal(direct.ItemId, folder.ItemId);
+                Assert.Equal(CollectionTypeOptions.movies, folder.CollectionType);
+                Assert.Equal(sources.First, Assert.Single(folder.Locations));
+                Assert.True(folder.LibraryOptions.SaveLocalMetadata);
+                Assert.NotNull(folder.RefreshStatus);
+            }
+
+            Assert.Equal(bytes, await File.ReadAllBytesAsync(definition, TestContext.Current.CancellationToken));
+            Assert.Null(reader.GetVirtualFolders().Single(f => f.Name == name).RefreshStatus);
+            sources.AssertMediaUntouched();
+        }
+        finally
+        {
+            await commands.RemoveVirtualFolderAsync(name, false, TestContext.Current.CancellationToken);
+        }
+    }
 
     [Fact]
     public async Task CompleteJourney_ChangesDefinitionAndPaths_ButNeverDeletesSourceMedia()
@@ -43,7 +84,7 @@ public sealed class LibraryStructureCommandsEndToEndTests(TesserafinApplicationF
             Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         }
 
-        var folder = factory.Services.GetRequiredService<ILibraryManager>().GetVirtualFolders().Single(folder => folder.Name == name);
+        var folder = factory.Services.GetRequiredService<ILibraryStructureReader>().GetVirtualFolders().Single(folder => folder.Name == name);
         Assert.Equal(2, folder.Locations.Length);
         var options = Options(sources.First, sources.Second);
         options.EnableRealtimeMonitor = false;
@@ -63,7 +104,7 @@ public sealed class LibraryStructureCommandsEndToEndTests(TesserafinApplicationF
             Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         }
 
-        folder = factory.Services.GetRequiredService<ILibraryManager>().GetVirtualFolders().Single(folder => folder.Name == renamed);
+        folder = factory.Services.GetRequiredService<ILibraryStructureReader>().GetVirtualFolders().Single(folder => folder.Name == renamed);
         Assert.Equal(sources.First, Assert.Single(folder.Locations));
         Assert.True(folder.LibraryOptions.SaveLocalMetadata);
         using (var response = await client.DeleteAsync("Library/VirtualFolders?name=" + renamed, TestContext.Current.CancellationToken))
@@ -71,7 +112,7 @@ public sealed class LibraryStructureCommandsEndToEndTests(TesserafinApplicationF
             Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         }
 
-        Assert.DoesNotContain(factory.Services.GetRequiredService<ILibraryManager>().GetVirtualFolders(), folder => folder.Name == name || folder.Name == renamed);
+        Assert.DoesNotContain(factory.Services.GetRequiredService<ILibraryStructureReader>().GetVirtualFolders(), folder => folder.Name == name || folder.Name == renamed);
         sources.AssertMediaUntouched();
     }
 
@@ -86,7 +127,7 @@ public sealed class LibraryStructureCommandsEndToEndTests(TesserafinApplicationF
         var commands = factory.Services.GetRequiredService<ILibraryStructureCommands>();
         var jobs = new[] { sources.First, sources.Second }.Select((path, index) => Task.Run(() => commands.AddVirtualFolderAsync(normalizeNames && index == 1 ? " " + name + " " : name, null, Options(path), false, TestContext.Current.CancellationToken), TestContext.Current.CancellationToken));
         await Task.WhenAll(jobs);
-        var folders = factory.Services.GetRequiredService<ILibraryManager>().GetVirtualFolders().Where(folder => folder.Name.StartsWith(name, StringComparison.Ordinal)).ToArray();
+        var folders = factory.Services.GetRequiredService<ILibraryStructureReader>().GetVirtualFolders().Where(folder => folder.Name.StartsWith(name, StringComparison.Ordinal)).ToArray();
         Assert.Equal(2, folders.Length);
         Assert.Contains(folders, folder => folder.Name == name);
         Assert.Contains(folders, folder => folder.Name == name + "2");
@@ -107,7 +148,7 @@ public sealed class LibraryStructureCommandsEndToEndTests(TesserafinApplicationF
         var commands = factory.Services.GetRequiredService<ILibraryStructureCommands>();
         var name = "failure-" + Guid.NewGuid().ToString("N");
         await commands.AddVirtualFolderAsync(name, null, Options(sources.First), false, TestContext.Current.CancellationToken);
-        var folder = factory.Services.GetRequiredService<ILibraryManager>().GetVirtualFolders().Single(folder => folder.Name == name);
+        var folder = factory.Services.GetRequiredService<ILibraryStructureReader>().GetVirtualFolders().Single(folder => folder.Name == name);
         var root = factory.Services.GetRequiredService<IServerConfigurationManager>().ApplicationPaths.DefaultUserViewsPath;
         var path = Path.Combine(root, name);
         var file = Path.Combine(path, "options.xml");

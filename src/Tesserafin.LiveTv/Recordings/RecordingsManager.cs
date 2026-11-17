@@ -42,6 +42,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IFileSystem _fileSystem;
     private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryStructureReader _libraryStructure;
     private readonly ILibraryStructureCommands _structure;
     private readonly ILibraryScanCoordinator _scans;
     private readonly ILibraryMonitor _libraryMonitor;
@@ -67,6 +68,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     /// <param name="fileSystem">The <see cref="IFileSystem"/>.</param>
     /// <param name="scans">Library scan scheduling and state.</param>
     /// <param name="structure">Library structure commands.</param>
+    /// <param name="libraryStructure">Configured library reader.</param>
     /// <param name="libraryManager">The <see cref="ILibraryManager"/>.</param>
     /// <param name="libraryMonitor">The <see cref="ILibraryMonitor"/>.</param>
     /// <param name="providerManager">The <see cref="IProviderManager"/>.</param>
@@ -84,6 +86,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         IHttpClientFactory httpClientFactory,
         IFileSystem fileSystem,
         ILibraryManager libraryManager,
+        ILibraryStructureReader libraryStructure,
         ILibraryStructureCommands structure,
         ILibraryScanCoordinator scans,
         ILibraryMonitor libraryMonitor,
@@ -102,6 +105,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         _httpClientFactory = httpClientFactory;
         _fileSystem = fileSystem;
         _libraryManager = libraryManager;
+        _libraryStructure = libraryStructure;
         _structure = structure;
         _scans = scans;
         _libraryMonitor = libraryMonitor;
@@ -182,7 +186,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         try
         {
             var recordingFolders = GetRecordingFolders().ToArray();
-            var virtualFolders = _libraryManager.GetVirtualFolders();
+            var virtualFolders = _libraryStructure.GetVirtualFolders();
 
             var allExistingPaths = virtualFolders.SelectMany(i => i.Locations).ToList();
 
@@ -248,7 +252,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         _logger.LogDebug("Removing path from library: {0}", path);
 
         var requiresRefresh = false;
-        var virtualFolders = _libraryManager.GetVirtualFolders();
+        var virtualFolders = _libraryStructure.GetVirtualFolders();
 
         foreach (var virtualFolder in virtualFolders)
         {

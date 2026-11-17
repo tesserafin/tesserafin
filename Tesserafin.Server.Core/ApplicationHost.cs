@@ -605,6 +605,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<ILibraryRootFolderProvider, LibraryRootFolderProvider>();
             serviceCollection.AddSingleton<ILibraryScanTraversal, LibraryScanTraversal>();
             serviceCollection.AddSingleton<ILibraryStructureCommands, LibraryStructureCommands>();
+            serviceCollection.AddSingleton<ILibraryStructureReader, LibraryStructureReader>();
             serviceCollection.AddSingleton<IItemDeletionCommands, ItemDeletionCommands>();
             serviceCollection.AddSingleton<IItemImageService, ItemImageService>();
             serviceCollection.AddSingleton<IRemoteImageSource, RemoteImageSource>();

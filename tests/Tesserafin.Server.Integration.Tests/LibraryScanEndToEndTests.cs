@@ -23,12 +23,13 @@ public sealed class LibraryScanEndToEndTests(TesserafinApplicationFactory factor
         Assert.Contains(factory.Services.GetServices<IHostedService>(), service => ReferenceEquals(service, scans));
         var roots = factory.Services.GetRequiredService<ILibraryRootFolderProvider>();
         var manager = factory.Services.GetRequiredService<ILibraryManager>();
+        var reader = factory.Services.GetRequiredService<ILibraryStructureReader>();
         var name = "scan-" + Guid.NewGuid().ToString("N");
         var renamed = name + "-renamed";
         var body = new AddVirtualFolderDto { LibraryOptions = new LibraryOptions { Enabled = false, EnableRealtimeMonitor = false } };
         using var created = await client.PostAsJsonAsync("Library/VirtualFolders?name=" + name, body, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, created.StatusCode);
-        Assert.Contains(manager.GetVirtualFolders(), folder => folder.Name == name);
+        Assert.Contains(reader.GetVirtualFolders(), folder => folder.Name == name);
         Assert.Same(roots.GetRootFolder(), manager.RootFolder);
 
         var progress = new List<double>();
@@ -37,11 +38,11 @@ public sealed class LibraryScanEndToEndTests(TesserafinApplicationFactory factor
         Assert.False(scans.IsScanRunning);
         using var moved = await client.PostAsync($"Library/VirtualFolders/Name?name={name}&newName={renamed}", null, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, moved.StatusCode);
-        Assert.Contains(manager.GetVirtualFolders(), folder => folder.Name == renamed);
-        Assert.DoesNotContain(manager.GetVirtualFolders(), folder => folder.Name == name);
+        Assert.Contains(reader.GetVirtualFolders(), folder => folder.Name == renamed);
+        Assert.DoesNotContain(reader.GetVirtualFolders(), folder => folder.Name == name);
         using var removed = await client.DeleteAsync("Library/VirtualFolders?name=" + renamed, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
-        Assert.DoesNotContain(manager.GetVirtualFolders(), folder => folder.Name == renamed);
+        Assert.DoesNotContain(reader.GetVirtualFolders(), folder => folder.Name == renamed);
         Assert.False(scans.IsScanRunning);
     }
 
