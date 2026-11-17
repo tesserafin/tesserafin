@@ -127,6 +127,63 @@ public sealed class OwnedVideosCommandsTests
     }
 
     [Fact]
+    public async Task ForeignGenericVersion_IsNotDeletedToMakeRoomForATypedAlternate()
+    {
+        using var context = new Context();
+        const string path = "/media/foreign-generic.mkv";
+        var generic = context.Candidate<Video>(path);
+        generic.OwnerId = Guid.NewGuid();
+        context.Persisted[generic.Id] = generic;
+        context.Owner.LocalAlternateVersions = [path];
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
+
+        context.Deletions.VerifyNoOtherCalls();
+        context.Provider.VerifyNoOtherCalls();
+        context.Persistence.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SelfOwnership_IsRejectedBeforePersistence(bool part)
+    {
+        using var context = new Context();
+        if (part)
+        {
+            context.Owner.AdditionalParts = [context.Owner.Path];
+        }
+        else
+        {
+            context.Owner.LocalAlternateVersions = [context.Owner.Path];
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
+
+        context.Provider.VerifyNoOtherCalls();
+        context.Persistence.VerifyNoOtherCalls();
+        context.Deletions.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task CreatedPart_FailedProviderRefreshDoesNotChangeItsAlreadyPublishedCreation()
+    {
+        using var context = new Context();
+        var part = context.Candidate<Video>("/media/new-part.mkv");
+        context.Owner.AdditionalParts = [part.Path];
+        context.Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>())).ThrowsAsync(new IOException("provider rejected"));
+
+        await Assert.ThrowsAsync<IOException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
+
+        var published = Assert.IsType<Video>(context.Lookup.GetItemById(part.Id));
+        Assert.Equal(context.Owner.Id, published.OwnerId);
+        Assert.Null(published.Overview);
+        Assert.Empty(published.Genres);
+        Assert.Null(context.Persisted[part.Id].Overview);
+        context.Persistence.Verify(p => p.SaveItems(It.IsAny<IReadOnlyList<BaseItem>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task MissingPart_RemovesOnlyItsOwnedCatalogueEntry()
     {
         using var context = new Context();
@@ -197,7 +254,7 @@ public sealed class OwnedVideosCommandsTests
         {
             var configuration = new Mock<IServerConfigurationManager>();
             configuration.SetupGet(c => c.Configuration).Returns(new ServerConfiguration());
-            Repository.Setup(r => r.RetrieveItem(It.IsAny<Guid>())).Returns((Guid id) => Persisted.GetValueOrDefault(id));
+            Repository.Setup(r => r.RetrieveItem(It.IsAny<Guid>())).Returns((Guid id) => Persisted.GetValueOrDefault(id)!);
             Lookup = new ItemLookupService(Repository.Object, configuration.Object);
             Cache = Lookup;
             Files.Setup(f => f.IsPathFile(It.IsAny<string>())).Returns(true);
