@@ -903,3 +903,16 @@ Filesystem suppression is shared by the monitor and metadata exporter through th
 `ILibraryWriteTracker`, without a new lazy edge to the library monitor. Overlapping writes keep
 suppression until each one's 45-second quiet period expires. The existing DI exception guard
 remains unchanged.
+
+## 28. Credit and person write ownership
+
+`IItemPeopleCommands` replaces credits and materializes person records through `IItemWriteCommands`.
+The synchronous manager bridge, asynchronous manager entry point and private person-save loop are
+removed. All active callers await the dedicated port, including audio/video probing and album
+refresh. New people produce one catalogue write and one added event, rather than two; existing
+people publish updates through the shared writer. Provider-id dictionaries and image arrays are
+copied before mutation so a failed item write does not change the published person. Person path
+construction has explicit filesystem/root inputs, sharing the policy with active named-item reads.
+Cancellation is checked before mapping replacement and between people. Mappings and people remain
+separate commits; there is no cross-record or filesystem/SQL rollback guarantee. HTTP and OpenAPI
+shapes remain unchanged. The real-host creation/update/clear journey is required by name in CI.

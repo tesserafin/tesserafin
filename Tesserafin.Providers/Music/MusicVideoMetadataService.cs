@@ -22,6 +22,7 @@ public class MusicVideoMetadataService : MetadataService<MusicVideo, MusicVideoI
     /// Initializes a new instance of the <see cref="MusicVideoMetadataService"/> class.
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
+    /// <param name="peopleCommands">Credit and person metadata writes.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -32,6 +33,7 @@ public class MusicVideoMetadataService : MetadataService<MusicVideo, MusicVideoI
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public MusicVideoMetadataService(
         IItemWriteCommands writes,
+        IItemPeopleCommands peopleCommands,
         IServerConfigurationManager serverConfigurationManager,
         ILogger<MusicVideoMetadataService> logger,
         IProviderManager providerManager,
@@ -40,7 +42,7 @@ public class MusicVideoMetadataService : MetadataService<MusicVideo, MusicVideoI
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository)
-        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
     }
 

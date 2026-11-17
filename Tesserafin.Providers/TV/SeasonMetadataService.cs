@@ -28,6 +28,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// Initializes a new instance of the <see cref="SeasonMetadataService"/> class.
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
+    /// <param name="peopleCommands">Credit and person metadata writes.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -39,6 +40,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     public SeasonMetadataService(
         IItemWriteCommands writes,
+        IItemPeopleCommands peopleCommands,
         IServerConfigurationManager serverConfigurationManager,
         ILogger<SeasonMetadataService> logger,
         IProviderManager providerManager,
@@ -48,7 +50,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
         IItemSortService itemSortService)
-        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
         _itemSortService = itemSortService;
     }

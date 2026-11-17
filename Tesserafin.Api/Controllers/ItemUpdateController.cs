@@ -33,6 +33,7 @@ namespace Tesserafin.Api.Controllers;
 [Authorize(Policy = Policies.RequiresElevation)]
 public class ItemUpdateController : BaseTesserafinApiController
 {
+    private readonly IItemPeopleCommands _peopleCommands;
     private readonly IItemWriteCommands _writes;
     private readonly ILibraryManager _libraryManager;
     private readonly IProviderManager _providerManager;
@@ -43,6 +44,7 @@ public class ItemUpdateController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="ItemUpdateController"/> class.
     /// </summary>
+    /// <param name="peopleCommands">Credit and person metadata writes.</param>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
@@ -50,6 +52,7 @@ public class ItemUpdateController : BaseTesserafinApiController
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
     public ItemUpdateController(
+        IItemPeopleCommands peopleCommands,
         IItemWriteCommands writes,
         IFileSystem fileSystem,
         ILibraryManager libraryManager,
@@ -57,6 +60,7 @@ public class ItemUpdateController : BaseTesserafinApiController
         ILocalizationManager localizationManager,
         IServerConfigurationManager serverConfigurationManager)
     {
+        _peopleCommands = peopleCommands;
         _writes = writes;
         _libraryManager = libraryManager;
         _providerManager = providerManager;
@@ -96,14 +100,15 @@ public class ItemUpdateController : BaseTesserafinApiController
         // Do this first so that metadata savers can pull the updates from the database.
         if (request.People is not null)
         {
-            _libraryManager.UpdatePeople(
+            await _peopleCommands.UpdateAsync(
                 item,
                 request.People.Select(x => new PersonInfo
                 {
                     Name = x.Name,
                     Role = x.Role,
                     Type = x.Type
-                }).ToList());
+                }).ToList(),
+                HttpContext.RequestAborted).ConfigureAwait(false);
         }
 
         await UpdateItem(request, item).ConfigureAwait(false);

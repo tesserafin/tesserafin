@@ -599,3 +599,13 @@ streaming controllers (retained behind the v2 execution adapter for now).
 > playback protocol; PostgreSQL and an out-of-process plugin SDK are planned but
 > not yet implemented. Treat `docs/major-rewrite-plan-v13.md` as the live status
 > board.
+
+- **Credit writes.** `IItemPeopleCommands` owns replacement of an item's credits and the associated
+  person metadata. API edits, scans, media probing and album refresh await this port directly;
+  `LibraryManager.UpdatePeople`, its asynchronous overload and its metadata-save loop are removed.
+  Person paths use the same policy with explicit filesystem/root inputs, and identity is shared
+  with named-item lookup. A new person is exported and created once; updates use the item writer
+  on a draft with independent provider-id dictionary and image array. Unchanged people are not
+  saved. There is no manager, provider-manager or service-locator dependency in the command.
+  Credit mappings, person writes and sidecar files do not form a single transaction; cancellation
+  stops further work but does not undo a mapping replacement that already committed.

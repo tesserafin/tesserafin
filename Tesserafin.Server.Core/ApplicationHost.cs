@@ -588,6 +588,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemMetadataExporter, ItemMetadataExporter>();
             serviceCollection.AddSingleton<ItemVersionGraphPlanner>();
             serviceCollection.AddSingleton<IItemWriteCommands, ItemWriteCommands>();
+            serviceCollection.AddSingleton<IItemPeopleCommands, ItemPeopleCommands>();
             serviceCollection.AddSingleton<IUserViewFactory, UserViewFactory>();
             serviceCollection.AddSingleton<IUserRootFolderProvider, UserRootFolderProvider>();
             serviceCollection.AddSingleton<ICollectionFolderResolver, CollectionFolderResolver>();

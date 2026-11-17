@@ -167,6 +167,7 @@ public sealed class ChannelCatalogParityTests
                 .Returns((Guid id) => Registry.GetValueOrDefault(id));
 
             return new ChannelManager(
+                Mock.Of<IItemPeopleCommands>(),
                 Mock.Of<IItemWriteCommands>(),
                 Mock.Of<IItemDeletionCommands>(),
                 userManager,

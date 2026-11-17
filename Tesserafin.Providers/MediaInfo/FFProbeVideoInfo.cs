@@ -30,6 +30,7 @@ namespace Tesserafin.Providers.MediaInfo
 {
     public class FFProbeVideoInfo
     {
+        private readonly IItemPeopleCommands _peopleCommands;
         private readonly ILogger<FFProbeVideoInfo> _logger;
         private readonly IMediaSourceManager _mediaSourceManager;
         private readonly IMediaEncoder _mediaEncoder;
@@ -46,6 +47,7 @@ namespace Tesserafin.Providers.MediaInfo
         private readonly IMediaStreamRepository _mediaStreamRepository;
 
         public FFProbeVideoInfo(
+            IItemPeopleCommands peopleCommands,
             ILogger<FFProbeVideoInfo> logger,
             IMediaSourceManager mediaSourceManager,
             IMediaEncoder mediaEncoder,
@@ -61,6 +63,7 @@ namespace Tesserafin.Providers.MediaInfo
             IMediaAttachmentRepository mediaAttachmentRepository,
             IMediaStreamRepository mediaStreamRepository)
         {
+            _peopleCommands = peopleCommands;
             _logger = logger;
             _mediaSourceManager = mediaSourceManager;
             _mediaEncoder = mediaEncoder;
@@ -246,7 +249,7 @@ namespace Tesserafin.Providers.MediaInfo
             if (mediaInfo is not null)
             {
                 FetchEmbeddedInfo(video, mediaInfo, options, libraryOptions);
-                FetchPeople(video, mediaInfo, options);
+                await FetchPeople(video, mediaInfo, options, cancellationToken).ConfigureAwait(false);
                 video.Timestamp = mediaInfo.Timestamp;
                 video.Video3DFormat ??= mediaInfo.Video3DFormat;
             }
@@ -499,7 +502,7 @@ namespace Tesserafin.Providers.MediaInfo
             }
         }
 
-        private void FetchPeople(Video video, Tesserafin.Model.MediaInfo.MediaInfo data, MetadataRefreshOptions options)
+        private async Task FetchPeople(Video video, Tesserafin.Model.MediaInfo.MediaInfo data, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
             if (video.IsLocked
                 || video.LockedFields.Contains(MetadataField.Cast)
@@ -525,7 +528,7 @@ namespace Tesserafin.Providers.MediaInfo
                     }
                 }
 
-                _libraryManager.UpdatePeople(video, people);
+                await _peopleCommands.UpdateAsync(video, people, cancellationToken).ConfigureAwait(false);
             }
         }
 

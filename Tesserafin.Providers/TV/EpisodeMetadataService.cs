@@ -21,6 +21,7 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     /// Initializes a new instance of the <see cref="EpisodeMetadataService"/> class.
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
+    /// <param name="peopleCommands">Credit and person metadata writes.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -31,6 +32,7 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public EpisodeMetadataService(
         IItemWriteCommands writes,
+        IItemPeopleCommands peopleCommands,
         IServerConfigurationManager serverConfigurationManager,
         ILogger<EpisodeMetadataService> logger,
         IProviderManager providerManager,
@@ -39,7 +41,7 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository)
-        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
     }
 

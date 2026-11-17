@@ -27,6 +27,7 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
     /// Initializes a new instance of the <see cref="AlbumMetadataService"/> class.
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
+    /// <param name="peopleCommands">Credit and person metadata writes.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -37,6 +38,7 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public AlbumMetadataService(
         IItemWriteCommands writes,
+        IItemPeopleCommands peopleCommands,
         IServerConfigurationManager serverConfigurationManager,
         ILogger<AlbumMetadataService> logger,
         IProviderManager providerManager,
@@ -45,7 +47,7 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository)
-        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
     }
 
@@ -63,13 +65,11 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
         => item.GetRecursiveChildren(i => i is Audio);
 
     /// <inheritdoc />
-    protected override Task AfterMetadataRefresh(MusicAlbum item, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
+    protected override async Task AfterMetadataRefresh(MusicAlbum item, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
     {
-        base.AfterMetadataRefresh(item, refreshOptions, cancellationToken);
+        await base.AfterMetadataRefresh(item, refreshOptions, cancellationToken).ConfigureAwait(false);
 
-        SetPeople(item);
-
-        return Task.CompletedTask;
+        await SetPeople(item, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -196,7 +196,7 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
         }
     }
 
-    private void SetPeople(MusicAlbum item)
+    private async Task SetPeople(MusicAlbum item, CancellationToken cancellationToken)
     {
         if (item.AlbumArtists.Any() || item.Artists.Any())
         {
@@ -226,7 +226,7 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
                 }
             }
 
-            LibraryManager.UpdatePeople(item, people);
+            await PeopleCommands.UpdateAsync(item, people, cancellationToken).ConfigureAwait(false);
         }
     }
 

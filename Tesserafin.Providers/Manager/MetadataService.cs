@@ -30,6 +30,7 @@ namespace Tesserafin.Providers.Manager
     {
         protected MetadataService(
             IItemWriteCommands writes,
+            IItemPeopleCommands peopleCommands,
             IServerConfigurationManager serverConfigurationManager,
             ILogger<MetadataService<TItemType, TIdType>> logger,
             IProviderManager providerManager,
@@ -40,6 +41,7 @@ namespace Tesserafin.Providers.Manager
             IItemRepository itemRepository)
         {
             Writes = writes;
+            PeopleCommands = peopleCommands;
             ServerConfigurationManager = serverConfigurationManager;
             Logger = logger;
             ProviderManager = providerManager;
@@ -52,6 +54,8 @@ namespace Tesserafin.Providers.Manager
         }
 
         protected IItemWriteCommands Writes { get; }
+
+        protected IItemPeopleCommands PeopleCommands { get; }
 
         protected ItemImageProvider ImageProvider { get; }
 
@@ -295,7 +299,7 @@ namespace Tesserafin.Providers.Manager
             {
                 var baseItem = result.Item;
 
-                await LibraryManager.UpdatePeopleAsync(baseItem, result.People, cancellationToken).ConfigureAwait(false);
+                await PeopleCommands.UpdateAsync(baseItem, result.People, cancellationToken).ConfigureAwait(false);
             }
         }
 

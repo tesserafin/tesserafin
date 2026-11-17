@@ -42,6 +42,7 @@ namespace Tesserafin.LiveTv.Channels
     /// </summary>
     public class ChannelManager : IChannelManager, IDisposable
     {
+        private readonly IItemPeopleCommands _peopleCommands;
         private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
         private readonly IUserManager _userManager;
@@ -60,6 +61,7 @@ namespace Tesserafin.LiveTv.Channels
         /// <summary>
         /// Initializes a new instance of the <see cref="ChannelManager"/> class.
         /// </summary>
+        /// <param name="peopleCommands">Credit and person metadata writes.</param>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="deletions">Item deletion operations.</param>
         /// <param name="userManager">The user manager.</param>
@@ -73,6 +75,7 @@ namespace Tesserafin.LiveTv.Channels
         /// <param name="memoryCache">The memory cache.</param>
         /// <param name="channels">The channels.</param>
         public ChannelManager(
+            IItemPeopleCommands peopleCommands,
             IItemWriteCommands writes,
             IItemDeletionCommands deletions,
             IUserManager userManager,
@@ -86,6 +89,7 @@ namespace Tesserafin.LiveTv.Channels
             IMemoryCache memoryCache,
             IEnumerable<IChannel> channels)
         {
+            _peopleCommands = peopleCommands;
             _writes = writes;
             _deletions = deletions;
             _userManager = userManager;
@@ -1152,7 +1156,7 @@ namespace Tesserafin.LiveTv.Channels
 
                 if (info.People is not null && info.People.Count > 0)
                 {
-                    await _libraryManager.UpdatePeopleAsync(item, info.People, cancellationToken).ConfigureAwait(false);
+                    await _peopleCommands.UpdateAsync(item, info.People, cancellationToken).ConfigureAwait(false);
                 }
             }
             else if (forceUpdate)

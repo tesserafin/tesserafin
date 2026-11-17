@@ -32,6 +32,7 @@ namespace Tesserafin.Providers.MediaInfo
     {
         private const char InternalValueSeparator = '\u001F';
 
+        private readonly IItemPeopleCommands _peopleCommands;
         private readonly IMediaEncoder _mediaEncoder;
         private readonly ILibraryManager _libraryManager;
         private readonly ILogger<AudioFileProber> _logger;
@@ -44,6 +45,7 @@ namespace Tesserafin.Providers.MediaInfo
         /// <summary>
         /// Initializes a new instance of the <see cref="AudioFileProber"/> class.
         /// </summary>
+        /// <param name="peopleCommands">Credit and person metadata writes.</param>
         /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
         /// <param name="mediaSourceManager">Instance of the <see cref="IMediaSourceManager"/> interface.</param>
         /// <param name="mediaEncoder">Instance of the <see cref="IMediaEncoder"/> interface.</param>
@@ -53,6 +55,7 @@ namespace Tesserafin.Providers.MediaInfo
         /// <param name="mediaStreamRepository">Instance of the <see cref="IMediaStreamRepository"/>.</param>
         /// <param name="chapterManager">Instance of the <see cref="IChapterManager"/> interface.</param>
         public AudioFileProber(
+            IItemPeopleCommands peopleCommands,
             ILogger<AudioFileProber> logger,
             IMediaSourceManager mediaSourceManager,
             IMediaEncoder mediaEncoder,
@@ -62,6 +65,7 @@ namespace Tesserafin.Providers.MediaInfo
             IMediaStreamRepository mediaStreamRepository,
             IChapterManager chapterManager)
         {
+            _peopleCommands = peopleCommands;
             _mediaEncoder = mediaEncoder;
             _libraryManager = libraryManager;
             _logger = logger;
@@ -147,7 +151,7 @@ namespace Tesserafin.Providers.MediaInfo
 
             if (!audio.IsLocked)
             {
-                await FetchDataFromTags(audio, mediaInfo, options, tryExtractEmbeddedLyrics).ConfigureAwait(false);
+                await FetchDataFromTags(audio, mediaInfo, options, tryExtractEmbeddedLyrics, cancellationToken).ConfigureAwait(false);
                 if (tryExtractEmbeddedLyrics)
                 {
                     AddExternalLyrics(audio, mediaStreams, options);
@@ -171,7 +175,8 @@ namespace Tesserafin.Providers.MediaInfo
         /// <param name="mediaInfo">The <see cref="Tesserafin.Model.MediaInfo.MediaInfo"/>.</param>
         /// <param name="options">The <see cref="MetadataRefreshOptions"/>.</param>
         /// <param name="tryExtractEmbeddedLyrics">Whether to extract embedded lyrics to lrc file. </param>
-        private async Task FetchDataFromTags(Audio audio, Tesserafin.Model.MediaInfo.MediaInfo mediaInfo, MetadataRefreshOptions options, bool tryExtractEmbeddedLyrics)
+        /// <param name="cancellationToken">The cancellation token.</param>
+        private async Task FetchDataFromTags(Audio audio, Tesserafin.Model.MediaInfo.MediaInfo mediaInfo, MetadataRefreshOptions options, bool tryExtractEmbeddedLyrics, CancellationToken cancellationToken)
         {
             var libraryOptions = _libraryManager.GetLibraryOptions(audio);
             Track track = new Track(audio.Path);
@@ -338,7 +343,7 @@ namespace Tesserafin.Providers.MediaInfo
                     }
                 }
 
-                _libraryManager.UpdatePeople(audio, people);
+                await _peopleCommands.UpdateAsync(audio, people, cancellationToken).ConfigureAwait(false);
 
                 if (options.ReplaceAllMetadata && performers.Length != 0)
                 {

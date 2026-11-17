@@ -53,6 +53,7 @@ namespace Tesserafin.Providers.MediaInfo
         /// <summary>
         /// Initializes a new instance of the <see cref="ProbeProvider"/> class.
         /// </summary>
+        /// <param name="peopleCommands">Credit and person metadata writes.</param>
         /// <param name="mediaSourceManager">Instance of the <see cref="IMediaSourceManager"/> interface.</param>
         /// <param name="mediaEncoder">Instance of the <see cref="IMediaEncoder"/> interface.</param>
         /// <param name="blurayExaminer">Instance of the <see cref="IBlurayExaminer"/> interface.</param>
@@ -69,6 +70,7 @@ namespace Tesserafin.Providers.MediaInfo
         /// <param name="mediaAttachmentRepository">Instance of the <see cref="IMediaAttachmentRepository"/> interface.</param>
         /// <param name="mediaStreamRepository">Instance of the <see cref="IMediaStreamRepository"/> interface.</param>
         public ProbeProvider(
+            IItemPeopleCommands peopleCommands,
             IMediaSourceManager mediaSourceManager,
             IMediaEncoder mediaEncoder,
             IBlurayExaminer blurayExaminer,
@@ -91,6 +93,7 @@ namespace Tesserafin.Providers.MediaInfo
             _lyricResolver = new LyricResolver(loggerFactory.CreateLogger<LyricResolver>(), localization, mediaEncoder, fileSystem, namingOptions);
 
             _videoProber = new FFProbeVideoInfo(
+                peopleCommands,
                 loggerFactory.CreateLogger<FFProbeVideoInfo>(),
                 mediaSourceManager,
                 mediaEncoder,
@@ -107,6 +110,7 @@ namespace Tesserafin.Providers.MediaInfo
                 mediaStreamRepository);
 
             _audioProber = new AudioFileProber(
+                peopleCommands,
                 loggerFactory.CreateLogger<AudioFileProber>(),
                 mediaSourceManager,
                 mediaEncoder,

@@ -10,6 +10,7 @@ using Tesserafin.Common.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Entities
 {
@@ -88,10 +89,13 @@ namespace Tesserafin.Controller.Entities
         }
 
         public static string GetPath(string name, bool normalizeName)
+            => GetPath(name, FileSystem, ConfigurationManager.ApplicationPaths.PeoplePath, normalizeName);
+
+        public static string GetPath(string name, IFileSystem fileSystem, string peoplePath, bool normalizeName = true)
         {
             // Trim the period at the end because windows will have a hard time with that
             var validFilename = normalizeName ?
-                FileSystem.GetValidFilename(name).Trim().TrimEnd('.') :
+                fileSystem.GetValidFilename(name).Trim().TrimEnd('.') :
                 name;
 
             string subFolderPrefix = null;
@@ -105,7 +109,7 @@ namespace Tesserafin.Controller.Entities
                 }
             }
 
-            var path = ConfigurationManager.ApplicationPaths.PeoplePath;
+            var path = peoplePath;
 
             if (!string.IsNullOrEmpty(subFolderPrefix))
             {

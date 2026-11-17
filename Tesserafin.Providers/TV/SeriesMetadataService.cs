@@ -35,6 +35,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// Initializes a new instance of the <see cref="SeriesMetadataService"/> class.
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
+    /// <param name="peopleCommands">Credit and person metadata writes.</param>
     /// <param name="deletions">Item deletion operations.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
@@ -48,6 +49,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     public SeriesMetadataService(
         IItemWriteCommands writes,
+        IItemPeopleCommands peopleCommands,
         IItemDeletionCommands deletions,
         IServerConfigurationManager serverConfigurationManager,
         ILogger<SeriesMetadataService> logger,
@@ -59,7 +61,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
         IItemSortService itemSortService)
-        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
         _deletions = deletions;
         _localizationManager = localizationManager;

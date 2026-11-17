@@ -93,6 +93,7 @@ public class EpisodeMetadataServiceTests
         public TestEpisodeMetadataService()
             : base(
                 Mock.Of<IItemWriteCommands>(),
+                Mock.Of<IItemPeopleCommands>(),
                 Mock.Of<IServerConfigurationManager>(),
                 NullLogger<EpisodeMetadataService>.Instance,
                 Mock.Of<IProviderManager>(),

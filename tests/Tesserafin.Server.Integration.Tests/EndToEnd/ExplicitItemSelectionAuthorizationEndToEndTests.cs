@@ -191,7 +191,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
         var libraryWrites = _factory.Services.GetRequiredService<IItemWriteCommands>();
         foreach (var (id, who) in new[] { (_hidden, "withheld-" + _suffix + " actor"), (_visible, "open-" + _suffix + " actor") })
         {
-            library.UpdatePeople(library.GetItemById(id)!, [new PersonInfo { Name = who, Type = PersonKind.Actor }]);
+            await _factory.Services.GetRequiredService<IItemPeopleCommands>().UpdateAsync(library.GetItemById(id)!, [new PersonInfo { Name = who, Type = PersonKind.Actor }], TestContext.Current.CancellationToken);
         }
 
         var series = new Series { Id = Guid.NewGuid(), Name = "withheld-" + _suffix + " series", Path = Path.Combine(withheldDir, "series"), ParentId = _withheldFolder, DateCreated = DateTime.UtcNow, DateModified = DateTime.UtcNow };

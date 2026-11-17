@@ -19,6 +19,7 @@ public class CollectionFolderMetadataService : MetadataService<CollectionFolder,
     /// Initializes a new instance of the <see cref="CollectionFolderMetadataService"/> class.
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
+    /// <param name="peopleCommands">Credit and person metadata writes.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -29,6 +30,7 @@ public class CollectionFolderMetadataService : MetadataService<CollectionFolder,
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     public CollectionFolderMetadataService(
         IItemWriteCommands writes,
+        IItemPeopleCommands peopleCommands,
         IServerConfigurationManager serverConfigurationManager,
         ILogger<CollectionFolderMetadataService> logger,
         IProviderManager providerManager,
@@ -37,7 +39,7 @@ public class CollectionFolderMetadataService : MetadataService<CollectionFolder,
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository)
-        : base(writes, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
     {
     }
 }
