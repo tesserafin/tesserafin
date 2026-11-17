@@ -13,6 +13,7 @@ using Tesserafin.Api.ModelBinders;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Playlists;
