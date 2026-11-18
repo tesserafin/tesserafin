@@ -17,21 +17,22 @@ namespace Tesserafin.Server.Core.Library
     /// Owns the item lookup cache (a <see cref="FastConcurrentLru{TKey,TValue}"/> read-through
     /// cache over <see cref="IItemRepository"/>) and exposes it as the public, read-only
     /// <see cref="IItemLookupService"/> plus the internal <see cref="IItemCacheStore"/> lifecycle
-    /// port used by <see cref="LibraryManager"/> to register and invalidate cache entries.
+    /// port used by <see cref="LibraryManager"/> to register and invalidate cache entries. Path
+    /// lookups through <see cref="IItemPathLookupService"/> query the catalogue directly.
     /// </summary>
     /// <remarks>
     /// Extracted from <c>LibraryManager</c> in PR75. Depends only on <see cref="IItemRepository"/>
     /// and <see cref="IServerConfigurationManager"/> - it must never take a dependency on
     /// <c>ILibraryManager</c>, to avoid a circular dependency with the class that consumes it.
     /// Hardened to <c>internal sealed</c> in PR76: outside this assembly the service is only ever
-    /// reachable through <see cref="IItemLookupService"/> (reads) or <see cref="IItemCacheStore"/>
-    /// (lifecycle), never as the concrete type. A reflection guard test keeps it that way.
+    /// reachable through its lookup interfaces or <see cref="IItemCacheStore"/>, never as the
+    /// concrete type. A reflection guard test keeps it that way.
     /// PR77 removed the user-aware <c>GetItemById&lt;T&gt;(Guid, User)</c> overload (and the
     /// <c>ItemIsVisible</c> visibility check it delegated to) from this class: this service now
     /// only ever finds items, it never decides whether a user may see them. See
     /// <see cref="ItemAccessService"/> for that concern.
     /// </remarks>
-    internal sealed class ItemLookupService : IItemLookupService, IItemCacheStore
+    internal sealed class ItemLookupService : IItemLookupService, IItemPathLookupService, IItemCacheStore
     {
         private readonly IItemRepository _itemRepository;
         private readonly FastConcurrentLru<Guid, BaseItem> _cache;
@@ -81,6 +82,13 @@ namespace Tesserafin.Server.Core.Library
             }
 
             return null;
+        }
+
+        /// <inheritdoc />
+        public BaseItem? FindByPath(string path, bool? isFolder)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(path);
+            return ItemPathQuery.Find(_itemRepository, path, isFolder);
         }
 
         /// <inheritdoc />

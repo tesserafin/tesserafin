@@ -56,7 +56,7 @@ internal sealed class CollectionFolderMembershipResolver(
             // Prefer folders already scanned at the root. Nested configured paths may be
             // covered by an ancestor in the physical scan, so resolve those by path.
             var matches = rootFolders.Where(folder => files.AreEqual(folder.Path, location)).ToArray();
-            if (matches.Length == 0 && repository.GetItemList(ItemPathQuery.Create(location, true)).FirstOrDefault() is Folder nested)
+            if (matches.Length == 0 && ItemPathQuery.Find(repository, location, true) is Folder nested)
             {
                 matches = [nested];
             }

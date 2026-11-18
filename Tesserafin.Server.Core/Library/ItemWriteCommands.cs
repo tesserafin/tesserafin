@@ -102,7 +102,7 @@ internal sealed partial class ItemWriteCommands(
         foreach (var target in targets)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var item = _repository.GetItemList(ItemPathQuery.Create(target.TargetPath, null)).FirstOrDefault();
+            var item = ItemPathQuery.Find(_repository, target.TargetPath, null);
             if ((item is not null && item.Id.Equals(owner.Id)) || files.AreEqual(target.TargetPath, owner.Path))
             {
                 throw new InvalidOperationException("A folder cannot link to itself through a shortcut.");

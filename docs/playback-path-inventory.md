@@ -1632,3 +1632,10 @@ The manager obtains static media sources through `IMediaSourceManager` with
 path substitution disabled. Generation selects the source belonging to the
 video being processed. The video manifest keeps a separate set of widths for
 each local source, including alternate versions.
+
+## 58. Playlist import roots and path lookup
+
+The local playlist provider reads root folders through `IUserRootFolderProvider`
+and resolves eligible files through `IItemPathLookupService`. It keeps playlist
+order and repeated entries. The path lookup shares the existing newest-match
+query with the library, visibility, membership and shortcut consumers.
