@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Providers;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.IO
 {
@@ -16,6 +18,9 @@ namespace Tesserafin.Server.Core.IO
     {
         private readonly ILogger _logger;
         private readonly IItemPathLookupService _itemPaths;
+        private readonly IItemLookupService _items;
+        private readonly Lazy<IProviderManager> _providers;
+        private readonly IFileSystem _fileSystem;
         private readonly IServerConfigurationManager _configurationManager;
 
         private readonly List<string> _affectedPaths = new();
@@ -23,13 +28,23 @@ namespace Tesserafin.Server.Core.IO
         private Timer? _timer;
         private bool _disposed;
 
-        public FileRefresher(string path, IServerConfigurationManager configurationManager, IItemPathLookupService itemPaths, ILogger logger)
+        public FileRefresher(
+            string path,
+            IServerConfigurationManager configurationManager,
+            IItemPathLookupService itemPaths,
+            IItemLookupService items,
+            Lazy<IProviderManager> providers,
+            IFileSystem fileSystem,
+            ILogger logger)
         {
             logger.LogDebug("New file refresher created for {0}", path);
             Path = path;
 
             _configurationManager = configurationManager;
             _itemPaths = itemPaths;
+            _items = items;
+            _providers = providers;
+            _fileSystem = fileSystem;
             _logger = logger;
             AddPath(path);
         }
@@ -146,7 +161,7 @@ namespace Tesserafin.Server.Core.IO
 
                 try
                 {
-                    item.ChangedExternally();
+                    _providers.Value.QueueRefresh(item.Id, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), RefreshPriority.High);
                 }
                 catch (Exception ex)
                 {
@@ -176,7 +191,7 @@ namespace Tesserafin.Server.Core.IO
                 // If the item has been deleted find the first valid parent that still exists
                 while (!Directory.Exists(item.Path) && !File.Exists(item.Path))
                 {
-                    item = item.GetOwner() ?? item.GetParent();
+                    item = item.GetOwner(_items) ?? item.GetParent(_items);
 
                     if (item is null)
                     {

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Providers;
 using Tesserafin.Model.IO;
 using Tesserafin.Server.Core.Library;
 
@@ -21,6 +22,8 @@ namespace Tesserafin.Server.Core.IO
         private readonly ILibraryRootFolderProvider _roots;
         private readonly ILibraryItemOptions _libraryOptions;
         private readonly IItemPathLookupService _itemPaths;
+        private readonly IItemLookupService _items;
+        private readonly Lazy<IProviderManager> _providers;
         private readonly ILibraryWriteTracker _writes;
         private readonly IItemChangeEvents _changes;
         private readonly IServerConfigurationManager _configurationManager;
@@ -46,6 +49,8 @@ namespace Tesserafin.Server.Core.IO
         /// <param name="roots">The physical library root provider.</param>
         /// <param name="libraryOptions">The effective library settings.</param>
         /// <param name="itemPaths">The catalogue path lookup service.</param>
+        /// <param name="items">The catalogue identity lookup service.</param>
+        /// <param name="providers">The deferred refresh queue owner, which also uses the library monitor.</param>
         /// <param name="writes">Shared filesystem write suppression.</param>
         /// <param name="changes">The completed item change feed.</param>
         /// <param name="configurationManager">The configuration manager.</param>
@@ -57,6 +62,8 @@ namespace Tesserafin.Server.Core.IO
             ILibraryRootFolderProvider roots,
             ILibraryItemOptions libraryOptions,
             IItemPathLookupService itemPaths,
+            IItemLookupService items,
+            Lazy<IProviderManager> providers,
             ILibraryWriteTracker writes,
             IItemChangeEvents changes,
             IServerConfigurationManager configurationManager,
@@ -67,6 +74,8 @@ namespace Tesserafin.Server.Core.IO
             _roots = roots;
             _libraryOptions = libraryOptions;
             _itemPaths = itemPaths;
+            _items = items;
+            _providers = providers;
             _writes = writes;
             _changes = changes;
             _logger = logger;
@@ -429,7 +438,7 @@ namespace Tesserafin.Server.Core.IO
                     }
                 }
 
-                var newRefresher = new FileRefresher(path, _configurationManager, _itemPaths, _logger);
+                var newRefresher = new FileRefresher(path, _configurationManager, _itemPaths, _items, _providers, _fileSystem, _logger);
                 newRefresher.Completed += OnNewRefresherCompleted;
                 _activeRefreshers.Add(newRefresher);
             }
