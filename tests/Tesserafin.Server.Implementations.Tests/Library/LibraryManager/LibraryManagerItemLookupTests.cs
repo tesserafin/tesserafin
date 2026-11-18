@@ -573,7 +573,7 @@ public class LibraryManagerItemLookupTests
             .Returns(new StubUserRootFolder { StubChildren = [missing] });
 
         var roots = Mock.Of<ILibraryRootFolderProvider>(p => p.GetRootFolder() == new StubAggregateFolder());
-        var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(_writes, Mock.Of<IItemImageService>(), _deletions, roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
+        var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(_writes, Mock.Of<IItemImageService>(), Mock.Of<IItemResolutionService>(), _deletions, roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
         await traversal.RefreshTopFoldersAsync(TestContext.Current.CancellationToken, false);
 
         // Deleted from the database...
