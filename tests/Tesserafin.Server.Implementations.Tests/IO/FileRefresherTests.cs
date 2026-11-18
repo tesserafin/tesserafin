@@ -22,15 +22,12 @@ public sealed class FileRefresherTests
         {
             var path = Path.Combine(directory.FullName, "unindexed", "movie.mkv");
             var refreshed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var folder = new Mock<Folder>();
-            folder.Object.Id = Guid.NewGuid();
-            folder.SetupGet(f => f.Path).Returns(directory.FullName);
-            folder.Setup(f => f.ChangedExternally()).Callback(refreshed.SetResult);
+            var folder = new RefreshProbeFolder(refreshed) { Id = Guid.NewGuid(), Path = directory.FullName };
 
             var paths = new Mock<IItemPathLookupService>(MockBehavior.Strict);
             paths.Setup(p => p.FindByPath(path, null)).Returns((BaseItem?)null);
             paths.Setup(p => p.FindByPath(Path.GetDirectoryName(path)!, null)).Returns((BaseItem?)null);
-            paths.Setup(p => p.FindByPath(directory.FullName, null)).Returns(folder.Object);
+            paths.Setup(p => p.FindByPath(directory.FullName, null)).Returns(folder);
             var config = new Mock<IServerConfigurationManager>();
             config.SetupGet(c => c.Configuration).Returns(new ServerConfiguration { LibraryMonitorDelay = 0 });
 
@@ -46,5 +43,10 @@ public sealed class FileRefresherTests
         {
             directory.Delete();
         }
+    }
+
+    private sealed class RefreshProbeFolder(TaskCompletionSource refreshed) : Folder
+    {
+        public override void ChangedExternally() => refreshed.SetResult();
     }
 }
