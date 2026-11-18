@@ -10,16 +10,13 @@ using System.Threading.Tasks;
 using AsyncKeyedLock;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Configuration;
-using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Providers;
-using Tesserafin.Data.Enums;
 using Tesserafin.LiveTv.Configuration;
 using Tesserafin.LiveTv.IO;
 using Tesserafin.LiveTv.Timers;
@@ -53,6 +50,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     private readonly TimerManager _timerManager;
     private readonly SeriesTimerManager _seriesTimerManager;
     private readonly RecordingsMetadataManager _recordingsMetadataManager;
+    private readonly RecordingRetentionReader _retention;
 
     private readonly ActiveRecordings _activeRecordings;
     private readonly AsyncNonKeyedLocker _recordingDeleteSemaphore = new();
@@ -79,6 +77,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     /// <param name="seriesTimerManager">The <see cref="SeriesTimerManager"/>.</param>
     /// <param name="recordingsMetadataManager">The <see cref="RecordingsMetadataManager"/>.</param>
     /// <param name="activeRecordings">The <see cref="ActiveRecordings"/>.</param>
+    /// <param name="retention">The reader for catalogue retention candidates.</param>
     public RecordingsManager(
         IItemDeletionCommands deletions,
         ILogger<RecordingsManager> logger,
@@ -97,7 +96,8 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         TimerManager timerManager,
         SeriesTimerManager seriesTimerManager,
         RecordingsMetadataManager recordingsMetadataManager,
-        ActiveRecordings activeRecordings)
+        ActiveRecordings activeRecordings,
+        RecordingRetentionReader retention)
     {
         _deletions = deletions;
         _logger = logger;
@@ -116,6 +116,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         _timerManager = timerManager;
         _seriesTimerManager = seriesTimerManager;
         _recordingsMetadataManager = recordingsMetadataManager;
+        _retention = retention;
         _activeRecordings = activeRecordings;
 
         _config.NamedConfigurationUpdated += OnNamedConfigurationUpdated;
@@ -692,38 +693,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
 
             await DeleteLibraryItemsForTimers(timersToDelete).ConfigureAwait(false);
 
-            if (_itemPaths.FindByPath(seriesPath, true) is not Folder librarySeries)
-            {
-                return;
-            }
-
-            // None of these are injectable here: IChannelManager -> IDtoService -> IRecordingsManager
-            // is an existing DI edge (and IUserViewManager itself depends on IChannelManager), so
-            // IRecordingsManager -> any of them would be circular. Fine to fall back to the statics:
-            // librarySeries is a real library Series (SourceType never Channel), so none of the
-            // branches these feed are reachable in this call path.
-            // Documented legitimate caller of the obsolete 5-parameter overload (the same DI cycle
-            // blocks IItemQueryService too, via its IChannelManager/IUserViewManager dependencies)
-            // — see docs/major-rewrite-plan-v13.md § PR28/N.
-#pragma warning disable CS0618
-            var episodesToDelete = librarySeries.GetItemList(
-                    new InternalItemsQuery
-                    {
-                        OrderBy = [(ItemSortBy.DateCreated, SortOrder.Descending)],
-                        IsVirtualItem = false,
-                        IsFolder = false,
-                        Recursive = true,
-                        DtoOptions = new DtoOptions(true)
-                    },
-                    BaseItem.ChannelManager,
-                    Folder.CollectionManager,
-                    Folder.UserViewManager,
-                    UserView.TVSeriesManager)
-#pragma warning restore CS0618
-                .Where(i => i.IsFileProtocol && File.Exists(i.Path))
-                .Skip(seriesTimer.KeepUpTo - 1);
-
-            foreach (var item in episodesToDelete)
+            foreach (var item in _retention.GetExcessFiles(seriesPath, seriesTimer.KeepUpTo - 1))
             {
                 try
                 {

@@ -6,8 +6,7 @@
     "Tesserafin.Controller/Entities/Folder.cs",
     "Tesserafin.Server.Core/ApplicationHost.cs",
     "Tesserafin.Server.Core/Dto/DtoService.cs",
-    "Tesserafin.Server.Core/Library/MediaSourceManager.cs",
-    "src/Tesserafin.LiveTv/Recordings/RecordingsManager.cs"
+    "Tesserafin.Server.Core/Library/MediaSourceManager.cs"
   ],
   "entityStaticServices": [
     "BaseItem.ChannelManager",

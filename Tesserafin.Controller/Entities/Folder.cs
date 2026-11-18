@@ -727,8 +727,8 @@ namespace Tesserafin.Controller.Entities
         // migration step (GetItemsInternal cluster, PR11/PR12), not a stable API. Marked obsolete
         // (warning) so no new application consumer picks it up; the remaining documented callers
         // (internal fallback sites here and in UserView, UserViewBuilder's relay, ItemQueryService's
-        // own fallback path, UserViewManager's self-reference, RecordingsManager's DI-cycle
-        // fallback) suppress CS0618 locally with a pointer back to that doc section.
+        // own fallback path, UserViewManager's self-reference) suppress CS0618 locally with
+        // a pointer back to that doc section.
         [Obsolete("Application code should use IItemQueryService instead of calling Folder.GetItems/GetItemList directly. See docs/major-rewrite-plan-v13.md § PR28/N.")]
         public QueryResult<BaseItem> GetItems(InternalItemsQuery query, IChannelManager channelManager, ICollectionManager collectionManager, IUserViewManager userViewManager, ITVSeriesManager tvSeriesManager)
         {

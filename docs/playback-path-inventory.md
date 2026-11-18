@@ -1324,3 +1324,12 @@ Playlist API reads and file exports, collection management, and the metadata
 and image providers use the injected resolver. Entity queries use the same
 resolution rules. Scoped collection visibility still resolves through its
 scope. The stored-path fallback no longer reads `BaseItem.ItemRepository`.
+
+## 53. Live TV recording retention reads
+
+The recording retention reader queries the catalogue through the repository
+and the existing scope service. Ordinary folders retain their parent scope,
+and series retain episode and season selection by presentation key. It skips
+missing files before counting the newest files to keep. Aggregate roots and
+missing series keys yield no candidates. Timer retention and deletion
+execution stay in the recordings manager.
