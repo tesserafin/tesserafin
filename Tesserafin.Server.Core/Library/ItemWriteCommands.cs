@@ -74,6 +74,7 @@ internal sealed partial class ItemWriteCommands(
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var desired = shortcuts.Concat(manual).ToArray();
         if (desired.Length == current.Count && desired.All(link => current.Any(existing => SameFolderLink(link, existing))))
         {
