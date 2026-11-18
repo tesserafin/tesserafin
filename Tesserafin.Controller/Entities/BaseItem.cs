@@ -2710,11 +2710,6 @@ namespace Tesserafin.Controller.Entities
             return [Id];
         }
 
-        public virtual double? GetRefreshProgress(IProviderManager providerManager)
-        {
-            return null;
-        }
-
         public virtual ItemUpdateType OnMetadataChanged(ILocalizationManager localization)
         {
             var updateType = ItemUpdateType.None;

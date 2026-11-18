@@ -282,11 +282,6 @@ namespace Tesserafin.Controller.Entities
             return GetCachedChildren();
         }
 
-        public override double? GetRefreshProgress(IProviderManager providerManager)
-        {
-            return providerManager.GetRefreshProgress(Id);
-        }
-
         /// <summary>
         /// Validates that the children of the folder still exist.
         /// </summary>

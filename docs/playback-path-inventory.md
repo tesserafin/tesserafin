@@ -1573,3 +1573,12 @@ covered by a scanned ancestor. The item writer stages the locations, folder
 identities and inherited links together and publishes them after persistence.
 Unavailable library definition directories do not produce a membership write.
 The existing metadata refresh follows the committed membership.
+
+## 51. Library refresh reads and progress notifications
+
+Targeted refresh and visible-content checks resolve committed physical folder
+IDs through the catalogue lookup port. The refresh notifier uses the same
+lookup and the provider's active progress, averaging the available active
+physical folders. It obtains library membership and the user root through
+their dedicated services. Progress calculation and notification no longer
+belong to item entities.

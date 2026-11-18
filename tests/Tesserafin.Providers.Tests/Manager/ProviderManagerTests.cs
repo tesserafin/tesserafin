@@ -581,6 +581,7 @@ namespace Tesserafin.Providers.Tests.Manager
                 Mock.Of<IFileSystem>(),
                 Mock.Of<IServerApplicationPaths>(),
                 libraryManager.Object,
+                Mock.Of<IItemLookupService>(),
                 Mock.Of<ILibraryScanCoordinator>(),
                 baseItemManager!,
                 Mock.Of<ILyricManager>(),
