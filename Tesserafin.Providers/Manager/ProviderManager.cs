@@ -25,6 +25,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Lyrics;
 using Tesserafin.Controller.MediaSegments;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
 using Tesserafin.Data.Enums;
@@ -65,7 +66,8 @@ namespace Tesserafin.Providers.Manager
         private readonly ILibraryMonitor _libraryMonitor;
         private readonly IFileSystem _fileSystem;
         private readonly IServerApplicationPaths _appPaths;
-        private readonly ILibraryManager _libraryManager;
+        private readonly ILibraryItemOptions _itemOptions;
+        private readonly IItemRepository _itemRepository;
         private readonly IItemLookupService _itemLookup;
         private readonly ILibraryScanCoordinator _scans;
         private readonly ISubtitleManager _subtitleManager;
@@ -111,8 +113,9 @@ namespace Tesserafin.Providers.Manager
         /// <param name="fileSystem">The filesystem.</param>
         /// <param name="appPaths">The server application paths.</param>
         /// <param name="scans">Library scan scheduling and state.</param>
-        /// <param name="libraryManager">The library manager.</param>
-        /// <param name="itemLookup">The catalogue lookup used for physical folder identities.</param>
+        /// <param name="itemOptions">Effective library options for provider selection.</param>
+        /// <param name="itemRepository">Catalogue reads for album refresh.</param>
+        /// <param name="itemLookup">Catalogue identity and hierarchy lookup.</param>
         /// <param name="baseItemManager">The BaseItem manager.</param>
         /// <param name="lyricManager">The lyric manager.</param>
         /// <param name="remoteImages">The image-only HTTP source.</param>
@@ -133,7 +136,8 @@ namespace Tesserafin.Providers.Manager
             ILogger<ProviderManager> logger,
             IFileSystem fileSystem,
             IServerApplicationPaths appPaths,
-            ILibraryManager libraryManager,
+            ILibraryItemOptions itemOptions,
+            IItemRepository itemRepository,
             IItemLookupService itemLookup,
             ILibraryScanCoordinator scans,
             IBaseItemManager baseItemManager,
@@ -154,7 +158,8 @@ namespace Tesserafin.Providers.Manager
             _libraryMonitor = libraryMonitor;
             _fileSystem = fileSystem;
             _appPaths = appPaths;
-            _libraryManager = libraryManager;
+            _itemOptions = itemOptions;
+            _itemRepository = itemRepository;
             _itemLookup = itemLookup;
             _scans = scans;
             _subtitleManager = subtitleManager;
@@ -353,7 +358,7 @@ namespace Tesserafin.Providers.Manager
         private IEnumerable<IRemoteImageProvider> GetRemoteImageProviders(BaseItem item, bool includeDisabled)
         {
             var options = GetMetadataOptions(item);
-            var libraryOptions = _libraryManager.GetLibraryOptions(item);
+            var libraryOptions = _itemOptions.GetLibraryOptions(item);
 
             return GetImageProvidersInternal(
                 item,
@@ -366,7 +371,7 @@ namespace Tesserafin.Providers.Manager
         /// <inheritdoc/>
         public IEnumerable<IImageProvider> GetImageProviders(BaseItem item, ImageRefreshOptions refreshOptions)
         {
-            return GetImageProvidersInternal(item, _libraryManager.GetLibraryOptions(item), GetMetadataOptions(item), refreshOptions, false);
+            return GetImageProvidersInternal(item, _itemOptions.GetLibraryOptions(item), GetMetadataOptions(item), refreshOptions, false);
         }
 
         private IEnumerable<IImageProvider> GetImageProvidersInternal(BaseItem item, LibraryOptions libraryOptions, MetadataOptions options, ImageRefreshOptions refreshOptions, bool includeDisabled)
@@ -439,14 +444,16 @@ namespace Tesserafin.Providers.Manager
             return GetMetadataProvidersInternal<T>(item, libraryOptions, globalMetadataOptions, includeDisabled, false, libraryPath);
         }
 
-        private static string GetLibraryPathForItem(BaseItem item)
+        private string GetLibraryPathForItem(BaseItem item)
         {
             if (item is CollectionFolder collectionFolder)
             {
                 return collectionFolder.Path ?? string.Empty;
             }
 
-            var topParent = item.GetTopParent();
+            var topParent = item.IsTopParentVia(_itemLookup)
+                ? item
+                : item.GetParents(_itemLookup).FirstOrDefault(parent => parent.IsTopParentVia(_itemLookup));
             return topParent?.Path ?? string.Empty;
         }
 
@@ -747,7 +754,7 @@ namespace Tesserafin.Providers.Manager
 
             if (!searchInfo.ItemId.IsEmpty())
             {
-                referenceItem = _libraryManager.GetItemById(searchInfo.ItemId);
+                referenceItem = _itemLookup.GetItemById(searchInfo.ItemId);
             }
 
             return GetRemoteSearchResults<TItemType, TLookupType>(searchInfo, referenceItem, cancellationToken);
@@ -775,7 +782,7 @@ namespace Tesserafin.Providers.Manager
             }
             else
             {
-                libraryOptions = _libraryManager.GetLibraryOptions(referenceItem);
+                libraryOptions = _itemOptions.GetLibraryOptions(referenceItem);
             }
 
             var options = GetMetadataOptions(referenceItem);
@@ -981,8 +988,6 @@ namespace Tesserafin.Providers.Manager
 
         private async Task StartProcessingRefreshQueue()
         {
-            var libraryManager = _libraryManager;
-
             if (_disposed)
             {
                 return;
@@ -1000,7 +1005,7 @@ namespace Tesserafin.Providers.Manager
 
                 try
                 {
-                    var item = libraryManager.GetItemById(refreshItem.ItemId);
+                    var item = _itemLookup.GetItemById(refreshItem.ItemId);
                     if (item is null)
                     {
                         continue;
@@ -1057,7 +1062,7 @@ namespace Tesserafin.Providers.Manager
 
         private async Task RefreshArtist(MusicArtist item, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
-            var albums = _libraryManager
+            var albums = _itemRepository
                 .GetItemList(new InternalItemsQuery
                 {
                     IncludeItemTypes = new[] { BaseItemKind.MusicAlbum },
