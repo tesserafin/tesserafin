@@ -39,7 +39,7 @@ namespace Tesserafin.Providers.MediaInfo
         private readonly IChapterManager _chapterManager;
         private readonly IServerConfigurationManager _config;
         private readonly ISubtitleManager _subtitleManager;
-        private readonly ILibraryManager _libraryManager;
+        private readonly ILibraryItemOptions _itemOptions;
         private readonly IItemPeopleService _itemPeopleService;
         private readonly AudioResolver _audioResolver;
         private readonly SubtitleResolver _subtitleResolver;
@@ -56,7 +56,7 @@ namespace Tesserafin.Providers.MediaInfo
             IChapterManager chapterManager,
             IServerConfigurationManager config,
             ISubtitleManager subtitleManager,
-            ILibraryManager libraryManager,
+            ILibraryItemOptions itemOptions,
             IItemPeopleService itemPeopleService,
             AudioResolver audioResolver,
             SubtitleResolver subtitleResolver,
@@ -72,7 +72,7 @@ namespace Tesserafin.Providers.MediaInfo
             _chapterManager = chapterManager;
             _config = config;
             _subtitleManager = subtitleManager;
-            _libraryManager = libraryManager;
+            _itemOptions = itemOptions;
             _itemPeopleService = itemPeopleService;
             _audioResolver = audioResolver;
             _subtitleResolver = subtitleResolver;
@@ -237,14 +237,13 @@ namespace Tesserafin.Providers.MediaInfo
             }
 
             // Download and insert external streams before the streams from the file to preserve stream IDs on remote videos
-            await AddExternalSubtitlesAsync(video, mediaStreams, options, cancellationToken).ConfigureAwait(false);
+            var libraryOptions = _itemOptions.GetLibraryOptions(video);
+            await AddExternalSubtitlesAsync(video, mediaStreams, options, libraryOptions, cancellationToken).ConfigureAwait(false);
 
             for (var i = 0; i < mediaStreams.Count; i++)
             {
                 mediaStreams[i].Index = i;
             }
-
-            var libraryOptions = _libraryManager.GetLibraryOptions(video);
 
             if (mediaInfo is not null)
             {
@@ -538,20 +537,20 @@ namespace Tesserafin.Providers.MediaInfo
         /// <param name="video">The video.</param>
         /// <param name="currentStreams">The current streams.</param>
         /// <param name="options">The refreshOptions.</param>
+        /// <param name="libraryOptions">The settings for this probe.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
         private async Task AddExternalSubtitlesAsync(
             Video video,
             List<MediaStream> currentStreams,
             MetadataRefreshOptions options,
+            LibraryOptions libraryOptions,
             CancellationToken cancellationToken)
         {
             var externalSubtitleStreams = await _subtitleResolver.GetExternalStreamsAsync(video, 0, options.DirectoryService, false, cancellationToken).ConfigureAwait(false);
 
             var enableSubtitleDownloading = options.MetadataRefreshMode == MetadataRefreshMode.Default ||
                                             options.MetadataRefreshMode == MetadataRefreshMode.FullRefresh;
-
-            var libraryOptions = _libraryManager.GetLibraryOptions(video);
 
             if (enableSubtitleDownloading && libraryOptions.SubtitleDownloadLanguages is not null)
             {

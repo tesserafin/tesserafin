@@ -1261,3 +1261,9 @@ The metadata service hierarchy reads effective library settings through
 `ILibraryItemOptions`. Series grouping and special-season naming use the
 same policy. When a series creates a missing season, `IItemStore` computes
 its deterministic identity from the existing series, number and name key.
+
+## 46. Audio and video probe options
+
+The audio and video probers use `ILibraryItemOptions` for the effective settings
+of the media item. A video probe resolves those settings once and uses them
+for subtitle download and filtering, embedded metadata, and chapter images.

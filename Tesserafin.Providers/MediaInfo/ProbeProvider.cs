@@ -61,7 +61,7 @@ namespace Tesserafin.Providers.MediaInfo
         /// <param name="chapterManager">Instance of the <see cref="IChapterManager"/> interface.</param>
         /// <param name="config">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
         /// <param name="subtitleManager">Instance of the <see cref="ISubtitleManager"/> interface.</param>
-        /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+        /// <param name="itemOptions">Effective library options for the probed item.</param>
         /// <param name="itemPeopleService">Instance of the <see cref="IItemPeopleService"/> interface.</param>
         /// <param name="loggerFactory">Instance of the <see cref="ILoggerFactory"/>.</param>
         /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
@@ -78,7 +78,7 @@ namespace Tesserafin.Providers.MediaInfo
             IChapterManager chapterManager,
             IServerConfigurationManager config,
             ISubtitleManager subtitleManager,
-            ILibraryManager libraryManager,
+            ILibraryItemOptions itemOptions,
             IItemPeopleService itemPeopleService,
             IFileSystem fileSystem,
             ILoggerFactory loggerFactory,
@@ -102,7 +102,7 @@ namespace Tesserafin.Providers.MediaInfo
                 chapterManager,
                 config,
                 subtitleManager,
-                libraryManager,
+                itemOptions,
                 itemPeopleService,
                 _audioResolver,
                 _subtitleResolver,
@@ -114,7 +114,7 @@ namespace Tesserafin.Providers.MediaInfo
                 loggerFactory.CreateLogger<AudioFileProber>(),
                 mediaSourceManager,
                 mediaEncoder,
-                libraryManager,
+                itemOptions,
                 _lyricResolver,
                 lyricManager,
                 mediaStreamRepository,
