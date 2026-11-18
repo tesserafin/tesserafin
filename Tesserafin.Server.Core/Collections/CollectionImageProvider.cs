@@ -6,6 +6,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
@@ -18,6 +19,8 @@ namespace Tesserafin.Server.Core.Collections
     /// </summary>
     public class CollectionImageProvider : BaseDynamicImageProvider<BoxSet>
     {
+        private readonly LinkedChildResolver _linkedChildren;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="CollectionImageProvider"/> class.
         /// </summary>
@@ -25,13 +28,16 @@ namespace Tesserafin.Server.Core.Collections
         /// <param name="providerManager">The provider manager.</param>
         /// <param name="applicationPaths">The application paths.</param>
         /// <param name="imageProcessor">The image processor.</param>
+        /// <param name="linkedChildren">The resolver for saved collection links.</param>
         public CollectionImageProvider(
             IFileSystem fileSystem,
             IProviderManager providerManager,
             IApplicationPaths applicationPaths,
-            IImageProcessor imageProcessor)
+            IImageProcessor imageProcessor,
+            LinkedChildResolver linkedChildren)
             : base(fileSystem, providerManager, applicationPaths, imageProcessor)
         {
+            _linkedChildren = linkedChildren;
         }
 
         /// <inheritdoc />
@@ -51,7 +57,7 @@ namespace Tesserafin.Server.Core.Collections
         {
             var playlist = (BoxSet)item;
 
-            return playlist.Children.Concat(playlist.GetLinkedChildren())
+            return playlist.Children.Concat(_linkedChildren.GetItems(playlist))
                 .Select(i =>
                 {
                     var subItem = i;

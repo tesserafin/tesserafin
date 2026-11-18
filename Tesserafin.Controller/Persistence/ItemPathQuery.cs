@@ -19,17 +19,20 @@ namespace Tesserafin.Controller.Persistence
         /// <param name="isFolder">Whether the item must be a folder; <c>null</c> for either.</param>
         /// <returns>The matching item, or null.</returns>
         public static BaseItem? Find(IItemRepository repository, string path, bool? isFolder)
+            => repository.GetItemList(Create(path, isFolder)).FirstOrDefault();
+
+        internal static InternalItemsQuery Create(string path, bool? isFolder)
         {
             ArgumentException.ThrowIfNullOrEmpty(path);
 
-            return repository.GetItemList(new InternalItemsQuery
+            return new InternalItemsQuery
             {
                 Path = path,
                 IsFolder = isFolder,
                 OrderBy = [(ItemSortBy.DateCreated, SortOrder.Descending)],
                 Limit = 1,
                 DtoOptions = new DtoOptions(true)
-            }).FirstOrDefault();
+            };
         }
     }
 }

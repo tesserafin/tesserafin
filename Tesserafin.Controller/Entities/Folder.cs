@@ -1459,41 +1459,18 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <returns>IEnumerable{BaseItem}.</returns>
         public List<BaseItem> GetLinkedChildren()
+            => CreateLinkedChildResolver().Resolve(this).Select(entry => entry.Item).ToList();
+
+        protected static LinkedChildResolver CreateLinkedChildResolver(IBoxSetVisibilityService scope = null)
         {
-            var resolved = ResolveLinkedChildren(LinkedChildren);
-            var list = new List<BaseItem>(resolved.Count);
-            foreach (var (_, item) in resolved)
-            {
-                list.Add(item);
-            }
-
-            return list;
-        }
-
-        public bool ContainsLinkedChildByItemId(Guid itemId)
-        {
-            var linkedChildren = LinkedChildren;
-            foreach (var i in linkedChildren)
-            {
-                if (i.ItemId.HasValue)
-                {
-                    if (i.ItemId.Value.Equals(itemId))
-                    {
-                        return true;
-                    }
-
-                    continue;
-                }
-
-                var child = GetLinkedChild(i);
-
-                if (child is not null && child.Id.Equals(itemId))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return new LinkedChildResolver(
+                scope is null ? query => LibraryManager.GetItemList(query) : null,
+                scope is null ? id => LibraryManager.GetItemById(id) : scope.GetItemById,
+                scope is ILinkedChildVisibilityService paths
+                    ? paths.FindByPath
+                    : path => LibraryManager.GetItemList(ItemPathQuery.Create(path, null)).FirstOrDefault(),
+                FileSystem,
+                Logger);
         }
 
         public List<BaseItem> GetLinkedChildren(User user)
@@ -1520,9 +1497,10 @@ namespace Tesserafin.Controller.Entities
                 .Select(i => i.Id)
                 .ToList();
 
+            var resolver = CreateLinkedChildResolver();
             foreach (var i in linkedChildren)
             {
-                var child = GetLinkedChild(i);
+                var child = resolver.ResolveSingle(this, i);
 
                 if (child is null)
                 {
@@ -1557,80 +1535,6 @@ namespace Tesserafin.Controller.Entities
             }
 
             return list;
-        }
-
-        /// <summary>
-        /// Gets the linked children.
-        /// </summary>
-        /// <returns>IEnumerable{BaseItem}.</returns>
-        public IReadOnlyList<Tuple<LinkedChild, BaseItem>> GetLinkedChildrenInfos()
-        {
-            return ResolveLinkedChildren(LinkedChildren)
-                .Select(t => new Tuple<LinkedChild, BaseItem>(t.Info, t.Item))
-                .ToArray();
-        }
-
-        /// <summary>
-        /// Resolves a list of <see cref="LinkedChild"/> entries to their <see cref="BaseItem"/> targets,
-        /// batching the database lookup across all entries with a known ItemId.
-        /// Entries without a usable ItemId fall back to the per-entry <see cref="BaseItem.GetLinkedChild(LinkedChild)"/>
-        /// path (legacy path-based resolution).
-        /// </summary>
-        /// <param name="linkedChildren">Linked children to resolve.</param>
-        /// <returns>Each input entry paired with its resolved item; entries that fail to resolve are dropped.</returns>
-        private List<(LinkedChild Info, BaseItem Item)> ResolveLinkedChildren(IReadOnlyList<LinkedChild> linkedChildren)
-        {
-            var resolved = new List<(LinkedChild Info, BaseItem Item)>(linkedChildren.Count);
-            if (linkedChildren.Count == 0)
-            {
-                return resolved;
-            }
-
-            var idsToBatch = new HashSet<Guid>();
-            foreach (var info in linkedChildren)
-            {
-                if (info.ItemId.HasValue && !info.ItemId.Value.IsEmpty())
-                {
-                    idsToBatch.Add(info.ItemId.Value);
-                }
-            }
-
-            Dictionary<Guid, BaseItem> byId = null;
-            if (idsToBatch.Count > 0)
-            {
-                var batched = LibraryManager.GetItemList(new InternalItemsQuery
-                {
-                    ItemIds = [.. idsToBatch]
-                });
-                byId = new Dictionary<Guid, BaseItem>(batched.Count);
-                foreach (var item in batched)
-                {
-                    byId[item.Id] = item;
-                }
-            }
-
-            foreach (var info in linkedChildren)
-            {
-                BaseItem item = null;
-                if (byId is not null && info.ItemId.HasValue && byId.TryGetValue(info.ItemId.Value, out var batchedItem))
-                {
-                    item = batchedItem;
-                }
-                else
-                {
-                    // ItemId is missing/empty or the batched query couldn't return the item
-                    // (e.g. it has been removed). Fall back to per-entry resolution, which also
-                    // handles legacy path-based linked children.
-                    item = GetLinkedChild(info);
-                }
-
-                if (item is not null)
-                {
-                    resolved.Add((info, item));
-                }
-            }
-
-            return resolved;
         }
 
         protected override async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)

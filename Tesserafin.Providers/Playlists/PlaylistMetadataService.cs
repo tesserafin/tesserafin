@@ -20,6 +20,8 @@ namespace Tesserafin.Providers.Playlists;
 /// </summary>
 public class PlaylistMetadataService : MetadataService<Playlist, ItemLookupInfo>
 {
+    private readonly LinkedChildResolver _linkedChildren;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="PlaylistMetadataService"/> class.
     /// </summary>
@@ -33,6 +35,7 @@ public class PlaylistMetadataService : MetadataService<Playlist, ItemLookupInfo>
     /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
+    /// <param name="linkedChildren">The resolver for saved links.</param>
     public PlaylistMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -43,9 +46,11 @@ public class PlaylistMetadataService : MetadataService<Playlist, ItemLookupInfo>
         ILibraryItemOptions itemOptions,
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
-        IItemRepository itemRepository)
+        IItemRepository itemRepository,
+        LinkedChildResolver linkedChildren)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository)
     {
+        _linkedChildren = linkedChildren;
     }
 
     /// <inheritdoc />
@@ -59,7 +64,7 @@ public class PlaylistMetadataService : MetadataService<Playlist, ItemLookupInfo>
 
     /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(Playlist item)
-        => item.GetLinkedChildren();
+        => _linkedChildren.GetItems(item);
 
     /// <inheritdoc />
     protected override void MergeData(MetadataResult<Playlist> source, MetadataResult<Playlist> target, MetadataField[] lockedFields, bool replaceData, bool mergeMetadataSettings)

@@ -20,6 +20,8 @@ namespace Tesserafin.Providers.BoxSets;
 /// </summary>
 public class BoxSetMetadataService : MetadataService<BoxSet, BoxSetInfo>
 {
+    private readonly LinkedChildResolver _linkedChildren;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="BoxSetMetadataService"/> class.
     /// </summary>
@@ -33,6 +35,7 @@ public class BoxSetMetadataService : MetadataService<BoxSet, BoxSetInfo>
     /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
+    /// <param name="linkedChildren">The resolver for saved links.</param>
     public BoxSetMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -43,9 +46,11 @@ public class BoxSetMetadataService : MetadataService<BoxSet, BoxSetInfo>
         ILibraryItemOptions itemOptions,
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
-        IItemRepository itemRepository)
+        IItemRepository itemRepository,
+        LinkedChildResolver linkedChildren)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository)
     {
+        _linkedChildren = linkedChildren;
     }
 
     /// <inheritdoc />
@@ -63,7 +68,7 @@ public class BoxSetMetadataService : MetadataService<BoxSet, BoxSetInfo>
     /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(BoxSet item)
     {
-        return item.GetLinkedChildren();
+        return _linkedChildren.GetItems(item);
     }
 
     /// <inheritdoc />

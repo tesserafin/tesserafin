@@ -1314,3 +1314,13 @@ refresh targets and retention, applying the folder filter at each call site.
 The shared stored-path query lives with the catalogue repository contract.
 Path-based saved links use that query too, with the supplied visibility scope
 when one is available. `FindByPath` has been removed from `ILibraryManager`.
+
+## 52. Saved playlist and collection links
+
+`LinkedChildResolver` batches catalogue reads by item ID and resolves
+remaining saved paths or legacy IDs. It preserves link order, repeated
+entries, and the association between a resolved item and its original link.
+Playlist API reads and file exports, collection management, and the metadata
+and image providers use the injected resolver. Entity queries use the same
+resolution rules. Scoped collection visibility still resolves through its
+scope. The stored-path fallback no longer reads `BaseItem.ItemRepository`.
