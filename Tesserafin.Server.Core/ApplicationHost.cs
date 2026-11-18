@@ -593,6 +593,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<INamedItemCatalog, NamedItemCatalog>();
             serviceCollection.AddSingleton<ItemVersionGraphPlanner>();
             serviceCollection.AddSingleton<FolderChildReconciler>();
+            serviceCollection.AddSingleton<CollectionFolderMembershipResolver>();
             serviceCollection.AddSingleton<IItemWriteCommands, ItemWriteCommands>();
             serviceCollection.AddSingleton<IItemPeopleCommands, ItemPeopleCommands>();
             serviceCollection.AddSingleton<IUserViewFactory, UserViewFactory>();

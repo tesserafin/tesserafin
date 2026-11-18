@@ -1227,3 +1227,13 @@ nested scan targets already covered by a parent. Configured shortcut locations
 are retained separately. Unavailable directories are distinguished from
 completed empty scans so folder reconciliation cannot treat them as removals.
 Root path normalization no longer goes through `LibraryManager`.
+
+## 42. Physical folder membership of configured libraries
+
+Collection-folder refresh asks the membership resolver to read the library
+definition and resolve its physical folders through the catalogue. Direct
+physical root children take precedence, with a folder lookup for paths
+covered by a scanned ancestor. The item writer stages the locations, folder
+identities and inherited links together and publishes them after persistence.
+Unavailable library definition directories do not produce a membership write.
+The existing metadata refresh follows the committed membership.
