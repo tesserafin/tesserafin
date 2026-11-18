@@ -45,7 +45,8 @@ public sealed class LibraryScanEndToEndTests(TesserafinApplicationFactory factor
                 LibraryOptions = new LibraryOptions
                 {
                     EnableRealtimeMonitor = false,
-                    PathInfos = [new MediaPathInfo(source)]
+                    PathInfos = [new MediaPathInfo(source)],
+                    TypeOptions = [new TypeOptions { Type = nameof(Movie) }]
                 }
             };
             using var created = await client.PostAsJsonAsync("Library/VirtualFolders?collectionType=movies&name=" + name, body, cancellationToken);
