@@ -9,6 +9,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Lyrics;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
@@ -29,7 +30,10 @@ public class LyricScheduledTask : IScheduledTask
     private static readonly SourceType[] _sourceTypes = [SourceType.Library];
     private static readonly DtoOptions _dtoOptions = new(false);
 
-    private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryRootFolderProvider _roots;
+    private readonly ILibraryItemOptions _libraryOptions;
+    private readonly IItemQueryService _itemQueries;
+    private readonly IItemCountService _itemCounts;
     private readonly ILyricManager _lyricManager;
     private readonly ILogger<LyricScheduledTask> _logger;
     private readonly ILocalizationManager _localizationManager;
@@ -38,19 +42,28 @@ public class LyricScheduledTask : IScheduledTask
     /// <summary>
     /// Initializes a new instance of the <see cref="LyricScheduledTask"/> class.
     /// </summary>
-    /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="roots">Provider for the physical library root.</param>
+    /// <param name="libraryOptions">Effective library settings.</param>
+    /// <param name="itemQueries">Service for reading catalogue items.</param>
+    /// <param name="itemCounts">Service for counting catalogue items.</param>
     /// <param name="lyricManager">Instance of the <see cref="ILyricManager"/> interface.</param>
-    /// <param name="logger">Instance of the <see cref="ILogger{DownloaderScheduledTask}"/> interface.</param>
+    /// <param name="logger">Task logger.</param>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="mediaSourceManager">Instance of the <see cref="IMediaSourceManager"/> interface.</param>
     public LyricScheduledTask(
-        ILibraryManager libraryManager,
+        ILibraryRootFolderProvider roots,
+        ILibraryItemOptions libraryOptions,
+        IItemQueryService itemQueries,
+        IItemCountService itemCounts,
         ILyricManager lyricManager,
         ILogger<LyricScheduledTask> logger,
         ILocalizationManager localizationManager,
         IMediaSourceManager mediaSourceManager)
     {
-        _libraryManager = libraryManager;
+        _roots = roots;
+        _libraryOptions = libraryOptions;
+        _itemQueries = itemQueries;
+        _itemCounts = itemCounts;
         _lyricManager = lyricManager;
         _logger = logger;
         _localizationManager = localizationManager;
@@ -72,7 +85,7 @@ public class LyricScheduledTask : IScheduledTask
     /// <inheritdoc />
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var totalCount = _libraryManager.GetCount(new InternalItemsQuery
+        var totalCount = _itemCounts.GetCount(new InternalItemsQuery
         {
             Recursive = true,
             IsVirtualItem = false,
@@ -84,9 +97,9 @@ public class LyricScheduledTask : IScheduledTask
 
         var completed = 0;
 
-        foreach (var library in _libraryManager.RootFolder.Children.ToList())
+        foreach (var library in _roots.GetRootFolder().Children.ToList())
         {
-            var libraryOptions = _libraryManager.GetLibraryOptions(library);
+            var libraryOptions = _libraryOptions.GetLibraryOptions(library);
             var itemQuery = new InternalItemsQuery
             {
                 Recursive = true,
@@ -104,7 +117,7 @@ public class LyricScheduledTask : IScheduledTask
             do
             {
                 itemQuery.StartIndex = startIndex;
-                var audioItems = _libraryManager.GetItemList(itemQuery);
+                var audioItems = _itemQueries.GetItemList(itemQuery);
 
                 foreach (var audioItem in audioItems.OfType<Audio>())
                 {
