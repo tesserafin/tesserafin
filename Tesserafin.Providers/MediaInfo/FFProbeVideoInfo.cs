@@ -559,12 +559,7 @@ namespace Tesserafin.Providers.MediaInfo
                     _subtitleManager).DownloadSubtitles(
                         video,
                         currentStreams.Concat(externalSubtitleStreams).ToList(),
-                        libraryOptions.SkipSubtitlesIfEmbeddedSubtitlesPresent,
-                        libraryOptions.SkipSubtitlesIfAudioTrackMatches,
-                        libraryOptions.RequirePerfectSubtitleMatch,
-                        libraryOptions.SubtitleDownloadLanguages,
-                        libraryOptions.DisabledSubtitleFetchers,
-                        libraryOptions.SubtitleFetcherOrder,
+                        libraryOptions,
                         true,
                         cancellationToken).ConfigureAwait(false);
 

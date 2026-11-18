@@ -73,10 +73,11 @@ public interface ILyricManager
     /// Saves new lyrics.
     /// </summary>
     /// <param name="audio">The audio file the lyrics belong to.</param>
+    /// <param name="libraryOptions">The effective settings already resolved for this audio item.</param>
     /// <param name="format">The lyrics format.</param>
     /// <param name="lyrics">The lyrics.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<LyricDto?> SaveLyricAsync(Audio audio, string format, string lyrics);
+    Task<LyricDto?> SaveLyricAsync(Audio audio, LibraryOptions libraryOptions, string format, string lyrics);
 
     /// <summary>
     /// Saves new lyrics.

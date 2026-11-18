@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
@@ -30,6 +31,8 @@ public class LyricManager : ILyricManager
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly ILibraryItemOptions _itemOptions;
+    private readonly IServerApplicationPaths _applicationPaths;
     private readonly ILogger<LyricManager> _logger;
     private readonly IFileSystem _fileSystem;
     private readonly ILibraryMonitor _libraryMonitor;
@@ -43,6 +46,8 @@ public class LyricManager : ILyricManager
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="itemOptions">Effective library options for lyrics.</param>
+    /// <param name="applicationPaths">The internal metadata root.</param>
     /// <param name="logger">Instance of the <see cref="ILogger{LyricManager}"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
     /// <param name="libraryMonitor">Instance of the <see cref="ILibraryMonitor"/> interface.</param>
@@ -52,6 +57,8 @@ public class LyricManager : ILyricManager
     public LyricManager(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
+        ILibraryItemOptions itemOptions,
+        IServerApplicationPaths applicationPaths,
         ILogger<LyricManager> logger,
         IFileSystem fileSystem,
         ILibraryMonitor libraryMonitor,
@@ -61,6 +68,8 @@ public class LyricManager : ILyricManager
     {
         _writes = writes;
         _deletions = deletions;
+        _itemOptions = itemOptions;
+        _applicationPaths = applicationPaths;
         _logger = logger;
         _fileSystem = fileSystem;
         _libraryMonitor = libraryMonitor;
@@ -137,7 +146,7 @@ public class LyricManager : ILyricManager
         ArgumentNullException.ThrowIfNull(audio);
         ArgumentException.ThrowIfNullOrWhiteSpace(lyricId);
 
-        var libraryOptions = BaseItem.LibraryManager.GetLibraryOptions(audio);
+        var libraryOptions = _itemOptions.GetLibraryOptions(audio);
 
         return DownloadLyricsAsync(audio, libraryOptions, lyricId, cancellationToken);
     }
@@ -191,15 +200,16 @@ public class LyricManager : ILyricManager
     }
 
     /// <inheritdoc />
-    public async Task<LyricDto?> SaveLyricAsync(Audio audio, string format, string lyrics)
+    public async Task<LyricDto?> SaveLyricAsync(Audio audio, LibraryOptions libraryOptions, string format, string lyrics)
     {
         ArgumentNullException.ThrowIfNull(audio);
         ArgumentException.ThrowIfNullOrEmpty(format);
         ArgumentException.ThrowIfNullOrEmpty(lyrics);
+        ArgumentNullException.ThrowIfNull(libraryOptions);
 
         var bytes = Encoding.UTF8.GetBytes(lyrics);
         using var lyricStream = new MemoryStream(bytes, 0, bytes.Length, false, true);
-        return await SaveLyricAsync(audio, format, lyricStream).ConfigureAwait(false);
+        return await SaveLyricAsync(audio, libraryOptions, format, lyricStream).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -209,8 +219,11 @@ public class LyricManager : ILyricManager
         ArgumentException.ThrowIfNullOrEmpty(format);
         ArgumentNullException.ThrowIfNull(lyrics);
 
-        var libraryOptions = BaseItem.LibraryManager.GetLibraryOptions(audio);
+        return await SaveLyricAsync(audio, _itemOptions.GetLibraryOptions(audio), format, lyrics).ConfigureAwait(false);
+    }
 
+    private async Task<LyricDto?> SaveLyricAsync(Audio audio, LibraryOptions libraryOptions, string format, Stream lyrics)
+    {
         var parsed = await InternalParseRemoteLyricsAsync(format, lyrics, CancellationToken.None).ConfigureAwait(false);
         if (parsed is null)
         {
@@ -412,10 +425,11 @@ public class LyricManager : ILyricManager
                 }
             }
 
-            var internalPath = Path.GetFullPath(Path.Combine(audio.GetInternalMetadataPath(), saveFileName));
+            var metadataFolder = audio.GetInternalMetadataPath(_applicationPaths.InternalMetadataPath);
+            var internalPath = Path.GetFullPath(Path.Combine(metadataFolder, saveFileName));
 
             // TODO: Add some error to the user: return BadRequest("Could not save lyric, bad path.");
-            if (internalPath.StartsWith(audio.GetInternalMetadataPath(), StringComparison.Ordinal))
+            if (internalPath.StartsWith(metadataFolder, StringComparison.Ordinal))
             {
                 savePaths.Add(internalPath);
             }

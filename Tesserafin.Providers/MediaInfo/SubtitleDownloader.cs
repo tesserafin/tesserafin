@@ -14,6 +14,7 @@ using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 
 namespace Tesserafin.Providers.MediaInfo
@@ -32,101 +33,50 @@ namespace Tesserafin.Providers.MediaInfo
         public async Task<List<string>> DownloadSubtitles(
             Video video,
             IReadOnlyList<MediaStream> mediaStreams,
-            bool skipIfEmbeddedSubtitlesPresent,
-            bool skipIfAudioTrackMatches,
-            bool requirePerfectMatch,
-            IEnumerable<string> languages,
-            string[] disabledSubtitleFetchers,
-            string[] subtitleFetcherOrder,
+            LibraryOptions libraryOptions,
             bool isAutomated,
             CancellationToken cancellationToken)
         {
+            var languages = libraryOptions.SubtitleDownloadLanguages;
+            if (languages is null)
+            {
+                return [];
+            }
+
+            VideoContentType? mediaType = video switch
+            {
+                Episode => VideoContentType.Episode,
+                Movie => VideoContentType.Movie,
+                _ => null
+            };
+            if (!mediaType.HasValue)
+            {
+                return [];
+            }
+
             var downloadedLanguages = new List<string>();
 
-            foreach (var lang in languages)
+            foreach (var language in languages)
             {
-                var downloaded = await DownloadSubtitles(
-                    video,
-                    mediaStreams,
-                    skipIfEmbeddedSubtitlesPresent,
-                    skipIfAudioTrackMatches,
-                    requirePerfectMatch,
-                    lang,
-                    disabledSubtitleFetchers,
-                    subtitleFetcherOrder,
-                    isAutomated,
-                    cancellationToken).ConfigureAwait(false);
-
-                if (downloaded)
+                if (video.VideoType != VideoType.VideoFile || !video.IsCompleteMedia)
                 {
-                    downloadedLanguages.Add(lang);
+                    continue;
+                }
+
+                if (await DownloadLanguageAsync(video, mediaStreams, libraryOptions, language, mediaType.Value, isAutomated, cancellationToken).ConfigureAwait(false))
+                {
+                    downloadedLanguages.Add(language);
                 }
             }
 
             return downloadedLanguages;
         }
 
-        public Task<bool> DownloadSubtitles(
+        private async Task<bool> DownloadLanguageAsync(
             Video video,
             IReadOnlyList<MediaStream> mediaStreams,
-            bool skipIfEmbeddedSubtitlesPresent,
-            bool skipIfAudioTrackMatches,
-            bool requirePerfectMatch,
-            string lang,
-            string[] disabledSubtitleFetchers,
-            string[] subtitleFetcherOrder,
-            bool isAutomated,
-            CancellationToken cancellationToken)
-        {
-            if (video.VideoType != VideoType.VideoFile)
-            {
-                return Task.FromResult(false);
-            }
-
-            if (!video.IsCompleteMedia)
-            {
-                return Task.FromResult(false);
-            }
-
-            VideoContentType mediaType;
-
-            if (video is Episode)
-            {
-                mediaType = VideoContentType.Episode;
-            }
-            else if (video is Movie)
-            {
-                mediaType = VideoContentType.Movie;
-            }
-            else
-            {
-                // These are the only supported types
-                return Task.FromResult(false);
-            }
-
-            return DownloadSubtitles(
-                video,
-                mediaStreams,
-                skipIfEmbeddedSubtitlesPresent,
-                skipIfAudioTrackMatches,
-                requirePerfectMatch,
-                lang,
-                disabledSubtitleFetchers,
-                subtitleFetcherOrder,
-                mediaType,
-                isAutomated,
-                cancellationToken);
-        }
-
-        private async Task<bool> DownloadSubtitles(
-            Video video,
-            IReadOnlyList<MediaStream> mediaStreams,
-            bool skipIfEmbeddedSubtitlesPresent,
-            bool skipIfAudioTrackMatches,
-            bool requirePerfectMatch,
+            LibraryOptions libraryOptions,
             string language,
-            string[] disabledSubtitleFetchers,
-            string[] subtitleFetcherOrder,
             VideoContentType mediaType,
             bool isAutomated,
             CancellationToken cancellationToken)
@@ -147,14 +97,14 @@ namespace Tesserafin.Providers.MediaInfo
             }
 
             // There's already a default audio stream for this language
-            if (skipIfAudioTrackMatches &&
+            if (libraryOptions.SkipSubtitlesIfAudioTrackMatches &&
                 defaultAudioStreams.Any(i => string.Equals(i.Language, language, StringComparison.OrdinalIgnoreCase)))
             {
                 return false;
             }
 
             // There's an internal subtitle stream for this language
-            if (skipIfEmbeddedSubtitlesPresent &&
+            if (libraryOptions.SkipSubtitlesIfEmbeddedSubtitlesPresent &&
                 mediaStreams.Any(i => i.Type == MediaStreamType.Subtitle && !i.IsExternal && string.Equals(i.Language, language, StringComparison.OrdinalIgnoreCase)))
             {
                 return false;
@@ -174,9 +124,9 @@ namespace Tesserafin.Providers.MediaInfo
                 // Stop as soon as we find something
                 SearchAllProviders = false,
 
-                IsPerfectMatch = requirePerfectMatch,
-                DisabledSubtitleFetchers = disabledSubtitleFetchers,
-                SubtitleFetcherOrder = subtitleFetcherOrder,
+                IsPerfectMatch = libraryOptions.RequirePerfectSubtitleMatch,
+                DisabledSubtitleFetchers = libraryOptions.DisabledSubtitleFetchers,
+                SubtitleFetcherOrder = libraryOptions.SubtitleFetcherOrder,
                 IsAutomated = isAutomated
             };
 
@@ -194,7 +144,7 @@ namespace Tesserafin.Providers.MediaInfo
 
                 if (result is not null)
                 {
-                    await _subtitleManager.DownloadSubtitles(video, result.Id, cancellationToken).ConfigureAwait(false);
+                    await _subtitleManager.DownloadSubtitles(video, libraryOptions, result.Id, cancellationToken).ConfigureAwait(false);
 
                     return true;
                 }
