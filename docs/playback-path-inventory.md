@@ -1669,3 +1669,11 @@ and series retain episode and season selection by presentation key. It skips
 missing files before counting the newest files to keep. Aggregate roots and
 missing series keys yield no candidates. Timer retention and deletion
 execution stay in the recordings manager.
+
+## 62. Filesystem change refresh queue
+
+The filesystem refresher resolves removed items through the injected identity
+lookup, trying the owner before the parent. It queues a high-priority metadata
+refresh with a directory service built from the monitor's filesystem. The
+provider manager is resolved when the callback needs the queue, after monitor
+construction. The entity's filesystem change hook is removed.

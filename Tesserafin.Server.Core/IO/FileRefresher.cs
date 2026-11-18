@@ -18,16 +18,24 @@ namespace Tesserafin.Server.Core.IO
     {
         private readonly ILogger _logger;
         private readonly IItemPathLookupService _itemPaths;
-        private readonly IServerConfigurationManager _configurationManager;
-        private readonly IFileSystem _fileSystem;
+        private readonly IItemLookupService _items;
         private readonly Lazy<IProviderManager> _providers;
+        private readonly IFileSystem _fileSystem;
+        private readonly IServerConfigurationManager _configurationManager;
 
         private readonly List<string> _affectedPaths = new();
         private readonly Lock _timerLock = new();
         private Timer? _timer;
         private bool _disposed;
 
-        public FileRefresher(string path, IServerConfigurationManager configurationManager, IItemPathLookupService itemPaths, IFileSystem fileSystem, Lazy<IProviderManager> providers, ILogger logger)
+        public FileRefresher(
+            string path,
+            IServerConfigurationManager configurationManager,
+            IItemPathLookupService itemPaths,
+            IItemLookupService items,
+            Lazy<IProviderManager> providers,
+            IFileSystem fileSystem,
+            ILogger logger)
         {
             logger.LogDebug("New file refresher created for {0}", path);
             Path = path;
@@ -36,6 +44,7 @@ namespace Tesserafin.Server.Core.IO
             _fileSystem = fileSystem;
             _providers = providers;
             _itemPaths = itemPaths;
+            _items = items;
             _logger = logger;
             AddPath(path);
         }
@@ -182,7 +191,7 @@ namespace Tesserafin.Server.Core.IO
                 // If the item has been deleted find the first valid parent that still exists
                 while (!Directory.Exists(item.Path) && !File.Exists(item.Path))
                 {
-                    item = item.GetOwner() ?? item.GetParent();
+                    item = item.GetOwner(_items) ?? item.GetParent(_items);
 
                     if (item is null)
                     {

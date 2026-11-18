@@ -22,11 +22,12 @@ namespace Tesserafin.Server.Core.IO
         private readonly ILibraryRootFolderProvider _roots;
         private readonly ILibraryItemOptions _libraryOptions;
         private readonly IItemPathLookupService _itemPaths;
+        private readonly IItemLookupService _items;
+        private readonly Lazy<IProviderManager> _providers;
         private readonly ILibraryWriteTracker _writes;
         private readonly IItemChangeEvents _changes;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly IFileSystem _fileSystem;
-        private readonly Lazy<IProviderManager> _providers;
         private readonly DotIgnoreIgnoreRule _dotIgnoreIgnoreRule;
 
         /// <summary>
@@ -48,11 +49,12 @@ namespace Tesserafin.Server.Core.IO
         /// <param name="roots">The physical library root provider.</param>
         /// <param name="libraryOptions">The effective library settings.</param>
         /// <param name="itemPaths">The catalogue path lookup service.</param>
+        /// <param name="items">The catalogue identity lookup service.</param>
+        /// <param name="providers">The deferred refresh queue owner, which also uses the library monitor.</param>
         /// <param name="writes">Shared filesystem write suppression.</param>
         /// <param name="changes">The completed item change feed.</param>
         /// <param name="configurationManager">The configuration manager.</param>
         /// <param name="fileSystem">The filesystem.</param>
-        /// <param name="providers">The deferred provider manager that queues refreshes.</param>
         /// <param name="appLifetime">The <see cref="IHostApplicationLifetime"/>.</param>
         /// <param name="dotIgnoreIgnoreRule">The .ignore rule handler.</param>
         public LibraryMonitor(
@@ -60,23 +62,25 @@ namespace Tesserafin.Server.Core.IO
             ILibraryRootFolderProvider roots,
             ILibraryItemOptions libraryOptions,
             IItemPathLookupService itemPaths,
+            IItemLookupService items,
+            Lazy<IProviderManager> providers,
             ILibraryWriteTracker writes,
             IItemChangeEvents changes,
             IServerConfigurationManager configurationManager,
             IFileSystem fileSystem,
-            Lazy<IProviderManager> providers,
             IHostApplicationLifetime appLifetime,
             DotIgnoreIgnoreRule dotIgnoreIgnoreRule)
         {
             _roots = roots;
             _libraryOptions = libraryOptions;
             _itemPaths = itemPaths;
+            _items = items;
+            _providers = providers;
             _writes = writes;
             _changes = changes;
             _logger = logger;
             _configurationManager = configurationManager;
             _fileSystem = fileSystem;
-            _providers = providers;
             _dotIgnoreIgnoreRule = dotIgnoreIgnoreRule;
 
             appLifetime.ApplicationStarted.Register(Start);
@@ -434,7 +438,7 @@ namespace Tesserafin.Server.Core.IO
                     }
                 }
 
-                var newRefresher = new FileRefresher(path, _configurationManager, _itemPaths, _fileSystem, _providers, _logger);
+                var newRefresher = new FileRefresher(path, _configurationManager, _itemPaths, _items, _providers, _fileSystem, _logger);
                 newRefresher.Completed += OnNewRefresherCompleted;
                 _activeRefreshers.Add(newRefresher);
             }
