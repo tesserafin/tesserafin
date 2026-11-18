@@ -75,7 +75,7 @@ public sealed class ScheduledSidecarDownloadTests
         var subtitles = new Mock<ISubtitleManager>(MockBehavior.Strict);
         subtitles.Setup(s => s.SearchSubtitles(It.IsAny<SubtitleSearchRequest>(), token)).ReturnsAsync(Array.Empty<RemoteSubtitleInfo>());
         var mediaSources = new Mock<IMediaSourceManager>(MockBehavior.Strict);
-        mediaSources.Setup(s => s.GetMediaStreams(It.Is<MediaStreamQuery>(q => q.ItemId == movie.Id))).Returns([]);
+        mediaSources.Setup(s => s.GetMediaStreams(It.Is<MediaStreamQuery>(q => q.ItemId.Equals(movie.Id)))).Returns([]);
         var task = new SubtitleScheduledTask(
             Mock.Of<IItemWriteCommands>(),
             Mock.Of<IItemDeletionCommands>(),
@@ -94,9 +94,11 @@ public sealed class ScheduledSidecarDownloadTests
         options.Verify(o => o.GetLibraryOptions(movie), Times.Once);
         foreach (var language in languages)
         {
-            subtitles.Verify(s => s.SearchSubtitles(
-                It.Is<SubtitleSearchRequest>(r => r.IsAutomated && r.Language == language && r.SubtitleFetcherOrder[0] == "Preferred"),
-                token), Times.Once);
+            subtitles.Verify(
+                s => s.SearchSubtitles(
+                    It.Is<SubtitleSearchRequest>(r => r.IsAutomated && r.Language == language && r.SubtitleFetcherOrder[0] == "Preferred"),
+                    token),
+                Times.Once);
         }
     }
 
@@ -111,7 +113,7 @@ public sealed class ScheduledSidecarDownloadTests
         var options = new Mock<ILibraryItemOptions>(MockBehavior.Strict);
         options.Setup(o => o.GetLibraryOptions(folder)).Returns(settings);
         var count = new Mock<IItemCountService>(MockBehavior.Strict);
-        count.Setup(c => c.GetCount(It.Is<InternalItemsQuery>(q => q.ParentId == Guid.Empty && q.Recursive
+        count.Setup(c => c.GetCount(It.Is<InternalItemsQuery>(q => q.ParentId.Equals(Guid.Empty) && q.Recursive
             && q.IsVirtualItem == false && q.IncludeItemTypes.SequenceEqual(new[] { BaseItemKind.Audio })
             && q.MediaTypes.SequenceEqual(new[] { MediaType.Audio }) && q.SourceTypes.SequenceEqual(new[] { SourceType.Library }))))
             .Returns(101);
@@ -136,7 +138,7 @@ public sealed class ScheduledSidecarDownloadTests
         });
         var mediaSources = new Mock<IMediaSourceManager>(MockBehavior.Strict);
         mediaSources.Setup(s => s.GetMediaStreams(It.IsAny<MediaStreamQuery>()))
-            .Returns((MediaStreamQuery q) => q.ItemId == song.Id ? [] : [new MediaStream { Type = MediaStreamType.Lyric }]);
+            .Returns((MediaStreamQuery q) => q.ItemId.Equals(song.Id) ? [] : [new MediaStream { Type = MediaStreamType.Lyric }]);
         var match = new RemoteLyricInfoDto { Id = "match", ProviderName = "Preferred", Lyrics = new LyricDto() };
         var lyrics = new Mock<ILyricManager>(MockBehavior.Strict);
         lyrics.Setup(l => l.SearchLyricsAsync(It.IsAny<LyricSearchRequest>(), token)).ReturnsAsync(new[] { match });
@@ -155,10 +157,12 @@ public sealed class ScheduledSidecarDownloadTests
         await task.ExecuteAsync(progress.Object, token);
 
         Assert.Equal([0, 100, 200], pageOffsets);
-        lyrics.Verify(l => l.SearchLyricsAsync(
-            It.Is<LyricSearchRequest>(r => r.IsAutomated && r.MediaPath == song.Path
-                && r.DisabledLyricFetchers == settings.DisabledLyricFetchers && r.LyricFetcherOrder == settings.LyricFetcherOrder),
-            token), Times.Once);
+        lyrics.Verify(
+            l => l.SearchLyricsAsync(
+                It.Is<LyricSearchRequest>(r => r.IsAutomated && r.MediaPath == song.Path
+                    && r.DisabledLyricFetchers == settings.DisabledLyricFetchers && r.LyricFetcherOrder == settings.LyricFetcherOrder),
+                token),
+            Times.Once);
         lyrics.Verify(l => l.DownloadLyricsAsync(song, settings, match.Id, token), Times.Once);
         lyrics.VerifyNoOtherCalls();
         progress.Verify(p => p.Report(100d / 101), Times.Once);
