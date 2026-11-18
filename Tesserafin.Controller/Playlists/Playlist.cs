@@ -146,7 +146,7 @@ namespace Tesserafin.Controller.Playlists
             return GetPlayableItems(user, query);
         }
 
-        protected override IReadOnlyList<BaseItem> GetNonCachedChildren(IDirectoryService directoryService)
+        protected override IReadOnlyList<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             return [];
         }

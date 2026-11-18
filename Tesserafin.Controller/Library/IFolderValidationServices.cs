@@ -5,8 +5,8 @@ using Tesserafin.Controller.Providers;
 namespace Tesserafin.Controller.Library;
 
 /// <summary>
-/// The services a folder's validation and recursive refresh use: deletion, writes, image preparation, the
-/// bounded-concurrency scheduler, refresh tracking and channel removal policy.
+/// The services a folder's validation and recursive refresh use: deletion, writes, image preparation,
+/// filesystem candidate resolution, the bounded-concurrency scheduler, refresh tracking and channel removal policy.
 /// </summary>
 /// <remarks>
 /// One port instead of a growing parameter list threaded through <c>Folder.ValidateChildren</c> and its overrides.
@@ -22,6 +22,9 @@ public interface IFolderValidationServices
 
     /// <summary>Gets the image preparation and commit service.</summary>
     IItemImageService Images { get; }
+
+    /// <summary>Gets the filesystem candidate resolver for the scan.</summary>
+    IItemResolutionService Resolution { get; }
 
     /// <summary>Gets the bounded-concurrency scheduler.</summary>
     ILimitedConcurrencyLibraryScheduler Scheduler { get; }

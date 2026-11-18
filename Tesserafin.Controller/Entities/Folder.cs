@@ -354,7 +354,8 @@ namespace Tesserafin.Controller.Entities
 
                 try
                 {
-                    nonCachedChildren = GetNonCachedChildren(directoryService).ToArray();
+                    nonCachedChildren = GetNonCachedChildren(services.Resolution, directoryService, cancellationToken).ToArray();
+                    cancellationToken.ThrowIfCancellationRequested();
                 }
                 catch (IOException ex)
                 {
@@ -549,19 +550,13 @@ namespace Tesserafin.Controller.Entities
                 .ConfigureAwait(false);
         }
 
-        /// <summary>
-        /// Get the children of this folder from the actual file system.
-        /// </summary>
-        /// <returns>IEnumerable{BaseItem}.</returns>
-        /// <param name="directoryService">The directory service to use for operation.</param>
-        /// <returns>Returns set of base items.</returns>
-        protected virtual IEnumerable<BaseItem> GetNonCachedChildren(IDirectoryService directoryService)
-        {
-            var collectionType = LibraryManager.GetContentType(this);
-            var libraryOptions = LibraryManager.GetLibraryOptions(this);
-
-            return LibraryManager.ResolvePaths(GetFileSystemChildren(directoryService), directoryService, this, libraryOptions, collectionType);
-        }
+        /// <summary>Discovers children for catalogue reconciliation.</summary>
+        /// <param name="resolution">The filesystem candidate resolver.</param>
+        /// <param name="directoryService">Access to filesystem entries.</param>
+        /// <param name="cancellationToken">Cancels discovery.</param>
+        /// <returns>The children resolved from the current filesystem entries.</returns>
+        protected virtual IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
+            => resolution.ResolveFolderChildren(this, GetFileSystemChildren(directoryService), directoryService, cancellationToken);
 
         /// <summary>
         /// Get our children from the repo - stubbed for now.

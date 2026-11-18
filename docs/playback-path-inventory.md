@@ -1544,3 +1544,12 @@ with SQLite, retries, checks domain/HTTP reads, aborts a partial retarget, fills
 then removes shortcuts while preserving manual links and every media/source-note byte.
 HTTP/OpenAPI/SDK shapes are unchanged; .NET resolution/command DTO and protected-hook changes are
 intentional.
+
+### Folder scan candidate resolution
+
+Full scans and provider-triggered folder refreshes pass the same
+`IItemResolutionService` through folder validation and recursion. The resolver
+applies the folder's effective library options, collection type, ignore rules
+and registered resolver order. Folder-specific discovery hooks still supply
+entries or virtual children. The scan materializes the result and checks
+cancellation before reconciliation. `LibraryManager.ResolvePaths` is removed.

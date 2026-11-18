@@ -206,6 +206,10 @@ internal sealed class ItemResolutionService(
         {
             return resolver.ResolvePath(args);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in {Resolver} resolving {Path}", resolver.GetType().Name, args.Path);
@@ -338,7 +342,7 @@ internal sealed class ItemResolutionService(
             {
                 files = FileData.GetFilteredFileSystemEntries(directoryService, args.Path, _fileSystem, _configurationManager.ApplicationPaths, _logger, args, flattenFolderDepth: flattenFolderDepth, resolveShortcuts: isPhysicalRoot || isVf);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 if (parent is not null && parent.IsPhysicalRoot)
                 {
@@ -397,58 +401,63 @@ internal sealed class ItemResolutionService(
         return newList;
     }
 
-    public IEnumerable<BaseItem> ResolvePaths(IEnumerable<FileSystemMetadata> files, IDirectoryService directoryService, Folder parent, LibraryOptions libraryOptions, CollectionType? collectionType = null)
+    public IEnumerable<BaseItem> ResolveFolderChildren(Folder parent, IReadOnlyList<FileSystemMetadata> files, IDirectoryService directoryService, CancellationToken cancellationToken)
     {
-        return ResolvePaths(files, directoryService, parent, libraryOptions, collectionType, EntityResolvers);
-    }
-
-    public IEnumerable<BaseItem> ResolvePaths(
-        IEnumerable<FileSystemMetadata> files,
-        IDirectoryService directoryService,
-        Folder parent,
-        LibraryOptions libraryOptions,
-        CollectionType? collectionType,
-        IItemResolver[] resolvers)
-    {
-        var fileList = files.Where(i => !IgnoreFile(i, parent)).ToList();
-
-        if (parent is not null)
+        cancellationToken.ThrowIfCancellationRequested();
+        var collectionType = options.GetContentType(parent);
+        var libraryOptions = options.GetLibraryOptions(parent);
+        var fileList = new List<FileSystemMetadata>(files.Count);
+        foreach (var file in files)
         {
-            var multiItemResolvers = resolvers is null ? MultiItemResolvers : resolvers.OfType<IMultiItemResolver>();
-
-            foreach (var resolver in multiItemResolvers)
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IgnoreFile(file, parent))
             {
-                var result = resolver.ResolveMultiple(parent, fileList, collectionType, directoryService);
-
-                if (result?.Items.Count > 0)
-                {
-                    var items = result.Items;
-                    items.RemoveAll(item => !ResolverHelper.SetInitialItemValues(item, parent, this, directoryService, _configurationManager.GetMetadataConfiguration().UseFileCreationTimeForDateAdded));
-                    items.AddRange(ResolveFileList(result.ExtraFiles, directoryService, parent, collectionType, resolvers, libraryOptions));
-                    return items;
-                }
+                fileList.Add(file);
             }
         }
 
-        return ResolveFileList(fileList, directoryService, parent, collectionType, resolvers, libraryOptions);
+        foreach (var resolver in MultiItemResolvers)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = resolver.ResolveMultiple(parent, fileList, collectionType, directoryService);
+            if (result?.Items.Count > 0)
+            {
+                var useFileCreationTime = _configurationManager.GetMetadataConfiguration().UseFileCreationTimeForDateAdded;
+                var items = result.Items;
+                items.RemoveAll(item =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return !ResolverHelper.SetInitialItemValues(item, parent, this, directoryService, useFileCreationTime);
+                });
+                items.AddRange(ResolveFileList(result.ExtraFiles, directoryService, parent, collectionType, libraryOptions, cancellationToken));
+                return items;
+            }
+        }
+
+        return ResolveFileList(fileList, directoryService, parent, collectionType, libraryOptions, cancellationToken);
     }
 
     private IEnumerable<BaseItem> ResolveFileList(
         IReadOnlyList<FileSystemMetadata> fileList,
         IDirectoryService directoryService,
-        Folder? parent,
+        Folder parent,
         CollectionType? collectionType,
-        IItemResolver[]? resolvers,
-        LibraryOptions libraryOptions)
+        LibraryOptions libraryOptions,
+        CancellationToken cancellationToken)
     {
         // Given that fileList is a list we can save enumerator allocations by indexing
         for (var i = 0; i < fileList.Count; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var file = fileList[i];
             BaseItem? result = null;
             try
             {
-                result = ResolvePath(file, directoryService, resolvers, parent, collectionType, libraryOptions);
+                result = ResolvePath(file, directoryService, EntityResolvers, parent, collectionType, libraryOptions);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {

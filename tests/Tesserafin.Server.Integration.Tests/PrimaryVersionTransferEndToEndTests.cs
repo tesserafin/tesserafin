@@ -156,6 +156,7 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
                 deletions,
                 writes,
                 images,
+                resolution,
                 new Progress<double>(),
                 new MetadataRefreshOptions(new DirectoryService(files)) { MetadataRefreshMode = MetadataRefreshMode.None, ImageRefreshMode = MetadataRefreshMode.None },
                 recursive: false,
@@ -175,6 +176,6 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
 
         public override string GetClientTypeName() => nameof(Folder);
 
-        protected override IEnumerable<BaseItem> GetNonCachedChildren(IDirectoryService directoryService) => Resolved;
+        protected override IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken) => Resolved;
     }
 }

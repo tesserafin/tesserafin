@@ -16,6 +16,7 @@ namespace Tesserafin.Server.Core.Library;
 internal sealed class LibraryScanTraversal(
     IItemWriteCommands writes,
     IItemImageService images,
+    IItemResolutionService resolution,
     IItemDeletionCommands deletions,
     IFolderValidationServices validation,
     ILibraryRootFolderProvider roots,
@@ -28,6 +29,8 @@ internal sealed class LibraryScanTraversal(
     private readonly IItemWriteCommands _writes = writes;
 
     private readonly IItemImageService _images = images;
+
+    private readonly IItemResolutionService _resolution = resolution;
 
     private readonly IItemDeletionCommands _deletions = deletions;
     private readonly IFolderValidationServices _validation = validation;

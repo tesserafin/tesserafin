@@ -54,6 +54,7 @@ namespace Tesserafin.Providers.Manager
     {
         private readonly IFolderValidationServices _validation;
         private readonly IItemWriteCommands _writes;
+        private readonly IItemResolutionService _resolution;
         private readonly IItemMetadataExporter _metadataExporter;
         private readonly IItemImageService _images;
         private readonly IRemoteImageSource _remoteImages;
@@ -97,6 +98,7 @@ namespace Tesserafin.Providers.Manager
         /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="metadataExporter">Metadata saver selection and execution.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+        /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
         /// <param name="deletions">Item deletion operations.</param>
         /// <param name="validation">The services folder validation runs with.</param>
         /// <param name="libraryOptions">The persisted library options, whose updates invalidate cached provider choices.</param>
@@ -118,6 +120,7 @@ namespace Tesserafin.Providers.Manager
             IItemWriteCommands writes,
             IItemMetadataExporter metadataExporter,
             IItemImageService images,
+            IItemResolutionService resolution,
             IItemDeletionCommands deletions,
             IFolderValidationServices validation,
             ILibraryOptionsStore libraryOptions,
@@ -140,6 +143,7 @@ namespace Tesserafin.Providers.Manager
             _writes = writes;
             _metadataExporter = metadataExporter;
             _images = images;
+            _resolution = resolution;
             _deletions = deletions;
             _libraryOptions = libraryOptions;
             _logger = logger;

@@ -152,9 +152,9 @@ namespace Tesserafin.Controller.Entities
             return args;
         }
 
-        protected override IEnumerable<BaseItem> GetNonCachedChildren(IDirectoryService directoryService)
+        protected override IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
-            return base.GetNonCachedChildren(directoryService).Concat(_virtualChildren);
+            return base.GetNonCachedChildren(resolution, directoryService, cancellationToken).Concat(_virtualChildren);
         }
 
         protected override async Task ValidateChildrenInternal(IFolderValidationServices services, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)

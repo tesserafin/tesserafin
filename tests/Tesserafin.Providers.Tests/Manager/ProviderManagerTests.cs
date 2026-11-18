@@ -569,6 +569,7 @@ namespace Tesserafin.Providers.Tests.Manager
                 Mock.Of<IItemWriteCommands>(),
                 Mock.Of<IItemMetadataExporter>(),
                 Mock.Of<IItemImageService>(),
+                Mock.Of<IItemResolutionService>(),
                 Mock.Of<IItemDeletionCommands>(),
                 Mock.Of<IFolderValidationServices>(),
                 Mock.Of<ILibraryOptionsStore>(),
