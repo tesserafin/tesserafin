@@ -24,7 +24,7 @@ public sealed class FileRefresherTests
             var refreshed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var folder = new Mock<Folder>();
             folder.Object.Id = Guid.NewGuid();
-            folder.Object.Path = directory.FullName;
+            folder.SetupGet(f => f.Path).Returns(directory.FullName);
             folder.Setup(f => f.ChangedExternally()).Callback(refreshed.SetResult);
 
             var paths = new Mock<IItemPathLookupService>(MockBehavior.Strict);
