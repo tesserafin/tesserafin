@@ -468,7 +468,6 @@ public class LibraryManagerItemLookupTests
 
         IItemPathLookupService lookup = _itemLookupService;
         Assert.Same(newest, lookup.FindByPath(newest.Path, isFolder));
-        Assert.Same(newest, _libraryManager.FindByPath(newest.Path, isFolder));
     }
 
     // ---------------------------------------------------------------

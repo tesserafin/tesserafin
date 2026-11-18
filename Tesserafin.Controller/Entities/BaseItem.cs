@@ -2167,7 +2167,7 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <param name="info">The info.</param>
         /// <param name="scope">Where the items come from: by id from it, and by path when it is an
-        /// <see cref="ILinkedChildVisibilityService"/>; <c>null</c> reads them through the static <see cref="LibraryManager"/>.</param>
+        /// <see cref="ILinkedChildVisibilityService"/>; <c>null</c> uses the entity's catalogue services.</param>
         /// <returns>BaseItem.</returns>
         protected BaseItem GetLinkedChild(LinkedChild info, IBoxSetVisibilityService scope)
         {
@@ -2227,7 +2227,7 @@ namespace Tesserafin.Controller.Entities
 
                 var itemByPath = scope is ILinkedChildVisibilityService paths
                     ? paths.FindByPath(path)
-                    : LibraryManager.FindByPath(path, null);
+                    : ItemPathQuery.Find(ItemRepository, path, null);
 
                 if (itemByPath is null)
                 {

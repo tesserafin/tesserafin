@@ -15,7 +15,7 @@ namespace Tesserafin.Server.Core.IO
     public sealed class FileRefresher : IDisposable
     {
         private readonly ILogger _logger;
-        private readonly ILibraryManager _libraryManager;
+        private readonly IItemPathLookupService _itemPaths;
         private readonly IServerConfigurationManager _configurationManager;
 
         private readonly List<string> _affectedPaths = new();
@@ -23,13 +23,13 @@ namespace Tesserafin.Server.Core.IO
         private Timer? _timer;
         private bool _disposed;
 
-        public FileRefresher(string path, IServerConfigurationManager configurationManager, ILibraryManager libraryManager, ILogger logger)
+        public FileRefresher(string path, IServerConfigurationManager configurationManager, IItemPathLookupService itemPaths, ILogger logger)
         {
             logger.LogDebug("New file refresher created for {0}", path);
             Path = path;
 
             _configurationManager = configurationManager;
-            _libraryManager = libraryManager;
+            _itemPaths = itemPaths;
             _logger = logger;
             AddPath(path);
         }
@@ -166,7 +166,7 @@ namespace Tesserafin.Server.Core.IO
 
             while (item is null && !string.IsNullOrEmpty(path))
             {
-                item = _libraryManager.FindByPath(path, null);
+                item = _itemPaths.FindByPath(path, null);
 
                 path = System.IO.Path.GetDirectoryName(path) ?? string.Empty;
             }

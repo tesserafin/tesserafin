@@ -86,10 +86,7 @@ namespace Tesserafin.Server.Core.Library
 
         /// <inheritdoc />
         public BaseItem? FindByPath(string path, bool? isFolder)
-        {
-            ArgumentException.ThrowIfNullOrEmpty(path);
-            return ItemPathQuery.Find(_itemRepository, path, isFolder);
-        }
+            => ItemPathQuery.Find(_itemRepository, path, isFolder);
 
         /// <inheritdoc />
         public void Register(BaseItem item)

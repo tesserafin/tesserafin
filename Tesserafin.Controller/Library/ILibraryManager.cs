@@ -64,14 +64,6 @@ namespace Tesserafin.Controller.Library
             CollectionType? collectionType);
 
         /// <summary>
-        /// Finds the by path.
-        /// </summary>
-        /// <param name="path">The path.</param>
-        /// <param name="isFolder"><c>true</c> is the path is a directory; otherwise <c>false</c>.</param>
-        /// <returns>BaseItem.</returns>
-        BaseItem? FindByPath(string path, bool? isFolder);
-
-        /// <summary>
         /// Gets the item by id, as T, and validates user access.
         /// </summary>
         /// <param name="id">The item id.</param>
