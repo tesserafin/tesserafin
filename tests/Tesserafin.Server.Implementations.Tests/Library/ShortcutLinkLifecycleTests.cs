@@ -43,8 +43,8 @@ public sealed class ShortcutLinkLifecycleTests
         Assert.True(await context.RefreshAsync());
 
         Assert.Equal(2, context.StoredLinks.Count);
-        Assert.Contains(context.StoredLinks, link => link.ItemId == manualId && link.Type == LinkedChildType.Manual);
-        Assert.Contains(context.StoredLinks, link => link.ItemId == target.Id && link.Type == LinkedChildType.Shortcut);
+        Assert.Contains(context.StoredLinks, link => link.ItemId.GetValueOrDefault().Equals(manualId) && link.Type == LinkedChildType.Manual);
+        Assert.Contains(context.StoredLinks, link => link.ItemId.GetValueOrDefault().Equals(target.Id) && link.Type == LinkedChildType.Shortcut);
         Assert.Equal(2, context.Owner.LinkedChildren.Length);
         Assert.Equal(1, context.CachePublications);
         Assert.False(await context.RefreshAsync());
@@ -63,7 +63,7 @@ public sealed class ShortcutLinkLifecycleTests
         Assert.False(await context.RefreshAsync());
 
         Assert.Equal(2, context.Owner.LinkedChildren.Length);
-        Assert.Contains(context.Owner.LinkedChildren, link => link.ItemId == manualId);
+        Assert.Contains(context.Owner.LinkedChildren, link => link.ItemId.GetValueOrDefault().Equals(manualId));
         context.Persistence.VerifyNoOtherCalls();
         context.Metadata.VerifyNoOtherCalls();
     }
