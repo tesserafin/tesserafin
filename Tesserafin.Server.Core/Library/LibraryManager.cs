@@ -223,12 +223,8 @@ namespace Tesserafin.Server.Core.Library
         /// <inheritdoc />
         public BaseItem? FindByPath(string path, bool? isFolder)
         {
-            // If this returns multiple items it could be tricky figuring out which one is correct.
-            // In most cases, the newest one will be and the others obsolete but not yet cleaned up
             ArgumentException.ThrowIfNullOrEmpty(path);
-
-            return GetItemList(ItemPathQuery.Create(path, isFolder))
-                .FirstOrDefault();
+            return ItemPathQuery.Find(_itemRepository, path, isFolder);
         }
 
         public IReadOnlyDictionary<string, MusicArtist[]> GetArtists(IReadOnlyList<string> names)

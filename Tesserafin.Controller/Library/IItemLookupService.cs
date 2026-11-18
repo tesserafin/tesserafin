@@ -12,8 +12,8 @@ namespace Tesserafin.Controller.Library
     /// </summary>
     /// <remarks>
     /// This interface intentionally excludes mutation (create/register/delete), querying/listing,
-    /// collection folder access, and path-based lookups - those remain the responsibility of
-    /// <see cref="ILibraryManager"/>. The user-aware <c>GetItemById&lt;T&gt;(Guid, User)</c> and
+    /// and collection folder access. Path lookups use <see cref="IItemPathLookupService"/>.
+    /// The user-aware <c>GetItemById&lt;T&gt;(Guid, User)</c> and
     /// <c>GetItemById&lt;T&gt;(Guid, Guid)</c> overloads are also excluded (moved to
     /// <see cref="IItemAccessService"/> in PR77, for the <c>User</c> overload; the <c>Guid</c>
     /// user-id overload was never part of this interface); callers needing either should depend on

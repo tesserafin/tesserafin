@@ -450,6 +450,27 @@ public class LibraryManagerItemLookupTests
         _itemRepositoryMock.Verify(r => r.RetrieveItem(movie.Id), Times.Once);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FindByPath_UsesTheNewestMatchAndTheRequestedFolderFilter(bool? isFolder)
+    {
+        BaseItem newest = isFolder == true ? new Folder { Path = "/library/folder" } : new Movie { Path = "/library/movie.mkv" };
+        _itemRepositoryMock.Setup(r => r.GetItemList(It.IsAny<InternalItemsQuery>())).Returns((InternalItemsQuery query) =>
+        {
+            Assert.Equal(newest.Path, query.Path);
+            Assert.Equal(isFolder, query.IsFolder);
+            Assert.Equal(1, query.Limit);
+            Assert.Equal((ItemSortBy.DateCreated, SortOrder.Descending), Assert.Single(query.OrderBy));
+            return new BaseItem[] { newest };
+        });
+
+        IItemPathLookupService lookup = _itemLookupService;
+        Assert.Same(newest, lookup.FindByPath(newest.Path, isFolder));
+        Assert.Same(newest, _libraryManager.FindByPath(newest.Path, isFolder));
+    }
+
     // ---------------------------------------------------------------
     // 15. PR76: BaseItem.GetParent()/GetOwner() (static LibraryManager) and their
     // GetParent(lookup)/GetOwner(lookup) counterparts (PR72) resolve through the same cache.

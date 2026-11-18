@@ -93,7 +93,7 @@ namespace Tesserafin.Server.Core.Library
         /// <inheritdoc />
         public BaseItem? FindByPath(string path)
         {
-            return _itemRepository.GetItemList(ItemPathQuery.Create(path, null)).FirstOrDefault();
+            return ItemPathQuery.Find(_itemRepository, path, null);
         }
 
         /// <inheritdoc />
