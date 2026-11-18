@@ -334,39 +334,34 @@ internal sealed class ItemResolutionService(
         if (args.IsDirectory)
         {
             var isPhysicalRoot = args.IsPhysicalRoot;
-
-            // When resolving the root, we need it's grandchildren (children of user views)
-            var flattenFolderDepth = isPhysicalRoot ? 2 : 0;
-
-            FileSystemMetadata[] files;
             var isVf = args.IsVf;
 
             try
             {
-                files = FileData.GetFilteredFileSystemEntries(directoryService, args.Path, _fileSystem, _appHost, _logger, args, flattenFolderDepth: flattenFolderDepth, resolveShortcuts: isPhysicalRoot || isVf);
+                if (isPhysicalRoot || isVf)
+                {
+                    var discovery = FileData.ReadLibraryDirectory(args.FileInfo, directoryService, _fileSystem, _appHost, _logger, isPhysicalRoot);
+                    args.FileSystemChildren = discovery.Entries;
+                    args.PhysicalLocations = discovery.PhysicalLocations;
+                }
+                else
+                {
+                    args.FileSystemChildren = directoryService.GetFileSystemEntries(args.Path);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 if (parent is not null && parent.IsPhysicalRoot)
                 {
-                    _logger.LogError(ex, "Error in GetFilteredFileSystemEntries isPhysicalRoot: {0} IsVf: {1}", isPhysicalRoot, isVf);
+                    _logger.LogError(ex, "Error reading folder entries (physical root: {PhysicalRoot}, virtual folder: {VirtualFolder})", isPhysicalRoot, isVf);
 
-                    files = [];
+                    args.FileSystemChildren = [];
                 }
                 else
                 {
                     throw;
                 }
             }
-
-            // Need to remove sub-paths that may have been resolved from shortcuts
-            // Example: if \\server\movies exists, then strip out \\server\movies\action
-            if (isPhysicalRoot)
-            {
-                files = NormalizeRootPathList(files).ToArray();
-            }
-
-            args.FileSystemChildren = files;
         }
 
         // Filter content based on ignore rules
@@ -381,28 +376,6 @@ internal sealed class ItemResolutionService(
 
     public bool IgnoreFile(FileSystemMetadata file, BaseItem? parent)
         => EntityResolutionIgnoreRules.Any(r => r.ShouldIgnore(file, parent));
-
-    public List<FileSystemMetadata> NormalizeRootPathList(IEnumerable<FileSystemMetadata> paths)
-    {
-        var originalList = paths.ToList();
-
-        var list = originalList.Where(i => i.IsDirectory)
-            .Select(i => Path.TrimEndingDirectorySeparator(i.FullName))
-            .Distinct()
-            .ToList();
-
-        var dupes = list.Where(subPath => !subPath.EndsWith(":\\", StringComparison.Ordinal) && list.Any(i => _fileSystem.ContainsSubPath(i, subPath)))
-            .ToList();
-
-        foreach (var dupe in dupes)
-        {
-            _logger.LogInformation("Found duplicate path: {0}", dupe);
-        }
-
-        var newList = list.Except(dupes, StringComparer.Ordinal).Select(_fileSystem.GetDirectoryInfo).ToList();
-        newList.AddRange(originalList.Where(i => !i.IsDirectory));
-        return newList;
-    }
 
     public IEnumerable<BaseItem> ResolveFolderChildren(Folder parent, IReadOnlyList<FileSystemMetadata> files, IDirectoryService directoryService, CancellationToken cancellationToken)
     {

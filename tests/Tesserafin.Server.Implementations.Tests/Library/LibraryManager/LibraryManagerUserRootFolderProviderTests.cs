@@ -83,7 +83,7 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
         fixture.Register(() => new Lazy<IExternalDataManager>(() => externalDataManagerMock.Object));
 
         // Real ManagedFileSystem, not a mock - the resolve-fallback path does real disk I/O
-        // (Directory.CreateDirectory + directory enumeration via FileData.GetFilteredFileSystemEntries)
+        // (Directory.CreateDirectory + directory enumeration via the resolver)
         // against a real, empty temp directory, exactly like the historical code path in production.
         var applicationPathsMock = new Mock<IApplicationPaths>();
         applicationPathsMock.Setup(p => p.TempDirectory).Returns(Path.GetTempPath());

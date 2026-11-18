@@ -1217,3 +1217,13 @@ applies the folder's effective library options, collection type, ignore rules
 and registered resolver order. Folder-specific discovery hooks still supply
 entries or virtual children. The scan materializes the result and checks
 cancellation before reconciliation. `LibraryManager.ResolvePaths` is removed.
+
+## 41. Physical root and library directory discovery
+
+`FileData.ReadLibraryDirectory` supplies both the entries to scan and the
+configured physical locations to the physical root, collection folders and
+item resolver. The physical root flattens definition directories and removes
+nested scan targets already covered by a parent. Configured shortcut locations
+are retained separately. Unavailable directories are distinguished from
+completed empty scans so folder reconciliation cannot treat them as removals.
+Root path normalization no longer goes through `LibraryManager`.

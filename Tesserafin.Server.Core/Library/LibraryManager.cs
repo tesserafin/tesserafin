@@ -180,9 +180,6 @@ namespace Tesserafin.Server.Core.Library
         public Video? ResolveAlternateVersion(string path, Type expectedVideoType, Folder? parent, CollectionType? collectionType)
             => _resolution.ResolveAlternateVersion(path, expectedVideoType, parent, collectionType);
 
-        public List<FileSystemMetadata> NormalizeRootPathList(IEnumerable<FileSystemMetadata> paths)
-            => _resolution.NormalizeRootPathList(paths);
-
         public bool AreEqualPaths(string first, string second) => _fileSystem.AreEqual(first, second);
 
         public void RegisterItem(BaseItem item)
