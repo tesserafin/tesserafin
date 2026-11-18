@@ -1611,3 +1611,12 @@ Subtitle and lyric managers resolve manual requests through
 application paths. Automated subtitle downloads pass the options used for
 search into storage. Embedded lyric extraction passes the audio probe's
 options into storage as well.
+
+## 56. Scheduled subtitle and lyric catalogue reads
+
+Both scheduled downloads enumerate the physical root through
+`ILibraryRootFolderProvider` and read candidates through `IItemQueryService`.
+Subtitle selection reads per-folder filters and resolves the effective
+settings of each distinct video through `ILibraryItemOptions`. Lyric
+downloads use the folder's options for each page and count the unscoped
+audio candidates through `IItemCountService` to report progress.

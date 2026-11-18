@@ -8,7 +8,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
@@ -25,8 +24,9 @@ namespace Tesserafin.Providers.MediaInfo
         private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
         private readonly IProviderManager _providers;
-        private readonly ILibraryManager _libraryManager;
-        private readonly IServerConfigurationManager _config;
+        private readonly ILibraryRootFolderProvider _roots;
+        private readonly ILibraryItemOptions _libraryOptions;
+        private readonly IItemQueryService _itemQueries;
         private readonly ISubtitleManager _subtitleManager;
         private readonly ILogger<SubtitleScheduledTask> _logger;
         private readonly ILocalizationManager _localization;
@@ -37,8 +37,9 @@ namespace Tesserafin.Providers.MediaInfo
             IItemWriteCommands writes,
             IItemDeletionCommands deletions,
             IProviderManager providers,
-            ILibraryManager libraryManager,
-            IServerConfigurationManager config,
+            ILibraryRootFolderProvider roots,
+            ILibraryItemOptions libraryOptions,
+            IItemQueryService itemQueries,
             ISubtitleManager subtitleManager,
             ILogger<SubtitleScheduledTask> logger,
             ILocalizationManager localization,
@@ -48,8 +49,9 @@ namespace Tesserafin.Providers.MediaInfo
             _writes = writes;
             _deletions = deletions;
             _providers = providers;
-            _libraryManager = libraryManager;
-            _config = config;
+            _roots = roots;
+            _libraryOptions = libraryOptions;
+            _itemQueries = itemQueries;
             _subtitleManager = subtitleManager;
             _logger = logger;
             _localization = localization;
@@ -80,9 +82,9 @@ namespace Tesserafin.Providers.MediaInfo
 
             var dict = new Dictionary<Guid, BaseItem>();
 
-            foreach (var library in _libraryManager.RootFolder.Children.ToList())
+            foreach (var library in _roots.GetRootFolder().Children.ToList())
             {
-                var libraryOptions = _libraryManager.GetLibraryOptions(library);
+                var libraryOptions = _libraryOptions.GetLibraryOptions(library);
 
                 string[] subtitleDownloadLanguages;
                 bool skipIfEmbeddedSubtitlesPresent;
@@ -134,7 +136,7 @@ namespace Tesserafin.Providers.MediaInfo
                         query.HasNoExternalSubtitleTrackWithLanguage = lang;
                     }
 
-                    var videosByLanguage = _libraryManager.GetItemList(query);
+                    var videosByLanguage = _itemQueries.GetItemList(query);
 
                     foreach (var video in videosByLanguage)
                     {
@@ -177,7 +179,7 @@ namespace Tesserafin.Providers.MediaInfo
         {
             var mediaStreams = video.GetMediaStreams(_mediaSourceManager);
 
-            var libraryOptions = _libraryManager.GetLibraryOptions(video);
+            var libraryOptions = _libraryOptions.GetLibraryOptions(video);
 
             var downloadedLanguages = await new SubtitleDownloader(
                 _logger,
