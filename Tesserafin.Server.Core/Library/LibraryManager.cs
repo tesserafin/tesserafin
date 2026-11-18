@@ -220,13 +220,6 @@ namespace Tesserafin.Server.Core.Library
             return _userRootFolderProvider.GetUserRootFolder();
         }
 
-        /// <inheritdoc />
-        public BaseItem? FindByPath(string path, bool? isFolder)
-        {
-            ArgumentException.ThrowIfNullOrEmpty(path);
-            return ItemPathQuery.Find(_itemRepository, path, isFolder);
-        }
-
         public IReadOnlyDictionary<string, MusicArtist[]> GetArtists(IReadOnlyList<string> names)
         {
             return _linkedChildrenService.FindArtists(names);

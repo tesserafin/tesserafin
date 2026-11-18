@@ -1639,3 +1639,14 @@ The local playlist provider reads root folders through `IUserRootFolderProvider`
 and resolves eligible files through `IItemPathLookupService`. It keeps playlist
 order and repeated entries. The path lookup shares the existing newest-match
 query with the library, visibility, membership and shortcut consumers.
+
+## 59. Filesystem and recording path lookup
+
+The filesystem monitor reads the physical root and effective monitoring options
+through their dedicated services. Its refreshers walk changed paths through
+`IItemPathLookupService`. Live TV uses the same service for recording folders,
+refresh targets and retention, applying the folder filter at each call site.
+
+The shared stored-path query lives with the catalogue repository contract.
+Path-based saved links use that query too, with the supplied visibility scope
+when one is available. `FindByPath` has been removed from `ILibraryManager`.

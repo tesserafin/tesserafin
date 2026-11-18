@@ -2166,7 +2166,7 @@ namespace Tesserafin.Controller.Entities
 
                 var itemByPath = scope is IStandaloneVisibilityService paths
                     ? paths.FindByPath(path)
-                    : LibraryManager.FindByPath(path, null);
+                    : ItemPathQuery.Find(ItemRepository, path, null);
 
                 if (itemByPath is null)
                 {

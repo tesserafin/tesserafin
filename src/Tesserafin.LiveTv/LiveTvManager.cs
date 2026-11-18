@@ -42,6 +42,7 @@ namespace Tesserafin.LiveTv
         private readonly IDtoService _dtoService;
         private readonly IUserDataManager _userDataManager;
         private readonly ILibraryManager _libraryManager;
+        private readonly IItemPathLookupService _itemPaths;
         private readonly ILocalizationManager _localization;
         private readonly IChannelManager _channelManager;
         private readonly IRecordingsManager _recordingsManager;
@@ -56,6 +57,7 @@ namespace Tesserafin.LiveTv
             IDtoService dtoService,
             IUserManager userManager,
             ILibraryManager libraryManager,
+            IItemPathLookupService itemPaths,
             ILocalizationManager localization,
             IChannelManager channelManager,
             IRecordingsManager recordingsManager,
@@ -69,6 +71,7 @@ namespace Tesserafin.LiveTv
             _logger = logger;
             _userManager = userManager;
             _libraryManager = libraryManager;
+            _itemPaths = itemPaths;
             _localization = localization;
             _dtoService = dtoService;
             _userDataManager = userDataManager;
@@ -495,17 +498,7 @@ namespace Tesserafin.LiveTv
 
             if (query.IsInProgress ?? false)
             {
-                // limit = (query.Limit ?? 10) * 2;
                 limit = null;
-
-                // var allActivePaths = EmbyTV.EmbyTV.Current.GetAllActiveRecordings().Select(i => i.Path).ToArray();
-                // var items = allActivePaths.Select(i => _libraryManager.FindByPath(i, false)).Where(i => i is not null).ToArray();
-
-                // return new QueryResult<BaseItem>
-                // {
-                //    Items = items,
-                //    TotalRecordCount = items.Length
-                // };
 
                 dtoOptions.Fields = dtoOptions.Fields.Concat([ItemFields.Tags]).Distinct().ToArray();
             }
@@ -1280,7 +1273,7 @@ namespace Tesserafin.LiveTv
             var folders = _recordingsManager.GetRecordingFolders()
                 .SelectMany(i => i.Locations)
                 .Distinct()
-                .Select(i => _libraryManager.FindByPath(i, true))
+                .Select(i => _itemPaths.FindByPath(i, true))
                 .Where(i => i is not null && i.IsVisibleStandalone(user, _visibility))
                 .SelectMany(i => _libraryManager.GetCollectionFolders(i))
                 .DistinctBy(x => x.Id)

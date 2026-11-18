@@ -41,7 +41,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     private readonly IServerConfigurationManager _config;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IFileSystem _fileSystem;
-    private readonly ILibraryManager _libraryManager;
+    private readonly IItemPathLookupService _itemPaths;
     private readonly ILibraryStructureReader _libraryStructure;
     private readonly ILibraryStructureCommands _structure;
     private readonly ILibraryScanCoordinator _scans;
@@ -69,7 +69,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     /// <param name="scans">Library scan scheduling and state.</param>
     /// <param name="structure">Library structure commands.</param>
     /// <param name="libraryStructure">Configured library reader.</param>
-    /// <param name="libraryManager">The <see cref="ILibraryManager"/>.</param>
+    /// <param name="itemPaths">The catalogue path lookup service.</param>
     /// <param name="libraryMonitor">The <see cref="ILibraryMonitor"/>.</param>
     /// <param name="providerManager">The <see cref="IProviderManager"/>.</param>
     /// <param name="mediaEncoder">The <see cref="IMediaEncoder"/>.</param>
@@ -85,7 +85,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         IServerConfigurationManager config,
         IHttpClientFactory httpClientFactory,
         IFileSystem fileSystem,
-        ILibraryManager libraryManager,
+        IItemPathLookupService itemPaths,
         ILibraryStructureReader libraryStructure,
         ILibraryStructureCommands structure,
         ILibraryScanCoordinator scans,
@@ -104,7 +104,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         _config = config;
         _httpClientFactory = httpClientFactory;
         _fileSystem = fileSystem;
-        _libraryManager = libraryManager;
+        _itemPaths = itemPaths;
         _libraryStructure = libraryStructure;
         _structure = structure;
         _scans = scans;
@@ -634,7 +634,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         var parentPath = Path.GetDirectoryName(path);
         while (item is null && !string.IsNullOrEmpty(path))
         {
-            item = _libraryManager.FindByPath(path, null);
+            item = _itemPaths.FindByPath(path, null);
             path = Path.GetDirectoryName(path);
         }
 
@@ -692,7 +692,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
 
             await DeleteLibraryItemsForTimers(timersToDelete).ConfigureAwait(false);
 
-            if (_libraryManager.FindByPath(seriesPath, true) is not Folder librarySeries)
+            if (_itemPaths.FindByPath(seriesPath, true) is not Folder librarySeries)
             {
                 return;
             }
@@ -763,7 +763,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
 
     private async Task DeleteLibraryItemForTimer(TimerInfo timer)
     {
-        var libraryItem = _libraryManager.FindByPath(timer.RecordingPath, false);
+        var libraryItem = _itemPaths.FindByPath(timer.RecordingPath, false);
         if (libraryItem is not null)
         {
             await _deletions.DeleteAsync(

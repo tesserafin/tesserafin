@@ -1,15 +1,15 @@
+using System;
 using System.Linq;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
-using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Enums;
 
-namespace Tesserafin.Server.Core.Library
+namespace Tesserafin.Controller.Persistence
 {
     /// <summary>
     /// The shared catalogue search for a stored path.
     /// </summary>
-    internal static class ItemPathQuery
+    public static class ItemPathQuery
     {
         /// <summary>
         /// Finds the newest item at a path.
@@ -20,6 +20,8 @@ namespace Tesserafin.Server.Core.Library
         /// <returns>The matching item, or null.</returns>
         public static BaseItem? Find(IItemRepository repository, string path, bool? isFolder)
         {
+            ArgumentException.ThrowIfNullOrEmpty(path);
+
             return repository.GetItemList(new InternalItemsQuery
             {
                 Path = path,

@@ -19,7 +19,9 @@ namespace Tesserafin.Server.Core.IO
     public sealed class LibraryMonitor : ILibraryMonitor, IDisposable
     {
         private readonly ILogger<LibraryMonitor> _logger;
-        private readonly ILibraryManager _libraryManager;
+        private readonly ILibraryRootFolderProvider _roots;
+        private readonly ILibraryItemOptions _libraryOptions;
+        private readonly IItemPathLookupService _itemPaths;
         private readonly ILibraryWriteTracker _writes;
         private readonly IItemChangeEvents _changes;
         private readonly IServerConfigurationManager _configurationManager;
@@ -43,7 +45,9 @@ namespace Tesserafin.Server.Core.IO
         /// Initializes a new instance of the <see cref="LibraryMonitor" /> class.
         /// </summary>
         /// <param name="logger">The logger.</param>
-        /// <param name="libraryManager">The library manager.</param>
+        /// <param name="roots">The physical library root provider.</param>
+        /// <param name="libraryOptions">The effective library settings.</param>
+        /// <param name="itemPaths">The catalogue path lookup service.</param>
         /// <param name="writes">Shared filesystem write suppression.</param>
         /// <param name="changes">The completed item change feed.</param>
         /// <param name="configurationManager">The configuration manager.</param>
@@ -53,7 +57,9 @@ namespace Tesserafin.Server.Core.IO
         /// <param name="dotIgnoreIgnoreRule">The .ignore rule handler.</param>
         public LibraryMonitor(
             ILogger<LibraryMonitor> logger,
-            ILibraryManager libraryManager,
+            ILibraryRootFolderProvider roots,
+            ILibraryItemOptions libraryOptions,
+            IItemPathLookupService itemPaths,
             ILibraryWriteTracker writes,
             IItemChangeEvents changes,
             IServerConfigurationManager configurationManager,
@@ -62,7 +68,9 @@ namespace Tesserafin.Server.Core.IO
             IHostApplicationLifetime appLifetime,
             DotIgnoreIgnoreRule dotIgnoreIgnoreRule)
         {
-            _libraryManager = libraryManager;
+            _roots = roots;
+            _libraryOptions = libraryOptions;
+            _itemPaths = itemPaths;
             _writes = writes;
             _changes = changes;
             _logger = logger;
@@ -110,7 +118,7 @@ namespace Tesserafin.Server.Core.IO
                 return false;
             }
 
-            var options = _libraryManager.GetLibraryOptions(item);
+            var options = _libraryOptions.GetLibraryOptions(item);
 
             return options is not null && options.EnableRealtimeMonitor;
         }
@@ -123,8 +131,8 @@ namespace Tesserafin.Server.Core.IO
 
             var pathsToWatch = new List<string>();
 
-            var paths = _libraryManager
-                .RootFolder
+            var paths = _roots
+                .GetRootFolder()
                 .Children
                 .Where(IsLibraryMonitorEnabled)
                 .OfType<Folder>()
@@ -426,7 +434,7 @@ namespace Tesserafin.Server.Core.IO
                     }
                 }
 
-                var newRefresher = new FileRefresher(path, _configurationManager, _libraryManager, _fileSystem, _providers, _logger);
+                var newRefresher = new FileRefresher(path, _configurationManager, _itemPaths, _fileSystem, _providers, _logger);
                 newRefresher.Completed += OnNewRefresherCompleted;
                 _activeRefreshers.Add(newRefresher);
             }
