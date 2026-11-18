@@ -158,11 +158,6 @@ namespace Tesserafin.Controller.Playlists
             return items;
         }
 
-        public IReadOnlyList<Tuple<LinkedChild, BaseItem>> GetManageableItems()
-        {
-            return GetLinkedChildrenInfos();
-        }
-
         private IReadOnlyList<BaseItem> GetPlayableItems(User user, InternalItemsQuery query)
         {
             query ??= new InternalItemsQuery(user);

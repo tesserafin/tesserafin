@@ -38,6 +38,7 @@ namespace Tesserafin.Server.Core.Collections
         private readonly ILogger<CollectionManager> _logger;
         private readonly IProviderManager _providerManager;
         private readonly ILinkedChildrenService _linkedChildrenService;
+        private readonly LinkedChildResolver _linkedChildResolver;
         private readonly ILocalizationManager _localizationManager;
         private readonly IApplicationPaths _appPaths;
         private readonly IItemSortService _itemSortService;
@@ -57,6 +58,7 @@ namespace Tesserafin.Server.Core.Collections
         /// <param name="linkedChildrenService">The linked children service.</param>
         /// <param name="itemSortService">The item sort service.</param>
         /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
+        /// <param name="linkedChildResolver">The resolver for saved collection links.</param>
         public CollectionManager(
             IItemWriteCommands writes,
             ILibraryManager libraryManager,
@@ -69,7 +71,8 @@ namespace Tesserafin.Server.Core.Collections
             IProviderManager providerManager,
             ILinkedChildrenService linkedChildrenService,
             IItemSortService itemSortService,
-            IStandaloneVisibilityService visibility)
+            IStandaloneVisibilityService visibility,
+            LinkedChildResolver linkedChildResolver)
         {
             _writes = writes;
             _visibility = visibility;
@@ -80,6 +83,7 @@ namespace Tesserafin.Server.Core.Collections
             _logger = loggerFactory.CreateLogger<CollectionManager>();
             _providerManager = providerManager;
             _linkedChildrenService = linkedChildrenService;
+            _linkedChildResolver = linkedChildResolver;
             _localizationManager = localizationManager;
             _appPaths = appPaths;
             _itemSortService = itemSortService;
@@ -252,7 +256,7 @@ namespace Tesserafin.Server.Core.Collections
 
             List<BaseItem>? itemList = null;
 
-            var linkedChildrenList = collection.GetLinkedChildren();
+            var linkedChildrenList = _linkedChildResolver.Resolve(collection).Select(entry => entry.Item).ToList();
             var currentLinkedChildrenIds = linkedChildrenList.Select(i => i.Id).ToList();
 
             foreach (var id in ids)
@@ -362,7 +366,7 @@ namespace Tesserafin.Server.Core.Collections
                     var itemIsInBoxSet = false;
                     foreach (var boxSet in allBoxSets)
                     {
-                        if (!boxSet.ContainsLinkedChildByItemId(itemId))
+                        if (!_linkedChildResolver.Contains(boxSet, itemId))
                         {
                             continue;
                         }

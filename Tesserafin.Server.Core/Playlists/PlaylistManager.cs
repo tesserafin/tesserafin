@@ -47,6 +47,7 @@ namespace Tesserafin.Server.Core.Playlists
         private readonly IConfiguration _appConfig;
         private readonly IItemQueryService _itemQueryService;
         private readonly IItemSortService _itemSortService;
+        private readonly LinkedChildResolver _linkedChildren;
 
         public PlaylistManager(
             IItemWriteCommands writes,
@@ -60,7 +61,8 @@ namespace Tesserafin.Server.Core.Playlists
             IConfiguration appConfig,
             IItemQueryService itemQueryService,
             IItemSortService itemSortService,
-            IStandaloneVisibilityService visibility)
+            IStandaloneVisibilityService visibility,
+            LinkedChildResolver linkedChildren)
         {
             _writes = writes;
             _visibility = visibility;
@@ -74,6 +76,7 @@ namespace Tesserafin.Server.Core.Playlists
             _appConfig = appConfig;
             _itemQueryService = itemQueryService;
             _itemSortService = itemSortService;
+            _linkedChildren = linkedChildren;
         }
 
         public Playlist GetPlaylistForUser(Guid playlistId, Guid userId)
@@ -312,14 +315,14 @@ namespace Tesserafin.Server.Core.Playlists
                 throw new ArgumentException("No Playlist exists with the supplied Id");
             }
 
-            var children = playlist.GetManageableItems().ToList();
+            var children = _linkedChildren.Resolve(playlist).ToList();
 
             var idList = entryIds.ToList();
 
-            var removals = children.Where(i => idList.Contains(i.Item1.ItemId?.ToString("N", CultureInfo.InvariantCulture)));
+            var removals = children.Where(i => idList.Contains(i.Link.ItemId?.ToString("N", CultureInfo.InvariantCulture)));
 
             playlist.LinkedChildren = children.Except(removals)
-                .Select(i => i.Item1)
+                .Select(i => i.Link)
                 .ToArray();
 
             await UpdatePlaylistInternal(playlist).ConfigureAwait(false);
@@ -351,11 +354,11 @@ namespace Tesserafin.Server.Core.Playlists
             }
 
             var user = _userManager.GetUserById(callingUserId);
-            var children = playlist.GetManageableItems().ToList();
-            var accessibleChildren = children.Where(c => c.Item2.IsVisibleStandalone(user, _visibility)).ToArray();
+            var children = _linkedChildren.Resolve(playlist).ToList();
+            var accessibleChildren = children.Where(c => c.Item.IsVisibleStandalone(user, _visibility)).ToArray();
 
-            var oldIndexAll = children.FindIndex(i => string.Equals(entryId, i.Item1.ItemId?.ToString("N", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase));
-            var oldIndexAccessible = accessibleChildren.FindIndex(i => string.Equals(entryId, i.Item1.ItemId?.ToString("N", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase));
+            var oldIndexAll = children.FindIndex(i => string.Equals(entryId, i.Link.ItemId?.ToString("N", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase));
+            var oldIndexAccessible = accessibleChildren.FindIndex(i => string.Equals(entryId, i.Link.ItemId?.ToString("N", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase));
 
             if (oldIndexAccessible == newIndex)
             {
@@ -363,8 +366,8 @@ namespace Tesserafin.Server.Core.Playlists
             }
 
             var newPriorItemIndex = Math.Max(newIndex - 1, 0);
-            var newPriorItemId = accessibleChildren[newPriorItemIndex].Item1.ItemId;
-            var newPriorItemIndexOnAllChildren = children.FindIndex(c => c.Item1.ItemId.Equals(newPriorItemId));
+            var newPriorItemId = accessibleChildren[newPriorItemIndex].Link.ItemId;
+            var newPriorItemIndexOnAllChildren = children.FindIndex(c => c.Link.ItemId.Equals(newPriorItemId));
             var adjustedNewIndex = DetermineAdjustedIndex(newPriorItemIndexOnAllChildren, newIndex);
 
             var item = playlist.LinkedChildren.FirstOrDefault(i => string.Equals(entryId, i.ItemId?.ToString("N", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase));
@@ -403,7 +406,7 @@ namespace Tesserafin.Server.Core.Playlists
             if (extension.Equals(".wpl", StringComparison.OrdinalIgnoreCase))
             {
                 var playlist = new WplPlaylist();
-                foreach (var child in item.GetLinkedChildren())
+                foreach (var child in _linkedChildren.GetItems(item))
                 {
                     var entry = new WplPlaylistEntry()
                     {
@@ -436,7 +439,7 @@ namespace Tesserafin.Server.Core.Playlists
             else if (extension.Equals(".zpl", StringComparison.OrdinalIgnoreCase))
             {
                 var playlist = new ZplPlaylist();
-                foreach (var child in item.GetLinkedChildren())
+                foreach (var child in _linkedChildren.GetItems(item))
                 {
                     var entry = new ZplPlaylistEntry()
                     {
@@ -472,7 +475,7 @@ namespace Tesserafin.Server.Core.Playlists
                 {
                     IsExtended = true
                 };
-                foreach (var child in item.GetLinkedChildren())
+                foreach (var child in _linkedChildren.GetItems(item))
                 {
                     var entry = new M3uPlaylistEntry()
                     {
@@ -504,7 +507,7 @@ namespace Tesserafin.Server.Core.Playlists
                     IsExtended = true
                 };
 
-                foreach (var child in item.GetLinkedChildren())
+                foreach (var child in _linkedChildren.GetItems(item))
                 {
                     var entry = new M3uPlaylistEntry()
                     {
@@ -532,7 +535,7 @@ namespace Tesserafin.Server.Core.Playlists
             else if (extension.Equals(".pls", StringComparison.OrdinalIgnoreCase))
             {
                 var playlist = new PlsPlaylist();
-                foreach (var child in item.GetLinkedChildren())
+                foreach (var child in _linkedChildren.GetItems(item))
                 {
                     var entry = new PlsPlaylistEntry()
                     {

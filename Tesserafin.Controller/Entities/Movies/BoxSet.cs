@@ -302,18 +302,8 @@ namespace Tesserafin.Controller.Entities.Movies
         /// there is one: by id, then, for an entry without an id or whose id finds nothing, by path
         /// (DEBT-SERVER-7).
         /// </summary>
-        private List<BaseItem> GetLinkedChildren(IStandaloneVisibilityService scope)
-        {
-            if (scope is null)
-            {
-                return GetLinkedChildren();
-            }
-
-            return LinkedChildren
-                .Select(i => GetLinkedChild(i, scope))
-                .Where(i => i is not null)
-                .ToList();
-        }
+        private IReadOnlyList<BaseItem> GetLinkedChildren(IStandaloneVisibilityService scope)
+            => CreateLinkedChildResolver(scope).GetItems(this);
 
         private IEnumerable<BaseItem> FlattenItems(IEnumerable<BaseItem> items, List<Guid> expandedFolders, IStandaloneVisibilityService scope)
         {
