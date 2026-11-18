@@ -1209,7 +1209,7 @@ then removes shortcuts while preserving manual links and every media/source-note
 HTTP/OpenAPI/SDK shapes are unchanged; .NET resolution/command DTO and protected-hook changes are
 intentional.
 
-### Folder scan candidate resolution
+## 40. Folder scan candidate resolution
 
 Full scans and provider-triggered folder refreshes pass the same
 `IItemResolutionService` through folder validation and recursion. The resolver
