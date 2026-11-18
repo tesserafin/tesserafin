@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text.Json.Serialization;
+using System.Threading;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Library;
@@ -88,11 +89,11 @@ namespace Tesserafin.Controller.Entities.Movies
             return UnratedItem.Movie;
         }
 
-        protected override IEnumerable<BaseItem> GetNonCachedChildren(IDirectoryService directoryService)
+        protected override IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             if (IsLegacyBoxSet)
             {
-                return base.GetNonCachedChildren(directoryService);
+                return base.GetNonCachedChildren(resolution, directoryService, cancellationToken);
             }
 
             return Enumerable.Empty<BaseItem>();

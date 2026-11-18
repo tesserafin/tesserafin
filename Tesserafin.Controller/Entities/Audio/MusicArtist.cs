@@ -115,7 +115,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return base.IsSaveLocalMetadataEnabled();
         }
 
-        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             if (IsAccessedByName)
             {
@@ -123,7 +123,7 @@ namespace Tesserafin.Controller.Entities.Audio
                 return;
             }
 
-            await base.ValidateChildrenInternal(deletions, writes, images, progress, recursive, refreshChildMetadata, false, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
+            await base.ValidateChildrenInternal(deletions, writes, images, resolution, progress, recursive, refreshChildMetadata, false, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
         }
 
         public override List<string> GetUserDataKeys()

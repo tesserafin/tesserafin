@@ -35,9 +35,13 @@ public interface IItemResolutionService : IItemResolutionPolicy
 
     BaseItem? ResolvePath(FileSystemMetadata fileInfo, IDirectoryService directoryService, IItemResolver[]? resolvers, Folder? parent = null, CollectionType? collectionType = null, LibraryOptions? libraryOptions = null);
 
-    IEnumerable<BaseItem> ResolvePaths(IEnumerable<FileSystemMetadata> files, IDirectoryService directoryService, Folder parent, LibraryOptions libraryOptions, CollectionType? collectionType = null);
-
-    IEnumerable<BaseItem> ResolvePaths(IEnumerable<FileSystemMetadata> files, IDirectoryService directoryService, Folder parent, LibraryOptions libraryOptions, CollectionType? collectionType, IItemResolver[] resolvers);
+    /// <summary>Resolves a folder's filesystem entries with its current library options and collection type.</summary>
+    /// <param name="parent">The folder whose children are being discovered.</param>
+    /// <param name="files">Filesystem entries supplied by the folder.</param>
+    /// <param name="directoryService">Directory access shared with the scan.</param>
+    /// <param name="cancellationToken">Cancels candidate discovery and resolution.</param>
+    /// <returns>The resolved candidates for catalogue reconciliation.</returns>
+    IEnumerable<BaseItem> ResolveFolderChildren(Folder parent, IReadOnlyList<FileSystemMetadata> files, IDirectoryService directoryService, CancellationToken cancellationToken);
 
     Video? ResolveAlternateVersion(string path, Type expectedVideoType, Folder? parent, CollectionType? collectionType);
 

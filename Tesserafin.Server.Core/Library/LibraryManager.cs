@@ -210,18 +210,6 @@ namespace Tesserafin.Server.Core.Library
         public bool IgnoreFile(FileSystemMetadata file, BaseItem? parent)
             => _resolution.IgnoreFile(file, parent);
 
-        public IEnumerable<BaseItem> ResolvePaths(IEnumerable<FileSystemMetadata> files, IDirectoryService directoryService, Folder parent, LibraryOptions libraryOptions, CollectionType? collectionType = null)
-            => _resolution.ResolvePaths(files, directoryService, parent, libraryOptions, collectionType);
-
-        public IEnumerable<BaseItem> ResolvePaths(
-            IEnumerable<FileSystemMetadata> files,
-            IDirectoryService directoryService,
-            Folder parent,
-            LibraryOptions libraryOptions,
-            CollectionType? collectionType,
-            IItemResolver[] resolvers)
-            => _resolution.ResolvePaths(files, directoryService, parent, libraryOptions, collectionType, resolvers);
-
         /// <inheritdoc />
         /// <remarks>
         /// Delegates to <see cref="IUserRootFolderProvider"/> (PR107) - construction, caching and the

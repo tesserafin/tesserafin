@@ -150,16 +150,16 @@ namespace Tesserafin.Controller.Entities
             return args;
         }
 
-        protected override IEnumerable<BaseItem> GetNonCachedChildren(IDirectoryService directoryService)
+        protected override IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
-            return base.GetNonCachedChildren(directoryService).Concat(_virtualChildren);
+            return base.GetNonCachedChildren(resolution, directoryService, cancellationToken).Concat(_virtualChildren);
         }
 
-        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             ClearCache();
 
-            await base.ValidateChildrenInternal(deletions, writes, images, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken)
+            await base.ValidateChildrenInternal(deletions, writes, images, resolution, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken)
                 .ConfigureAwait(false);
 
             ClearCache();

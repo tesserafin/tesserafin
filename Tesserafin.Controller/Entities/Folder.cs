@@ -292,9 +292,9 @@ namespace Tesserafin.Controller.Entities
             return ProviderManager.GetRefreshProgress(Id);
         }
 
-        public Task ValidateChildren(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, CancellationToken cancellationToken)
+        public Task ValidateChildren(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, IProgress<double> progress, CancellationToken cancellationToken)
         {
-            return ValidateChildren(deletions, writes, images, progress, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken: cancellationToken);
+            return ValidateChildren(deletions, writes, images, resolution, progress, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -303,16 +303,17 @@ namespace Tesserafin.Controller.Entities
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+        /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="metadataRefreshOptions">The metadata refresh options.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
         /// <param name="allowRemoveRoot">remove item even this folder is root.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        public Task ValidateChildren(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, MetadataRefreshOptions metadataRefreshOptions, bool recursive = true, bool allowRemoveRoot = false, CancellationToken cancellationToken = default)
+        public Task ValidateChildren(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, IProgress<double> progress, MetadataRefreshOptions metadataRefreshOptions, bool recursive = true, bool allowRemoveRoot = false, CancellationToken cancellationToken = default)
         {
             Children = null; // invalidate cached children.
-            return ValidateChildrenInternal(deletions, writes, images, progress, recursive, true, allowRemoveRoot, metadataRefreshOptions, metadataRefreshOptions.DirectoryService, cancellationToken);
+            return ValidateChildrenInternal(deletions, writes, images, resolution, progress, recursive, true, allowRemoveRoot, metadataRefreshOptions, metadataRefreshOptions.DirectoryService, cancellationToken);
         }
 
         /// <summary>
@@ -321,6 +322,7 @@ namespace Tesserafin.Controller.Entities
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+        /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
         /// <param name="refreshChildMetadata">if set to <c>true</c> [refresh child metadata].</param>
@@ -329,7 +331,7 @@ namespace Tesserafin.Controller.Entities
         /// <param name="directoryService">The directory service.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        protected virtual async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected virtual async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             if (recursive)
             {
@@ -343,7 +345,7 @@ namespace Tesserafin.Controller.Entities
                     throw new InvalidOperationException("Recursive datastructure detected abort processing this item.");
                 }
 
-                await ValidateChildrenInternal2(deletions, writes, images, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
+                await ValidateChildrenInternal2(deletions, writes, images, resolution, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -354,7 +356,7 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        private async Task ValidateChildrenInternal2(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        private async Task ValidateChildrenInternal2(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -368,7 +370,8 @@ namespace Tesserafin.Controller.Entities
 
                 try
                 {
-                    nonCachedChildren = GetNonCachedChildren(directoryService).ToArray();
+                    nonCachedChildren = GetNonCachedChildren(resolution, directoryService, cancellationToken).ToArray();
+                    cancellationToken.ThrowIfCancellationRequested();
                 }
                 catch (IOException ex)
                 {
@@ -439,7 +442,7 @@ namespace Tesserafin.Controller.Entities
                     validChildrenNeedGeneration = false;
                 }
 
-                await ValidateSubFolders(deletions, writes, images, accessibleChildren.OfType<Folder>().ToList(), directoryService, innerProgress, cancellationToken).ConfigureAwait(false);
+                await ValidateSubFolders(deletions, writes, images, resolution, accessibleChildren.OfType<Folder>().ToList(), directoryService, innerProgress, cancellationToken).ConfigureAwait(false);
             }
 
             if (refreshChildMetadata)
@@ -529,15 +532,16 @@ namespace Tesserafin.Controller.Entities
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+        /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
         /// <param name="children">The children.</param>
         /// <param name="directoryService">The directory service.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        private async Task ValidateSubFolders(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IList<Folder> children, IDirectoryService directoryService, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task ValidateSubFolders(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, IList<Folder> children, IDirectoryService directoryService, IProgress<double> progress, CancellationToken cancellationToken)
         {
             await RunTasks(
-                (folder, innerProgress) => folder.ValidateChildrenInternal(deletions, writes, images, innerProgress, true, false, false, null, directoryService, cancellationToken),
+                (folder, innerProgress) => folder.ValidateChildrenInternal(deletions, writes, images, resolution, innerProgress, true, false, false, null, directoryService, cancellationToken),
                 children,
                 progress,
                 cancellationToken).ConfigureAwait(false);
@@ -562,19 +566,13 @@ namespace Tesserafin.Controller.Entities
                 .ConfigureAwait(false);
         }
 
-        /// <summary>
-        /// Get the children of this folder from the actual file system.
-        /// </summary>
-        /// <returns>IEnumerable{BaseItem}.</returns>
-        /// <param name="directoryService">The directory service to use for operation.</param>
-        /// <returns>Returns set of base items.</returns>
-        protected virtual IEnumerable<BaseItem> GetNonCachedChildren(IDirectoryService directoryService)
-        {
-            var collectionType = LibraryManager.GetContentType(this);
-            var libraryOptions = LibraryManager.GetLibraryOptions(this);
-
-            return LibraryManager.ResolvePaths(GetFileSystemChildren(directoryService), directoryService, this, libraryOptions, collectionType);
-        }
+        /// <summary>Discovers children for catalogue reconciliation.</summary>
+        /// <param name="resolution">The filesystem candidate resolver.</param>
+        /// <param name="directoryService">Access to filesystem entries.</param>
+        /// <param name="cancellationToken">Cancels discovery.</param>
+        /// <returns>The children resolved from the current filesystem entries.</returns>
+        protected virtual IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
+            => resolution.ResolveFolderChildren(this, GetFileSystemChildren(directoryService), directoryService, cancellationToken);
 
         /// <summary>
         /// Get our children from the repo - stubbed for now.

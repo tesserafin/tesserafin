@@ -52,6 +52,7 @@ namespace Tesserafin.Providers.Manager
     public class ProviderManager : IProviderManager, IDisposable
     {
         private readonly IItemWriteCommands _writes;
+        private readonly IItemResolutionService _resolution;
         private readonly IItemMetadataExporter _metadataExporter;
         private readonly IItemImageService _images;
         private readonly IRemoteImageSource _remoteImages;
@@ -94,6 +95,7 @@ namespace Tesserafin.Providers.Manager
         /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="metadataExporter">Metadata saver selection and execution.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+        /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
         /// <param name="deletions">Item deletion operations.</param>
         /// <param name="subtitleManager">The subtitle manager.</param>
         /// <param name="configurationManager">The configuration manager.</param>
@@ -112,6 +114,7 @@ namespace Tesserafin.Providers.Manager
             IItemWriteCommands writes,
             IItemMetadataExporter metadataExporter,
             IItemImageService images,
+            IItemResolutionService resolution,
             IItemDeletionCommands deletions,
             ISubtitleManager subtitleManager,
             IServerConfigurationManager configurationManager,
@@ -130,6 +133,7 @@ namespace Tesserafin.Providers.Manager
             _writes = writes;
             _metadataExporter = metadataExporter;
             _images = images;
+            _resolution = resolution;
             _deletions = deletions;
             _logger = logger;
             _configurationManager = configurationManager;
@@ -1021,7 +1025,7 @@ namespace Tesserafin.Providers.Manager
                     await RefreshCollectionFolderChildren(options, collectionFolder, cancellationToken).ConfigureAwait(false);
                     break;
                 case Folder folder:
-                    await folder.ValidateChildren(_deletions, _writes, _images, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await folder.ValidateChildren(_deletions, _writes, _images, _resolution, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
                     break;
             }
         }
@@ -1032,7 +1036,7 @@ namespace Tesserafin.Providers.Manager
             {
                 await child.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
 
-                await child.ValidateChildren(_deletions, _writes, _images, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                await child.ValidateChildren(_deletions, _writes, _images, _resolution, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -1055,7 +1059,7 @@ namespace Tesserafin.Providers.Manager
                 .Where(i => i is not null)
                 .Distinct();
 
-            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_deletions, _writes, _images, new Progress<double>(), options, true, false, cancellationToken));
+            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_deletions, _writes, _images, _resolution, new Progress<double>(), options, true, false, cancellationToken));
 
             await Task.WhenAll(musicArtistRefreshTasks).ConfigureAwait(false);
 

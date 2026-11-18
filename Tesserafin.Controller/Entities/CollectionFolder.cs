@@ -335,6 +335,7 @@ namespace Tesserafin.Controller.Entities
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+        /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
         /// <param name="refreshChildMetadata">if set to <c>true</c> [refresh child metadata].</param>
@@ -343,7 +344,7 @@ namespace Tesserafin.Controller.Entities
         /// <param name="directoryService">The directory service.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }

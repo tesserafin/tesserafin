@@ -167,6 +167,7 @@ public sealed class FolderChildReconciliationEndToEndTests(TesserafinApplication
                 deletions,
                 writes,
                 images,
+                resolution,
                 new Progress<double>(),
                 new MetadataRefreshOptions(new DirectoryService(files)) { MetadataRefreshMode = MetadataRefreshMode.None, ImageRefreshMode = MetadataRefreshMode.None },
                 recursive: false,
@@ -184,6 +185,6 @@ public sealed class FolderChildReconciliationEndToEndTests(TesserafinApplication
 
         public override string GetClientTypeName() => nameof(Folder);
 
-        protected override IEnumerable<BaseItem> GetNonCachedChildren(IDirectoryService directoryService) => Discover();
+        protected override IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken) => Discover();
     }
 }

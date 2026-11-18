@@ -134,7 +134,7 @@ namespace Tesserafin.Controller.Playlists
             return [];
         }
 
-        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -144,7 +144,7 @@ namespace Tesserafin.Controller.Playlists
             return GetPlayableItems(user, query);
         }
 
-        protected override IReadOnlyList<BaseItem> GetNonCachedChildren(IDirectoryService directoryService)
+        protected override IReadOnlyList<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             return [];
         }
