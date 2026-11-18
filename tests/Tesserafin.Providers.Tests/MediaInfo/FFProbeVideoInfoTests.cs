@@ -73,7 +73,10 @@ public class FFProbeVideoInfoTests
                     new MediaStream { Type = MediaStreamType.Subtitle, Codec = "hdmv_pgs_subtitle" }
                 ]
             });
+        IReadOnlyList<MediaStream> saved = [];
         var streams = new Mock<IMediaStreamRepository>();
+        streams.Setup(r => r.SaveMediaStreams(video.Id, It.IsAny<IReadOnlyList<MediaStream>>(), token))
+            .Callback<Guid, IReadOnlyList<MediaStream>, CancellationToken>((_, tracks, _) => saved = tracks);
         IFixture fixture = new Fixture().Customize(new AutoMoqCustomization { ConfigureMembers = true });
         fixture.Inject(itemOptions.Object);
         fixture.Inject(encoder.Object);
@@ -86,11 +89,19 @@ public class FFProbeVideoInfoTests
 
         Assert.Equal(embeddedTitle ? "Embedded title" : "File title", video.Name);
         Assert.Equal(expectText || expectImage, video.HasSubtitles);
-        streams.Verify(r => r.SaveMediaStreams(video.Id, It.Is<IReadOnlyList<MediaStream>>(saved =>
-            saved.Count == 1 + (expectText ? 1 : 0) + (expectImage ? 1 : 0)
-            && saved.Any(stream => stream.Type == MediaStreamType.Video)
-            && saved.Any(stream => stream.Type == MediaStreamType.Subtitle && stream.IsTextSubtitleStream) == expectText
-            && saved.Any(stream => stream.Type == MediaStreamType.Subtitle && !stream.IsTextSubtitleStream) == expectImage), token), Times.Once);
+        var expectedCodecs = new List<string> { "h264" };
+        if (expectText)
+        {
+            expectedCodecs.Add("subrip");
+        }
+
+        if (expectImage)
+        {
+            expectedCodecs.Add("hdmv_pgs_subtitle");
+        }
+
+        Assert.Equal(expectedCodecs, saved.Select(stream => stream.Codec));
+        streams.Verify(r => r.SaveMediaStreams(video.Id, It.IsAny<IReadOnlyList<MediaStream>>(), token), Times.Once);
         itemOptions.Verify(o => o.GetLibraryOptions(video), Times.Once);
     }
 
