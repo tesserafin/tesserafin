@@ -287,11 +287,6 @@ namespace Tesserafin.Controller.Entities
             return GetCachedChildren();
         }
 
-        public override double? GetRefreshProgress()
-        {
-            return ProviderManager.GetRefreshProgress(Id);
-        }
-
         public Task ValidateChildren(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, IProgress<double> progress, CancellationToken cancellationToken)
         {
             return ValidateChildren(deletions, writes, images, resolution, progress, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken: cancellationToken);

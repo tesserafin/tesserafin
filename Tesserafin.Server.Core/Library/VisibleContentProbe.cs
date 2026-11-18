@@ -55,9 +55,7 @@ namespace Tesserafin.Server.Core.Library
         {
             IEnumerable<BaseItem> children = library switch
             {
-                CollectionFolder collectionFolder => collectionFolder.PhysicalFolderIds
-                    .Select(_itemLookupService.GetItemById)
-                    .OfType<Folder>()
+                CollectionFolder collectionFolder => collectionFolder.GetPhysicalFolders(_itemLookupService)
                     .SelectMany(GetChildren),
                 PlaylistsFolder => GetChildren(library).OfType<Playlist>(),
                 _ => []

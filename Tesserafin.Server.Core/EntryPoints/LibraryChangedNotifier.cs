@@ -28,7 +28,9 @@ namespace Tesserafin.Server.Core.EntryPoints;
 /// </summary>
 public sealed class LibraryChangedNotifier : IHostedService, IDisposable
 {
-    private readonly ILibraryManager _libraryManager;
+    private readonly ICollectionFolderResolver _collectionFolders;
+    private readonly IUserRootFolderProvider _roots;
+    private readonly IItemLookupService _lookup;
     private readonly IItemChangeEvents _changes;
     private readonly IServerConfigurationManager _configurationManager;
     private readonly IProviderManager _providerManager;
@@ -50,7 +52,9 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="LibraryChangedNotifier"/> class.
     /// </summary>
-    /// <param name="libraryManager">The <see cref="ILibraryManager"/>.</param>
+    /// <param name="collectionFolders">The resolver mapping items to configured libraries.</param>
+    /// <param name="roots">The user root provider.</param>
+    /// <param name="lookup">The catalogue lookup used for parent and physical folder identities.</param>
     /// <param name="changes">The completed item change feed.</param>
     /// <param name="configurationManager">The <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="sessionManager">The <see cref="ISessionManager"/>.</param>
@@ -59,7 +63,9 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     /// <param name="providerManager">The <see cref="IProviderManager"/>.</param>
     /// <param name="itemSortService">The <see cref="IItemSortService"/>.</param>
     public LibraryChangedNotifier(
-        ILibraryManager libraryManager,
+        ICollectionFolderResolver collectionFolders,
+        IUserRootFolderProvider roots,
+        IItemLookupService lookup,
         IItemChangeEvents changes,
         IServerConfigurationManager configurationManager,
         ISessionManager sessionManager,
@@ -68,7 +74,9 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         IProviderManager providerManager,
         IItemSortService itemSortService)
     {
-        _libraryManager = libraryManager;
+        _collectionFolders = collectionFolders;
+        _roots = roots;
+        _lookup = lookup;
         _changes = changes;
         _configurationManager = configurationManager;
         _sessionManager = sessionManager;
@@ -139,14 +147,14 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         {
         }
 
-        var collectionFolders = _libraryManager.GetCollectionFolders(item);
+        var collectionFolders = _collectionFolders.GetCollectionFolders(item);
 
         foreach (var collectionFolder in collectionFolders)
         {
             var collectionFolderDict = new Dictionary<string, string>
             {
                 ["ItemId"] = collectionFolder.Id.ToString("N", CultureInfo.InvariantCulture),
-                ["Progress"] = (collectionFolder.GetRefreshProgress() ?? 0).ToString(CultureInfo.InvariantCulture)
+                ["Progress"] = GetLibraryRefreshProgress(collectionFolder).ToString(CultureInfo.InvariantCulture)
             };
 
             try
@@ -169,9 +177,22 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         _lastProgressMessageTimes.TryRemove(e.Argument.Id, out _);
     }
 
-    private static bool EnableRefreshMessage(BaseItem item)
-        => item is Folder { IsRoot: false, IsTopParent: true }
-            and not (AggregateFolder or UserRootFolder or UserView or Channel);
+    private double GetLibraryRefreshProgress(Folder library)
+    {
+        if (library is not CollectionFolder collection)
+        {
+            return _providerManager.GetRefreshProgress(library.Id) ?? 0;
+        }
+
+        return collection.GetPhysicalFolders(_lookup)
+            .Select(folder => _providerManager.GetRefreshProgress(folder.Id))
+            .Average() ?? 0;
+    }
+
+    private bool EnableRefreshMessage(BaseItem item)
+        => item is Folder { IsRoot: false }
+            and not (AggregateFolder or UserRootFolder or UserView or Channel)
+            && item.IsTopParentVia(_lookup);
 
     private void OnLibraryItemAdded(object? sender, ItemChangeEventArgs e)
         => OnLibraryChange(e.Item, e.Parent, _itemsAdded, _foldersAddedTo);
@@ -317,7 +338,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         newAndRemoved.AddRange(foldersAddedTo);
         newAndRemoved.AddRange(foldersRemovedFrom);
 
-        var allUserRootChildren = _libraryManager.GetUserRootFolder()
+        var allUserRootChildren = _roots.GetUserRootFolder()
             .GetChildren(user, true, null, _itemSortService)
             .OfType<Folder>()
             .ToList();
@@ -390,7 +411,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         // If the physical root changed, return the user root
         if (item is AggregateFolder)
         {
-            return _libraryManager.GetUserRootFolder() is T t ? new[] { t } : Array.Empty<T>();
+            return _roots.GetUserRootFolder() is T t ? new[] { t } : Array.Empty<T>();
         }
 
         // Return it only if it's in the user's library

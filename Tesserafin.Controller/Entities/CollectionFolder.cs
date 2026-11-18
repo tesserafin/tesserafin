@@ -80,17 +80,17 @@ namespace Tesserafin.Controller.Entities
         /// <remarks>
         /// Our children are actually just references to the ones in the physical root...
         /// Setting to null propagates invalidation to physical folders since the getter
-        /// always delegates to <see cref="GetActualChildren"/> and never reads the backing field.
+        /// reads from the physical folders and never uses the backing field.
         /// </remarks>
         /// <value>The actual children.</value>
         [JsonIgnore]
         public override IEnumerable<BaseItem> Children
         {
-            get => GetActualChildren();
+            get => GetPhysicalFolders(LibraryManager).SelectMany(folder => folder.Children);
             set
             {
                 // The getter delegates to physical folders, so invalidate their caches.
-                foreach (var folder in GetPhysicalFolders())
+                foreach (var folder in GetPhysicalFolders(LibraryManager))
                 {
                     folder.Children = null;
                 }
@@ -196,30 +196,6 @@ namespace Tesserafin.Controller.Entities
         protected override Task<bool> RefreshOwnedItemsAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
             => writes.RefreshCollectionFolderMembershipAsync(this, options.DirectoryService, cancellationToken);
 
-        public override double? GetRefreshProgress()
-        {
-            var folders = GetPhysicalFolders().ToList();
-            double totalProgresses = 0;
-            var foldersWithProgress = 0;
-
-            foreach (var folder in folders)
-            {
-                var progress = ProviderManager.GetRefreshProgress(folder.Id);
-                if (progress.HasValue)
-                {
-                    totalProgresses += progress.Value;
-                    foldersWithProgress++;
-                }
-            }
-
-            if (foldersWithProgress == 0)
-            {
-                return null;
-            }
-
-            return totalProgresses / foldersWithProgress;
-        }
-
         /// <summary>
         /// Compare our current children (presumably just read from the repo) with the current state of the file system and adjust for any changes
         /// ***Currently does not contain logic to maintain items that are unavailable in the file system***.
@@ -241,12 +217,10 @@ namespace Tesserafin.Controller.Entities
             return Task.CompletedTask;
         }
 
-        public IEnumerable<BaseItem> GetActualChildren()
-        {
-            return GetPhysicalFolders().SelectMany(c => c.Children);
-        }
-
-        public IEnumerable<Folder> GetPhysicalFolders()
-            => PhysicalFolderIds.Select(id => LibraryManager.GetItemById(id)).OfType<Folder>();
+        /// <summary>Resolves the currently committed physical folder identities through a catalogue lookup.</summary>
+        /// <param name="lookup">The item lookup used for physical folder resolution.</param>
+        /// <returns>The available folders in membership order.</returns>
+        public IEnumerable<Folder> GetPhysicalFolders(IItemLookupService lookup)
+            => PhysicalFolderIds.Select(id => lookup.GetItemById(id)).OfType<Folder>();
     }
 }

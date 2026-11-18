@@ -2843,11 +2843,6 @@ namespace Tesserafin.Controller.Entities
             return [Id];
         }
 
-        public virtual double? GetRefreshProgress()
-        {
-            return null;
-        }
-
         public virtual ItemUpdateType OnMetadataChanged()
         {
             var updateType = ItemUpdateType.None;

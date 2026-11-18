@@ -105,7 +105,7 @@ public sealed class CollectionFolderMembershipEndToEndTests(TesserafinApplicatio
             await library.RefreshMetadata(deletions, writes, options, token);
             AssertMembership(library, nestedPath, nested.Id, secondMovie.Id);
             AssertMembership(Assert.IsType<CollectionFolder>(repository.RetrieveItem(library.Id)), nestedPath, nested.Id, secondMovie.Id);
-            Assert.Equal(nested.Id, Assert.Single(library.GetPhysicalFolders()).Id);
+            Assert.Equal(nested.Id, Assert.Single(library.GetPhysicalFolders(lookup)).Id);
             Assert.Equal(secondMovie.Id, Assert.Single(library.GetLinkedChildren()).Id);
             Assert.Equal(secondMovie.Id, Assert.Single(links.GetLinkedChildrenIds(library.Id, (int)LinkedChildType.Manual)));
             Assert.False(await RefreshAsync());

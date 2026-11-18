@@ -26,7 +26,7 @@ public sealed class LibraryStructureReaderTests
         var definition = Path.Combine(Path.GetTempPath(), "libraries", "Films");
         var orphan = Path.Combine(Path.GetTempPath(), "libraries", "Unscanned");
         var id = Guid.NewGuid();
-        var library = new ThrowingProgressFolder { Id = id, Path = definition };
+        var library = new Folder { Id = id, Path = definition };
         library.ImageInfos = [new ItemImageInfo { Path = "primary.png", Type = ImageType.Primary }];
         var root = new Mock<Folder>();
         root.SetupGet(f => f.Children).Returns([library]);
@@ -82,10 +82,5 @@ public sealed class LibraryStructureReaderTests
         {
             Assert.DoesNotContain(forbidden, dependencies);
         }
-    }
-
-    private sealed class ThrowingProgressFolder : Folder
-    {
-        public override double? GetRefreshProgress() => throw new InvalidOperationException("Readers must not consult provider statics.");
     }
 }

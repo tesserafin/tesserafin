@@ -63,6 +63,7 @@ namespace Tesserafin.Providers.Manager
         private readonly IFileSystem _fileSystem;
         private readonly IServerApplicationPaths _appPaths;
         private readonly ILibraryManager _libraryManager;
+        private readonly IItemLookupService _itemLookup;
         private readonly ILibraryScanCoordinator _scans;
         private readonly ISubtitleManager _subtitleManager;
         private readonly ILyricManager _lyricManager;
@@ -105,6 +106,7 @@ namespace Tesserafin.Providers.Manager
         /// <param name="appPaths">The server application paths.</param>
         /// <param name="scans">Library scan scheduling and state.</param>
         /// <param name="libraryManager">The library manager.</param>
+        /// <param name="itemLookup">The catalogue lookup used for physical folder identities.</param>
         /// <param name="baseItemManager">The BaseItem manager.</param>
         /// <param name="lyricManager">The lyric manager.</param>
         /// <param name="remoteImages">The image-only HTTP source.</param>
@@ -123,6 +125,7 @@ namespace Tesserafin.Providers.Manager
             IFileSystem fileSystem,
             IServerApplicationPaths appPaths,
             ILibraryManager libraryManager,
+            IItemLookupService itemLookup,
             ILibraryScanCoordinator scans,
             IBaseItemManager baseItemManager,
             ILyricManager lyricManager,
@@ -141,6 +144,7 @@ namespace Tesserafin.Providers.Manager
             _fileSystem = fileSystem;
             _appPaths = appPaths;
             _libraryManager = libraryManager;
+            _itemLookup = itemLookup;
             _scans = scans;
             _subtitleManager = subtitleManager;
             _baseItemManager = baseItemManager;
@@ -1032,7 +1036,7 @@ namespace Tesserafin.Providers.Manager
 
         private async Task RefreshCollectionFolderChildren(MetadataRefreshOptions options, CollectionFolder collectionFolder, CancellationToken cancellationToken)
         {
-            foreach (var child in collectionFolder.GetPhysicalFolders())
+            foreach (var child in collectionFolder.GetPhysicalFolders(_itemLookup))
             {
                 await child.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
 
