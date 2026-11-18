@@ -130,12 +130,19 @@ public sealed class ShortcutLinkLifecycleTests
         Assert.Empty(context.Owner.LinkedChildren);
     }
 
-    [Fact]
-    public async Task CancellationAfterTargetLookup_DoesNotPublishPreparedLinks()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CancellationAfterTargetLookup_DoesNotPublishPreparedLinks(bool alreadyCommitted)
     {
         var context = new Context();
         using var cancellation = new CancellationTokenSource();
         var target = context.Target("/media/film.mkv");
+        if (alreadyCommitted)
+        {
+            context.StoredLinks = [new LinkedChild { ItemId = target.Id, Type = LinkedChildType.Shortcut }];
+        }
+
         context.Resolved = [new("a.mblink", target.Path)];
         context.Repository.Setup(r => r.GetItemList(It.IsAny<InternalItemsQuery>())).Callback(() => cancellation.Cancel()).Returns([target]);
 
