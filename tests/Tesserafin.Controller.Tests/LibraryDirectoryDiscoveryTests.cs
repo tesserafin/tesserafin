@@ -45,7 +45,7 @@ public sealed class LibraryDirectoryDiscoveryTests
         files.Setup(f => f.ContainsSubPath(It.IsAny<string>(), It.IsAny<string>()))
             .Returns((string parent, string path) => path.StartsWith(parent + Path.DirectorySeparatorChar, StringComparison.Ordinal));
         var host = new Mock<IServerApplicationHost>();
-        host.Setup(h => h.ExpandVirtualPath(It.IsAny<string>())).Returns((string? path) => path == "%MEDIA%" ? target : path);
+        host.Setup(h => h.ExpandVirtualPath(It.IsAny<string>())).Returns((string path) => path == "%MEDIA%" ? target : path);
 
         var discovery = FileData.ReadLibraryDirectory(Entry(root, true), directories.Object, files.Object, host.Object, NullLogger.Instance, physicalRoot);
 
