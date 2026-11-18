@@ -1590,3 +1590,10 @@ hierarchy lookup, and a library-wide album query directly. Remote metadata
 search selects providers using the referenced item's library policy and
 retains per-path provider ordering in the cache. The refresh queue resolves
 items through the same catalogue lookup.
+
+## 53. Metadata refresh library options and season identities
+
+The metadata service hierarchy reads effective library settings through
+`ILibraryItemOptions`. Series grouping and special-season naming use the
+same policy. When a series creates a missing season, `IItemStore` computes
+its deterministic identity from the existing series, number and name key.

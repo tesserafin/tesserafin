@@ -36,7 +36,7 @@ namespace Tesserafin.Providers.Manager
             ILogger<MetadataService<TItemType, TIdType>> logger,
             IProviderManager providerManager,
             IFileSystem fileSystem,
-            ILibraryManager libraryManager,
+            ILibraryItemOptions itemOptions,
             IItemNamingService itemNamingService,
             IExternalDataManager externalDataManager,
             IItemRepository itemRepository,
@@ -49,7 +49,7 @@ namespace Tesserafin.Providers.Manager
             Logger = logger;
             ProviderManager = providerManager;
             FileSystem = fileSystem;
-            LibraryManager = libraryManager;
+            ItemOptions = itemOptions;
             ItemNamingService = itemNamingService;
             ExternalDataManager = externalDataManager;
             ItemRepository = itemRepository;
@@ -70,7 +70,7 @@ namespace Tesserafin.Providers.Manager
 
         protected IFileSystem FileSystem { get; }
 
-        protected ILibraryManager LibraryManager { get; }
+        protected ILibraryItemOptions ItemOptions { get; }
 
         protected IItemNamingService ItemNamingService { get; }
 
@@ -108,7 +108,7 @@ namespace Tesserafin.Providers.Manager
             var itemOfType = (TItemType)item;
             var updateType = ItemUpdateType.None;
 
-            var libraryOptions = LibraryManager.GetLibraryOptions(item);
+            var libraryOptions = ItemOptions.GetLibraryOptions(item);
             var isFirstRefresh = item.DateLastRefreshed == DateTime.MinValue;
             var hasRefreshedMetadata = true;
             var hasRefreshedImages = true;

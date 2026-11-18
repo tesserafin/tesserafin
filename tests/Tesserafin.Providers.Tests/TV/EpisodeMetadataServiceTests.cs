@@ -100,7 +100,7 @@ public class EpisodeMetadataServiceTests
                 NullLogger<EpisodeMetadataService>.Instance,
                 Mock.Of<IProviderManager>(),
                 Mock.Of<IFileSystem>(),
-                Mock.Of<ILibraryManager>(),
+                Mock.Of<ILibraryItemOptions>(),
                 Mock.Of<IItemNamingService>(),
                 Mock.Of<IExternalDataManager>(),
                 Mock.Of<IItemRepository>(),

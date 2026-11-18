@@ -29,6 +29,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 {
     private readonly IItemListingServices _listing;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IItemStore _itemStore;
     private readonly ILocalizationManager _localizationManager;
     private readonly IItemSortService _itemSortService;
 
@@ -42,7 +43,8 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
-    /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="itemOptions">Effective options for the item's library.</param>
+    /// <param name="itemStore">Computes stable identities for synthesized seasons.</param>
     /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
@@ -57,17 +59,19 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         ILogger<SeriesMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
-        ILibraryManager libraryManager,
+        ILibraryItemOptions itemOptions,
+        IItemStore itemStore,
         IItemNamingService itemNamingService,
         ILocalizationManager localizationManager,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
         IItemSortService itemSortService,
         IItemListingServices listing)
-        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository, localizationManager)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
         _listing = listing;
         _deletions = deletions;
+        _itemStore = itemStore;
         _localizationManager = localizationManager;
         _itemSortService = itemSortService;
     }
@@ -98,7 +102,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         await base.AfterMetadataRefresh(item, refreshOptions, cancellationToken).ConfigureAwait(false);
 
         // Note that this only updates the children's SeriesPresentationUniqueKey and SeasonId, not the ParentIndexNumber
-        if (LibraryManager.GetLibraryOptions(item).EnableAutomaticSeriesGrouping)
+        if (ItemOptions.GetLibraryOptions(item).EnableAutomaticSeriesGrouping)
         {
             await UpdateSeriesChildrenInfoAsync(item, cancellationToken).ConfigureAwait(false);
         }
@@ -415,7 +419,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         {
             Name = seasonName,
             IndexNumber = seasonNumber,
-            Id = LibraryManager.GetNewItemId(
+            Id = _itemStore.GetNewItemId(
                 series.Id + (seasonNumber ?? -1).ToString(CultureInfo.InvariantCulture) + seasonName,
                 typeof(Season)),
             IsVirtualItem = false,
@@ -437,7 +441,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             seasonName = seasonNumber switch
             {
                 null => _localizationManager.GetLocalizedString("NameSeasonUnknown"),
-                0 => LibraryManager.GetLibraryOptions(series).SeasonZeroDisplayName,
+                0 => ItemOptions.GetLibraryOptions(series).SeasonZeroDisplayName,
                 _ => string.Format(CultureInfo.InvariantCulture, _localizationManager.GetLocalizedString("NameSeasonNumber"), seasonNumber.Value)
             };
         }
