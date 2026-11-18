@@ -32,10 +32,10 @@ namespace Tesserafin.Providers.Subtitles
         private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
         private readonly Lazy<IProviderManager> _providers;
-        private readonly ILibraryItemOptions _libraryOptions;
+        private readonly ILibraryItemOptions _itemOptions;
+        private readonly IServerApplicationPaths _applicationPaths;
         private readonly ILogger<SubtitleManager> _logger;
         private readonly IFileSystem _fileSystem;
-        private readonly IServerApplicationPaths _applicationPaths;
         private readonly ILibraryMonitor _monitor;
         private readonly IMediaSourceManager _mediaSourceManager;
         private readonly ILocalizationManager _localization;
@@ -47,10 +47,10 @@ namespace Tesserafin.Providers.Subtitles
             IItemWriteCommands writes,
             IItemDeletionCommands deletions,
             Lazy<IProviderManager> providers,
-            ILibraryItemOptions libraryOptions,
+            ILibraryItemOptions itemOptions,
+            IServerApplicationPaths applicationPaths,
             ILogger<SubtitleManager> logger,
             IFileSystem fileSystem,
-            IServerApplicationPaths applicationPaths,
             ILibraryMonitor monitor,
             IMediaSourceManager mediaSourceManager,
             ILocalizationManager localizationManager,
@@ -60,10 +60,10 @@ namespace Tesserafin.Providers.Subtitles
             _writes = writes;
             _deletions = deletions;
             _providers = providers;
-            _libraryOptions = libraryOptions;
+            _itemOptions = itemOptions;
+            _applicationPaths = applicationPaths;
             _logger = logger;
             _fileSystem = fileSystem;
-            _applicationPaths = applicationPaths;
             _monitor = monitor;
             _mediaSourceManager = mediaSourceManager;
             _localization = localizationManager;
@@ -152,7 +152,7 @@ namespace Tesserafin.Providers.Subtitles
         /// <inheritdoc />
         public Task DownloadSubtitles(Video video, string subtitleId, CancellationToken cancellationToken)
         {
-            var libraryOptions = _libraryOptions.GetLibraryOptions(video);
+            var libraryOptions = _itemOptions.GetLibraryOptions(video);
 
             return DownloadSubtitles(video, libraryOptions, subtitleId, cancellationToken);
         }
@@ -199,7 +199,7 @@ namespace Tesserafin.Providers.Subtitles
                 throw new ArgumentException($"Unsupported subtitle format: '{format}'");
             }
 
-            var libraryOptions = _libraryOptions.GetLibraryOptions(video);
+            var libraryOptions = _itemOptions.GetLibraryOptions(video);
             return TrySaveSubtitle(video, libraryOptions, response);
         }
 

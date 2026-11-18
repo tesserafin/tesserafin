@@ -1603,3 +1603,11 @@ its deterministic identity from the existing series, number and name key.
 The audio and video probers use `ILibraryItemOptions` for the effective settings
 of the media item. A video probe resolves those settings once and uses them
 for subtitle download and filtering, embedded metadata, and chapter images.
+
+## 55. Subtitle and lyric sidecar policy
+
+Subtitle and lyric managers resolve manual requests through
+`ILibraryItemOptions` and build internal metadata paths from the injected
+application paths. Automated subtitle downloads pass the options used for
+search into storage. Embedded lyric extraction passes the audio probe's
+options into storage as well.

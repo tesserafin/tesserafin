@@ -556,7 +556,7 @@ namespace Tesserafin.Providers.MediaInfo
             if (!string.IsNullOrWhiteSpace(lyrics)
                 && (tryExtractEmbeddedLyrics || options.ReplaceAllMetadata))
             {
-                await _lyricManager.SaveLyricAsync(audio, "lrc", lyrics).ConfigureAwait(false);
+                await _lyricManager.SaveLyricAsync(audio, libraryOptions, "lrc", lyrics).ConfigureAwait(false);
             }
         }
 

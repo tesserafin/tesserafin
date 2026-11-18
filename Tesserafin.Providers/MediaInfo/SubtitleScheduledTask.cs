@@ -179,33 +179,12 @@ namespace Tesserafin.Providers.MediaInfo
 
             var libraryOptions = _libraryManager.GetLibraryOptions(video);
 
-            string[] subtitleDownloadLanguages;
-            bool skipIfEmbeddedSubtitlesPresent;
-            bool skipIfAudioTrackMatches;
-            bool requirePerfectMatch;
-
-            if (libraryOptions.SubtitleDownloadLanguages is null)
-            {
-                // Subtitle downloading is not configured for this library
-                return true;
-            }
-
-            subtitleDownloadLanguages = libraryOptions.SubtitleDownloadLanguages;
-            skipIfEmbeddedSubtitlesPresent = libraryOptions.SkipSubtitlesIfEmbeddedSubtitlesPresent;
-            skipIfAudioTrackMatches = libraryOptions.SkipSubtitlesIfAudioTrackMatches;
-            requirePerfectMatch = libraryOptions.RequirePerfectSubtitleMatch;
-
             var downloadedLanguages = await new SubtitleDownloader(
                 _logger,
                 _subtitleManager).DownloadSubtitles(
                     video,
                     mediaStreams,
-                    skipIfEmbeddedSubtitlesPresent,
-                    skipIfAudioTrackMatches,
-                    requirePerfectMatch,
-                    subtitleDownloadLanguages,
-                    libraryOptions.DisabledSubtitleFetchers,
-                    libraryOptions.SubtitleFetcherOrder,
+                    libraryOptions,
                     true,
                     cancellationToken).ConfigureAwait(false);
 
