@@ -1620,3 +1620,15 @@ Subtitle selection reads per-folder filters and resolves the effective
 settings of each distinct video through `ILibraryItemOptions`. Lyric
 downloads use the folder's options for each page and count the unscoped
 audio candidates through `IItemCountService` to report progress.
+
+## 57. Trickplay catalogue and media source reads
+
+The scan provider uses `ILibraryItemOptions` for generation policy. The
+generation and storage-move tasks use `IItemQueryService` for candidate
+pages and `IItemCountService` for progress. Each passes the effective settings
+of the selected video to the Trickplay manager.
+
+The manager obtains static media sources through `IMediaSourceManager` with
+path substitution disabled. Generation selects the source belonging to the
+video being processed. The video manifest keeps a separate set of widths for
+each local source, including alternate versions.

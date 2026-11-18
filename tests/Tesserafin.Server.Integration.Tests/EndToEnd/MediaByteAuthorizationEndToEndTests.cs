@@ -15,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Api.Models.PlaybackSessionDtos;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Configuration;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
@@ -662,11 +663,20 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
     [Fact(Timeout = 120_000)]
     public async Task AttachmentAndTrickplayOfAWithheldVersion_AreAnsweredAsAVersionThatDoesNotExist()
     {
-        await SeedAttachmentAndTrickplayAsync(TestContext.Current.CancellationToken);
-        using (var merged = await _admin.PostAsync(FormattableString.Invariant($"Videos/MergeVersions?ids={_own},{_item}"), null, TestContext.Current.CancellationToken))
+        var token = TestContext.Current.CancellationToken;
+        await SeedAttachmentAndTrickplayAsync(token);
+        var trickplay = _factory.Services.GetRequiredService<ITrickplayManager>();
+        await SaveTrickplayResolutionAsync(trickplay, _own);
+
+        using (var merged = await _admin.PostAsync(FormattableString.Invariant($"Videos/MergeVersions?ids={_own},{_item}"), null, token))
         {
             Assert.Equal(HttpStatusCode.NoContent, merged.StatusCode);
         }
+
+        var video = Assert.IsAssignableFrom<Video>(_factory.Services.GetRequiredService<IItemLookupService>().GetItemById(_own));
+        var manifest = await trickplay.GetTrickplayManifest(video);
+        Assert.Equal(_own, Assert.Single(manifest[_own.ToString("N", CultureInfo.InvariantCulture)]).Value.ItemId);
+        Assert.Equal(_item, Assert.Single(manifest[_item.ToString("N", CultureInfo.InvariantCulture)]).Value.ItemId);
 
         string[] templates =
         [
@@ -824,9 +834,13 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
         Directory.CreateDirectory(Path.GetDirectoryName(extracted)!);
         await File.WriteAllBytesAsync(extracted, _mark, cancellationToken);
 
-        await _factory.Services.GetRequiredService<ITrickplayManager>().SaveTrickplayInfo(new TrickplayInfo
+        await SaveTrickplayResolutionAsync(_factory.Services.GetRequiredService<ITrickplayManager>(), _item);
+    }
+
+    private static Task SaveTrickplayResolutionAsync(ITrickplayManager trickplay, Guid itemId)
+        => trickplay.SaveTrickplayInfo(new TrickplayInfo
         {
-            ItemId = _item,
+            ItemId = itemId,
             Width = EndToEndMediaFixtures.Width,
             Height = EndToEndMediaFixtures.Height,
             TileWidth = 1,
@@ -835,7 +849,6 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
             Interval = 1000,
             Bandwidth = 1,
         });
-    }
 
     /// <summary>
     /// Blocks the withheld tag for a user, or stops blocking it: its policy as it is, with that

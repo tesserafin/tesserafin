@@ -26,22 +26,22 @@ public class TrickplayProvider : ICustomMetadataProvider<Episode>,
 {
     private readonly IServerConfigurationManager _config;
     private readonly ITrickplayManager _trickplayManager;
-    private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryItemOptions _libraryOptions;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TrickplayProvider"/> class.
     /// </summary>
     /// <param name="config">The configuration manager.</param>
     /// <param name="trickplayManager">The trickplay manager.</param>
-    /// <param name="libraryManager">The library manager.</param>
+    /// <param name="libraryOptions">The effective library settings.</param>
     public TrickplayProvider(
         IServerConfigurationManager config,
         ITrickplayManager trickplayManager,
-        ILibraryManager libraryManager)
+        ILibraryItemOptions libraryOptions)
     {
         _config = config;
         _trickplayManager = trickplayManager;
-        _libraryManager = libraryManager;
+        _libraryOptions = libraryOptions;
     }
 
     /// <inheritdoc />
@@ -97,7 +97,7 @@ public class TrickplayProvider : ICustomMetadataProvider<Episode>,
 
     private async Task<ItemUpdateType> FetchInternal(Video video, MetadataRefreshOptions options, CancellationToken cancellationToken)
     {
-        var libraryOptions = _libraryManager.GetLibraryOptions(video);
+        var libraryOptions = _libraryOptions.GetLibraryOptions(video);
         bool? enableDuringScan = libraryOptions?.ExtractTrickplayImagesDuringLibraryScan;
         bool replace = options.RegenerateTrickplay && options.MetadataRefreshMode > MetadataRefreshMode.Default;
 

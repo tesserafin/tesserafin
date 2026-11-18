@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Trickplay;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Globalization;
@@ -21,7 +22,9 @@ public class TrickplayImagesTask : IScheduledTask
     private const int QueryPageLimit = 100;
 
     private readonly ILogger<TrickplayImagesTask> _logger;
-    private readonly ILibraryManager _libraryManager;
+    private readonly IItemQueryService _itemQueries;
+    private readonly IItemCountService _itemCounts;
+    private readonly ILibraryItemOptions _libraryOptions;
     private readonly ILocalizationManager _localization;
     private readonly ITrickplayManager _trickplayManager;
 
@@ -29,16 +32,22 @@ public class TrickplayImagesTask : IScheduledTask
     /// Initializes a new instance of the <see cref="TrickplayImagesTask"/> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
-    /// <param name="libraryManager">The library manager.</param>
+    /// <param name="itemQueries">The service for reading catalogue items.</param>
+    /// <param name="itemCounts">The service for counting catalogue items.</param>
+    /// <param name="libraryOptions">The effective library settings.</param>
     /// <param name="localization">The localization manager.</param>
     /// <param name="trickplayManager">The trickplay manager.</param>
     public TrickplayImagesTask(
         ILogger<TrickplayImagesTask> logger,
-        ILibraryManager libraryManager,
+        IItemQueryService itemQueries,
+        IItemCountService itemCounts,
+        ILibraryItemOptions libraryOptions,
         ILocalizationManager localization,
         ITrickplayManager trickplayManager)
     {
-        _libraryManager = libraryManager;
+        _itemQueries = itemQueries;
+        _itemCounts = itemCounts;
+        _libraryOptions = libraryOptions;
         _logger = logger;
         _localization = localization;
         _trickplayManager = trickplayManager;
@@ -83,7 +92,7 @@ public class TrickplayImagesTask : IScheduledTask
             Limit = QueryPageLimit
         };
 
-        var numberOfVideos = _libraryManager.GetCount(query);
+        var numberOfVideos = _itemCounts.GetCount(query);
 
         var startIndex = 0;
         var numComplete = 0;
@@ -91,7 +100,7 @@ public class TrickplayImagesTask : IScheduledTask
         while (startIndex < numberOfVideos)
         {
             query.StartIndex = startIndex;
-            var videos = _libraryManager.GetItemList(query).OfType<Video>();
+            var videos = _itemQueries.GetItemList(query).OfType<Video>();
 
             foreach (var video in videos)
             {
@@ -99,7 +108,7 @@ public class TrickplayImagesTask : IScheduledTask
 
                 try
                 {
-                    var libraryOptions = _libraryManager.GetLibraryOptions(video);
+                    var libraryOptions = _libraryOptions.GetLibraryOptions(video);
                     await _trickplayManager.RefreshTrickplayDataAsync(video, false, libraryOptions, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)

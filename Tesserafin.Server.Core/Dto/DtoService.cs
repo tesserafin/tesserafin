@@ -1307,7 +1307,7 @@ namespace Tesserafin.Server.Core.Dto
 
                 if (options.ContainsField(ItemFields.Trickplay))
                 {
-                    var trickplay = _trickplayManager.GetTrickplayManifest(item).GetAwaiter().GetResult();
+                    var trickplay = _trickplayManager.GetTrickplayManifest(video).GetAwaiter().GetResult();
                     dto.Trickplay = trickplay.ToDictionary(
                         mediaStream => mediaStream.Key,
                         mediaStream => mediaStream.Value.ToDictionary(
