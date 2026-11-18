@@ -167,13 +167,6 @@ namespace Tesserafin.Controller.Library
         CollectionType? GetConfiguredContentType(BaseItem item);
 
         /// <summary>
-        /// Normalizes the root path list.
-        /// </summary>
-        /// <param name="paths">The paths.</param>
-        /// <returns>IEnumerable{System.String}.</returns>
-        List<FileSystemMetadata> NormalizeRootPathList(IEnumerable<FileSystemMetadata> paths);
-
-        /// <summary>
         /// Registers the item.
         /// </summary>
         /// <param name="item">The item.</param>
