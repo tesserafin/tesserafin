@@ -7,7 +7,6 @@
     "Tesserafin.Server.Core/ApplicationHost.cs",
     "Tesserafin.Server.Core/Dto/DtoService.cs",
     "Tesserafin.Server.Core/Library/MediaSourceManager.cs",
-    "Tesserafin.Server.Implementations/Trickplay/TrickplayManager.cs",
     "src/Tesserafin.LiveTv/Recordings/RecordingsManager.cs"
   ],
   "entityStaticServices": [
