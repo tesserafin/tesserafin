@@ -16,11 +16,13 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Lyrics;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.IO;
+using Tesserafin.Model.Providers;
 using Tesserafin.Providers.Manager;
 using Xunit;
 
@@ -408,6 +410,52 @@ namespace Tesserafin.Providers.Tests.Manager
             Assert.Equal(expected ? 1 : 0, actualProviders.Length);
         }
 
+        [Fact]
+        public async Task RemoteSearch_UsesEachReferencedLibraryProviderSet_WhenTheProviderCacheIsWarm()
+        {
+            var root = new AggregateFolder { Id = Guid.NewGuid() };
+            var films = new Folder { Id = Guid.NewGuid(), ParentId = root.Id, Path = "/media/films" };
+            var animation = new Folder { Id = Guid.NewGuid(), ParentId = root.Id, Path = "/media/animation" };
+            var first = new Movie { Id = Guid.NewGuid(), ParentId = films.Id, Path = "/media/films/first.mkv" };
+            var second = new Movie { Id = Guid.NewGuid(), ParentId = animation.Id, Path = "/media/animation/second.mkv" };
+            var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
+            foreach (var item in new BaseItem[] { root, films, animation, first, second })
+            {
+                lookup.Setup(l => l.GetItemById(item.Id)).Returns(item);
+            }
+
+            var options = new Mock<ILibraryItemOptions>(MockBehavior.Strict);
+            options.Setup(o => o.GetLibraryOptions(first)).Returns(Options("Film metadata"));
+            options.Setup(o => o.GetLibraryOptions(second)).Returns(Options("Animation metadata"));
+            var flags = new Mock<IBaseItemManager>(MockBehavior.Strict);
+            flags.Setup(f => f.IsMetadataFetcherEnabled(It.IsAny<BaseItem>(), It.IsAny<TypeOptions>(), It.IsAny<string>())).Returns(true);
+            var filmProvider = Provider("Film metadata");
+            var animationProvider = Provider("Animation metadata");
+            using var manager = GetProviderManager(baseItemManager: flags.Object, itemLookup: lookup.Object, itemOptions: options.Object);
+            AddParts(manager, metadataProviders: [filmProvider, animationProvider]);
+
+            Assert.Equal("Film metadata", Assert.Single(await Search(first)).SearchProviderName);
+            Assert.Equal("Animation metadata", Assert.Single(await Search(second)).SearchProviderName);
+            Assert.Equal("Film metadata", Assert.Single(await Search(first)).SearchProviderName);
+
+            Task<IEnumerable<RemoteSearchResult>> Search(Movie movie)
+                => manager.GetRemoteSearchResults<Movie, MovieInfo>(
+                    new RemoteSearchQuery<MovieInfo> { ItemId = movie.Id, SearchInfo = new MovieInfo() },
+                    TestContext.Current.CancellationToken);
+
+            static LibraryOptions Options(string provider)
+                => new() { TypeOptions = [new TypeOptions { Type = nameof(Movie), MetadataFetchers = [provider] }] };
+
+            static IRemoteMetadataProvider<Movie, MovieInfo> Provider(string name)
+            {
+                var provider = new Mock<IRemoteMetadataProvider<Movie, MovieInfo>>(MockBehavior.Strict);
+                provider.SetupGet(p => p.Name).Returns(name);
+                provider.Setup(p => p.GetSearchResults(It.IsAny<MovieInfo>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(() => new[] { new RemoteSearchResult { Name = name } });
+                return provider.Object;
+            }
+        }
+
         private static Mock<IMetadataService> MockIMetadataService(bool refreshPrimary, bool canRefresh, int order = 0)
         {
             var service = new Mock<IMetadataService>(MockBehavior.Strict);
@@ -554,15 +602,21 @@ namespace Tesserafin.Providers.Tests.Manager
         private static ProviderManager GetProviderManager(
             ServerConfiguration? serverConfiguration = null,
             LibraryOptions? libraryOptions = null,
-            IBaseItemManager? baseItemManager = null)
+            IBaseItemManager? baseItemManager = null,
+            IItemLookupService? itemLookup = null,
+            ILibraryItemOptions? itemOptions = null)
         {
             var serverConfigurationManager = new Mock<IServerConfigurationManager>(MockBehavior.Strict);
             serverConfigurationManager.Setup(i => i.Configuration)
                 .Returns(serverConfiguration ?? new ServerConfiguration());
 
-            var libraryManager = new Mock<ILibraryManager>(MockBehavior.Strict);
-            libraryManager.Setup(i => i.GetLibraryOptions(It.IsAny<BaseItem>()))
-                .Returns(libraryOptions ?? new LibraryOptions());
+            if (itemOptions is null)
+            {
+                var options = new Mock<ILibraryItemOptions>(MockBehavior.Strict);
+                options.Setup(i => i.GetLibraryOptions(It.IsAny<BaseItem>()))
+                    .Returns(libraryOptions ?? new LibraryOptions());
+                itemOptions = options.Object;
+            }
 
             var providerManager = new ProviderManager(
                 Mock.Of<IItemWriteCommands>(),
@@ -576,8 +630,9 @@ namespace Tesserafin.Providers.Tests.Manager
                 _logger,
                 Mock.Of<IFileSystem>(),
                 Mock.Of<IServerApplicationPaths>(),
-                libraryManager.Object,
-                Mock.Of<IItemLookupService>(),
+                itemOptions,
+                Mock.Of<IItemRepository>(),
+                itemLookup ?? Mock.Of<IItemLookupService>(),
                 Mock.Of<ILibraryScanCoordinator>(),
                 baseItemManager!,
                 Mock.Of<ILyricManager>(),

@@ -1246,3 +1246,11 @@ lookup and the provider's active progress, averaging the available active
 physical folders. It obtains library membership and the user root through
 their dedicated services. Progress calculation and notification no longer
 belong to item entities.
+
+## 44. Provider catalogue reads
+
+`ProviderManager` now uses effective library options, catalogue identity and
+hierarchy lookup, and a library-wide album query directly. Remote metadata
+search selects providers using the referenced item's library policy and
+retains per-path provider ordering in the cache. The refresh queue resolves
+items through the same catalogue lookup.
