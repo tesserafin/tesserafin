@@ -25,7 +25,7 @@ public class AudioBookMetadataService : MetadataService<AudioBook, SongInfo>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
-    /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="itemOptions">Effective options for the item's library.</param>
     /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
@@ -36,11 +36,11 @@ public class AudioBookMetadataService : MetadataService<AudioBook, SongInfo>
         ILogger<AudioBookMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
-        ILibraryManager libraryManager,
+        ILibraryItemOptions itemOptions,
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository)
-        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository)
     {
     }
 

@@ -33,7 +33,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
-    /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="itemOptions">Effective options for the item's library.</param>
     /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
@@ -45,12 +45,12 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
         ILogger<SeasonMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
-        ILibraryManager libraryManager,
+        ILibraryItemOptions itemOptions,
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
         IItemSortService itemSortService)
-        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository)
     {
         _itemSortService = itemSortService;
     }
@@ -65,7 +65,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 
         if (item.IndexNumber == 0 && !item.IsLocked && !item.LockedFields.Contains(MetadataField.Name))
         {
-            var seasonZeroDisplayName = LibraryManager.GetLibraryOptions(item).SeasonZeroDisplayName;
+            var seasonZeroDisplayName = ItemOptions.GetLibraryOptions(item).SeasonZeroDisplayName;
 
             if (!string.Equals(item.Name, seasonZeroDisplayName, StringComparison.OrdinalIgnoreCase))
             {
