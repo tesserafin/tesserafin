@@ -187,7 +187,7 @@ public sealed class ShortcutLinkLifecycleTests
                 var folder = Assert.IsType<Folder>(Assert.Single(items));
                 StoredLinks = folder.LinkedChildren.Where(link => link.ItemId.HasValue).ToArray();
             });
-            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, Mock.Of<ILibraryItemOptions>(), Lookup.Object, Links.Object), Persistence.Object, this, Lookup.Object, Links.Object, Metadata.Object, Files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(Mock.Of<IServerConfigurationManager>(), Files.Object), Resolution.Object, Repository.Object, Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(Lookup.Object, Files.Object, NullLogger<FolderChildReconciler>.Instance), NullLogger<ItemWriteCommands>.Instance);
+            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, Mock.Of<ILibraryItemOptions>(), Lookup.Object, Links.Object), Persistence.Object, this, Lookup.Object, Links.Object, Metadata.Object, Files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(Mock.Of<IServerConfigurationManager>(), Files.Object), Resolution.Object, Repository.Object, Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(Lookup.Object, Files.Object, NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
         }
 
         public Folder Owner { get; } = new() { Id = Guid.NewGuid(), Path = "/shortcut-owner", Name = "owner" };

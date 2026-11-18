@@ -1529,7 +1529,7 @@ namespace Tesserafin.Controller.Entities
                 {
                     if (IsFileProtocol)
                     {
-                        requiresSave = await RefreshedOwnedItems(deletions, writes, providers, options, GetFileSystemChildren(options.DirectoryService), cancellationToken).ConfigureAwait(false);
+                        requiresSave = await RefreshOwnedItemsAsync(deletions, writes, options, cancellationToken).ConfigureAwait(false);
                     }
                 }
                 catch (OperationCanceledException)
@@ -1611,6 +1611,15 @@ namespace Tesserafin.Controller.Entities
         {
             ParentId = parent is null ? Guid.Empty : parent.Id;
         }
+
+        /// <summary>Discovers and refreshes relationships owned by this item.</summary>
+        /// <param name="deletions">Explicit deletion operations for this refresh.</param>
+        /// <param name="writes">Explicit catalogue write operations.</param>
+        /// <param name="options">The metadata refresh options.</param>
+        /// <param name="cancellationToken">Cancellation for discovery and writes.</param>
+        /// <returns>Whether the metadata provider should save after refreshing owned items.</returns>
+        protected virtual Task<bool> RefreshOwnedItemsAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
+            => RefreshedOwnedItems(deletions, writes, options, GetFileSystemChildren(options.DirectoryService), cancellationToken);
 
         /// <summary>
         /// Refreshes owned items such as trailers, theme videos, special features, etc.

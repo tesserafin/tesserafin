@@ -13,6 +13,13 @@ namespace Tesserafin.Controller.Library;
 /// <summary>Item graph writes, staged metadata and post-persistence publication.</summary>
 public interface IItemWriteCommands
 {
+    /// <summary>Refreshes and saves a library's physical locations, folder identities and inherited links.</summary>
+    /// <param name="owner">The library definition being refreshed.</param>
+    /// <param name="directoryService">The directory service used by the metadata refresh.</param>
+    /// <param name="cancellationToken">Cancellation for discovery and persistence.</param>
+    /// <returns>Whether a changed membership was saved.</returns>
+    Task<bool> RefreshCollectionFolderMembershipAsync(CollectionFolder owner, IDirectoryService directoryService, CancellationToken cancellationToken);
+
     /// <summary>Persists a completed shortcut-link snapshot before updating the caller's folder.</summary>
     /// <param name="owner">The shortcut-enabled folder.</param>
     /// <param name="fileSystemChildren">Completed discovery inputs.</param>

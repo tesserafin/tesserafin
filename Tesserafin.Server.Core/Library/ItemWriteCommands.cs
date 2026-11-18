@@ -32,12 +32,57 @@ internal sealed partial class ItemWriteCommands(
     IItemRepository repository,
     ILibraryItemOptions itemOptions,
     FolderChildReconciler childReconciler,
+    CollectionFolderMembershipResolver collectionMembership,
     ILogger<ItemWriteCommands> logger) : IItemWriteCommands
 {
     private readonly IItemResolutionService _resolution = resolution;
     private readonly IItemRepository _repository = repository;
 
     private readonly object _namedItemGate = new();
+
+    public async Task<bool> RefreshCollectionFolderMembershipAsync(CollectionFolder owner, IDirectoryService directoryService, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (owner.Id.Equals(Guid.Empty))
+        {
+            throw new ArgumentException("Library must have a catalogue identity.", nameof(owner));
+        }
+
+        var (locations, physicalFolders) = collectionMembership.Resolve(owner, directoryService, cancellationToken);
+        var ids = physicalFolders.Select(folder => folder.Id).ToArray();
+        var links = physicalFolders.SelectMany(folder => folder.LinkedChildren).Select(CopyFolderLink).ToArray();
+        var saved = lookup.GetItemById(owner.Id) as CollectionFolder ?? owner;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (MatchesMembership(saved))
+        {
+            if (!MatchesMembership(owner))
+            {
+                PublishMembership(owner);
+            }
+
+            return false;
+        }
+
+        var staged = (CollectionFolder)saved.CopyForWrite();
+        PublishMembership(staged);
+        await UpdateItemAsync(staged, saved.GetParent(lookup), ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+        PublishMembership(owner);
+        owner.DateLastSaved = staged.DateLastSaved;
+        return true;
+
+        bool MatchesMembership(CollectionFolder folder)
+            => locations.SequenceEqual(folder.PhysicalLocations)
+                && ids.SequenceEqual(folder.PhysicalFolderIds)
+                && links.Length == folder.LinkedChildren.Length
+                && links.Zip(folder.LinkedChildren, SameFolderLink).All(equal => equal);
+
+        void PublishMembership(CollectionFolder folder)
+        {
+            folder.PhysicalLocationsList = locations;
+            folder.PhysicalFolderIds = ids;
+            folder.LinkedChildren = links;
+        }
+    }
 
     public async Task<bool> RefreshShortcutLinksAsync(Folder owner, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
     {

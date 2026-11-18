@@ -27,7 +27,6 @@ namespace Tesserafin.Controller.Entities
     /// </summary>
     public class CollectionFolder : Folder, ICollectionFolder
     {
-        private bool _requiresRefresh;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CollectionFolder"/> class.
@@ -79,7 +78,7 @@ namespace Tesserafin.Controller.Entities
             set
             {
                 // The getter delegates to physical folders, so invalidate their caches.
-                foreach (var folder in GetPhysicalFolders(true))
+                foreach (var folder in GetPhysicalFolders())
                 {
                     folder.Children = null;
                 }
@@ -110,53 +109,12 @@ namespace Tesserafin.Controller.Entities
             return true;
         }
 
-        protected override FileSystemMetadata[] GetFileSystemChildren(IDirectoryService directoryService)
-        {
-            return ReadLibraryDirectory(directoryService, true).Entries
-                ?? throw new DirectoryNotFoundException($"Cannot read library directory {ContainingFolderPath}.");
-        }
-
-        public override bool RequiresRefresh()
-        {
-            var changed = base.RequiresRefresh() || _requiresRefresh;
-
-            if (!changed)
-            {
-                var locations = PhysicalLocations;
-
-                var newLocations = ReadLibraryDirectory(new DirectoryService(FileSystem), false).PhysicalLocations;
-
-                if (!locations.SequenceEqual(newLocations))
-                {
-                    changed = true;
-                }
-            }
-
-            if (!changed)
-            {
-                var folderIds = PhysicalFolderIds;
-
-                var newFolderIds = GetPhysicalFolders(false).Select(i => i.Id).ToList();
-
-                if (!folderIds.SequenceEqual(newFolderIds))
-                {
-                    changed = true;
-                }
-            }
-
-            return changed;
-        }
-
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
-        {
-            var changed = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService) || _requiresRefresh;
-            _requiresRefresh = false;
-            return changed;
-        }
+        protected override Task<bool> RefreshOwnedItemsAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
+            => writes.RefreshCollectionFolderMembershipAsync(this, options.DirectoryService, cancellationToken);
 
         public override double? GetRefreshProgress(IProviderManager providerManager)
         {
-            var folders = GetPhysicalFolders(true).ToList();
+            var folders = GetPhysicalFolders().ToList();
             double totalProgresses = 0;
             var foldersWithProgress = 0;
 
@@ -176,53 +134,6 @@ namespace Tesserafin.Controller.Entities
             }
 
             return totalProgresses / foldersWithProgress;
-        }
-
-        protected override Task<bool> RefreshLinkedChildrenAsync(IItemWriteCommands writes, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(RefreshLinkedChildrenInternal(true));
-        }
-
-        private bool RefreshLinkedChildrenInternal(bool setFolders)
-        {
-            var physicalFolders = GetPhysicalFolders(false)
-                .ToList();
-
-            var linkedChildren = physicalFolders
-                .SelectMany(c => c.LinkedChildren)
-                .ToList();
-
-            var changed = !linkedChildren.SequenceEqual(LinkedChildren, new LinkedChildComparer(FileSystem));
-
-            LinkedChildren = linkedChildren.ToArray();
-
-            var folderIds = PhysicalFolderIds;
-            var newFolderIds = physicalFolders.Select(i => i.Id).ToArray();
-
-            if (!folderIds.SequenceEqual(newFolderIds))
-            {
-                changed = true;
-                if (setFolders)
-                {
-                    PhysicalFolderIds = newFolderIds;
-                }
-            }
-
-            return changed;
-        }
-
-        private (FileSystemMetadata[] Entries, string[] PhysicalLocations) ReadLibraryDirectory(IDirectoryService directoryService, bool setPhysicalLocations)
-        {
-            var directory = FileSystem.GetDirectoryInfo(ContainingFolderPath);
-            var discovery = FileData.ReadLibraryDirectory(directory, directoryService, FileSystem, ConfigurationManager.ApplicationPaths, Logger, physicalRoot: false);
-            _requiresRefresh = _requiresRefresh || !discovery.PhysicalLocations.SequenceEqual(PhysicalLocations);
-            if (setPhysicalLocations)
-            {
-                PhysicalLocationsList = discovery.PhysicalLocations;
-            }
-
-            return discovery;
         }
 
         /// <summary>
@@ -245,46 +156,10 @@ namespace Tesserafin.Controller.Entities
 
         public IEnumerable<BaseItem> GetActualChildren()
         {
-            return GetPhysicalFolders(true).SelectMany(c => c.Children);
+            return GetPhysicalFolders().SelectMany(c => c.Children);
         }
 
         public IEnumerable<Folder> GetPhysicalFolders()
-        {
-            return GetPhysicalFolders(true);
-        }
-
-        private IEnumerable<Folder> GetPhysicalFolders(bool enableCache)
-        {
-            if (enableCache)
-            {
-                return PhysicalFolderIds.Select(i => LibraryManager.GetItemById(i)).OfType<Folder>();
-            }
-
-            var rootChildren = LibraryManager.RootFolder.Children
-                .OfType<Folder>()
-                .ToList();
-
-            return PhysicalLocations
-                    .Where(i => !FileSystem.AreEqual(i, Path))
-                    .SelectMany(i => GetPhysicalParents(i, rootChildren))
-                    .DistinctBy(x => x.Id);
-        }
-
-        private IEnumerable<Folder> GetPhysicalParents(string path, List<Folder> rootChildren)
-        {
-            var result = rootChildren
-                .Where(i => FileSystem.AreEqual(i.Path, path))
-                .ToList();
-
-            if (result.Count == 0)
-            {
-                if (LibraryManager.FindByPath(path, true) is Folder folder)
-                {
-                    result.Add(folder);
-                }
-            }
-
-            return result;
-        }
+            => PhysicalFolderIds.Select(id => LibraryManager.GetItemById(id)).OfType<Folder>();
     }
 }
