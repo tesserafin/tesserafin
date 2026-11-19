@@ -612,14 +612,12 @@ public class LibraryManagerItemLookupTests
         var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(context, roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
         await traversal.RefreshTopFoldersAsync(cancellationToken, false);
 
-        providerManager.Verify(manager => manager.RefreshSingleItem(
-            It.Is<BaseItem>(item => item is AggregateFolder),
-            It.IsAny<MetadataRefreshOptions>(),
-            cancellationToken), Times.Once);
-        providerManager.Verify(manager => manager.RefreshSingleItem(
-            It.Is<BaseItem>(item => item is UserRootFolder),
-            It.IsAny<MetadataRefreshOptions>(),
-            cancellationToken), Times.Once);
+        providerManager.Verify(
+            manager => manager.RefreshSingleItem(It.Is<BaseItem>(item => item is AggregateFolder), It.IsAny<MetadataRefreshOptions>(), cancellationToken),
+            Times.Once);
+        providerManager.Verify(
+            manager => manager.RefreshSingleItem(It.Is<BaseItem>(item => item is UserRootFolder), It.IsAny<MetadataRefreshOptions>(), cancellationToken),
+            Times.Once);
 
         // Deleted from the database...
         _persistenceServiceMock.Verify(
