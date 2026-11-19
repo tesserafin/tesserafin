@@ -1719,3 +1719,36 @@ albums, extras and owned video parts or versions use the same dispatch.
 The scan context resolves it when metadata work begins so the provider
 manager can initiate a scan without a construction cycle. Top-folder
 refreshes build their directory service from the traversal's filesystem.
+
+## 68. Explicit metadata dispatch at refresh entry points
+
+Metadata refreshes for playback probing, sidecars, people and named items,
+playlists, and Live TV pass the registered dispatcher into the item refresh
+method. Callers create default directory services from their injected
+filesystem. Services also used by the provider manager resolve the dispatcher
+when refresh work starts. The static provider property and implicit item
+refresh overloads are removed.
+
+## 69. Embedded episode metadata probing
+
+The episode metadata service reads embedded MP4 tags through its injected
+media encoder and media source services. For eligible episodes it reads the
+tags before the filename fallback and before provider lookup. Cancellation
+of the refresh stops the probe and filename fallback. The episode encoder
+and base item media segment statics are removed.
+
+## 70. Chapter thumbnail lookup
+
+The image controller resolves chapter thumbnails through the chapter
+repository. Serving an image, deleting its file, and swapping thumbnail
+files use the same lookup and the controller's filesystem. The base item
+image collection continues to own the images stored directly on the item.
+The static chapter manager is removed from the entity and from startup.
+
+## 71. Catalogue traversal for container metadata
+
+Series and album metadata refresh use the scan context to read direct
+catalogue children and resolve saved links. The shared traversal keeps
+physical traversal order, loads links only from the starting folder and
+deduplicates by item ID. Metadata refresh keeps its existing season and
+episode order and existing album rules.

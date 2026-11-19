@@ -166,7 +166,7 @@ namespace Tesserafin.Controller.Entities.Audio
 
         public async Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IProviderManager providers, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
-            var items = GetRecursiveChildren();
+            var items = GetRecursiveCatalogueChildren(context);
 
             var totalItems = items.Count;
             var numComplete = 0;
