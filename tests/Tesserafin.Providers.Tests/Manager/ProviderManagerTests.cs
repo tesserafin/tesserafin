@@ -619,14 +619,25 @@ namespace Tesserafin.Providers.Tests.Manager
                 itemOptions = options.Object;
             }
 
-            var providerManager = new ProviderManager(
-                Mock.Of<IItemWriteCommands>(),
-                Mock.Of<IItemMetadataExporter>(),
-                Mock.Of<IItemImageService>(),
+            var writes = Mock.Of<IItemWriteCommands>();
+            var images = Mock.Of<IItemImageService>();
+            var deletions = Mock.Of<IItemDeletionCommands>();
+            itemLookup ??= Mock.Of<IItemLookupService>();
+            var scanContext = new LibraryScanContext(
+                deletions,
+                writes,
+                images,
                 Mock.Of<IItemResolutionService>(),
                 Mock.Of<ILibraryRefreshProgress>(),
                 Mock.Of<ILimitedConcurrencyLibraryScheduler>(),
-                Mock.Of<IItemDeletionCommands>(),
+                itemLookup);
+
+            var providerManager = new ProviderManager(
+                writes,
+                Mock.Of<IItemMetadataExporter>(),
+                images,
+                scanContext,
+                deletions,
                 Mock.Of<ISubtitleManager>(),
                 serverConfigurationManager.Object,
                 Mock.Of<ILibraryMonitor>(),
@@ -635,7 +646,7 @@ namespace Tesserafin.Providers.Tests.Manager
                 Mock.Of<IServerApplicationPaths>(),
                 itemOptions,
                 Mock.Of<IItemRepository>(),
-                itemLookup ?? Mock.Of<IItemLookupService>(),
+                itemLookup,
                 Mock.Of<ILibraryScanCoordinator>(),
                 baseItemManager!,
                 Mock.Of<ILyricManager>(),

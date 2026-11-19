@@ -609,6 +609,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IVisibleContentProbe, VisibleContentProbe>();
             serviceCollection.AddSingleton<IUserViewCatalog, UserViewCatalog>();
             serviceCollection.AddSingleton<ILibraryRootFolderProvider, LibraryRootFolderProvider>();
+            serviceCollection.AddSingleton<LibraryScanContext>();
             serviceCollection.AddSingleton<ILibraryScanTraversal, LibraryScanTraversal>();
             serviceCollection.AddSingleton<ILibraryRefreshProgress, LibraryRefreshProgress>();
             serviceCollection.AddSingleton<ILibraryStructureCommands, LibraryStructureCommands>();

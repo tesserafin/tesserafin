@@ -20,7 +20,6 @@ using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
@@ -285,41 +284,26 @@ namespace Tesserafin.Controller.Entities
             return GetCachedChildren();
         }
 
-        public Task ValidateChildren(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, ILibraryRefreshProgress refreshProgress, ILimitedConcurrencyLibraryScheduler scheduler, IProgress<double> progress, CancellationToken cancellationToken)
-        {
-            return ValidateChildren(deletions, writes, images, resolution, refreshProgress, scheduler, progress, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken: cancellationToken);
-        }
-
         /// <summary>
         /// Validates that the children of the folder still exist.
         /// </summary>
-        /// <param name="deletions">Explicit deletion operations for this refresh.</param>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="images">Explicit image preparation and commit lifecycle.</param>
-        /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
-        /// <param name="refreshProgress">Progress of active recursive scans.</param>
-        /// <param name="scheduler">The shared library scan scheduler.</param>
+        /// <param name="context">The services used throughout the scan.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="metadataRefreshOptions">The metadata refresh options.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
         /// <param name="allowRemoveRoot">remove item even this folder is root.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        public Task ValidateChildren(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, ILibraryRefreshProgress refreshProgress, ILimitedConcurrencyLibraryScheduler scheduler, IProgress<double> progress, MetadataRefreshOptions metadataRefreshOptions, bool recursive = true, bool allowRemoveRoot = false, CancellationToken cancellationToken = default)
+        public Task ValidateChildren(LibraryScanContext context, IProgress<double> progress, MetadataRefreshOptions metadataRefreshOptions, bool recursive = true, bool allowRemoveRoot = false, CancellationToken cancellationToken = default)
         {
             Children = null; // invalidate cached children.
-            return ValidateChildrenInternal(deletions, writes, images, resolution, refreshProgress, scheduler, progress, recursive, true, allowRemoveRoot, metadataRefreshOptions, metadataRefreshOptions.DirectoryService, cancellationToken);
+            return ValidateChildrenInternal(context, progress, recursive, true, allowRemoveRoot, metadataRefreshOptions, metadataRefreshOptions.DirectoryService, cancellationToken);
         }
 
         /// <summary>
         /// Validates the children internal.
         /// </summary>
-        /// <param name="deletions">Explicit deletion operations for this refresh.</param>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="images">Explicit image preparation and commit lifecycle.</param>
-        /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
-        /// <param name="refreshProgress">Progress of active recursive scans.</param>
-        /// <param name="scheduler">The shared library scan scheduler.</param>
+        /// <param name="context">The services used throughout the scan.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
         /// <param name="refreshChildMetadata">if set to <c>true</c> [refresh child metadata].</param>
@@ -328,32 +312,36 @@ namespace Tesserafin.Controller.Entities
         /// <param name="directoryService">The directory service.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        protected virtual async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, ILibraryRefreshProgress refreshProgress, ILimitedConcurrencyLibraryScheduler scheduler, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected virtual async Task ValidateChildrenInternal(LibraryScanContext context, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             if (recursive)
             {
-                refreshProgress.OnRefreshStart(this);
+                context.RefreshProgress.OnRefreshStart(this);
             }
 
             try
             {
-                if (GetParents().Any(f => f.Id.Equals(Id)))
+                var ancestorIds = new HashSet<Guid> { Id };
+                foreach (var parent in GetParents(context.Lookup))
                 {
-                    throw new InvalidOperationException("Recursive datastructure detected abort processing this item.");
+                    if (!ancestorIds.Add(parent.Id))
+                    {
+                        throw new InvalidOperationException("Recursive datastructure detected abort processing this item.");
+                    }
                 }
 
-                await ValidateChildrenInternal2(deletions, writes, images, resolution, refreshProgress, scheduler, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
+                await ReconcileAndRefreshChildren(context, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
                 if (recursive)
                 {
-                    refreshProgress.OnRefreshComplete(this);
+                    context.RefreshProgress.OnRefreshComplete(this);
                 }
             }
         }
 
-        private async Task ValidateChildrenInternal2(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, ILibraryRefreshProgress refreshProgress, ILimitedConcurrencyLibraryScheduler scheduler, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        private async Task ReconcileAndRefreshChildren(LibraryScanContext context, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -367,7 +355,7 @@ namespace Tesserafin.Controller.Entities
 
                 try
                 {
-                    nonCachedChildren = GetNonCachedChildren(resolution, directoryService, cancellationToken).ToArray();
+                    nonCachedChildren = GetNonCachedChildren(context.Resolution, directoryService, cancellationToken).ToArray();
                     cancellationToken.ThrowIfCancellationRequested();
                 }
                 catch (IOException ex)
@@ -394,11 +382,11 @@ namespace Tesserafin.Controller.Entities
 
                 if (recursive)
                 {
-                    refreshProgress.OnRefreshProgress(this, ProgressHelpers.RetrievedChildren);
+                    context.RefreshProgress.OnRefreshProgress(this, ProgressHelpers.RetrievedChildren);
                 }
 
                 Children = null;
-                var reconciliation = await writes.ReconcileFolderChildrenAsync(this, Children.ToArray(), nonCachedChildren, directoryService, allowRemoveRoot, deletions, images, cancellationToken).ConfigureAwait(false);
+                var reconciliation = await context.Writes.ReconcileFolderChildrenAsync(this, Children.ToArray(), nonCachedChildren, directoryService, allowRemoveRoot, context.Deletions, context.Images, cancellationToken).ConfigureAwait(false);
                 if (reconciliation.Skipped)
                 {
                     return;
@@ -416,7 +404,7 @@ namespace Tesserafin.Controller.Entities
 
             if (recursive)
             {
-                refreshProgress.OnRefreshProgress(this, ProgressHelpers.UpdatedChildItems);
+                context.RefreshProgress.OnRefreshProgress(this, ProgressHelpers.UpdatedChildItems);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -430,7 +418,7 @@ namespace Tesserafin.Controller.Entities
 
                     progress.Report(percent);
 
-                    refreshProgress.OnRefreshProgress(folder, percent);
+                    context.RefreshProgress.OnRefreshProgress(folder, percent);
                 });
 
                 if (validChildrenNeedGeneration)
@@ -439,7 +427,7 @@ namespace Tesserafin.Controller.Entities
                     validChildrenNeedGeneration = false;
                 }
 
-                await ValidateSubFolders(deletions, writes, images, resolution, refreshProgress, scheduler, accessibleChildren.OfType<Folder>().ToList(), directoryService, innerProgress, cancellationToken).ConfigureAwait(false);
+                await ValidateSubFolders(context, accessibleChildren.OfType<Folder>().ToList(), directoryService, innerProgress, cancellationToken).ConfigureAwait(false);
             }
 
             if (refreshChildMetadata)
@@ -448,7 +436,7 @@ namespace Tesserafin.Controller.Entities
 
                 if (recursive)
                 {
-                    refreshProgress.OnRefreshProgress(this, ProgressHelpers.ScannedSubfolders);
+                    context.RefreshProgress.OnRefreshProgress(this, ProgressHelpers.ScannedSubfolders);
                 }
 
                 var container = this as IMetadataContainer;
@@ -462,13 +450,13 @@ namespace Tesserafin.Controller.Entities
 
                     if (recursive)
                     {
-                        refreshProgress.OnRefreshProgress(folder, percent);
+                        context.RefreshProgress.OnRefreshProgress(folder, percent);
                     }
                 });
 
                 if (container is not null)
                 {
-                    await RefreshAllMetadataForContainer(deletions, writes, images, container, refreshOptions, innerProgress, cancellationToken).ConfigureAwait(false);
+                    await RefreshAllMetadataForContainer(context, container, refreshOptions, innerProgress, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
@@ -478,47 +466,47 @@ namespace Tesserafin.Controller.Entities
                         validChildren = Children.ToList();
                     }
 
-                    await RefreshMetadataRecursive(deletions, writes, images, scheduler, accessibleChildren, refreshOptions, recursive, innerProgress, cancellationToken).ConfigureAwait(false);
+                    await RefreshMetadataRecursive(context, accessibleChildren, refreshOptions, recursive, innerProgress, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
 
-        private async Task RefreshMetadataRecursive(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, ILimitedConcurrencyLibraryScheduler scheduler, IList<BaseItem> children, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task RefreshMetadataRecursive(LibraryScanContext context, IList<BaseItem> children, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
         {
-            await scheduler.Enqueue(
+            await context.Scheduler.Enqueue(
                 children.ToArray(),
-                (baseItem, innerProgress) => RefreshChildMetadata(deletions, writes, images, scheduler, baseItem, refreshOptions, recursive && baseItem.IsFolder, innerProgress, cancellationToken),
+                (baseItem, innerProgress) => RefreshChildMetadata(context, baseItem, refreshOptions, recursive && baseItem.IsFolder, innerProgress, cancellationToken),
                 progress,
                 cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task RefreshAllMetadataForContainer(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IMetadataContainer container, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task RefreshAllMetadataForContainer(LibraryScanContext context, IMetadataContainer container, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
             if (container is Series series)
             {
-                await series.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                await series.RefreshMetadata(context.Deletions, context.Writes, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
 
-            await container.RefreshAllMetadata(deletions, writes, images, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
+            await container.RefreshAllMetadata(context.Deletions, context.Writes, context.Images, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task RefreshChildMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, ILimitedConcurrencyLibraryScheduler scheduler, BaseItem child, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task RefreshChildMetadata(LibraryScanContext context, BaseItem child, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
         {
             if (child is IMetadataContainer container)
             {
-                await RefreshAllMetadataForContainer(deletions, writes, images, container, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
+                await RefreshAllMetadataForContainer(context, container, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
             }
             else
             {
                 if (refreshOptions.RefreshItem(child))
                 {
-                    await child.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                    await child.RefreshMetadata(context.Deletions, context.Writes, refreshOptions, cancellationToken).ConfigureAwait(false);
                 }
 
                 if (recursive && child is Folder folder)
                 {
                     folder.Children = null; // invalidate cached children.
-                    await folder.RefreshMetadataRecursive(deletions, writes, images, scheduler, folder.Children.Except([this, child]).ToList(), refreshOptions, true, progress, cancellationToken).ConfigureAwait(false);
+                    await folder.RefreshMetadataRecursive(context, folder.Children.Except([this, child]).ToList(), refreshOptions, true, progress, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -526,22 +514,17 @@ namespace Tesserafin.Controller.Entities
         /// <summary>
         /// Refreshes the children.
         /// </summary>
-        /// <param name="deletions">Explicit deletion operations for this refresh.</param>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="images">Explicit image preparation and commit lifecycle.</param>
-        /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
-        /// <param name="refreshProgress">Progress of active recursive scans.</param>
-        /// <param name="scheduler">The shared library scan scheduler.</param>
+        /// <param name="context">The services used throughout the scan.</param>
         /// <param name="children">The children.</param>
         /// <param name="directoryService">The directory service.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        private async Task ValidateSubFolders(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, ILibraryRefreshProgress refreshProgress, ILimitedConcurrencyLibraryScheduler scheduler, IList<Folder> children, IDirectoryService directoryService, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task ValidateSubFolders(LibraryScanContext context, IList<Folder> children, IDirectoryService directoryService, IProgress<double> progress, CancellationToken cancellationToken)
         {
-            await scheduler.Enqueue(
+            await context.Scheduler.Enqueue(
                 children.ToArray(),
-                (folder, innerProgress) => folder.ValidateChildrenInternal(deletions, writes, images, resolution, refreshProgress, scheduler, innerProgress, true, false, false, null, directoryService, cancellationToken),
+                (folder, innerProgress) => folder.ValidateChildrenInternal(context, innerProgress, true, false, false, null, directoryService, cancellationToken),
                 progress,
                 cancellationToken).ConfigureAwait(false);
         }

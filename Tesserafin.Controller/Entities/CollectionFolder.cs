@@ -13,7 +13,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
@@ -201,12 +200,7 @@ namespace Tesserafin.Controller.Entities
         /// Compare our current children (presumably just read from the repo) with the current state of the file system and adjust for any changes
         /// ***Currently does not contain logic to maintain items that are unavailable in the file system***.
         /// </summary>
-        /// <param name="deletions">Explicit deletion operations for this refresh.</param>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="images">Explicit image preparation and commit lifecycle.</param>
-        /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
-        /// <param name="refreshProgress">Progress of active recursive scans.</param>
-        /// <param name="scheduler">The shared library scan scheduler.</param>
+        /// <param name="context">The services used throughout the scan.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
         /// <param name="refreshChildMetadata">if set to <c>true</c> [refresh child metadata].</param>
@@ -215,7 +209,7 @@ namespace Tesserafin.Controller.Entities
         /// <param name="directoryService">The directory service.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, ILibraryRefreshProgress refreshProgress, ILimitedConcurrencyLibraryScheduler scheduler, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override Task ValidateChildrenInternal(LibraryScanContext context, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }

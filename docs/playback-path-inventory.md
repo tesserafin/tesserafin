@@ -1356,3 +1356,12 @@ Full scans and provider-initiated refreshes pass the shared
 `ILimitedConcurrencyLibraryScheduler` through folder validation. Both
 subfolder scans and child metadata work use the same scheduler, including
 nested work. The folder entity no longer holds a static scheduler.
+
+## 57. Shared services for folder validation
+
+Full scans and provider refreshes pass the same `LibraryScanContext` through
+validation, subfolder scans and child metadata refresh. The context holds
+the catalogue and scheduling services. Each call supplies its own refresh
+options and progress. Validation reads the parent chain through the
+catalogue lookup and rejects cycles anywhere in that chain. A rejected
+recursive scan still clears its active progress entry.

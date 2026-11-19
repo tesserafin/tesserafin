@@ -594,7 +594,8 @@ public class LibraryManagerItemLookupTests
             .Returns(new StubUserRootFolder { StubChildren = [missing] });
 
         var roots = Mock.Of<ILibraryRootFolderProvider>(p => p.GetRootFolder() == new StubAggregateFolder());
-        var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(_writes, Mock.Of<IItemImageService>(), Mock.Of<IItemResolutionService>(), Mock.Of<ILibraryRefreshProgress>(), Mock.Of<ILimitedConcurrencyLibraryScheduler>(), _deletions, roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
+        var context = new LibraryScanContext(_deletions, _writes, Mock.Of<IItemImageService>(), Mock.Of<IItemResolutionService>(), Mock.Of<ILibraryRefreshProgress>(), Mock.Of<ILimitedConcurrencyLibraryScheduler>(), _itemLookupService);
+        var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(context, roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
         await traversal.RefreshTopFoldersAsync(TestContext.Current.CancellationToken, false);
 
         // Deleted from the database...
@@ -615,7 +616,7 @@ public class LibraryManagerItemLookupTests
             set { }
         }
 
-        protected override System.Threading.Tasks.Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, ILibraryRefreshProgress refreshProgress, ILimitedConcurrencyLibraryScheduler scheduler, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override System.Threading.Tasks.Task ValidateChildrenInternal(LibraryScanContext context, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
             => System.Threading.Tasks.Task.CompletedTask;
     }
 
@@ -629,7 +630,7 @@ public class LibraryManagerItemLookupTests
             set { }
         }
 
-        protected override System.Threading.Tasks.Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, ILibraryRefreshProgress refreshProgress, ILimitedConcurrencyLibraryScheduler scheduler, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override System.Threading.Tasks.Task ValidateChildrenInternal(LibraryScanContext context, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
             => System.Threading.Tasks.Task.CompletedTask;
     }
 }
