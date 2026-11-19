@@ -28,6 +28,7 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
     private readonly IItemLookupService _lookup;
     private readonly LinkedChildResolver _links;
     private readonly ILinkedChildrenService _artists;
+    private readonly ICollectionFolderResolver _collections;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AlbumMetadataService"/> class.
@@ -46,6 +47,7 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
     /// <param name="lookup">The item identity lookup.</param>
     /// <param name="links">The saved link resolver.</param>
     /// <param name="artists">The catalogue service for finding artists by name.</param>
+    /// <param name="collections">The library membership resolver.</param>
     public AlbumMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -60,12 +62,14 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
         ILocalizationManager localizationManager,
         IItemLookupService lookup,
         LinkedChildResolver links,
-        ILinkedChildrenService artists)
+        ILinkedChildrenService artists,
+        ICollectionFolderResolver collections)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
         _lookup = lookup;
         _links = links;
         _artists = artists;
+        _collections = collections;
     }
 
     /// <inheritdoc />
@@ -79,7 +83,14 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
 
     /// <inheritdoc />
     protected override AlbumInfo GetLookupInfo(MusicAlbum item, LibraryOptions libraryOptions)
-        => item.GetLookupInfo(ItemRepository, _lookup, _links, _artists);
+    {
+        var configuration = ServerConfigurationManager.Configuration;
+        var locale = item.GetMetadataLocale(_lookup, _collections, libraryOptions, configuration);
+        SongInfo ReadTrack(Audio track)
+            => track.GetLookupInfo(track.GetMetadataLocale(_lookup, _collections, ItemOptions, configuration));
+
+        return item.GetLookupInfo(ItemRepository, _lookup, _links, _artists, locale, ReadTrack);
+    }
 
     /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(MusicAlbum item)

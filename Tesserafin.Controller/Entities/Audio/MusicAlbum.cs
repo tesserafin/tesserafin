@@ -120,12 +120,19 @@ namespace Tesserafin.Controller.Entities.Audio
         }
 
         public AlbumInfo GetLookupInfo()
-            => BuildLookupInfo(GetMusicArtist(), Tracks);
+            => BuildLookupInfo(GetMusicArtist(), Tracks.Select(track => track.GetLookupInfo()), null);
 
-        public AlbumInfo GetLookupInfo(IItemRepository repository, IItemLookupService lookup, LinkedChildResolver links, ILinkedChildrenService artists)
+        public AlbumInfo GetLookupInfo(
+            IItemRepository repository,
+            IItemLookupService lookup,
+            LinkedChildResolver links,
+            ILinkedChildrenService artists,
+            (string Language, string CountryCode) locale,
+            Func<Audio, SongInfo> getTrackLookupInfo)
             => BuildLookupInfo(
                 FindMusicArtist(GetParents(lookup), name => artists.FindArtists([name])),
-                GetCatalogueTracks(repository, lookup, links).Cast<Audio>());
+                GetCatalogueTracks(repository, lookup, links).Cast<Audio>().Select(getTrackLookupInfo),
+                locale);
 
         public async Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IProviderManager providers, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
@@ -188,9 +195,9 @@ namespace Tesserafin.Controller.Entities.Audio
             return null;
         }
 
-        private AlbumInfo BuildLookupInfo(MusicArtist artist, IEnumerable<Audio> tracks)
+        private AlbumInfo BuildLookupInfo(MusicArtist artist, IEnumerable<SongInfo> tracks, (string Language, string CountryCode)? locale)
         {
-            var id = GetItemLookupInfo<AlbumInfo>();
+            var id = GetItemLookupInfo<AlbumInfo>(locale);
 
             id.AlbumArtists = AlbumArtists;
 
@@ -199,9 +206,7 @@ namespace Tesserafin.Controller.Entities.Audio
                 id.ArtistProviderIds = artist.ProviderIds;
             }
 
-            id.SongInfos = tracks
-                .Select(i => i.GetLookupInfo())
-                .ToList();
+            id.SongInfos = tracks.ToList();
 
             var album = id.SongInfos
                 .Select(i => i.Album)

@@ -1777,22 +1777,44 @@ namespace Tesserafin.Controller.Entities
             ICollectionFolderResolver collections,
             LibraryOptions options,
             ServerConfiguration configuration)
+            => ResolveMetadataLocale(lookup, collections, () => options, configuration);
+
+        /// <summary>Resolves inherited preferences, reading effective library options only if needed.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <param name="collections">The library membership resolver.</param>
+        /// <param name="itemOptions">The effective library options service.</param>
+        /// <param name="configuration">The server-wide metadata defaults.</param>
+        /// <returns>The preferred metadata language and country code.</returns>
+        public (string Language, string CountryCode) GetMetadataLocale(
+            IItemLookupService lookup,
+            ICollectionFolderResolver collections,
+            ILibraryItemOptions itemOptions,
+            ServerConfiguration configuration)
+            => ResolveMetadataLocale(lookup, collections, () => itemOptions.GetLibraryOptions(this), configuration);
+
+        private (string Language, string CountryCode) ResolveMetadataLocale(
+            IItemLookupService lookup,
+            ICollectionFolderResolver collections,
+            Func<LibraryOptions> getOptions,
+            ServerConfiguration configuration)
         {
             List<Folder> libraries = null;
+            LibraryOptions options = null;
             IEnumerable<BaseItem> ReadParents() => GetParents(lookup);
             IEnumerable<Folder> ReadLibraries() => libraries ??= collections.GetCollectionFolders(this);
+            LibraryOptions ReadOptions() => options ??= getOptions();
 
             var language = GetPreferredMetadataLanguage(
                 ReadParents,
                 ReadLibraries,
-                () => options.PreferredMetadataLanguage,
+                () => ReadOptions().PreferredMetadataLanguage,
                 () => configuration.PreferredMetadataLanguage);
             var country = ResolveMetadataPreference(
                 PreferredMetadataCountryCode,
                 ReadParents,
                 ReadLibraries,
                 static item => item.PreferredMetadataCountryCode,
-                () => options.MetadataCountryCode,
+                () => ReadOptions()?.MetadataCountryCode,
                 () => configuration.MetadataCountryCode);
             return (language, country);
         }

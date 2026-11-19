@@ -40,10 +40,22 @@ public sealed class AlbumMetadataServiceTests
             ParentId = hasParentArtist ? parent.Id : Guid.Empty,
             Name = "Album folder",
             AlbumArtists = ["Artist from tags"],
-            PreferredMetadataLanguage = "en",
-            PreferredMetadataCountryCode = "US",
+            PreferredMetadataLanguage = "fr",
+            PreferredMetadataCountryCode = "BE",
             LinkedChildren = [new LinkedChild { ItemId = second.Id }, new LinkedChild { ItemId = linked.Id }]
         };
+
+        first.ParentId = album.Id;
+        first.PreferredMetadataLanguage = null;
+        first.PreferredMetadataCountryCode = null;
+        linked.PreferredMetadataLanguage = null;
+        linked.PreferredMetadataCountryCode = null;
+        var linkedLibrary = new CollectionFolder { PreferredMetadataLanguage = "ja" };
+        var collections = new Mock<ICollectionFolderResolver>(MockBehavior.Strict);
+        collections.Setup(c => c.GetCollectionFolders(linked)).Returns([linkedLibrary]);
+        var linkedOptions = new LibraryOptions { MetadataCountryCode = "JP" };
+        var itemOptions = new Mock<ILibraryItemOptions>(MockBehavior.Strict);
+        itemOptions.Setup(o => o.GetLibraryOptions(linked)).Returns(linkedOptions);
 
         var repository = new Mock<IItemRepository>(MockBehavior.Strict);
         repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.ParentId.Equals(album.Id)))).Returns([first, disc]);
@@ -52,6 +64,7 @@ public sealed class AlbumMetadataServiceTests
 
         var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
         lookup.Setup(l => l.GetItemById(parent.Id)).Returns(parent);
+        lookup.Setup(l => l.GetItemById(album.Id)).Returns(album);
 
         var artists = new Mock<ILinkedChildrenService>(MockBehavior.Strict);
         artists.Setup(a => a.FindArtists(It.Is<IReadOnlyList<string>>(names => names.Count == 1 && names[0] == "Artist from tags")))
@@ -62,7 +75,13 @@ public sealed class AlbumMetadataServiceTests
             Mock.Of<IItemPathLookupService>(MockBehavior.Strict),
             Mock.Of<IFileSystem>(MockBehavior.Strict),
             NullLogger<LinkedChildResolver>.Instance);
-        var service = new ExposedAlbumMetadataService(repository.Object, lookup.Object, resolver, artists.Object);
+        var service = new ExposedAlbumMetadataService(
+            repository.Object,
+            lookup.Object,
+            resolver,
+            artists.Object,
+            collections.Object,
+            itemOptions.Object);
 
         Assert.Equal<BaseItem>([first, second, linked], service.ReadTracks(album));
 
@@ -70,12 +89,15 @@ public sealed class AlbumMetadataServiceTests
 
         Assert.Equal("Album from tags", info.Name);
         Assert.Equal(album.AlbumArtists, info.AlbumArtists);
+        Assert.Equal(("fr", "BE"), (info.MetadataLanguage, info.MetadataCountryCode));
         Assert.Equal(hasParentArtist ? "parent" : "physical", info.ArtistProviderIds["MusicBrainzArtist"]);
         Assert.Collection(
             info.SongInfos,
-            song => Assert.Equal("First", song.Name),
-            song => Assert.Equal("Second", song.Name),
-            song => Assert.Equal("Linked", song.Name));
+            song => Assert.Equal(("First", "fr", "BE"), (song.Name, song.MetadataLanguage, song.MetadataCountryCode)),
+            song => Assert.Equal(("Second", "en", "US"), (song.Name, song.MetadataLanguage, song.MetadataCountryCode)),
+            song => Assert.Equal(("Linked", "ja", "JP"), (song.Name, song.MetadataLanguage, song.MetadataCountryCode)));
+        collections.Verify(c => c.GetCollectionFolders(linked), Times.Once());
+        itemOptions.Verify(o => o.GetLibraryOptions(linked), Times.Once());
         artists.Verify(a => a.FindArtists(It.IsAny<IReadOnlyList<string>>()), hasParentArtist ? Times.Never() : Times.Once());
     }
 
@@ -93,7 +115,9 @@ public sealed class AlbumMetadataServiceTests
         IItemRepository repository,
         IItemLookupService lookup,
         LinkedChildResolver links,
-        ILinkedChildrenService artists)
+        ILinkedChildrenService artists,
+        ICollectionFolderResolver collections,
+        ILibraryItemOptions itemOptions)
         : AlbumMetadataService(
             Mock.Of<IItemWriteCommands>(),
             Mock.Of<IItemPeopleCommands>(),
@@ -101,13 +125,14 @@ public sealed class AlbumMetadataServiceTests
             NullLogger<AlbumMetadataService>.Instance,
             Mock.Of<IProviderManager>(),
             Mock.Of<IFileSystem>(),
-            Mock.Of<ILibraryItemOptions>(),
+            itemOptions,
             Mock.Of<IItemNamingService>(),
             Mock.Of<IExternalDataManager>(),
             repository,
             lookup,
             links,
-            artists)
+            artists,
+            collections)
     {
         public IReadOnlyList<BaseItem> ReadTracks(MusicAlbum album) => GetChildrenForMetadataUpdates(album);
 

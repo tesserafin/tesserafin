@@ -7,6 +7,7 @@ using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
@@ -19,6 +20,9 @@ namespace Tesserafin.Providers.Music;
 /// </summary>
 public class AudioMetadataService : MetadataService<Audio, SongInfo>
 {
+    private readonly IItemLookupService _lookup;
+    private readonly ICollectionFolderResolver _collections;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="AudioMetadataService"/> class.
     /// </summary>
@@ -33,6 +37,8 @@ public class AudioMetadataService : MetadataService<Audio, SongInfo>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
+    /// <param name="lookup">The item identity lookup.</param>
+    /// <param name="collections">The library membership resolver.</param>
     public AudioMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -44,10 +50,18 @@ public class AudioMetadataService : MetadataService<Audio, SongInfo>
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
-        ILocalizationManager localizationManager)
+        ILocalizationManager localizationManager,
+        IItemLookupService lookup,
+        ICollectionFolderResolver collections)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
+        _lookup = lookup;
+        _collections = collections;
     }
+
+    /// <inheritdoc />
+    protected override SongInfo GetLookupInfo(Audio item, LibraryOptions libraryOptions)
+        => item.GetLookupInfo(item.GetMetadataLocale(_lookup, _collections, libraryOptions, ServerConfigurationManager.Configuration));
 
     private void SetProviderId(Audio sourceItem, Audio targetItem, bool replaceData, MetadataProvider provider)
     {
