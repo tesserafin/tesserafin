@@ -186,9 +186,9 @@ namespace Tesserafin.Controller.Entities.TV
         public string FindSeriesPresentationUniqueKey()
             => Series?.PresentationUniqueKey;
 
-        public string FindSeasonName()
+        public string FindSeasonName(IItemLookupService lookup, IItemRepository repository)
         {
-            var season = Season;
+            var season = GetSeason(lookup, repository);
 
             if (season is null)
             {
@@ -207,6 +207,16 @@ namespace Tesserafin.Controller.Entities.TV
         {
             var series = Series;
             return series is null ? SeriesName : series.Name;
+        }
+
+        /// <summary>Resolves the stored season or finds the episode's season through the catalogue.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <param name="repository">The item repository.</param>
+        /// <returns>The season, or <c>null</c> if it could not be resolved.</returns>
+        public Season GetSeason(IItemLookupService lookup, IItemRepository repository)
+        {
+            var seasonId = SeasonId.IsEmpty() ? FindSeasonId(lookup, repository) : SeasonId;
+            return seasonId.IsEmpty() ? null : lookup.GetItemById(seasonId) as Season;
         }
 
         public Guid FindSeasonId()
@@ -333,10 +343,14 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         public EpisodeInfo GetLookupInfo()
+            => CreateLookupInfo(Series, Season);
+
+        public EpisodeInfo GetLookupInfo(IItemLookupService lookup, IItemRepository repository)
+            => CreateLookupInfo(GetSeries(lookup), GetSeason(lookup, repository));
+
+        private EpisodeInfo CreateLookupInfo(Series series, Season season)
         {
             var id = GetItemLookupInfo<EpisodeInfo>();
-
-            var series = Series;
 
             if (series is not null)
             {
@@ -344,9 +358,9 @@ namespace Tesserafin.Controller.Entities.TV
                 id.SeriesDisplayOrder = series.DisplayOrder;
             }
 
-            if (Season is not null)
+            if (season is not null)
             {
-                id.SeasonProviderIds = Season.ProviderIds;
+                id.SeasonProviderIds = season.ProviderIds;
             }
 
             id.IsMissingEpisode = IsMissingEpisode;

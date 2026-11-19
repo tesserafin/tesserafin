@@ -63,6 +63,14 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     protected override bool EnableUpdatingPremiereDateFromChildren => true;
 
     /// <inheritdoc />
+    protected override SeasonInfo GetLookupInfo(Season item)
+        => item.GetLookupInfo(_lookup);
+
+    /// <inheritdoc />
+    protected override string CreatePresentationUniqueKey(Season item)
+        => item.CreatePresentationUniqueKey(_lookup);
+
+    /// <inheritdoc />
     protected override ItemUpdateType BeforeSaveInternal(Season item, bool isFullRefresh, ItemUpdateType updateType)
     {
         var updatedType = base.BeforeSaveInternal(item, isFullRefresh, updateType);
@@ -78,21 +86,22 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
             }
         }
 
-        var seriesName = item.FindSeriesName();
+        var series = item.GetSeries(_lookup);
+        var seriesName = series is null ? item.SeriesName : series.Name;
         if (!string.Equals(item.SeriesName, seriesName, StringComparison.Ordinal))
         {
             item.SeriesName = seriesName;
             updatedType |= ItemUpdateType.MetadataImport;
         }
 
-        var seriesPresentationUniqueKey = item.FindSeriesPresentationUniqueKey();
+        var seriesPresentationUniqueKey = series?.PresentationUniqueKey;
         if (!string.Equals(item.SeriesPresentationUniqueKey, seriesPresentationUniqueKey, StringComparison.Ordinal))
         {
             item.SeriesPresentationUniqueKey = seriesPresentationUniqueKey;
             updatedType |= ItemUpdateType.MetadataImport;
         }
 
-        var seriesId = item.FindSeriesId();
+        var seriesId = item.FindSeriesId(_lookup);
         if (!item.SeriesId.Equals(seriesId))
         {
             item.SeriesId = seriesId;

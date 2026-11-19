@@ -39,9 +39,34 @@ public sealed class SeasonMetadataServiceTests
         Assert.Equal("Original", locked.Name);
     }
 
+    [Fact]
+    public void BeforeSave_UsesTheInjectedSeriesForPresentationAndProviderKeys()
+    {
+        var series = new Series { Id = Guid.NewGuid(), Name = "Series", PresentationUniqueKey = "series-key" };
+        series.ProviderIds["Tvdb"] = "series-provider";
+        var season = new Season
+        {
+            Id = Guid.NewGuid(),
+            ParentId = series.Id,
+            IndexNumber = 2,
+            PreferredMetadataLanguage = "en",
+            PreferredMetadataCountryCode = "US"
+        };
+        var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
+        lookup.Setup(l => l.GetItemById(series.Id)).Returns(series);
+        var service = new TestSeasonMetadataService(Mock.Of<ILibraryItemOptions>(MockBehavior.Strict), lookup.Object);
+
+        Assert.True(service.Prepare(season).HasFlag(ItemUpdateType.MetadataImport));
+        Assert.Equal(series.Name, season.SeriesName);
+        Assert.Equal(series.Id, season.SeriesId);
+        Assert.Equal(series.PresentationUniqueKey, season.SeriesPresentationUniqueKey);
+        Assert.Equal("series-key-002", season.PresentationUniqueKey);
+        Assert.Equal("series-provider", service.ReadLookupInfo(season).SeriesProviderIds["Tvdb"]);
+    }
+
     private static Season Specials() => new() { Id = Guid.NewGuid(), Name = "Original", IndexNumber = 0 };
 
-    private sealed class TestSeasonMetadataService(ILibraryItemOptions itemOptions)
+    private sealed class TestSeasonMetadataService(ILibraryItemOptions itemOptions, IItemLookupService? lookup = null)
         : SeasonMetadataService(
             Mock.Of<IItemWriteCommands>(),
             Mock.Of<IItemPeopleCommands>(),
@@ -54,8 +79,10 @@ public sealed class SeasonMetadataServiceTests
             Mock.Of<IExternalDataManager>(),
             Mock.Of<IItemRepository>(),
             Mock.Of<IItemSortService>(),
-            Mock.Of<IItemLookupService>())
+            lookup ?? Mock.Of<IItemLookupService>())
     {
         public ItemUpdateType Prepare(Season season) => BeforeSaveInternal(season, false, ItemUpdateType.None);
+
+        public SeasonInfo ReadLookupInfo(Season season) => GetLookupInfo(season);
     }
 }
