@@ -56,6 +56,7 @@ namespace Tesserafin.Providers.Manager
         private readonly IItemWriteCommands _writes;
         private readonly IItemResolutionService _resolution;
         private readonly ILibraryRefreshProgress _refreshProgress;
+        private readonly ILimitedConcurrencyLibraryScheduler _scheduler;
         private readonly IItemMetadataExporter _metadataExporter;
         private readonly IItemImageService _images;
         private readonly IRemoteImageSource _remoteImages;
@@ -102,6 +103,7 @@ namespace Tesserafin.Providers.Manager
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
         /// <param name="refreshProgress">Progress of active recursive scans.</param>
+        /// <param name="scheduler">The shared library scan scheduler.</param>
         /// <param name="deletions">Item deletion operations.</param>
         /// <param name="validation">The services folder validation runs with.</param>
         /// <param name="libraryOptions">The persisted library options, whose updates invalidate cached provider choices.</param>
@@ -127,6 +129,7 @@ namespace Tesserafin.Providers.Manager
             IItemImageService images,
             IItemResolutionService resolution,
             ILibraryRefreshProgress refreshProgress,
+            ILimitedConcurrencyLibraryScheduler scheduler,
             IItemDeletionCommands deletions,
             IFolderValidationServices validation,
             ILibraryOptionsStore libraryOptions,
@@ -153,6 +156,7 @@ namespace Tesserafin.Providers.Manager
             _images = images;
             _resolution = resolution;
             _refreshProgress = refreshProgress;
+            _scheduler = scheduler;
             _deletions = deletions;
             _libraryOptions = libraryOptions;
             _logger = logger;

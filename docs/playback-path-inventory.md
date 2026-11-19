@@ -1685,3 +1685,10 @@ and completion events. Scan traversal and provider-initiated scans pass it
 through recursive folder validation. The library notifier and the virtual
 folders endpoint read the same active state. Pending work still comes from
 the metadata refresh queue.
+
+## 64. Shared scheduler for recursive library work
+
+Full scans and provider-initiated refreshes pass the shared
+`ILimitedConcurrencyLibraryScheduler` through folder validation. Both
+subfolder scans and child metadata work use the same scheduler, including
+nested work. The folder entity no longer holds a static scheduler.
