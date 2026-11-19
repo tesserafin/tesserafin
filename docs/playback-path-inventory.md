@@ -966,3 +966,11 @@ Removed from `CollectionFolder`: the `XmlSerializer` static, the static cache, `
 `SaveLibraryOptions`, `OnCollectionFolderChange`, `UpdateLibraryOptions`, the instance
 `GetLibraryOptions()` and the static `LibraryOptionsUpdated` event. `entityStaticServices` 16 → 15.
 `CollectionFolder.ApplicationHost` stays (file-system child enumeration and shortcut expansion).
+
+## 32. Virtual paths during folder discovery
+
+Folder discovery expands shortcuts using the application paths carried by
+`ItemResolveArgs`. Linked-folder shortcuts use the same pure mapper with
+the configured paths. Library options and the host share that mapper.
+`CollectionFolder.ApplicationHost` and its startup assignment are removed,
+and `ItemResolutionService` drops its application host dependency.

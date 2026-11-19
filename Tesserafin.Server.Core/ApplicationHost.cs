@@ -821,7 +821,6 @@ namespace Tesserafin.Server.Core
             BaseItem.MediaSourceManager = Resolve<IMediaSourceManager>();
             BaseItem.ProviderManager = Resolve<IProviderManager>();
             BaseItem.UserDataManager = Resolve<IUserDataManager>();
-            CollectionFolder.ApplicationHost = this;
             Folder.UserViewManager = Resolve<IUserViewManager>();
             Folder.CollectionManager = Resolve<ICollectionManager>();
             UserView.TVSeriesManager = Resolve<ITVSeriesManager>();

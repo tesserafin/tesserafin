@@ -43,6 +43,8 @@ namespace Tesserafin.Controller.Library
         /// <value>The file system children.</value>
         public FileSystemMetadata[] FileSystemChildren { get; set; }
 
+        internal IServerApplicationPaths ApplicationPaths => _appPaths;
+
         public LibraryOptions LibraryOptions
         {
             get => _libraryOptions ??= Parent is null ? new LibraryOptions() : _policy.GetLibraryOptions(Parent);
