@@ -498,10 +498,10 @@ namespace Tesserafin.Controller.Entities
         {
             if (container is Series series)
             {
-                await series.RefreshMetadata(context.Deletions, context.Writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                await series.RefreshMetadata(context.Metadata.Value, context.Deletions, context.Writes, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
 
-            await container.RefreshAllMetadata(context.Deletions, context.Writes, context.Images, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
+            await container.RefreshAllMetadata(context, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
         }
 
         private async Task RefreshChildMetadata(LibraryScanContext context, BaseItem child, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
@@ -514,7 +514,7 @@ namespace Tesserafin.Controller.Entities
             {
                 if (refreshOptions.RefreshItem(child))
                 {
-                    await child.RefreshMetadata(context.Deletions, context.Writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                    await child.RefreshMetadata(context.Metadata.Value, context.Deletions, context.Writes, refreshOptions, cancellationToken).ConfigureAwait(false);
                 }
 
                 if (recursive && child is Folder folder)
@@ -1505,7 +1505,7 @@ namespace Tesserafin.Controller.Entities
             return list;
         }
 
-        protected override async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        protected override async Task<bool> RefreshedOwnedItems(IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
             var changesFound = false;
 
@@ -1517,7 +1517,7 @@ namespace Tesserafin.Controller.Entities
                 }
             }
 
-            var baseHasChanges = await base.RefreshedOwnedItems(deletions, writes, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
+            var baseHasChanges = await base.RefreshedOwnedItems(metadata, deletions, writes, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
 
             return baseHasChanges || changesFound;
         }

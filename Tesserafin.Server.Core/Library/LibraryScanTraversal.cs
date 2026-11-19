@@ -26,13 +26,13 @@ internal sealed class LibraryScanTraversal(
         cancellationToken.ThrowIfCancellationRequested();
         var root = roots.GetRootFolder();
         root.InvalidateCatalogueChildren(context.Lookup);
-        await root.RefreshMetadata(context.Deletions, context.Writes, cancellationToken).ConfigureAwait(false);
-        await root.ValidateChildren(context, new Progress<double>(), new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
+        await root.RefreshMetadata(context.Metadata.Value, context.Deletions, context.Writes, CreateRefreshOptions(), cancellationToken).ConfigureAwait(false);
+        await root.ValidateChildren(context, new Progress<double>(), CreateRefreshOptions(), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         var userRoot = userRoots.GetUserRootFolder();
         userRoot.InvalidateCatalogueChildren(context.Lookup);
-        await userRoot.RefreshMetadata(context.Deletions, context.Writes, cancellationToken).ConfigureAwait(false);
-        await userRoot.ValidateChildren(context, new Progress<double>(), new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
+        await userRoot.RefreshMetadata(context.Metadata.Value, context.Deletions, context.Writes, CreateRefreshOptions(), cancellationToken).ConfigureAwait(false);
+        await userRoot.ValidateChildren(context, new Progress<double>(), CreateRefreshOptions(), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         var deleted = new List<Guid>();
         foreach (var child in userRoot.GetCatalogueChildren(context.Repository, context.Lookup).OfType<Folder>())
@@ -44,7 +44,7 @@ internal sealed class LibraryScanTraversal(
             }
             else
             {
-                await child.RefreshMetadata(context.Deletions, context.Writes, cancellationToken).ConfigureAwait(false);
+                await child.RefreshMetadata(context.Metadata.Value, context.Deletions, context.Writes, CreateRefreshOptions(), cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -57,9 +57,11 @@ internal sealed class LibraryScanTraversal(
     }
 
     public Task RefreshAllAsync(IProgress<double> progress, CancellationToken cancellationToken)
-        => roots.GetRootFolder().ValidateChildren(context, progress, new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: true, cancellationToken: cancellationToken);
+        => roots.GetRootFolder().ValidateChildren(context, progress, CreateRefreshOptions(), recursive: true, cancellationToken: cancellationToken);
 
     public void ClearIgnoreRuleCache() => ignore.ClearDirectoryCache();
 
     public void UpdateInheritedValues() => persistence.UpdateInheritedValues();
+
+    private MetadataRefreshOptions CreateRefreshOptions() => new(new DirectoryService(fileSystem));
 }

@@ -624,6 +624,7 @@ namespace Tesserafin.Providers.Tests.Manager
             var deletions = Mock.Of<IItemDeletionCommands>();
             var repository = Mock.Of<IItemRepository>();
             itemLookup ??= Mock.Of<IItemLookupService>();
+            ProviderManager providerManager = null!;
             var scanContext = new LibraryScanContext(
                 deletions,
                 writes,
@@ -633,9 +634,10 @@ namespace Tesserafin.Providers.Tests.Manager
                 Mock.Of<ILimitedConcurrencyLibraryScheduler>(),
                 itemLookup,
                 repository,
-                Mock.Of<IItemStore>());
+                Mock.Of<IItemStore>(),
+                new Lazy<IItemMetadataDispatcher>(() => providerManager));
 
-            var providerManager = new ProviderManager(
+            providerManager = new ProviderManager(
                 writes,
                 Mock.Of<IItemMetadataExporter>(),
                 images,

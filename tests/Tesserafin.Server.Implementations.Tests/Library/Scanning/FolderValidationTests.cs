@@ -37,7 +37,8 @@ public sealed class FolderValidationTests
             Mock.Of<ILimitedConcurrencyLibraryScheduler>(MockBehavior.Strict),
             lookup.Object,
             Mock.Of<IItemRepository>(MockBehavior.Strict),
-            Mock.Of<IItemStore>(MockBehavior.Strict));
+            Mock.Of<IItemStore>(MockBehavior.Strict),
+            new Lazy<IItemMetadataDispatcher>(() => Mock.Of<IItemMetadataDispatcher>(MockBehavior.Strict)));
         var options = new MetadataRefreshOptions(Mock.Of<IDirectoryService>(MockBehavior.Strict));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => folder.ValidateChildren(
@@ -81,7 +82,8 @@ public sealed class FolderValidationTests
             scheduler.Object,
             lookup.Object,
             repository.Object,
-            store.Object);
+            store.Object,
+            new Lazy<IItemMetadataDispatcher>(() => Mock.Of<IItemMetadataDispatcher>(MockBehavior.Strict)));
 
         await root.ValidateChildren(
             context,

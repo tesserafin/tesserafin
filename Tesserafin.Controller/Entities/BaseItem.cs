@@ -1525,15 +1525,19 @@ namespace Tesserafin.Controller.Entities
             return RefreshMetadata(deletions, writes, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken);
         }
 
+        public Task<ItemUpdateType> RefreshMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
+            => RefreshMetadata(ProviderManager, deletions, writes, options, cancellationToken);
+
         /// <summary>
         /// The base implementation to refresh metadata.
         /// </summary>
+        /// <param name="metadata">The provider dispatch used throughout this refresh.</param>
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="options">The options.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>true if a provider reports we changed.</returns>
-        public async Task<ItemUpdateType> RefreshMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
+        public async Task<ItemUpdateType> RefreshMetadata(IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
             var requiresSave = false;
 
@@ -1543,7 +1547,7 @@ namespace Tesserafin.Controller.Entities
                 {
                     if (IsFileProtocol)
                     {
-                        requiresSave = await RefreshOwnedItemsAsync(deletions, writes, options, cancellationToken).ConfigureAwait(false);
+                        requiresSave = await RefreshOwnedItemsAsync(metadata, deletions, writes, options, cancellationToken).ConfigureAwait(false);
                     }
                 }
                 catch (OperationCanceledException)
@@ -1563,7 +1567,7 @@ namespace Tesserafin.Controller.Entities
                 }
                 : options;
 
-            return await ProviderManager.RefreshSingleItem(this, refreshOptions, cancellationToken).ConfigureAwait(false);
+            return await metadata.RefreshSingleItem(this, refreshOptions, cancellationToken).ConfigureAwait(false);
         }
 
         protected bool IsVisibleStandaloneInternal(User user, bool checkFolders)
@@ -1636,32 +1640,34 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>Discovers and refreshes relationships owned by this item.</summary>
+        /// <param name="metadata">The provider dispatch used throughout this refresh.</param>
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
         /// <param name="writes">Explicit catalogue write operations.</param>
         /// <param name="options">The metadata refresh options.</param>
         /// <param name="cancellationToken">Cancellation for discovery and writes.</param>
         /// <returns>Whether the metadata provider should save after refreshing owned items.</returns>
-        protected virtual Task<bool> RefreshOwnedItemsAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
-            => RefreshedOwnedItems(deletions, writes, options, GetFileSystemChildren(options.DirectoryService), cancellationToken);
+        protected virtual Task<bool> RefreshOwnedItemsAsync(IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
+            => RefreshedOwnedItems(metadata, deletions, writes, options, GetFileSystemChildren(options.DirectoryService), cancellationToken);
 
         /// <summary>
         /// Refreshes owned items such as trailers, theme videos, special features, etc.
         /// Returns true or false indicating if changes were found.
         /// </summary>
+        /// <param name="metadata">The provider dispatch used throughout this refresh.</param>
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="options">The metadata refresh options.</param>
         /// <param name="fileSystemChildren">The list of filesystem children.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns><c>true</c> if any items have changed, else <c>false</c>.</returns>
-        protected virtual async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        protected virtual async Task<bool> RefreshedOwnedItems(IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
             if (!IsFileProtocol || !SupportsOwnedItems || IsInMixedFolder || this is ICollectionFolder or UserRootFolder or AggregateFolder || this.GetType() == typeof(Folder))
             {
                 return false;
             }
 
-            return await writes.RefreshExtrasAsync(this, deletions, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
+            return await writes.RefreshExtrasAsync(this, metadata, deletions, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
         }
 
         protected virtual FileSystemMetadata[] GetFileSystemChildren(IDirectoryService directoryService)

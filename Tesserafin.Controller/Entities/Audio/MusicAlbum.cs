@@ -164,7 +164,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return id;
         }
 
-        public async Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
+        public async Task RefreshAllMetadata(LibraryScanContext context, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
             var items = GetRecursiveChildren();
 
@@ -177,7 +177,7 @@ namespace Tesserafin.Controller.Entities.Audio
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var updateType = await item.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                var updateType = await item.RefreshMetadata(context.Metadata.Value, context.Deletions, context.Writes, refreshOptions, cancellationToken).ConfigureAwait(false);
                 childUpdateType = childUpdateType | updateType;
 
                 numComplete++;
@@ -196,15 +196,15 @@ namespace Tesserafin.Controller.Entities.Audio
             }
 
             // Refresh current item
-            await RefreshMetadata(deletions, writes, parentRefreshOptions, cancellationToken).ConfigureAwait(false);
+            await RefreshMetadata(context.Metadata.Value, context.Deletions, context.Writes, parentRefreshOptions, cancellationToken).ConfigureAwait(false);
 
             if (!refreshOptions.IsAutomated)
             {
-                await RefreshArtists(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                await RefreshArtists(context, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        private async Task RefreshArtists(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
+        private async Task RefreshArtists(LibraryScanContext context, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
         {
             foreach (var i in this.GetAllArtists())
             {
@@ -214,14 +214,14 @@ namespace Tesserafin.Controller.Entities.Audio
                     continue;
                 }
 
-                var artist = writes.GetOrCreateNamedItem<MusicArtist>(i, cancellationToken);
+                var artist = context.Writes.GetOrCreateNamedItem<MusicArtist>(i, cancellationToken);
 
                 if (!artist.IsAccessedByName)
                 {
                     continue;
                 }
 
-                await artist.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                await artist.RefreshMetadata(context.Metadata.Value, context.Deletions, context.Writes, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
         }
     }

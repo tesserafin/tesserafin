@@ -26,6 +26,7 @@ public sealed class OwnedVideosEndToEndTests(TesserafinApplicationFactory factor
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.AddAuthHeader(await AuthHelper.CompleteStartupAsync(client));
         var writes = factory.Services.GetRequiredService<IItemWriteCommands>();
+        var metadata = factory.Services.GetRequiredService<IProviderManager>();
         var deletions = factory.Services.GetRequiredService<IItemDeletionCommands>();
         var resolution = factory.Services.GetRequiredService<IItemResolutionService>();
         var repository = factory.Services.GetRequiredService<IItemRepository>();
@@ -74,7 +75,7 @@ public sealed class OwnedVideosEndToEndTests(TesserafinApplicationFactory factor
 
             try
             {
-                var error = await Assert.ThrowsAnyAsync<Exception>(() => writes.RefreshOwnedVideosAsync(owner, deletions, Options(), TestContext.Current.CancellationToken));
+                var error = await Assert.ThrowsAnyAsync<Exception>(() => writes.RefreshOwnedVideosAsync(owner, metadata, deletions, Options(), TestContext.Current.CancellationToken));
                 Assert.Contains("owned version rejected", error.ToString(), StringComparison.Ordinal);
                 Assert.Null(repository.RetrieveItem(alternateId));
                 Assert.Null(lookup.GetItemById(alternateId));
@@ -87,7 +88,7 @@ public sealed class OwnedVideosEndToEndTests(TesserafinApplicationFactory factor
                 await database.Database.ExecuteSqlRawAsync("DROP TRIGGER reject_owned_version;", TestContext.Current.CancellationToken);
             }
 
-            await owner.RefreshMetadata(deletions, writes, Options(), TestContext.Current.CancellationToken);
+            await owner.RefreshMetadata(metadata, deletions, writes, Options(), TestContext.Current.CancellationToken);
             Assert.Equal(alternatePath, Assert.Single(owner.LocalAlternateVersions));
             var alternate = Assert.IsType<Movie>(repository.RetrieveItem(alternateId));
             Assert.Equal(owner.Id, alternate.OwnerId);
@@ -98,7 +99,7 @@ public sealed class OwnedVideosEndToEndTests(TesserafinApplicationFactory factor
             var part = Assert.IsType<Video>(repository.RetrieveItem(resolution.GetNewItemId(partPath, typeof(Video))));
             Assert.Equal(owner.Id, part.OwnerId);
             Assert.Equal(owner.Overview, part.Overview);
-            Assert.False(await writes.RefreshOwnedVideosAsync(owner, deletions, Options(), TestContext.Current.CancellationToken));
+            Assert.False(await writes.RefreshOwnedVideosAsync(owner, metadata, deletions, Options(), TestContext.Current.CancellationToken));
 
             var detail = await client.GetFromJsonAsync<BaseItemDto>($"Items/{owner.Id}?fields=MediaSources", JsonDefaults.Options, TestContext.Current.CancellationToken);
             Assert.NotNull(detail);

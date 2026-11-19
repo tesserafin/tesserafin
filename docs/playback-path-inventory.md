@@ -1374,3 +1374,12 @@ Collection folders still delegate reads and cache invalidation to their
 physical folders. The user root reloads its library definitions after
 validation and registers them through `IItemStore`. The library manager
 facade no longer exposes a cache registration method.
+
+## 59. Metadata dispatch during library scans
+
+Scan traversal, provider-initiated scans and recursive refresh pass an
+`IItemMetadataDispatcher` into the shared item refresh routine. Series,
+albums, extras and owned video parts or versions use the same dispatch.
+The scan context resolves it when metadata work begins so the provider
+manager can initiate a scan without a construction cycle. Top-folder
+refreshes build their directory service from the traversal's filesystem.

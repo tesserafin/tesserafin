@@ -1,5 +1,7 @@
+using System;
 using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Persistence;
+using Tesserafin.Controller.Providers;
 
 namespace Tesserafin.Controller.Library;
 
@@ -15,6 +17,7 @@ namespace Tesserafin.Controller.Library;
 /// <param name="Lookup">Reads the catalogue hierarchy.</param>
 /// <param name="Repository">Reads the persisted children of each folder.</param>
 /// <param name="Store">Registers refreshed library definitions in the item cache.</param>
+/// <param name="Metadata">Executes metadata refreshes. Resolution is deferred because the manager also initiates scans.</param>
 public sealed record LibraryScanContext(
     IItemDeletionCommands Deletions,
     IItemWriteCommands Writes,
@@ -24,4 +27,5 @@ public sealed record LibraryScanContext(
     ILimitedConcurrencyLibraryScheduler Scheduler,
     IItemLookupService Lookup,
     IItemRepository Repository,
-    IItemStore Store);
+    IItemStore Store,
+    Lazy<IItemMetadataDispatcher> Metadata);

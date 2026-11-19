@@ -18,7 +18,7 @@ namespace Tesserafin.Controller.Providers
     /// <summary>
     /// Interface IProviderManager.
     /// </summary>
-    public interface IProviderManager
+    public interface IProviderManager : IItemMetadataDispatcher
     {
         /// <summary>
         /// Queues the refresh.
@@ -36,15 +36,6 @@ namespace Tesserafin.Controller.Providers
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
         Task RefreshFullItem(BaseItem item, MetadataRefreshOptions options, CancellationToken cancellationToken);
-
-        /// <summary>
-        /// Refreshes the metadata.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        /// <param name="options">The options.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>Task.</returns>
-        Task<ItemUpdateType> RefreshSingleItem(BaseItem item, MetadataRefreshOptions options, CancellationToken cancellationToken);
 
         /// <summary>
         /// Saves the image.

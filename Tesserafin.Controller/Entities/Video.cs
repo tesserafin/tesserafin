@@ -474,11 +474,11 @@ namespace Tesserafin.Controller.Entities
             return updateType;
         }
 
-        protected override async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        protected override async Task<bool> RefreshedOwnedItems(IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
-            var hasChanges = await base.RefreshedOwnedItems(deletions, writes, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
+            var hasChanges = await base.RefreshedOwnedItems(metadata, deletions, writes, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
 
-            var videoChanges = await writes.RefreshOwnedVideosAsync(this, deletions, options, cancellationToken).ConfigureAwait(false);
+            var videoChanges = await writes.RefreshOwnedVideosAsync(this, metadata, deletions, options, cancellationToken).ConfigureAwait(false);
             return hasChanges || videoChanges;
         }
 

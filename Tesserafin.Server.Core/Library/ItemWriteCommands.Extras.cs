@@ -14,7 +14,7 @@ namespace Tesserafin.Server.Core.Library;
 
 internal sealed partial class ItemWriteCommands
 {
-    public async Task<bool> RefreshExtrasAsync(BaseItem owner, IItemDeletionCommands deletions, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+    public async Task<bool> RefreshExtrasAsync(BaseItem owner, IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var extras = _resolution.FindExtras(owner, fileSystemChildren, options.DirectoryService).DistinctBy(item => item.Id).ToArray();
@@ -50,11 +50,11 @@ internal sealed partial class ItemWriteCommands
             prepared.Add((staged, refresh));
         }
 
-        await Task.WhenAll(prepared.Select(item => RefreshOwnedMetadataAsync(owner, item.Item, true, deletions, item.Options, cancellationToken))).ConfigureAwait(false);
+        await Task.WhenAll(prepared.Select(item => RefreshOwnedMetadataAsync(owner, item.Item, true, metadata, deletions, item.Options, cancellationToken))).ConfigureAwait(false);
         return true;
     }
 
-    public async Task RefreshOwnedMetadataAsync(BaseItem owner, BaseItem ownedItem, bool copyTitleMetadata, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken)
+    public async Task RefreshOwnedMetadataAsync(BaseItem owner, BaseItem ownedItem, bool copyTitleMetadata, IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken)
     {
         var newOptions = new MetadataRefreshOptions(options)
         {
@@ -116,6 +116,6 @@ internal sealed partial class ItemWriteCommands
             }
         }
 
-        await ownedItem.RefreshMetadata(deletions, this, newOptions, cancellationToken).ConfigureAwait(false);
+        await ownedItem.RefreshMetadata(metadata, deletions, this, newOptions, cancellationToken).ConfigureAwait(false);
     }
 }

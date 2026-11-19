@@ -945,7 +945,7 @@ namespace Tesserafin.Providers.Manager
 
         private async Task RefreshItem(BaseItem item, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
-            await item.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
+            await item.RefreshMetadata(this, _deletions, _writes, options, cancellationToken).ConfigureAwait(false);
 
             // Collection folders don't validate their children so we'll have to simulate that here
             switch (item)
@@ -963,7 +963,7 @@ namespace Tesserafin.Providers.Manager
         {
             foreach (var child in collectionFolder.GetPhysicalFolders(_itemLookup))
             {
-                await child.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
+                await child.RefreshMetadata(this, _deletions, _writes, options, cancellationToken).ConfigureAwait(false);
 
                 await child.ValidateChildren(_scanContext, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
@@ -994,7 +994,7 @@ namespace Tesserafin.Providers.Manager
 
             try
             {
-                await item.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
+                await item.RefreshMetadata(this, _deletions, _writes, options, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
