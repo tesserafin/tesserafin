@@ -286,7 +286,7 @@ namespace Tesserafin.Controller.Entities.TV
         {
             InvalidateCatalogueChildren(context.Lookup);
             // Refresh bottom up, seasons and episodes first, then the series
-            var items = GetRecursiveCatalogueChildren(context);
+            var items = GetRecursiveCatalogueChildren(context.Repository, context.Lookup, context.Links);
 
             var totalItems = items.Count;
             var numComplete = 0;

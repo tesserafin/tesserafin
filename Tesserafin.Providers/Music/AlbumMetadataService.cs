@@ -24,6 +24,10 @@ namespace Tesserafin.Providers.Music;
 /// </summary>
 public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
 {
+    private readonly IItemLookupService _lookup;
+    private readonly LinkedChildResolver _links;
+    private readonly ILinkedChildrenService _artists;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="AlbumMetadataService"/> class.
     /// </summary>
@@ -38,6 +42,9 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
+    /// <param name="lookup">The item identity lookup.</param>
+    /// <param name="links">The saved link resolver.</param>
+    /// <param name="artists">The catalogue service for finding artists by name.</param>
     public AlbumMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -49,9 +56,15 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
-        ILocalizationManager localizationManager)
+        ILocalizationManager localizationManager,
+        IItemLookupService lookup,
+        LinkedChildResolver links,
+        ILinkedChildrenService artists)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
+        _lookup = lookup;
+        _links = links;
+        _artists = artists;
     }
 
     /// <inheritdoc />
@@ -64,8 +77,12 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
     protected override bool EnableUpdatingStudiosFromChildren => true;
 
     /// <inheritdoc />
+    protected override AlbumInfo GetLookupInfo(MusicAlbum item)
+        => item.GetLookupInfo(ItemRepository, _lookup, _links, _artists);
+
+    /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(MusicAlbum item)
-        => item.GetRecursiveChildren(i => i is Audio);
+        => item.GetCatalogueTracks(ItemRepository, _lookup, _links);
 
     /// <inheritdoc />
     protected override async Task AfterMetadataRefresh(MusicAlbum item, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
