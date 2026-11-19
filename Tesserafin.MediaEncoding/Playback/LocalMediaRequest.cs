@@ -8,4 +8,8 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// </summary>
 /// <param name="Capabilities">The declared client capabilities.</param>
 /// <param name="Constraints">The declared playback constraints.</param>
-public sealed record LocalMediaRequest(ClientCapabilities Capabilities, PlaybackConstraints Constraints);
+/// <param name="LiveStreamId">
+/// For a Live TV channel, the tuner stream this session opened: the one infinite source the planner
+/// may decide on. <see langword="null"/> for a library item.
+/// </param>
+public sealed record LocalMediaRequest(ClientCapabilities Capabilities, PlaybackConstraints Constraints, string? LiveStreamId = null);

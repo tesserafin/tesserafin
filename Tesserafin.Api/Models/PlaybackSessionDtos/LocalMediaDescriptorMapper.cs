@@ -34,13 +34,15 @@ public static class LocalMediaDescriptorMapper
     /// <param name="itemId">The item the session plays.</param>
     /// <param name="plan">The retained execution plan; see <see cref="CanMap"/>.</param>
     /// <param name="engineVersion">The engine version that decided the plan.</param>
+    /// <param name="live">Whether the plan executes a tuner stream the session holds: its output is the live playlist.</param>
     /// <returns>The descriptor.</returns>
     public static PlaybackSessionStreamDescriptor Map(
         PlaybackSessionId sessionId,
         string? playSessionId,
         Guid itemId,
         PlaybackExecutionPlan plan,
-        int engineVersion)
+        int engineVersion,
+        bool live = false)
     {
         ArgumentNullException.ThrowIfNull(plan);
         if (!CanMap(plan))
@@ -58,7 +60,7 @@ public static class LocalMediaDescriptorMapper
             // Container is the segment container the client declared (fMP4 or MPEG-TS); the
             // resource itself is the media playlist.
             return new PlaybackSessionStreamDescriptor(
-                FormattableString.Invariant($"/Playback/Sessions/{sessionId}/Hls/main.m3u8?{binding}"),
+                FormattableString.Invariant($"/Playback/Sessions/{sessionId}/Hls/{(live ? "live" : "main")}.m3u8?{binding}"),
                 StreamingProtocol.Hls,
                 engineVersion,
                 null,

@@ -254,6 +254,35 @@ public static class EndToEndMediaFixtures
     }
 
     /// <summary>
+    /// Synthesizes the body a software tuner serves for one channel: H.264 and AAC in MPEG-TS, the
+    /// shape an M3U or HDHomeRun tuner delivers.
+    /// </summary>
+    /// <param name="directory">The directory to write the fixture into.</param>
+    /// <param name="durationSeconds">The duration of the fixture, in seconds.</param>
+    /// <returns>The full path to the synthesized file.</returns>
+    public static async Task<string> CreateTunerTransportStreamAsync(string directory, int durationSeconds)
+    {
+        var path = Path.Combine(directory, "channel1.ts");
+        var duration = durationSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        await RunFfmpegAsync(
+        [
+            "-hide_banner", "-y",
+            "-f", "lavfi", "-i", $"testsrc=size=320x180:rate=25:duration={duration}",
+            "-f", "lavfi", "-i", $"sine=frequency=440:duration={duration}",
+            "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-g", "25",
+            "-c:a", "aac", "-shortest",
+            "-f", "mpegts", path,
+        ]).ConfigureAwait(false);
+
+        if (!File.Exists(path) || new FileInfo(path).Length == 0)
+        {
+            throw new InvalidOperationException($"ffmpeg did not produce a non-empty fixture at {path}.");
+        }
+
+        return path;
+    }
+
+    /// <summary>
     /// Synthesizes a real AAC track in a Matroska audio container: a codec a browser decodes, in a
     /// container it does not play as it is.
     /// </summary>

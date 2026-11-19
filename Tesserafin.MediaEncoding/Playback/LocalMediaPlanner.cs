@@ -106,6 +106,18 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             && source.VideoType is null or VideoType.VideoFile
             && !string.IsNullOrEmpty(source.Path);
 
+    /// <summary>
+    /// Determines whether a media source is the tuner stream this session opened: the source the
+    /// media source manager returned for <paramref name="liveStreamId"/>.
+    /// </summary>
+    /// <param name="source">The media source.</param>
+    /// <param name="liveStreamId">The live stream the session holds.</param>
+    /// <returns><see langword="true"/> if the source is that opened stream.</returns>
+    public static bool IsSessionLiveSource(MediaSourceInfo? source, string? liveStreamId)
+        => source is not null
+            && !string.IsNullOrEmpty(liveStreamId)
+            && string.Equals(source.LiveStreamId, liveStreamId, StringComparison.Ordinal);
+
     /// <inheritdoc/>
     public PlaybackPlan? PlanAudio(MediaOptions options) => Plan(options, MediaKind.Audio, _inner.PlanAudio);
 
@@ -239,10 +251,16 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
         var sources = options.MediaSources
             .Where(source => string.IsNullOrEmpty(options.MediaSourceId) || string.Equals(source.Id, options.MediaSourceId, StringComparison.Ordinal))
             .ToList();
-        if (sources.Count == 0 || !sources.All(IsLocalFileSource))
+        var live = !string.IsNullOrEmpty(request.LiveStreamId);
+        if (sources.Count == 0 || !sources.All(source => live ? IsSessionLiveSource(source, request.LiveStreamId) : IsLocalFileSource(source)))
         {
             return null;
         }
+
+        // An opened tuner stream has no end and is reachable by the server only (through its
+        // provider): it can be remuxed or transcoded into the session's live HLS output, never handed
+        // to the client as it is.
+        var constraints = live ? request.Constraints with { AllowDirectPlay = false } : request.Constraints;
 
         var context = DlnaPlaybackAdapter.ToContext(options.ItemId, options.UserId, options.MediaSourceId, kind, PlaybackEngine.EngineVersion);
         // Resolved track indices belong to a source, not to the item. A later playable version
@@ -254,7 +272,7 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
         V2PlanRecord? transcode = null;
         foreach (var source in sources)
         {
-            var decision = _engine.Decide(context, WithExecutableTargetsFirst(request.Capabilities), [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(request.Constraints, source));
+            var decision = _engine.Decide(context, WithExecutableTargetsFirst(request.Capabilities), [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(constraints, source));
             if (!decision.IsViable
                 || !PlaybackExecutionPlanBuilder.TryBuild(decision, out var plan, out _)
                 || plan is null)
@@ -262,7 +280,7 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
                 continue;
             }
 
-            if (plan.Method == PlaybackMethod.DirectPlay)
+            if (plan.Method == PlaybackMethod.DirectPlay && !live)
             {
                 return new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }

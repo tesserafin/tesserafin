@@ -30,6 +30,7 @@ public sealed class PlaybackSessionDeliveryGuard
 {
     private static readonly TimeSpan _keepAliveAfter = TimeSpan.FromMinutes(15);
 
+    private readonly PlaybackSessionLiveStreams? _liveStreams;
     private readonly IPlaybackSessionManager _playbackSessionManager;
     private readonly IV2PlanStore _v2PlanStore;
     private readonly IUserManager _userManager;
@@ -42,12 +43,15 @@ public sealed class PlaybackSessionDeliveryGuard
     /// <param name="v2PlanStore">Instance of the <see cref="IV2PlanStore"/> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="itemAccessService">Instance of the <see cref="IItemAccessService"/> interface.</param>
+    /// <param name="liveStreams">The tuner streams Live TV sessions hold; without it no session plays a channel.</param>
     public PlaybackSessionDeliveryGuard(
         IPlaybackSessionManager playbackSessionManager,
         IV2PlanStore v2PlanStore,
         IUserManager userManager,
-        IItemAccessService itemAccessService)
+        IItemAccessService itemAccessService,
+        PlaybackSessionLiveStreams? liveStreams = null)
     {
+        _liveStreams = liveStreams;
         _playbackSessionManager = playbackSessionManager;
         _v2PlanStore = v2PlanStore;
         _userManager = userManager;
@@ -111,18 +115,26 @@ public sealed class PlaybackSessionDeliveryGuard
             return PlaybackSessionDelivery.NotFound;
         }
 
-        // An alternate version is its own item, with its own access rules: the version the plan
-        // selected must still be visible to the owner too, not only the film it belongs to.
-        if (!Guid.TryParse(plan.SourceId, out var sourceItemId)
-            || (!sourceItemId.Equals(itemId) && _itemAccessService.GetVisibleItemById<BaseItem>(sourceItemId, owner) is null))
-        {
-            return PlaybackSessionDelivery.NotFound;
-        }
-
         var source = options.MediaSources.FirstOrDefault(s => string.Equals(s.Id, plan.SourceId, StringComparison.Ordinal));
-        if (!LocalMediaPlanner.IsLocalFileSource(source) || !System.IO.File.Exists(source!.Path))
+        if (LocalMediaPlanner.IsSessionLiveSource(source, _liveStreams?.Get(session.Id)))
         {
-            return PlaybackSessionDelivery.NotFound;
+            // A Live TV channel: the tuner stream the session opened, still held by it. The channel
+            // itself was checked above; a tuner source is not an item of its own.
+        }
+        else
+        {
+            // An alternate version is its own item, with its own access rules: the version the plan
+            // selected must still be visible to the owner too, not only the film it belongs to.
+            if (!Guid.TryParse(plan.SourceId, out var sourceItemId)
+                || (!sourceItemId.Equals(itemId) && _itemAccessService.GetVisibleItemById<BaseItem>(sourceItemId, owner) is null))
+            {
+                return PlaybackSessionDelivery.NotFound;
+            }
+
+            if (!LocalMediaPlanner.IsLocalFileSource(source) || !System.IO.File.Exists(source!.Path))
+            {
+                return PlaybackSessionDelivery.NotFound;
+            }
         }
 
         // The session's routes are the only thing a long playback asks of it: a film paused and

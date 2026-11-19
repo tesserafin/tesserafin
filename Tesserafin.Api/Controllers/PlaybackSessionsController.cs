@@ -166,7 +166,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         // shadow mode is off (the default) the shadow run never executes and this scope costs one
         // AsyncLocal write and produces nothing.
         PlaybackSession? session;
-        using (BeginLocalMediaScope(isLocalMedia, request))
+        using (BeginLocalMediaScope(isLocalMedia, request, liveStreamId))
         using (_shadowDiagnosticsStore.BeginCapture(new ShadowCaptureInputs(request.Capabilities, HttpContext.Request.ContentLength, ReadCapturedScan())))
         {
             session = _playbackSessionManager.Create(
@@ -270,7 +270,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         // Issue #75: same ambient scope as the POST - a PUT re-plans with a complete new body, so it
         // carries its own declared capabilities and its own Content-Length.
         PlaybackSession? session;
-        using (BeginLocalMediaScope(isLocalMedia, request))
+        using (BeginLocalMediaScope(isLocalMedia, request, liveStreamId))
         using (_shadowDiagnosticsStore.BeginCapture(new ShadowCaptureInputs(request.Capabilities, HttpContext.Request.ContentLength, ReadCapturedScan())))
         {
             session = _playbackSessionManager.Patch(id, new PlaybackSessionRequest(kind, options), request.PlaybackAttemptId);
@@ -465,7 +465,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
                 return Forbid();
             }
 
-            return Ok(LocalMediaDescriptorMapper.Map(session.Id, session.PlaySessionId, engineOptions.ItemId, enginePlan, engineDecided.Decision.EngineVersion));
+            return Ok(LocalMediaDescriptorMapper.Map(session.Id, session.PlaySessionId, engineOptions.ItemId, enginePlan, engineDecided.Decision.EngineVersion, live: _liveStreams?.Get(session.Id) is not null));
         }
 
         var options = session.Request?.Options;
@@ -753,8 +753,10 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     private static bool IsLibraryAudio(BaseItem item)
         => item is Tesserafin.Controller.Entities.Audio.Audio audio && audio.ChannelId.IsEmpty();
 
-    private static IDisposable? BeginLocalMediaScope(bool isLocalMedia, PlaybackPlanRequestBase request)
-        => isLocalMedia ? LocalMediaPlanner.BeginRequest(new LocalMediaRequest(request.Capabilities, request.Constraints)) : null;
+    private static IDisposable? BeginLocalMediaScope(bool isLocalMedia, PlaybackPlanRequestBase request, string? liveStreamId)
+        => isLocalMedia || liveStreamId is not null
+            ? LocalMediaPlanner.BeginRequest(new LocalMediaRequest(request.Capabilities, request.Constraints, liveStreamId))
+            : null;
 
     /// <summary>
     /// Issue #43: opens a structured log scope carrying the attempt id for the rest of the action,

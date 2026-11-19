@@ -115,6 +115,10 @@ public static class EnginePlanEncodingRequest
         request.Context = EncodingContext.Streaming;
         request.TranscodeReasons = transcodeReasons;
         request.BuiltFromRetainedPlan = true;
+
+        // An opened tuner stream is read through its provider (pipe:0), which the executor finds by
+        // this id; the stream's own path is a route the executor has no credential for.
+        request.LiveStreamId = string.IsNullOrEmpty(source?.LiveStreamId) ? null : source.LiveStreamId;
         return request;
     }
 

@@ -289,6 +289,51 @@ public sealed class LocalMediaPlannerTests
     }
 
     [Fact]
+    public void An_opened_tuner_stream_is_remuxed_into_hls_never_played_as_it_is()
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var tuner = Source("tuner", "h264", 1, -1, container: "ts");
+        tuner.Path = "http://127.0.0.1/LiveTv/LiveStreamFiles/live-1/stream.ts";
+        tuner.Protocol = MediaProtocol.Http;
+        tuner.IsInfiniteStream = true;
+        tuner.LiveStreamId = "live-1";
+        tuner.MediaStreams = [.. tuner.MediaStreams.Where(stream => stream.Type != MediaStreamType.Subtitle)];
+        var browser = Browser(hlsOutput: true) with
+        {
+            Decode = Browser(hlsOutput: true).Decode with { DirectPlayProfiles = [new DecodeProfile(MediaKind.Video, ["ts", "mp4"], ["h264"], ["aac"])] },
+        };
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(browser, _declared, "live-1"));
+        var plan = planner.PlanVideo(Options(tuner));
+        var record = store.TakeCaptured();
+
+        // The client could play the container as it is; an infinite, server-only stream still is not handed over.
+        Assert.NotEqual(PlayMethod.DirectPlay, plan?.PlayMethod);
+        Assert.Equal(PlaybackMethod.Remux, record?.ExecutionPlan?.Method);
+        Assert.True(LocalMediaPlanner.IsExecutableHlsOutput(record?.ExecutionPlan));
+    }
+
+    [Fact]
+    public void A_tuner_stream_the_session_did_not_open_is_left_to_the_existing_chain()
+    {
+        var existing = new PlaybackPlan(PlayMethod.Transcode, 0);
+        var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
+        inner.Setup(p => p.PlanVideo(It.IsAny<MediaOptions>())).Returns(existing);
+        var (planner, store) = Planner(inner.Object);
+        var tuner = Source("tuner", "h264", 1, -1, container: "ts");
+        tuner.Protocol = MediaProtocol.Http;
+        tuner.IsInfiniteStream = true;
+        tuner.LiveStreamId = "someone-else";
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(Browser(hlsOutput: true), _declared, "live-1"));
+
+        Assert.Same(existing, planner.PlanVideo(Options(tuner)));
+        Assert.Null(store.TakeCaptured());
+    }
+
+    [Fact]
     public void Only_an_hls_copy_of_one_audio_stream_is_an_executable_audio_remux()
     {
         var remux = new PlaybackExecutionPlan(

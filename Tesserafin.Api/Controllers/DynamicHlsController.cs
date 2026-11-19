@@ -296,6 +296,17 @@ public partial class DynamicHlsController : BaseTesserafinApiController
             AlwaysBurnInSubtitleWhenTranscoding = alwaysBurnInSubtitleWhenTranscoding
         };
 
+        return await GetLivePlaylistInternal(streamingRequest, sessionOwned: false, sessionBinding: null).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Starts (or joins) the live HLS job of a request and answers its playlist: the playlist ffmpeg
+    /// writes as it goes, with the validated capability carried into its segment uris. Shared by the
+    /// legacy live route and the session-owned one, which also checks the state against its plan
+    /// and binds every segment uri to the session.
+    /// </summary>
+    private async Task<ActionResult> GetLivePlaylistInternal(StreamingRequestDto streamingRequest, bool sessionOwned, Func<string, bool, string>? sessionBinding)
+    {
         // CTS lifecycle is managed internally.
         var cancellationTokenSource = new CancellationTokenSource();
         // Due to CTS.Token calling ThrowIfDisposed (https://github.com/dotnet/runtime/issues/29970) we have to "cache" the token
@@ -303,6 +314,13 @@ public partial class DynamicHlsController : BaseTesserafinApiController
         var cancellationToken = cancellationTokenSource.Token;
         var state = await ResolveStreamingState(streamingRequest, cancellationToken)
             .ConfigureAwait(false);
+
+        // A session-owned live output is the retained plan executed, or nothing (see IsThePlan).
+        if (sessionOwned && !IsThePlan(state, streamingRequest))
+        {
+            state.Dispose();
+            return PlanNotExecutable();
+        }
 
         TranscodingJob? job = null;
         var playlistPath = Path.ChangeExtension(state.OutputFilePath, ".m3u8");
@@ -389,7 +407,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
                         throw;
                     }
 
-                    minSegments = state.MinSegments;
+                    var minSegments = state.MinSegments;
                     if (minSegments > 0)
                     {
                         // This wait holds the output's lock. A transcode that ends by itself cancels
@@ -440,6 +458,11 @@ public partial class DynamicHlsController : BaseTesserafinApiController
         // so "the propagated value came from a validated result" is a decision a test can reach
         // rather than a line a reviewer has to read. LTV-R0's control M1 replaced the read below
         // with Request.Query["playbackCapability"] and nothing in the repository went red.
+        if (sessionBinding is not null)
+        {
+            playlistText = sessionBinding(playlistText, PlaybackCapabilityProvenance.Resolve(HttpContext).Outcome == PlaybackCapabilityProvenanceOutcome.Propagate);
+        }
+
         var provenance = PlaybackCapabilityProvenance.Resolve(HttpContext);
         if (provenance.Outcome == PlaybackCapabilityProvenanceOutcome.Refuse)
         {

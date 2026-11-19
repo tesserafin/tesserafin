@@ -378,6 +378,7 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.EndToEnd.AudioHlsEndToEndTests.TranscodeAudio_FlacWithCoverArt_EncodesAudioOnlyOverTheSessionHlsRoute
           --require Tesserafin.Server.Integration.Tests.EndToEnd.AudioHlsEndToEndTests.TranscodeAudio_AnotherUser_CanNeitherReadNorStopNorTakeTheJob
           --require Tesserafin.Server.Integration.Tests.EndToEnd.AudioHlsEndToEndTests.RemuxAudio_AacInMatroska_CopiesTheAudioOverTheSessionHlsRoute
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.LiveTvSessionEndToEndTests.LiveTvChannel_PlaysFromTheSessionLiveRoute_OnOneTunerStream_ClosedByTheStop
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_ParametersThatDoNotMatchTheSession_AreNotServed
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_Stop_DeletesTheSessionAndRevokesItsCapability
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_AnotherUser_CanNeitherReadNorStopTheSession

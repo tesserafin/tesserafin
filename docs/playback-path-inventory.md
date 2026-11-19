@@ -333,11 +333,28 @@ stream copy for video requests only and takes an audio-only request's codec as i
 required by name. Every local library audio track a client declares an AAC-over-HLS output for is
 now played from its session.
 
+Live TV, first slice: a channel (`LiveTvChannel`) planned through `Playback/Sessions` opens its tuner
+stream (`IMediaSourceManager.OpenLiveStream`) and is planned on that opened source; the session
+holds that one reference (`PlaybackSessionLiveStreams`) until it ends, on every removal path of
+`PlaybackSessionManager` (DELETE, replacement, legacy stop report, TTL sweep, revoked device). A
+PUT re-plans on the stream the session holds. Tuner sharing stays the media source manager's. The
+planner decides only on the stream this session opened (`IsSessionLiveSource`), forbids a direct
+play of it (infinite, reachable by the server only) and keeps an HLS remux or transcode. The
+session's `Hls/live.m3u8` starts ffmpeg with an event playlist; the encoding request carries the
+`LiveStreamId`, so ffmpeg reads the stream through its provider (`pipe:0`), never through the
+`[Authorize]`d `LiveStreamFiles` route. Segment uris are bound to the session and served by
+`Hls/hls/{playlistId}/{segment}`, which checks the session and then the caller's own job exactly as
+the legacy live segment route does. Proof: `LiveTvSessionEndToEndTests` (a paced M3U software
+tuner on loopback; one tuner open across POST and PUT; segments probed H.264 + AAC; another user
+refused; the stop closes the tuner stream), required by name. Break controls: planner without the
+live source (legacy planner reached), request without `LiveStreamId` (422), removal without release
+(tuner stream never closed).
+
 Remaining consumers by name. Nothing is deleted globally while one of them still needs it:
 
 | Legacy path | Still reached by |
 | --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | audio for a client that declares no AAC-over-HLS output, Live TV, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
+| `PlaybackSessionPlanner` / `StreamBuilder` | audio for a client that declares no AAC-over-HLS output, Live TV through `PlaybackInfo`, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
 | Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio the server does not serve from the session, Live TV, channel-plugin items; a library video the server does not serve from the session |

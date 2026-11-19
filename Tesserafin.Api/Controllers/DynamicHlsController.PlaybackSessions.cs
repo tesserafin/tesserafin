@@ -1,6 +1,8 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -55,6 +57,12 @@ public partial class DynamicHlsController
             return refusal;
         }
 
+        // A tuner stream has no runtime to lay a VOD playlist over: its output is live.m3u8.
+        if (!string.IsNullOrEmpty(request!.LiveStreamId))
+        {
+            return NotFound();
+        }
+
         using var cancellationTokenSource = new CancellationTokenSource();
         return await GetVariantPlaylistInternal(request!, cancellationTokenSource, sessionOwned: true).ConfigureAwait(false);
     }
@@ -101,6 +109,11 @@ public partial class DynamicHlsController
             return refusal;
         }
 
+        if (!string.IsNullOrEmpty(request!.LiveStreamId))
+        {
+            return NotFound();
+        }
+
         // The segment container is the plan's; a url naming another one names nothing.
         if (!string.Equals(EncodingHelper.GetSegmentFileExtension(request!.SegmentContainer).TrimStart('.'), container, StringComparison.OrdinalIgnoreCase))
         {
@@ -110,6 +123,106 @@ public partial class DynamicHlsController
         request.CurrentRuntimeTicks = runtimeTicks;
         request.ActualSegmentLengthTicks = actualSegmentLengthTicks;
         return await GetDynamicSegment(request, segmentId, sessionOwned: true).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets the live playlist of a Live TV session decided as a remux or a transcode of the tuner
+    /// stream the session holds. The job is started from the retained plan, reading the stream
+    /// through its provider; the playlist is the one ffmpeg writes as it goes, its segment uris
+    /// bound to this session (<c>Playback/Sessions/{id}/Hls/hls/...</c>).
+    /// </summary>
+    /// <param name="id">The session.</param>
+    /// <param name="itemId">The channel the session plays; must match the session.</param>
+    /// <param name="mediaSourceId">The tuner source the session's plan selected; must match it.</param>
+    /// <param name="playSessionId">The session's play session id; must match it.</param>
+    /// <param name="deliveryGuard">Instance of <see cref="PlaybackSessionDeliveryGuard"/>.</param>
+    /// <response code="200">Playlist returned.</response>
+    /// <response code="403">The caller does not own the session.</response>
+    /// <response code="404">No such live session-executed plan.</response>
+    /// <response code="422">The retained plan cannot be executed as planned.</response>
+    /// <returns>The live playlist.</returns>
+    [HttpGet("Playback/Sessions/{id}/Hls/live.m3u8")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesPlaylistFile]
+    [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId")]
+    public async Task<ActionResult> GetPlaybackSessionLiveHlsPlaylist(
+        [FromRoute] PlaybackSessionId id,
+        [FromQuery, Required] Guid itemId,
+        [FromQuery, Required] string mediaSourceId,
+        [FromQuery, Required] string playSessionId,
+        [FromServices] PlaybackSessionDeliveryGuard deliveryGuard)
+    {
+        var (refusal, request) = ResolveSessionOutput(deliveryGuard, id, itemId, mediaSourceId, playSessionId);
+        if (refusal is not null)
+        {
+            return refusal;
+        }
+
+        if (string.IsNullOrEmpty(request!.LiveStreamId))
+        {
+            return NotFound();
+        }
+
+        return await GetLivePlaylistInternal(
+            request,
+            sessionOwned: true,
+            (playlist, capabilityPropagated) => BindLiveSegments(playlist, itemId, mediaSourceId, playSessionId, capabilityPropagated)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Binds every segment uri of a live playlist to its session: the item, and - unless the
+    /// capability propagation adds them with the capability - the media source and play session
+    /// the session segment route demands. Line endings are kept as they are.
+    /// </summary>
+    /// <param name="playlist">The playlist ffmpeg wrote.</param>
+    /// <param name="itemId">The channel the session plays.</param>
+    /// <param name="mediaSourceId">The tuner source of the session's plan.</param>
+    /// <param name="playSessionId">The session's play session id.</param>
+    /// <param name="capabilityPropagated">Whether the capability propagation adds the media source and play session itself.</param>
+    /// <returns>The playlist, every segment uri bound to the session.</returns>
+    internal static string BindLiveSegments(string playlist, Guid itemId, string mediaSourceId, string playSessionId, bool capabilityPropagated)
+    {
+        var binding = "itemId=" + itemId.ToString("N", CultureInfo.InvariantCulture);
+        if (!capabilityPropagated)
+        {
+            binding += "&mediaSourceId=" + Uri.EscapeDataString(mediaSourceId) + "&playSessionId=" + Uri.EscapeDataString(playSessionId);
+        }
+
+        var builder = new StringBuilder(playlist.Length + 256);
+        var start = 0;
+        while (start < playlist.Length)
+        {
+            var end = playlist.IndexOf('\n', start);
+            var lineEnd = end < 0 ? playlist.Length : end;
+            var line = playlist.AsSpan(start, lineEnd - start);
+            var content = line.TrimEnd('\r');
+            builder.Append(content);
+            if (content.Length > 0 && content[0] != '#')
+            {
+                builder.Append(content.Contains('?') ? '&' : '?').Append(binding);
+            }
+            else if (content.StartsWith("#EXT-X-MAP:URI=\"", StringComparison.Ordinal))
+            {
+                // The fMP4 initialisation segment is named inside a tag.
+                builder.Length -= content.Length;
+                var uriEnd = content.LastIndexOf('"');
+                builder.Append(content[..uriEnd])
+                    .Append(content[..uriEnd].Contains('?') ? '&' : '?')
+                    .Append(binding)
+                    .Append(content[uriEnd..]);
+            }
+
+            builder.Append(line[content.Length..]);
+            if (end < 0)
+            {
+                break;
+            }
+
+            builder.Append('\n');
+            start = end + 1;
+        }
+
+        return builder.ToString();
     }
 
     /// <summary>

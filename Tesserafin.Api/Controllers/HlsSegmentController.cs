@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -13,6 +14,7 @@ using Tesserafin.Api.Helpers;
 using Tesserafin.Common.Api;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Net.PlaybackCredentials;
+using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Model.Net;
 
 namespace Tesserafin.Api.Controllers;
@@ -249,6 +251,61 @@ public class HlsSegmentController : BaseTesserafinApiController
         [FromRoute, Required] string playlistId,
         [FromRoute, Required] string segmentId,
         [FromRoute, Required] string segmentContainer)
+        => ServeOwnedVideoSegment(itemId, playlistId, segmentId, requiredPlaySessionId: null);
+
+    /// <summary>
+    /// Gets a segment of the live HLS output of a Live TV session the v2 engine decided
+    /// (<c>Playback/Sessions/{id}/Hls/live.m3u8</c> names these uris). The session is checked
+    /// first - owner, item, media source and play session - then the segment is served exactly as
+    /// the live segment route serves one: from the caller's own job, resolved from server state.
+    /// </summary>
+    /// <param name="id">The session.</param>
+    /// <param name="playlistId">The job's playlist id.</param>
+    /// <param name="segmentId">The segment name.</param>
+    /// <param name="segmentContainer">The segment container.</param>
+    /// <param name="itemId">The channel the session plays.</param>
+    /// <param name="mediaSourceId">The tuner source the session's plan selected.</param>
+    /// <param name="playSessionId">The session's play session id.</param>
+    /// <param name="deliveryGuard">Instance of <see cref="PlaybackSessionDeliveryGuard"/>.</param>
+    /// <param name="liveStreams">Instance of <see cref="PlaybackSessionLiveStreams"/>.</param>
+    /// <returns>The segment file.</returns>
+    [HttpGet("Playback/Sessions/{id}/Hls/hls/{playlistId}/{segmentId}.{segmentContainer}")]
+    [Authorize(Policy = Policies.MediaDelivery)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesVideoFile]
+    [SuppressMessage("Microsoft.Performance", "CA1801:ReviewUnusedParameters", MessageId = "segmentContainer", Justification = "Part of the segment uri ffmpeg writes; the extension is read from the path.")]
+    [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId")]
+    public ActionResult GetPlaybackSessionLiveSegment(
+        [FromRoute] PlaybackSessionId id,
+        [FromRoute, Required] string playlistId,
+        [FromRoute, Required] string segmentId,
+        [FromRoute, Required] string segmentContainer,
+        [FromQuery, Required] Guid itemId,
+        [FromQuery, Required] string mediaSourceId,
+        [FromQuery, Required] string playSessionId,
+        [FromServices] PlaybackSessionDeliveryGuard deliveryGuard,
+        [FromServices] PlaybackSessionLiveStreams liveStreams)
+    {
+        ArgumentNullException.ThrowIfNull(deliveryGuard);
+        ArgumentNullException.ThrowIfNull(liveStreams);
+        var delivery = deliveryGuard.Resolve(id, User, itemId, mediaSourceId, playSessionId, LocalMediaPlanner.IsExecutableHlsOutput, allowAdministrator: false);
+        if (delivery.Outcome == PlaybackSessionDeliveryOutcome.Forbidden)
+        {
+            return Forbid();
+        }
+
+        if (delivery.Outcome != PlaybackSessionDeliveryOutcome.Granted
+            || !LocalMediaPlanner.IsSessionLiveSource(delivery.Source, liveStreams.Get(id)))
+        {
+            return NotFound();
+        }
+
+        return ServeOwnedVideoSegment(itemId.ToString("N", CultureInfo.InvariantCulture), playlistId, segmentId, playSessionId);
+    }
+
+    private ActionResult ServeOwnedVideoSegment(string itemId, string playlistId, string segmentId, string? requiredPlaySessionId)
     {
         // #153-LTV-R1, LTV-R0 finding 2. Nothing below derives the file from the caller's
         // parameters. The job is resolved from server state FIRST, the path is canonicalised
@@ -277,6 +334,12 @@ public class HlsSegmentController : BaseTesserafinApiController
         if (!RequestedMediaSourceAgrees(binding))
         {
             return Unauthorized();
+        }
+
+        // A session's segment is its own play session's job's, not any job of the same caller.
+        if (requiredPlaySessionId is not null && !string.Equals(binding.PlaySessionId, requiredPlaySessionId, StringComparison.Ordinal))
+        {
+            return NotFound("Hls segment not found.");
         }
 
         // ffmpeg was told to write this job's segments as "{playlistId}%d.{ext}", so a segment name
