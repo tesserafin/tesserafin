@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
 using Tesserafin.Model.IO;
@@ -67,18 +68,18 @@ namespace Tesserafin.Controller.Entities
                 ?? throw new DirectoryNotFoundException($"Cannot read library directory {ContainingFolderPath}.");
         }
 
-        protected override IReadOnlyList<BaseItem> LoadChildren()
+        protected override IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
             lock (_childIdsLock)
             {
                 if (_childrenIds is null || _childrenIds.Length == 0)
                 {
-                    var list = base.LoadChildren();
+                    var list = base.LoadChildren(repository, lookup);
                     _childrenIds = list.Select(i => i.Id).ToArray();
                     return list;
                 }
 
-                return _childrenIds.Select(LibraryManager.GetItemById).Where(i => i is not null).ToList();
+                return _childrenIds.Select(lookup.GetItemById).Where(i => i is not null).ToList();
             }
         }
 

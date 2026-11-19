@@ -2,6 +2,7 @@ using System;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LibraryTaskScheduler;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 
 namespace Tesserafin.Server.Core.Library;
@@ -16,6 +17,8 @@ internal sealed class FolderValidationServices(
     IItemImageService images,
     IItemResolutionService resolution,
     IItemLookupService lookup,
+    IItemRepository repository,
+    IItemStore store,
     ILimitedConcurrencyLibraryScheduler scheduler,
     ILibraryRefreshProgress refreshProgress,
     Lazy<IChannelManager> channels,
@@ -35,6 +38,12 @@ internal sealed class FolderValidationServices(
 
     /// <inheritdoc />
     public IItemLookupService Lookup { get; } = lookup;
+
+    /// <inheritdoc />
+    public IItemRepository Repository { get; } = repository;
+
+    /// <inheritdoc />
+    public IItemStore Store { get; } = store;
 
     /// <inheritdoc />
     public ILimitedConcurrencyLibraryScheduler Scheduler { get; } = scheduler;

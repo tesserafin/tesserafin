@@ -11,6 +11,7 @@ using System.Threading;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
@@ -99,11 +100,11 @@ namespace Tesserafin.Controller.Entities.Movies
             return Enumerable.Empty<BaseItem>();
         }
 
-        protected override IReadOnlyList<BaseItem> LoadChildren()
+        protected override IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
             if (IsLegacyBoxSet)
             {
-                return base.LoadChildren();
+                return base.LoadChildren(repository, lookup);
             }
 
             // Save a trip to the database

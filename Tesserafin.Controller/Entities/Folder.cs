@@ -132,7 +132,7 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public virtual IEnumerable<BaseItem> Children
         {
-            get => _children ??= LoadChildren();
+            get => GetCatalogueChildren(ItemRepository, LibraryManager);
             set => _children = value;
         }
 
@@ -269,16 +269,30 @@ namespace Tesserafin.Controller.Entities
             return base.IsVisible(user, skipAllowedTagsCheck, tagVisibility);
         }
 
-        /// <summary>
-        /// Loads our children.  Validation will occur externally.
-        /// We want this synchronous.
-        /// </summary>
-        /// <returns>Returns children.</returns>
-        protected virtual IReadOnlyList<BaseItem> LoadChildren()
+        /// <summary>Gets the direct catalogue children using the supplied repository and identity lookup.</summary>
+        /// <param name="repository">The item repository.</param>
+        /// <param name="lookup">The identity lookup for folders that cache child identities.</param>
+        /// <returns>The folder's catalogue children.</returns>
+        public virtual IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
+            => _children ??= LoadChildren(repository, lookup);
+
+        /// <summary>Invalidates the cached direct children.</summary>
+        /// <param name="lookup">The identity lookup for folders that delegate to physical folders.</param>
+        public virtual void InvalidateCatalogueChildren(IItemLookupService lookup)
+            => Children = null;
+
+        /// <summary>Loads the folder's direct children from the catalogue.</summary>
+        /// <param name="repository">The item repository.</param>
+        /// <param name="lookup">The identity lookup for folders that cache child identities.</param>
+        /// <returns>The folder's persisted children.</returns>
+        protected virtual IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
-            // logger.LogDebug("Loading children from {0} {1} {2}", GetType().Name, Id, Path);
-            // just load our children from the repo - the library will be validated and maintained in other processes
-            return GetCachedChildren();
+            return repository.GetItemList(new InternalItemsQuery
+            {
+                Parent = this,
+                GroupByPresentationUniqueKey = false,
+                DtoOptions = new DtoOptions(true)
+            });
         }
 
         /// <summary>
@@ -420,7 +434,7 @@ namespace Tesserafin.Controller.Entities
 
                 if (validChildrenNeedGeneration)
                 {
-                    validChildren = Children.ToList();
+                    validChildren = GetCatalogueChildren(services.Repository, services.Lookup).ToList();
                     validChildrenNeedGeneration = false;
                 }
 
@@ -459,8 +473,8 @@ namespace Tesserafin.Controller.Entities
                 {
                     if (validChildrenNeedGeneration)
                     {
-                        Children = null; // invalidate cached children.
-                        validChildren = Children.ToList();
+                        InvalidateCatalogueChildren(services.Lookup);
+                        validChildren = GetCatalogueChildren(services.Repository, services.Lookup).ToList();
                     }
 
                     await RefreshMetadataRecursive(services, accessibleChildren, refreshOptions, recursive, innerProgress, cancellationToken).ConfigureAwait(false);

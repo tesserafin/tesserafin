@@ -74,7 +74,6 @@ namespace Tesserafin.Server.Core.Library
         private readonly IItemNamingService _itemNamingService;
         private readonly IItemPeopleService _itemPeopleService;
         private readonly IItemLookupService _itemLookupService;
-        private readonly IItemCacheStore _itemCacheStore;
         private readonly IItemAccessService _itemAccessService;
         private readonly IUserViewFactory _userViewFactory;
         private readonly IUserRootFolderProvider _userRootFolderProvider;
@@ -101,7 +100,6 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="itemPeopleService">The item people service.</param>
         /// <param name="mediaStreamLanguageService">The media stream language service.</param>
         /// <param name="itemLookupService">The item lookup service (read side of the item lookup cache; see PR75/PR76).</param>
-        /// <param name="itemCacheStore">The item cache lifecycle port (register/invalidate side of the same cache; see PR76).</param>
         /// <param name="itemAccessService">The item access service (user visibility on top of the item lookup service; see PR77).</param>
         /// <param name="userViewFactory">The user-view factory leaf (named/shadow view creation; see PR106b). <see cref="GetNamedView(User, string, CollectionType?, string)"/> and the other overloads delegate to it - a leaf dependency, not a cycle: <c>UserViewFactory</c> never references <see cref="ILibraryManager"/>.</param>
         /// <param name="userRootFolderProvider">The user root folder provider leaf (construction/cache of the per-server <see cref="UserRootFolder"/>; see PR107). <see cref="GetUserRootFolder"/> and this class's internal callers delegate to it - a leaf dependency, not a cycle: <c>UserRootFolderProvider</c> never references <see cref="ILibraryManager"/>. <see cref="LibraryManager"/> no longer implements <see cref="IUserRootFolderProvider"/> itself (it used to be aliased onto it via a DI factory cast - RFC <c>docs/rfc-di-query-user-views-v2.md</c> §0/§1's "piège n°1").</param>
@@ -123,7 +121,6 @@ namespace Tesserafin.Server.Core.Library
             IItemPeopleService itemPeopleService,
             IMediaStreamLanguageService mediaStreamLanguageService,
             IItemLookupService itemLookupService,
-            IItemCacheStore itemCacheStore,
             IItemAccessService itemAccessService,
             IUserViewFactory userViewFactory,
             IUserRootFolderProvider userRootFolderProvider,
@@ -145,7 +142,6 @@ namespace Tesserafin.Server.Core.Library
             _itemPeopleService = itemPeopleService;
 
             _itemLookupService = itemLookupService;
-            _itemCacheStore = itemCacheStore;
             _itemAccessService = itemAccessService;
 
             _userViewFactory = userViewFactory;
@@ -181,13 +177,6 @@ namespace Tesserafin.Server.Core.Library
             => _resolution.ResolveAlternateVersion(path, expectedVideoType, parent, collectionType);
 
         public bool AreEqualPaths(string first, string second) => _fileSystem.AreEqual(first, second);
-
-        public void RegisterItem(BaseItem item)
-        {
-            ArgumentNullException.ThrowIfNull(item);
-
-            _itemCacheStore.Register(item);
-        }
 
         public Guid GetNewItemId(string key, Type type)
         {

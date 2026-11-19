@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
@@ -51,17 +52,10 @@ namespace Tesserafin.Controller.Entities
 
         public override bool SupportsRawQueryItems => false;
 
-        /// <summary>
-        /// Gets or sets the libraries, read each time from the item cache: a list kept here would be
-        /// copies of them that an edit through the cache never reaches, so a tag saved on a library
-        /// would not apply to its items until the root was validated again.
-        /// </summary>
-        [JsonIgnore]
-        public override IEnumerable<BaseItem> Children
-        {
-            get => LoadChildren();
-            set => base.Children = value;
-        }
+        // Keep only the IDs so a library edit is visible without waiting for the next root scan.
+        /// <inheritdoc />
+        public override IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
+            => LoadChildren(repository, lookup);
 
         private void ClearCache()
         {
@@ -69,11 +63,6 @@ namespace Tesserafin.Controller.Entities
             {
                 _childrenIds = null;
             }
-        }
-
-        protected override IReadOnlyList<BaseItem> LoadChildren()
-        {
-            return LoadChildren(id => LibraryManager.GetItemById(id));
         }
 
         /// <summary>
@@ -86,21 +75,21 @@ namespace Tesserafin.Controller.Entities
         {
             ArgumentNullException.ThrowIfNull(lookup);
 
-            return LoadChildren(lookup.GetItemById);
+            return LoadChildren(ItemRepository, lookup);
         }
 
-        private IReadOnlyList<BaseItem> LoadChildren(Func<Guid, BaseItem> getItemById)
+        protected override IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
             lock (_childIdsLock)
             {
                 if (_childrenIds is null)
                 {
-                    var list = base.LoadChildren();
+                    var list = base.LoadChildren(repository, lookup);
                     _childrenIds = list.Select(i => i.Id).ToList();
                     return list;
                 }
 
-                return _childrenIds.Select(getItemById).Where(i => i is not null).ToList();
+                return _childrenIds.Select(lookup.GetItemById).Where(i => i is not null).ToList();
             }
         }
 
@@ -194,9 +183,9 @@ namespace Tesserafin.Controller.Entities
             // Fix is in two places - make sure the folder gets saved
             // And here to remedy it for affected users.
             // In theory this can be removed eventually.
-            foreach (var item in Children)
+            foreach (var item in GetCatalogueChildren(services.Repository, services.Lookup))
             {
-                LibraryManager.RegisterItem(item);
+                services.Store.RegisterItem(item);
             }
         }
     }

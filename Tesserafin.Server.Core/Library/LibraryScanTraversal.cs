@@ -45,7 +45,7 @@ internal sealed class LibraryScanTraversal(
         await userRoot.ValidateChildren(_validation, new Progress<double>(), new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         var deleted = new List<Guid>();
-        foreach (var child in userRoot.Children!.OfType<Folder>())
+        foreach (var child in userRoot.GetCatalogueChildren(services.Repository, services.Lookup).OfType<Folder>())
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (child is CollectionFolder && !Directory.Exists(child.Path))

@@ -1,5 +1,6 @@
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.LibraryTaskScheduler;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 
 namespace Tesserafin.Controller.Library;
@@ -28,6 +29,12 @@ public interface IFolderValidationServices
 
     /// <summary>Gets the catalogue hierarchy reader.</summary>
     IItemLookupService Lookup { get; }
+
+    /// <summary>Gets the catalogue repository for scan child reads.</summary>
+    IItemRepository Repository { get; }
+
+    /// <summary>Gets the item cache store.</summary>
+    IItemStore Store { get; }
 
     /// <summary>Gets the bounded-concurrency scheduler.</summary>
     ILimitedConcurrencyLibraryScheduler Scheduler { get; }

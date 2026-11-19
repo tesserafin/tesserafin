@@ -159,12 +159,6 @@ namespace Tesserafin.Controller.Library
         CollectionType? GetConfiguredContentType(BaseItem item);
 
         /// <summary>
-        /// Registers the item.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        void RegisterItem(BaseItem item);
-
-        /// <summary>
         /// Gets the named view.
         /// </summary>
         /// <param name="user">The user.</param>
