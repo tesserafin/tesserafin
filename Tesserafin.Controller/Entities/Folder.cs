@@ -1402,7 +1402,7 @@ namespace Tesserafin.Controller.Entities
         /// <param name="links">The saved link resolver.</param>
         /// <param name="filter">An optional filter for items returned by the traversal.</param>
         /// <returns>The distinct items in catalogue traversal order.</returns>
-        protected IReadOnlyList<BaseItem> GetRecursiveCatalogueChildren(
+        public IReadOnlyList<BaseItem> GetRecursiveCatalogueChildren(
             IItemRepository repository,
             IItemLookupService lookup,
             LinkedChildResolver links,

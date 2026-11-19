@@ -11,6 +11,7 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
@@ -213,25 +214,23 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         public Guid FindSeasonId()
+            => ResolveSeasonId(FindParent<Season>(), () => Series?.Children);
+
+        /// <summary>Finds the parent season, or a numbered season for an episode stored in the series folder.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <param name="repository">The item repository.</param>
+        /// <returns>The season ID, or <see cref="Guid.Empty"/> if no season matches.</returns>
+        public Guid FindSeasonId(IItemLookupService lookup, IItemRepository repository)
+            => ResolveSeasonId(FindParent<Season>(lookup), () => GetSeries(lookup)?.GetCatalogueChildren(repository, lookup));
+
+        private Guid ResolveSeasonId(Season season, Func<IEnumerable<BaseItem>> getSeriesChildren)
         {
-            var season = FindParent<Season>();
-
-            // Episodes directly in series folder
-            if (season is null)
+            if (season is null && ParentIndexNumber is int seasonNumber)
             {
-                var series = Series;
-
-                if (series is not null && ParentIndexNumber.HasValue)
-                {
-                    var findNumber = ParentIndexNumber.Value;
-
-                    season = series.Children
-                        .OfType<Season>()
-                        .FirstOrDefault(i => i.IndexNumber.HasValue && i.IndexNumber.Value == findNumber);
-                }
+                season = getSeriesChildren()?.OfType<Season>().FirstOrDefault(item => item.IndexNumber == seasonNumber);
             }
 
-            return season is null ? Guid.Empty : season.Id;
+            return season?.Id ?? Guid.Empty;
         }
 
         /// <summary>
