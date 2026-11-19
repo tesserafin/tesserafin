@@ -635,7 +635,8 @@ namespace Tesserafin.Providers.Tests.Manager
                 itemLookup,
                 repository,
                 Mock.Of<IItemStore>(),
-                new Lazy<IItemMetadataDispatcher>(() => providerManager));
+                new Lazy<IItemMetadataDispatcher>(() => providerManager),
+                new LinkedChildResolver(repository, itemLookup, Mock.Of<IItemPathLookupService>(), Mock.Of<IFileSystem>(), NullLogger<LinkedChildResolver>.Instance));
 
             providerManager = new ProviderManager(
                 writes,

@@ -608,7 +608,13 @@ public class LibraryManagerItemLookupTests
             _itemLookupService,
             _itemRepositoryMock.Object,
             Mock.Of<IItemStore>(),
-            new Lazy<IItemMetadataDispatcher>(() => providerManager.Object));
+            new Lazy<IItemMetadataDispatcher>(() => providerManager.Object),
+            new LinkedChildResolver(
+                _itemRepositoryMock.Object,
+                _itemLookupService,
+                _itemLookupService,
+                Mock.Of<Tesserafin.Model.IO.IFileSystem>(),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<LinkedChildResolver>.Instance));
         var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(context, roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
         await traversal.RefreshTopFoldersAsync(cancellationToken, false);
 

@@ -1381,43 +1381,53 @@ namespace Tesserafin.Controller.Entities
         }
 
         public IReadOnlyList<BaseItem> GetRecursiveChildren(Func<BaseItem, bool> filter, bool includeLinkedChildren)
+            => ReadRecursiveChildren(filter, static folder => folder.Children, includeLinkedChildren ? static folder => folder.GetLinkedChildren() : null);
+
+        /// <summary>Reads the descendants and top-level saved links for a metadata refresh.</summary>
+        /// <param name="context">The scan's catalogue services.</param>
+        /// <returns>The distinct items in catalogue traversal order.</returns>
+        protected IReadOnlyList<BaseItem> GetRecursiveCatalogueChildren(LibraryScanContext context)
+            => ReadRecursiveChildren(
+                null,
+                folder => folder.GetCatalogueChildren(context.Repository, context.Lookup),
+                folder => context.Links.Resolve(folder).Select(entry => entry.Item));
+
+        private IReadOnlyList<BaseItem> ReadRecursiveChildren(
+            Func<BaseItem, bool> filter,
+            Func<Folder, IEnumerable<BaseItem>> readChildren,
+            Func<Folder, IEnumerable<BaseItem>> readRootLinks)
         {
             var result = new Dictionary<Guid, BaseItem>();
 
-            AddChildrenToList(result, includeLinkedChildren, true, filter);
+            AddPhysicalChildren(this);
+            if (readRootLinks is not null)
+            {
+                // Only follow links from the starting folder, where they contribute items but no new branches.
+                foreach (var child in readRootLinks(this))
+                {
+                    AddMatching(child);
+                }
+            }
 
             return result.Values.ToArray();
-        }
 
-        /// <summary>
-        /// Adds the children to list.
-        /// </summary>
-        private void AddChildrenToList(Dictionary<Guid, BaseItem> result, bool includeLinkedChildren, bool recursive, Func<BaseItem, bool> filter)
-        {
-            foreach (var child in Children)
+            void AddPhysicalChildren(Folder folder)
+            {
+                foreach (var child in readChildren(folder))
+                {
+                    AddMatching(child);
+                    if (child.IsFolder)
+                    {
+                        AddPhysicalChildren((Folder)child);
+                    }
+                }
+            }
+
+            void AddMatching(BaseItem child)
             {
                 if (filter is null || filter(child))
                 {
                     result[child.Id] = child;
-                }
-
-                if (recursive && child.IsFolder)
-                {
-                    var folder = (Folder)child;
-
-                    // We can only support includeLinkedChildren for the first folder, or we might end up stuck in a loop of linked items
-                    folder.AddChildrenToList(result, false, true, filter);
-                }
-            }
-
-            if (includeLinkedChildren)
-            {
-                foreach (var child in GetLinkedChildren())
-                {
-                    if (filter is null || filter(child))
-                    {
-                        result[child.Id] = child;
-                    }
                 }
             }
         }

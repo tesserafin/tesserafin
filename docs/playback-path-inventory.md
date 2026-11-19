@@ -1408,3 +1408,11 @@ repository. Serving an image, deleting its file, and swapping thumbnail
 files use the same lookup and the controller's filesystem. The base item
 image collection continues to own the images stored directly on the item.
 The static chapter manager is removed from the entity and from startup.
+
+## 63. Catalogue traversal for container metadata
+
+Series and album metadata refresh use the scan context to read direct
+catalogue children and resolve saved links. The shared traversal keeps
+physical traversal order, loads links only from the starting folder and
+deduplicates by item ID. Metadata refresh keeps its existing season and
+episode order and existing album rules.

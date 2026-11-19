@@ -310,9 +310,9 @@ namespace Tesserafin.Controller.Entities.TV
 
         public async Task RefreshAllMetadata(LibraryScanContext context, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
-            Children = null; // invalidate cached children.
+            InvalidateCatalogueChildren(context.Lookup);
             // Refresh bottom up, seasons and episodes first, then the series
-            var items = GetRecursiveChildren();
+            var items = GetRecursiveCatalogueChildren(context);
 
             var totalItems = items.Count;
             var numComplete = 0;

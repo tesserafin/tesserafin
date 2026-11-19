@@ -18,6 +18,7 @@ namespace Tesserafin.Controller.Library;
 /// <param name="Repository">Reads the persisted children of each folder.</param>
 /// <param name="Store">Registers refreshed library definitions in the item cache.</param>
 /// <param name="Metadata">Executes metadata refreshes. Resolution is deferred because the manager also initiates scans.</param>
+/// <param name="Links">Resolves saved links during container metadata refresh.</param>
 public sealed record LibraryScanContext(
     IItemDeletionCommands Deletions,
     IItemWriteCommands Writes,
@@ -28,4 +29,5 @@ public sealed record LibraryScanContext(
     IItemLookupService Lookup,
     IItemRepository Repository,
     IItemStore Store,
-    Lazy<IItemMetadataDispatcher> Metadata);
+    Lazy<IItemMetadataDispatcher> Metadata,
+    LinkedChildResolver Links);
