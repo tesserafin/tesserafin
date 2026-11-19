@@ -27,6 +27,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 {
     private readonly IItemSortService _itemSortService;
     private readonly IItemLookupService _lookup;
+    private readonly ICollectionFolderResolver _collections;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SeasonMetadataService"/> class.
@@ -43,6 +44,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     /// <param name="lookup">The item identity lookup.</param>
+    /// <param name="collections">The library membership resolver.</param>
     public SeasonMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -55,11 +57,13 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
         IItemSortService itemSortService,
-        IItemLookupService lookup)
+        IItemLookupService lookup,
+        ICollectionFolderResolver collections)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository)
     {
         _itemSortService = itemSortService;
         _lookup = lookup;
+        _collections = collections;
     }
 
     /// <inheritdoc />
@@ -70,8 +74,11 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
         => ValueTask.FromResult(item.BeforeMetadataRefresh(replaceAllMetadata, ItemNamingService, _lookup));
 
     /// <inheritdoc />
-    protected override SeasonInfo GetLookupInfo(Season item)
-        => item.GetLookupInfo(_lookup);
+    protected override SeasonInfo GetLookupInfo(Season item, LibraryOptions libraryOptions)
+    {
+        var locale = item.GetMetadataLocale(_lookup, _collections, libraryOptions, ServerConfigurationManager.Configuration);
+        return item.GetLookupInfo(_lookup, locale);
+    }
 
     /// <inheritdoc />
     protected override string CreatePresentationUniqueKey(Season item)

@@ -112,13 +112,14 @@ public sealed class SeasonMetadataServiceTests
             Mock.Of<IExternalDataManager>(),
             Mock.Of<IItemRepository>(),
             Mock.Of<IItemSortService>(),
-            lookup ?? Mock.Of<IItemLookupService>())
+            lookup ?? Mock.Of<IItemLookupService>(),
+            Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict))
     {
         public ItemUpdateType Prepare(Season season) => BeforeSaveInternal(season, false, ItemUpdateType.None);
 
         public ValueTask<bool> PrepareRefreshAsync(Season season, CancellationToken cancellationToken)
             => BeforeMetadataRefreshAsync(season, new LibraryOptions(), false, cancellationToken);
 
-        public SeasonInfo ReadLookupInfo(Season season) => GetLookupInfo(season);
+        public SeasonInfo ReadLookupInfo(Season season) => GetLookupInfo(season, new LibraryOptions());
     }
 }

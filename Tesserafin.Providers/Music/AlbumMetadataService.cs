@@ -12,6 +12,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.Manager;
@@ -74,7 +75,7 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
     protected override bool EnableUpdatingStudiosFromChildren => true;
 
     /// <inheritdoc />
-    protected override AlbumInfo GetLookupInfo(MusicAlbum item)
+    protected override AlbumInfo GetLookupInfo(MusicAlbum item, LibraryOptions libraryOptions)
         => item.GetLookupInfo(ItemRepository, _lookup, _links, _artists);
 
     /// <inheritdoc />

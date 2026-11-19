@@ -114,6 +114,60 @@ public sealed class SeriesMetadataServiceTests
         Assert.Equal(series.Id.ToString("N"), service.ReadPresentationKey(series));
     }
 
+    [Theory]
+    [InlineData(0, 1, "it", "NL")]
+    [InlineData(1, 0, "nl", "IT")]
+    [InlineData(2, 3, "de", "PT")]
+    [InlineData(3, 4, "pt", "FR")]
+    [InlineData(4, 2, "fr", "DE")]
+    public void LookupInfo_ResolvesLanguageAndCountryIndependently(
+        int languageSource,
+        int countrySource,
+        string expectedLanguage,
+        string expectedCountry)
+    {
+        var parent = new Folder
+        {
+            Id = Guid.NewGuid(),
+            PreferredMetadataLanguage = languageSource <= 1 ? "nl" : null,
+            PreferredMetadataCountryCode = countrySource <= 1 ? "NL" : null
+        };
+        var series = new Series
+        {
+            Id = Guid.NewGuid(),
+            ParentId = parent.Id,
+            PreferredMetadataLanguage = languageSource == 0 ? "it" : null,
+            PreferredMetadataCountryCode = countrySource == 0 ? "IT" : null
+        };
+        var folder = new CollectionFolder
+        {
+            PreferredMetadataLanguage = languageSource <= 2 ? "de" : null,
+            PreferredMetadataCountryCode = countrySource <= 2 ? "DE" : null
+        };
+        var options = new LibraryOptions
+        {
+            PreferredMetadataLanguage = languageSource <= 3 ? "pt" : null,
+            MetadataCountryCode = countrySource <= 3 ? "PT" : null
+        };
+        var configuration = new ServerConfiguration { PreferredMetadataLanguage = "fr", MetadataCountryCode = "FR" };
+        var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
+        lookup.Setup(l => l.GetItemById(parent.Id)).Returns(parent);
+        var collections = new Mock<ICollectionFolderResolver>(MockBehavior.Strict);
+        collections.Setup(c => c.GetCollectionFolders(series)).Returns([folder]);
+        var service = new TestSeriesMetadataService(
+            Mock.Of<IItemRepository>(MockBehavior.Strict),
+            lookup.Object,
+            CreateLinks(lookup.Object),
+            collections: collections.Object,
+            configuration: Mock.Of<IServerConfigurationManager>(c => c.Configuration == configuration));
+
+        var info = service.ReadLookupInfo(series, options);
+
+        Assert.Equal(expectedLanguage, info.MetadataLanguage);
+        Assert.Equal(expectedCountry, info.MetadataCountryCode);
+        collections.Verify(c => c.GetCollectionFolders(series), languageSource >= 2 || countrySource >= 2 ? Times.Once() : Times.Never());
+    }
+
     private static LinkedChildResolver CreateLinks(IItemLookupService lookup)
         => new(
             Mock.Of<IItemRepository>(MockBehavior.Strict),
@@ -156,5 +210,7 @@ public sealed class SeriesMetadataServiceTests
         public ItemUpdateType Prepare(Series series) => BeforeSaveInternal(series, false, ItemUpdateType.None);
 
         public string ReadPresentationKey(Series series) => CreatePresentationUniqueKey(series);
+
+        public SeriesInfo ReadLookupInfo(Series series, LibraryOptions libraryOptions) => GetLookupInfo(series, libraryOptions);
     }
 }

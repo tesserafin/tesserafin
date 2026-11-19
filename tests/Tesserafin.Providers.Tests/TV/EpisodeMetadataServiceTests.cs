@@ -216,7 +216,8 @@ public class EpisodeMetadataServiceTests
                 sources ?? Mock.Of<IMediaSourceManager>(),
                 segments ?? Mock.Of<IMediaSegmentManager>(),
                 channels ?? Mock.Of<IChannelManager>(),
-                lookup ?? Mock.Of<IItemLookupService>())
+                lookup ?? Mock.Of<IItemLookupService>(),
+                Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict))
         {
         }
 
@@ -225,7 +226,7 @@ public class EpisodeMetadataServiceTests
 
         public ItemUpdateType PrepareSave(Episode episode) => BeforeSaveInternal(episode, false, ItemUpdateType.None);
 
-        public EpisodeInfo ReadLookupInfo(Episode episode) => GetLookupInfo(episode);
+        public EpisodeInfo ReadLookupInfo(Episode episode) => GetLookupInfo(episode, new LibraryOptions());
 
         public void Merge(MetadataResult<Episode> source, MetadataResult<Episode> target, bool replaceData, bool mergeMetadataSettings)
         {

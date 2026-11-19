@@ -375,17 +375,18 @@ namespace Tesserafin.Controller.Entities.TV
         /// </summary>
         /// <returns>SeasonInfo.</returns>
         public SeasonInfo GetLookupInfo()
-            => CreateLookupInfo(Series);
+            => CreateLookupInfo(Series, null);
 
         /// <summary>Builds provider lookup information using the supplied lookup for the owning series.</summary>
         /// <param name="lookup">The item identity lookup.</param>
+        /// <param name="locale">The resolved metadata language and country.</param>
         /// <returns>The lookup information.</returns>
-        public SeasonInfo GetLookupInfo(IItemLookupService lookup)
-            => CreateLookupInfo(GetSeries(lookup));
+        public SeasonInfo GetLookupInfo(IItemLookupService lookup, (string Language, string CountryCode) locale)
+            => CreateLookupInfo(GetSeries(lookup), locale);
 
-        private SeasonInfo CreateLookupInfo(Series series)
+        private SeasonInfo CreateLookupInfo(Series series, (string Language, string CountryCode)? locale)
         {
-            var id = GetItemLookupInfo<SeasonInfo>();
+            var id = GetItemLookupInfo<SeasonInfo>(locale);
 
             if (series is not null)
             {
