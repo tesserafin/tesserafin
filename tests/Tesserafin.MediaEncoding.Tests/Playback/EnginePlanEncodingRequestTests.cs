@@ -229,6 +229,46 @@ public sealed class EnginePlanEncodingRequestTests
     }
 
     [Fact]
+    public void An_audio_plan_renders_an_audio_only_request()
+    {
+        var plan = new PlaybackExecutionPlan(
+            PlaybackMethod.Transcode,
+            SourceId: "track",
+            Container: "mp4",
+            Protocol: StreamingProtocol.Hls,
+            VideoStreamIndex: null,
+            VideoCodec: null,
+            VideoBitrate: null,
+            Resolution: null,
+            VideoRange: null,
+            AudioStreamIndex: 0,
+            AudioCodec: "aac",
+            AudioBitrate: null,
+            AudioChannels: 2,
+            TotalBitrate: null,
+            SubtitleStreamIndex: null,
+            SubtitleDelivery: null,
+            SubtitleFormat: null,
+            Transforms: [TransformKind.RemuxContainer, TransformKind.TranscodeAudio]);
+
+        var request = EnginePlanEncodingRequest.Build(plan, Guid.NewGuid(), "ps", "device", null, null);
+
+        // Not a VideoRequestDto: the executor reads that type as "the output has video".
+        Assert.IsNotType<Tesserafin.Controller.Streaming.VideoRequestDto>(request);
+        Assert.True(request.BuiltFromRetainedPlan);
+        Assert.Null(request.VideoStreamIndex);
+        Assert.Null(request.VideoCodec);
+        Assert.Null(request.VideoBitRate);
+        Assert.Equal(0, request.AudioStreamIndex);
+        Assert.Equal("aac", request.AudioCodec);
+        Assert.False(request.AllowAudioStreamCopy);
+        Assert.False(request.EnableAutoStreamCopy);
+        Assert.Equal(2, request.TranscodingMaxAudioChannels);
+        Assert.Equal(EnginePlanEncodingRequest.DefaultAudioBitratePerChannelPair, request.AudioBitRate);
+        Assert.IsType<Tesserafin.Controller.Streaming.VideoRequestDto>(EnginePlanEncodingRequest.Build(_audioOnly, Guid.NewGuid(), "ps", "device", Source("ac3"), null));
+    }
+
+    [Fact]
     public void A_plan_the_session_route_does_not_execute_has_no_request()
     {
         Assert.Throws<ArgumentException>(() => EnginePlanEncodingRequest.Build(_audioOnly with { Protocol = StreamingProtocol.Http }, Guid.NewGuid(), "ps", "device", null, null));

@@ -35,9 +35,9 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// The declared inputs reach the planner through an ambient request scope opened by the
 /// controller around <see cref="IPlaybackSessionManager.Create"/>/<see cref="IPlaybackSessionManager.Patch"/>,
 /// the same capture pattern <see cref="IV2PlanStore"/> already uses. Without a scope (the legacy
-/// <c>PlaybackInfo</c> path, a channel item, Live TV), this decorator only delegates. For audio only a
-/// direct play is owned here: the session's HLS route executes video plans, so an audio remux or
-/// transcode still reaches the existing chain.
+/// <c>PlaybackInfo</c> path, a channel item, Live TV), this decorator only delegates. For audio a
+/// direct play and a transcode to AAC over HLS (<see cref="IsExecutableAudioTranscode"/>) are owned
+/// here; an audio remux still reaches the existing chain.
 /// </remarks>
 public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
 {
@@ -154,12 +154,27 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
 
     /// <summary>
     /// Determines whether a plan is one the session's HLS route executes from the plan alone: an
-    /// executable remux or an executable transcode.
+    /// executable remux, an executable video transcode or an executable audio transcode.
     /// </summary>
     /// <param name="plan">The execution plan.</param>
     /// <returns><see langword="true"/> if the session's HLS route produces this plan.</returns>
     public static bool IsExecutableHlsOutput(PlaybackExecutionPlan? plan)
-        => IsExecutableRemux(plan) || IsExecutableTranscode(plan);
+        => IsExecutableRemux(plan) || IsExecutableTranscode(plan) || IsExecutableAudioTranscode(plan);
+
+    /// <summary>
+    /// Determines whether a plan is an audio transcode this server executes from the plan alone:
+    /// the engine chose <see cref="PlaybackMethod.Transcode"/> for one audio stream and no video
+    /// stream, delivered over HLS in fMP4 or MPEG-TS segments, re-encoded to AAC (optionally
+    /// down-mixed). No subtitle, no copy: an audio remux is not this definition.
+    /// </summary>
+    /// <param name="plan">The execution plan.</param>
+    /// <returns><see langword="true"/> if the plan is an executable audio transcode.</returns>
+    public static bool IsExecutableAudioTranscode(PlaybackExecutionPlan? plan)
+        => plan is { Method: PlaybackMethod.Transcode, Protocol: StreamingProtocol.Hls, VideoStreamIndex: null, AudioStreamIndex: not null, SubtitleStreamIndex: null }
+            && string.Equals(plan.AudioCodec, "aac", StringComparison.OrdinalIgnoreCase)
+            && (string.Equals(plan.Container, "mp4", StringComparison.OrdinalIgnoreCase) || string.Equals(plan.Container, "ts", StringComparison.OrdinalIgnoreCase))
+            && plan.Transforms.Contains(TransformKind.TranscodeAudio)
+            && plan.Transforms.All(transform => transform is TransformKind.RemuxContainer or TransformKind.TranscodeAudio or TransformKind.Downmix);
 
     /// <summary>
     /// Determines whether a plan is a transcode this server executes from the plan alone: the
@@ -241,7 +256,7 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             {
                 remux = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }
-            else if (transcode is null && IsExecutableTranscode(plan))
+            else if (transcode is null && (IsExecutableTranscode(plan) || IsExecutableAudioTranscode(plan)))
             {
                 transcode = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }

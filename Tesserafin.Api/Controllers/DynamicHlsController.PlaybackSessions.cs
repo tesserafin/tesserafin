@@ -115,14 +115,17 @@ public partial class DynamicHlsController
     /// <summary>
     /// Whether the state the executor resolved is the plan and nothing else: the streams the plan
     /// selected, each copied exactly when the plan copies it, and each encoded stream encoded to
-    /// the plan's codec. The executor falls back to a first stream when an index no longer exists
-    /// (a file replaced since planning) and refuses a copy it cannot make; either is a different
-    /// playback, not this plan.
+    /// the plan's codec; an audio plan is an audio output, with no video stream at all. The executor
+    /// falls back to a first stream when an index no longer exists (a file replaced since planning,
+    /// or, for an audio output, a plan that selected another than the source's default audio stream)
+    /// and refuses a copy it cannot make; either is a different playback, not this plan.
     /// </summary>
     private static bool IsThePlan(StreamState state, StreamingRequestDto request)
         => state.VideoStream?.Index == request.VideoStreamIndex
             && state.AudioStream?.Index == request.AudioStreamIndex
-            && IsThePlannedCodec(state.OutputVideoCodec, request.AllowVideoStreamCopy, (request as VideoRequestDto)?.VideoCodec)
+            && (request is VideoRequestDto
+                ? IsThePlannedCodec(state.OutputVideoCodec, request.AllowVideoStreamCopy, request.VideoCodec)
+                : !state.IsOutputVideo && state.OutputVideoCodec is null)
             && (state.AudioStream is null || IsThePlannedCodec(state.OutputAudioCodec, request.AllowAudioStreamCopy, request.AudioCodec));
 
     private static bool IsThePlannedCodec(string? outputCodec, bool planCopies, string? plannedCodec)
@@ -143,7 +146,7 @@ public partial class DynamicHlsController
     /// (<see cref="EnginePlanEncodingRequest"/>). Only the session's owner: the job a segment
     /// request starts is owned by its caller, and the session's stop ends its owner's jobs.
     /// </summary>
-    private (ActionResult? Refusal, VideoRequestDto? Request) ResolveSessionOutput(
+    private (ActionResult? Refusal, StreamingRequestDto? Request) ResolveSessionOutput(
         PlaybackSessionDeliveryGuard deliveryGuard,
         PlaybackSessionId id,
         Guid itemId,

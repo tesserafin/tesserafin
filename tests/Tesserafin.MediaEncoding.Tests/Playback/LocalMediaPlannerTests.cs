@@ -213,20 +213,94 @@ public sealed class LocalMediaPlannerTests
         Assert.Equal(PlaybackMethod.DirectPlay, record?.ExecutionPlan?.Method);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void An_audio_track_that_needs_a_transcode_to_aac_over_hls_is_owned_without_the_legacy_planner(bool coverArt)
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var track = Track("track", "flac");
+        if (coverArt)
+        {
+            // An embedded picture is a video stream to the prober; it is not what an audio session plays.
+            track.MediaStreams = [.. track.MediaStreams, new MediaStream { Index = 1, Type = MediaStreamType.EmbeddedImage, Codec = "mjpeg" }];
+        }
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(AudioPlayer(["mp3"]), _declared));
+        var plan = planner.PlanAudio(Options(track));
+        var record = store.TakeCaptured();
+
+        Assert.Equal(PlayMethod.Transcode, plan?.PlayMethod);
+        Assert.Null(plan?.StreamInfo);
+        var executed = record?.ExecutionPlan;
+        Assert.NotNull(executed);
+        Assert.Equal(PlaybackMethod.Transcode, executed.Method);
+        Assert.Null(executed.VideoStreamIndex);
+        Assert.Equal(0, executed.AudioStreamIndex);
+        Assert.Equal("aac", executed.AudioCodec);
+        Assert.True(LocalMediaPlanner.IsExecutableAudioTranscode(executed));
+        Assert.True(LocalMediaPlanner.IsExecutableHlsOutput(executed));
+    }
+
     [Fact]
-    public void An_audio_track_that_needs_a_transcode_is_left_to_the_existing_chain()
+    public void An_audio_transcode_to_a_target_the_session_route_does_not_encode_is_left_to_the_existing_chain()
     {
         var existing = new PlaybackPlan(PlayMethod.Transcode, 0);
         var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
         inner.Setup(p => p.PlanAudio(It.IsAny<MediaOptions>())).Returns(existing);
         var (planner, store) = Planner(inner.Object);
+        var mp3Output = AudioPlayer(["mp3"]) with
+        {
+            OutputProfiles = [new PlaybackOutputProfile(MediaKind.Audio, StreamingProtocol.Hls, "ts", [], ["mp3"], null, null, null)],
+        };
 
         using var capture = store.BeginCapture();
-        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(AudioPlayer(["mp3"]), _declared));
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(mp3Output, _declared));
         var plan = planner.PlanAudio(Options(Track("track", "flac")));
 
         Assert.Same(existing, plan);
         Assert.Null(store.TakeCaptured());
+    }
+
+    [Fact]
+    public void Only_an_hls_aac_transcode_of_one_audio_stream_is_an_executable_audio_transcode()
+    {
+        var audio = new PlaybackExecutionPlan(
+            PlaybackMethod.Transcode,
+            SourceId: "track",
+            Container: "mp4",
+            Protocol: StreamingProtocol.Hls,
+            VideoStreamIndex: null,
+            VideoCodec: null,
+            VideoBitrate: null,
+            Resolution: null,
+            VideoRange: null,
+            AudioStreamIndex: 0,
+            AudioCodec: "aac",
+            AudioBitrate: null,
+            AudioChannels: 2,
+            SubtitleStreamIndex: null,
+            SubtitleFormat: null,
+            SubtitleDelivery: null,
+            TotalBitrate: null,
+            Transforms: [TransformKind.RemuxContainer, TransformKind.TranscodeAudio, TransformKind.Downmix]);
+
+        Assert.True(LocalMediaPlanner.IsExecutableAudioTranscode(audio));
+        Assert.True(LocalMediaPlanner.IsExecutableAudioTranscode(audio with { Container = "ts" }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioTranscode(audio with { Container = "mp3" }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioTranscode(audio with { AudioCodec = "mp3" }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioTranscode(audio with { Protocol = StreamingProtocol.Http }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioTranscode(audio with { Method = PlaybackMethod.Remux, Transforms = [TransformKind.RemuxContainer, TransformKind.CopyAudio] }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioTranscode(audio with { Transforms = [TransformKind.RemuxContainer, TransformKind.CopyAudio] }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioTranscode(audio with { AudioStreamIndex = null }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioTranscode(audio with { VideoStreamIndex = 1, VideoCodec = "h264" }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioTranscode(audio with { SubtitleStreamIndex = 2, SubtitleFormat = "srt", SubtitleDelivery = Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioTranscode(null));
+
+        // A video plan is never an audio one, and the reverse.
+        Assert.False(LocalMediaPlanner.IsExecutableTranscode(audio));
+        Assert.False(LocalMediaPlanner.IsExecutableRemux(audio));
     }
 
     private static (LocalMediaPlanner Planner, InMemoryV2PlanStore Store) Planner(IPlaybackSessionPlanner inner)

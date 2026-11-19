@@ -214,6 +214,46 @@ public static class EndToEndMediaFixtures
     }
 
     /// <summary>
+    /// Synthesizes a real audio file in a format a browser does not play: a 440 Hz stereo tone
+    /// encoded as WMA in ASF, or as FLAC carrying an embedded cover picture (a PNG the prober reports
+    /// as a video stream).
+    /// </summary>
+    /// <param name="directory">The directory to write the fixture into.</param>
+    /// <param name="withCoverArt"><see langword="true"/> for FLAC with an embedded picture, otherwise WMA.</param>
+    /// <param name="durationSeconds">The duration of the fixture, in seconds.</param>
+    /// <returns>The full path to the synthesized file.</returns>
+    public static async Task<string> CreateUndecodedAudioAsync(string directory, bool withCoverArt, int durationSeconds = DurationSeconds)
+    {
+        var path = Path.Combine(directory, withCoverArt ? "fixture.flac" : "fixture.wma");
+        var duration = durationSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        string[] arguments = withCoverArt
+            ?
+            [
+                "-hide_banner", "-y",
+                "-f", "lavfi", "-i", $"sine=frequency=440:duration={duration}",
+                "-f", "lavfi", "-i", "color=c=red:s=64x64:d=1",
+                "-map", "0:a", "-map", "1:v", "-frames:v", "1",
+                "-c:a", "flac", "-ac", "2", "-c:v", "png", "-disposition:v", "attached_pic",
+                "-f", "flac", path,
+            ]
+            :
+            [
+                "-hide_banner", "-y",
+                "-f", "lavfi", "-i", $"sine=frequency=440:duration={duration}",
+                "-c:a", "wmav2", "-b:a", "128k", "-ac", "2",
+                "-f", "asf", path,
+            ];
+        await RunFfmpegAsync(arguments).ConfigureAwait(false);
+
+        if (!File.Exists(path) || new FileInfo(path).Length == 0)
+        {
+            throw new InvalidOperationException($"ffmpeg did not produce a non-empty fixture at {path}.");
+        }
+
+        return path;
+    }
+
+    /// <summary>
     /// Runs the REAL ffprobe binary against a file on disk and returns, per stream, its type, codec
     /// and (for video) width: what was actually produced, not what a command line or a label says.
     /// </summary>

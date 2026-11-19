@@ -264,7 +264,7 @@ those paths: §7.
 Outside this slice: HDR tone mapping and subtitle burn-in (explicitly), a transcode over plain HTTP,
 target codecs other than H.264/AAC, other media families, the global flag and the shadow.
 
-## 7. Loop 4 slice: every local library video, then local audio, on the same journey
+## 7. Loop 4 slice: every local library video, then local audio (direct play, transcode), on the same journey
 
 Scenario: an `Episode` in a local file, played by the same client and in the same three ways as
 a film: direct play (§4), HLS remux (§5) and SDR H.264/AAC transcode (§6). Nothing about the
@@ -310,14 +310,28 @@ yet: the session's HLS route builds video requests, so those plans reach the exi
 another user), required by name; with the controller's audio scope removed all three turn red with
 "The legacy planner (StreamBuilder) was reached".
 
+Audio, second slice: an audio track the client does not play as it is, and for which it declares
+an AAC-over-HLS output, is transcoded on the session's HLS route
+(`LocalMediaPlanner.IsExecutableAudioTranscode`: one audio stream, no video stream, no subtitle,
+re-encoded to AAC, optionally down-mixed, in fMP4 or MPEG-TS segments). The engine selects no
+video stream for `MediaKind.Audio`, even when the file carries an embedded picture.
+`EnginePlanEncodingRequest.Build` renders such a plan as a plain `StreamingRequestDto`, not a
+`VideoRequestDto`: the executor reads the request type as "the output has video", and an
+audio-only request makes it map no video (`-vn`). `IsThePlan` refuses an audio request whose
+executed state has video, or whose audio stream is not the plan's (the executor picks the
+source's default audio stream for audio, so a plan naming another one is refused rather than
+played as something else). An audio remux (copy into HLS) is still not owned. Proof:
+`TranscodeAudioEndToEndTests` (WMA; FLAC with an embedded picture, output probed as AAC only;
+another user), required by name, on the host where the legacy planner throws.
+
 Remaining consumers by name. Nothing is deleted globally while one of them still needs it:
 
 | Legacy path | Still reached by |
 | --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | audio that needs a remux or a transcode, Live TV, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
+| `PlaybackSessionPlanner` / `StreamBuilder` | audio that needs a remux, or a transcode to a target other than AAC over HLS, Live TV, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
-| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio the client does not play as it is, Live TV, channel-plugin items; a library video the server does not serve from the session |
+| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio the server does not serve from the session, Live TV, channel-plugin items; a library video the server does not serve from the session |
 
 ## 8. Shared model boundary (consolidation step 4, candidate)
 

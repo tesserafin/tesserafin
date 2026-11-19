@@ -66,8 +66,12 @@ public static class EnginePlanEncodingRequest
     /// <param name="deviceId">The device the session was planned for.</param>
     /// <param name="source">The media source the plan selected, for the bitrate of a copied audio stream.</param>
     /// <param name="transcodeReasons">The session's recorded reasons, for the job's diagnostics.</param>
-    /// <returns>The request the executor is started with.</returns>
-    public static VideoRequestDto Build(
+    /// <returns>
+    /// The request the executor is started with: a <see cref="VideoRequestDto"/> when the plan has a
+    /// video stream, otherwise an audio-only <see cref="StreamingRequestDto"/>, which the executor
+    /// reads as an audio output (no video stream mapped, an embedded picture included).
+    /// </returns>
+    public static StreamingRequestDto Build(
         PlaybackExecutionPlan plan,
         Guid itemId,
         string? playSessionId,
@@ -85,32 +89,31 @@ public static class EnginePlanEncodingRequest
         var copiesAudio = CopiesAudio(plan);
         int? audioBitrate = copiesAudio || plan.AudioStreamIndex is null ? null : plan.AudioBitrate ?? DefaultAudioBitrate(plan, source);
 
-        return new VideoRequestDto
-        {
-            Id = itemId,
-            MediaSourceId = plan.SourceId,
-            PlaySessionId = playSessionId,
-            DeviceId = deviceId,
-            SegmentContainer = plan.Container,
-            MinSegments = 1,
-            VideoCodec = plan.VideoCodec,
-            AudioCodec = plan.AudioCodec,
-            VideoStreamIndex = plan.VideoStreamIndex,
-            AudioStreamIndex = plan.AudioStreamIndex,
-            EnableAutoStreamCopy = copiesVideo || copiesAudio,
-            AllowVideoStreamCopy = copiesVideo,
-            AllowAudioStreamCopy = copiesAudio,
-            VideoBitRate = copiesVideo ? null : VideoBitrate(plan, source, audioBitrate),
-            MaxWidth = copiesVideo ? null : plan.Resolution?.Width,
-            MaxHeight = copiesVideo ? null : plan.Resolution?.Height,
-            AudioBitRate = audioBitrate,
-            MaxAudioChannels = copiesAudio ? null : plan.AudioChannels,
-            TranscodingMaxAudioChannels = copiesAudio ? null : plan.AudioChannels,
-            SubtitleMethod = Tesserafin.Model.Dlna.SubtitleDeliveryMethod.External,
-            Context = EncodingContext.Streaming,
-            TranscodeReasons = transcodeReasons,
-            BuiltFromRetainedPlan = true,
-        };
+        var request = plan.VideoStreamIndex is null ? new StreamingRequestDto() : new VideoRequestDto();
+        request.Id = itemId;
+        request.MediaSourceId = plan.SourceId;
+        request.PlaySessionId = playSessionId;
+        request.DeviceId = deviceId;
+        request.SegmentContainer = plan.Container;
+        request.MinSegments = 1;
+        request.VideoCodec = plan.VideoCodec;
+        request.AudioCodec = plan.AudioCodec;
+        request.VideoStreamIndex = plan.VideoStreamIndex;
+        request.AudioStreamIndex = plan.AudioStreamIndex;
+        request.EnableAutoStreamCopy = copiesVideo || copiesAudio;
+        request.AllowVideoStreamCopy = copiesVideo;
+        request.AllowAudioStreamCopy = copiesAudio;
+        request.VideoBitRate = copiesVideo || plan.VideoStreamIndex is null ? null : VideoBitrate(plan, source, audioBitrate);
+        request.MaxWidth = copiesVideo ? null : plan.Resolution?.Width;
+        request.MaxHeight = copiesVideo ? null : plan.Resolution?.Height;
+        request.AudioBitRate = audioBitrate;
+        request.MaxAudioChannels = copiesAudio ? null : plan.AudioChannels;
+        request.TranscodingMaxAudioChannels = copiesAudio ? null : plan.AudioChannels;
+        request.SubtitleMethod = Tesserafin.Model.Dlna.SubtitleDeliveryMethod.External;
+        request.Context = EncodingContext.Streaming;
+        request.TranscodeReasons = transcodeReasons;
+        request.BuiltFromRetainedPlan = true;
+        return request;
     }
 
     /// <summary>

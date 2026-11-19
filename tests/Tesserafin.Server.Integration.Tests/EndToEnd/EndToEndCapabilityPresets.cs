@@ -66,6 +66,18 @@ public static class EndToEndCapabilityPresets
         return (new ClientCapabilities(decode, OutputProfiles: []), BaseConstraints(allowDirectPlay: true, allowDirectStream: true, allowTranscoding: true));
     }
 
+    /// <summary>
+    /// A browser-like audio client: it plays MP3 as it is and declares one audio output, AAC in
+    /// fMP4 HLS segments. Against a source it does not decode (WMA, FLAC) the engine's answer is an
+    /// audio transcode delivered through that output. Every method stays allowed.
+    /// </summary>
+    /// <returns>Audio capabilities with an AAC-over-HLS output profile.</returns>
+    public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) AudioTranscodeOverHls()
+    {
+        var (direct, constraints) = AudioDirectPlay();
+        return (direct with { OutputProfiles = [new PlaybackOutputProfile(MediaKind.Audio, StreamingProtocol.Hls, "mp4", [], ["aac"], null, null, null)] }, constraints);
+    }
+
     public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) Remux()
     {
         var decode = new DecodeCapabilities(
