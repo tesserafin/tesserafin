@@ -29,7 +29,6 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
 using Tesserafin.Data.Enums;
-using Tesserafin.Data.Events;
 using Tesserafin.Extensions;
 using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Configuration;
@@ -56,6 +55,7 @@ namespace Tesserafin.Providers.Manager
         private readonly IFolderValidationServices _validation;
         private readonly IItemWriteCommands _writes;
         private readonly IItemResolutionService _resolution;
+        private readonly ILibraryRefreshProgress _refreshProgress;
         private readonly IItemMetadataExporter _metadataExporter;
         private readonly IItemImageService _images;
         private readonly IRemoteImageSource _remoteImages;
@@ -74,7 +74,6 @@ namespace Tesserafin.Providers.Manager
         private readonly ILyricManager _lyricManager;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly IBaseItemManager _baseItemManager;
-        private readonly ConcurrentDictionary<Guid, double> _activeRefreshes = new();
         private readonly CancellationTokenSource _disposeCancellationTokenSource = new();
         private readonly PriorityQueue<(Guid ItemId, MetadataRefreshOptions RefreshOptions), RefreshPriority> _refreshQueue = new();
         private readonly IMediaSegmentManager _mediaSegmentManager;
@@ -102,6 +101,7 @@ namespace Tesserafin.Providers.Manager
         /// <param name="metadataExporter">Metadata saver selection and execution.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
+        /// <param name="refreshProgress">Progress of active recursive scans.</param>
         /// <param name="deletions">Item deletion operations.</param>
         /// <param name="validation">The services folder validation runs with.</param>
         /// <param name="libraryOptions">The persisted library options, whose updates invalidate cached provider choices.</param>
@@ -126,6 +126,7 @@ namespace Tesserafin.Providers.Manager
             IItemMetadataExporter metadataExporter,
             IItemImageService images,
             IItemResolutionService resolution,
+            ILibraryRefreshProgress refreshProgress,
             IItemDeletionCommands deletions,
             IFolderValidationServices validation,
             ILibraryOptionsStore libraryOptions,
@@ -151,6 +152,7 @@ namespace Tesserafin.Providers.Manager
             _metadataExporter = metadataExporter;
             _images = images;
             _resolution = resolution;
+            _refreshProgress = refreshProgress;
             _deletions = deletions;
             _libraryOptions = libraryOptions;
             _logger = logger;
@@ -171,15 +173,6 @@ namespace Tesserafin.Providers.Manager
 
             _libraryOptions.Updated += OnLibraryOptionsUpdated;
         }
-
-        /// <inheritdoc/>
-        public event EventHandler<GenericEventArgs<BaseItem>>? RefreshStarted;
-
-        /// <inheritdoc/>
-        public event EventHandler<GenericEventArgs<BaseItem>>? RefreshCompleted;
-
-        /// <inheritdoc/>
-        public event EventHandler<GenericEventArgs<Tuple<BaseItem, double>>>? RefreshProgress;
 
         /// <inheritdoc/>
         public void AddParts(
@@ -889,75 +882,6 @@ namespace Tesserafin.Providers.Manager
             lock (_refreshQueueLock)
             {
                 return _refreshQueue.UnorderedItems.Select(x => x.Element.ItemId).ToHashSet();
-            }
-        }
-
-        /// <inheritdoc/>
-        public void OnRefreshStart(BaseItem item)
-        {
-            _logger.LogDebug("OnRefreshStart {Item:N}", item.Id);
-            _activeRefreshes[item.Id] = 0;
-            try
-            {
-                RefreshStarted?.Invoke(this, new GenericEventArgs<BaseItem>(item));
-            }
-            catch (Exception ex)
-            {
-                // EventHandlers should never propagate exceptions, but we have little control over plugins...
-                _logger.LogError(ex, "Invoking {RefreshEvent} event handlers failed", nameof(RefreshStarted));
-            }
-        }
-
-        /// <inheritdoc/>
-        public void OnRefreshComplete(BaseItem item)
-        {
-            _logger.LogDebug("OnRefreshComplete {Item:N}", item.Id);
-            _activeRefreshes.TryRemove(item.Id, out _);
-
-            try
-            {
-                RefreshCompleted?.Invoke(this, new GenericEventArgs<BaseItem>(item));
-            }
-            catch (Exception ex)
-            {
-                // EventHandlers should never propagate exceptions, but we have little control over plugins...
-                _logger.LogError(ex, "Invoking {RefreshEvent} event handlers failed", nameof(RefreshCompleted));
-            }
-        }
-
-        /// <inheritdoc/>
-        public double? GetRefreshProgress(Guid id)
-        {
-            if (_activeRefreshes.TryGetValue(id, out double value))
-            {
-                return value;
-            }
-
-            return null;
-        }
-
-        /// <inheritdoc/>
-        public void OnRefreshProgress(BaseItem item, double progress)
-        {
-            var id = item.Id;
-            _logger.LogDebug("OnRefreshProgress {Id:N} {Progress}", id, progress);
-
-            if (!_activeRefreshes.TryGetValue(id, out var current)
-                || progress <= current
-                || !_activeRefreshes.TryUpdate(id, progress, current))
-            {
-                // Item isn't currently refreshing, or update was received out-of-order, so don't trigger event.
-                return;
-            }
-
-            try
-            {
-                RefreshProgress?.Invoke(this, new GenericEventArgs<Tuple<BaseItem, double>>(new Tuple<BaseItem, double>(item, progress)));
-            }
-            catch (Exception ex)
-            {
-                // EventHandlers should never propagate exceptions, but we have little control over plugins...
-                _logger.LogError(ex, "Invoking {RefreshEvent} event handlers failed", nameof(RefreshProgress));
             }
         }
 

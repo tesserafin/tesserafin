@@ -314,7 +314,7 @@ namespace Tesserafin.Controller.Entities
         {
             if (recursive)
             {
-                services.Providers.OnRefreshStart(this);
+                services.RefreshProgress.OnRefreshStart(this);
             }
 
             try
@@ -330,7 +330,7 @@ namespace Tesserafin.Controller.Entities
             {
                 if (recursive)
                 {
-                    services.Providers.OnRefreshComplete(this);
+                    services.RefreshProgress.OnRefreshComplete(this);
                 }
             }
         }
@@ -376,7 +376,7 @@ namespace Tesserafin.Controller.Entities
 
                 if (recursive)
                 {
-                    services.Providers.OnRefreshProgress(this, ProgressHelpers.RetrievedChildren);
+                    services.RefreshProgress.OnRefreshProgress(this, ProgressHelpers.RetrievedChildren);
                 }
 
                 Children = null;
@@ -398,7 +398,7 @@ namespace Tesserafin.Controller.Entities
 
             if (recursive)
             {
-                services.Providers.OnRefreshProgress(this, ProgressHelpers.UpdatedChildItems);
+                services.RefreshProgress.OnRefreshProgress(this, ProgressHelpers.UpdatedChildItems);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -412,7 +412,7 @@ namespace Tesserafin.Controller.Entities
 
                     progress.Report(percent);
 
-                    services.Providers.OnRefreshProgress(folder, percent);
+                    services.RefreshProgress.OnRefreshProgress(folder, percent);
                 });
 
                 if (validChildrenNeedGeneration)
@@ -430,7 +430,7 @@ namespace Tesserafin.Controller.Entities
 
                 if (recursive)
                 {
-                    services.Providers.OnRefreshProgress(this, ProgressHelpers.ScannedSubfolders);
+                    services.RefreshProgress.OnRefreshProgress(this, ProgressHelpers.ScannedSubfolders);
                 }
 
                 var container = this as IMetadataContainer;
@@ -444,7 +444,7 @@ namespace Tesserafin.Controller.Entities
 
                     if (recursive)
                     {
-                        services.Providers.OnRefreshProgress(folder, percent);
+                        services.RefreshProgress.OnRefreshProgress(folder, percent);
                     }
                 });
 

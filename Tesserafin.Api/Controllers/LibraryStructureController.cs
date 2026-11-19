@@ -26,6 +26,7 @@ public class LibraryStructureController : BaseTesserafinApiController
 {
     private readonly ILibraryStructureReader _reader;
     private readonly IProviderManager _providers;
+    private readonly ILibraryRefreshProgress _refreshProgress;
     private readonly ILibraryStructureCommands _commands;
 
     /// <summary>
@@ -33,14 +34,17 @@ public class LibraryStructureController : BaseTesserafinApiController
     /// </summary>
     /// <param name="commands">Library structure commands.</param>
     /// <param name="reader">Configured library reader.</param>
-    /// <param name="providers">Metadata refresh state.</param>
+    /// <param name="providers">The metadata refresh queue.</param>
+    /// <param name="refreshProgress">Progress of active recursive scans.</param>
     public LibraryStructureController(
         ILibraryStructureReader reader,
         IProviderManager providers,
+        ILibraryRefreshProgress refreshProgress,
         ILibraryStructureCommands commands)
     {
         _reader = reader;
         _providers = providers;
+        _refreshProgress = refreshProgress;
         _commands = commands;
     }
 
@@ -59,7 +63,7 @@ public class LibraryStructureController : BaseTesserafinApiController
         {
             if (Guid.TryParse(folder.ItemId, out var id))
             {
-                folder.RefreshProgress = _providers.GetRefreshProgress(id);
+                folder.RefreshProgress = _refreshProgress.GetRefreshProgress(id);
                 folder.RefreshStatus = folder.RefreshProgress.HasValue ? "Active" : queue.Contains(id) ? "Queued" : "Idle";
             }
         }

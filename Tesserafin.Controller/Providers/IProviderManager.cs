@@ -9,7 +9,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
-using Tesserafin.Data.Events;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Providers;
@@ -21,12 +20,6 @@ namespace Tesserafin.Controller.Providers
     /// </summary>
     public interface IProviderManager
     {
-        event EventHandler<GenericEventArgs<BaseItem>> RefreshStarted;
-
-        event EventHandler<GenericEventArgs<BaseItem>> RefreshCompleted;
-
-        event EventHandler<GenericEventArgs<Tuple<BaseItem, double>>> RefreshProgress;
-
         /// <summary>
         /// Queues the refresh.
         /// </summary>
@@ -202,13 +195,5 @@ namespace Tesserafin.Controller.Providers
             where TLookupType : ItemLookupInfo;
 
         HashSet<Guid> GetRefreshQueue();
-
-        void OnRefreshStart(BaseItem item);
-
-        void OnRefreshProgress(BaseItem item, double progress);
-
-        void OnRefreshComplete(BaseItem item);
-
-        double? GetRefreshProgress(Guid id);
     }
 }

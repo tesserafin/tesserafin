@@ -16,6 +16,7 @@ internal sealed class FolderValidationServices(
     IItemImageService images,
     IItemResolutionService resolution,
     ILimitedConcurrencyLibraryScheduler scheduler,
+    ILibraryRefreshProgress refreshProgress,
     Lazy<IChannelManager> channels,
     Lazy<IProviderManager> providers) : IFolderValidationServices
 {
@@ -33,6 +34,9 @@ internal sealed class FolderValidationServices(
 
     /// <inheritdoc />
     public ILimitedConcurrencyLibraryScheduler Scheduler { get; } = scheduler;
+
+    /// <inheritdoc />
+    public ILibraryRefreshProgress RefreshProgress { get; } = refreshProgress;
 
     /// <inheritdoc />
     public IProviderManager Providers => providers.Value;

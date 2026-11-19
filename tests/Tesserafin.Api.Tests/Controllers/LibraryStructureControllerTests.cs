@@ -13,7 +13,7 @@ namespace Tesserafin.Api.Tests.Controllers;
 public sealed class LibraryStructureControllerTests
 {
     [Fact]
-    public void GetVirtualFolders_ProjectsActiveQueuedAndIdleFromInjectedProvider_AndPreservesUnscannedDefinitions()
+    public void GetVirtualFolders_ProjectsActiveQueuedAndIdleFromQueueAndProgress_AndPreservesUnscannedDefinitions()
     {
         var active = Guid.NewGuid();
         var queued = Guid.NewGuid();
@@ -29,10 +29,11 @@ public sealed class LibraryStructureControllerTests
         reader.Setup(r => r.GetVirtualFolders()).Returns(folders);
         var providers = new Mock<IProviderManager>();
         providers.Setup(p => p.GetRefreshQueue()).Returns(new HashSet<Guid> { active, queued });
-        providers.Setup(p => p.GetRefreshProgress(active)).Returns(42.5);
-        providers.Setup(p => p.GetRefreshProgress(queued)).Returns((double?)null);
-        providers.Setup(p => p.GetRefreshProgress(idle)).Returns((double?)null);
-        var controller = new LibraryStructureController(reader.Object, providers.Object, Mock.Of<ILibraryStructureCommands>());
+        var refreshProgress = new Mock<ILibraryRefreshProgress>();
+        refreshProgress.Setup(p => p.GetRefreshProgress(active)).Returns(42.5);
+        refreshProgress.Setup(p => p.GetRefreshProgress(queued)).Returns((double?)null);
+        refreshProgress.Setup(p => p.GetRefreshProgress(idle)).Returns((double?)null);
+        var controller = new LibraryStructureController(reader.Object, providers.Object, refreshProgress.Object, Mock.Of<ILibraryStructureCommands>());
 
         var result = controller.GetVirtualFolders();
 
@@ -43,6 +44,6 @@ public sealed class LibraryStructureControllerTests
         Assert.Equal("Idle", folders[2].RefreshStatus);
         Assert.Null(folders[3].RefreshStatus);
         providers.Verify(p => p.GetRefreshQueue(), Times.Once);
-        providers.Verify(p => p.GetRefreshProgress(It.IsAny<Guid>()), Times.Exactly(3));
+        refreshProgress.Verify(p => p.GetRefreshProgress(It.IsAny<Guid>()), Times.Exactly(3));
     }
 }

@@ -29,7 +29,10 @@ public interface IFolderValidationServices
     /// <summary>Gets the bounded-concurrency scheduler.</summary>
     ILimitedConcurrencyLibraryScheduler Scheduler { get; }
 
-    /// <summary>Gets the provider manager that tracks refresh progress.</summary>
+    /// <summary>Gets the progress tracker of active recursive refreshes.</summary>
+    ILibraryRefreshProgress RefreshProgress { get; }
+
+    /// <summary>Gets the provider manager for metadata refreshes.</summary>
     IProviderManager Providers { get; }
 
     /// <summary>Gets the channel manager.</summary>
