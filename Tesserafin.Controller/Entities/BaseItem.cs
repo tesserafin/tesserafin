@@ -477,8 +477,6 @@ namespace Tesserafin.Controller.Entities
 
         public static IServerConfigurationManager ConfigurationManager { get; set; }
 
-        public static IProviderManager ProviderManager { get; set; }
-
         public static ILocalizationManager LocalizationManager { get; set; }
 
         public static IItemRepository ItemRepository { get; set; }
@@ -1519,14 +1517,6 @@ namespace Tesserafin.Controller.Entities
 
             return prefix;
         }
-
-        public Task RefreshMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, CancellationToken cancellationToken)
-        {
-            return RefreshMetadata(deletions, writes, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken);
-        }
-
-        public Task<ItemUpdateType> RefreshMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
-            => RefreshMetadata(ProviderManager, deletions, writes, options, cancellationToken);
 
         /// <summary>
         /// The base implementation to refresh metadata.

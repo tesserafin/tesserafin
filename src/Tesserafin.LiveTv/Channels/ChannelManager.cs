@@ -502,6 +502,7 @@ namespace Tesserafin.LiveTv.Channels
             }
 
             await item.RefreshMetadata(
+                _providerManager,
                 _deletions,
                 _writes,
                 new MetadataRefreshOptions(new DirectoryService(_fileSystem))

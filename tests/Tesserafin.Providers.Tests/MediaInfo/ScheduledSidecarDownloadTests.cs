@@ -17,6 +17,7 @@ using Tesserafin.Data.Enums;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
+using Tesserafin.Model.IO;
 using Tesserafin.Model.Lyrics;
 using Tesserafin.Model.Providers;
 using Tesserafin.Providers.Lyric;
@@ -79,6 +80,8 @@ public sealed class ScheduledSidecarDownloadTests
         var task = new SubtitleScheduledTask(
             Mock.Of<IItemWriteCommands>(),
             Mock.Of<IItemDeletionCommands>(),
+            Mock.Of<IItemMetadataDispatcher>(MockBehavior.Strict),
+            Mock.Of<IFileSystem>(),
             PhysicalRoot(folder, disabledFolder),
             options.Object,
             queries.Object,

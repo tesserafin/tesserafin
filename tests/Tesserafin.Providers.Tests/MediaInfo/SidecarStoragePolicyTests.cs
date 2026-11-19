@@ -10,9 +10,11 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
 using Tesserafin.Model.Configuration;
+using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.Providers;
@@ -89,6 +91,7 @@ public sealed class SidecarStoragePolicyTests
         var manager = new LyricManager(
             Mock.Of<IItemWriteCommands>(),
             Mock.Of<IItemDeletionCommands>(),
+            new Lazy<IItemMetadataDispatcher>(() => Mock.Of<IItemMetadataDispatcher>(MockBehavior.Strict)),
             itemOptions.Object,
             storage.ApplicationPaths,
             NullLogger<LyricManager>.Instance,
@@ -108,10 +111,50 @@ public sealed class SidecarStoragePolicyTests
         itemOptions.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task DeletingLyrics_RefreshesTheItemThroughTheInjectedDispatcher()
+    {
+        var audio = new Audio { Id = Guid.NewGuid() };
+        const string lyricsPath = "song.lrc";
+        var mediaSources = new Mock<IMediaSourceManager>(MockBehavior.Strict);
+        mediaSources.Setup(m => m.GetMediaStreams(It.Is<MediaStreamQuery>(q => q.ItemId.Equals(audio.Id) && q.Type == MediaStreamType.Lyric)))
+            .Returns([new MediaStream { Path = lyricsPath }]);
+        var sequence = new MockSequence();
+        var files = new Mock<IFileSystem>(MockBehavior.Strict);
+        files.InSequence(sequence).Setup(f => f.DeleteFile(lyricsPath));
+        var dispatcher = new Mock<IItemMetadataDispatcher>(MockBehavior.Strict);
+        dispatcher.InSequence(sequence).Setup(d => d.RefreshSingleItem(
+            audio,
+            It.Is<MetadataRefreshOptions>(options => options.MetadataRefreshMode == MetadataRefreshMode.Default),
+            CancellationToken.None)).ReturnsAsync(ItemUpdateType.None);
+        var metadata = new Lazy<IItemMetadataDispatcher>(() => dispatcher.Object);
+        var manager = new LyricManager(
+            Mock.Of<IItemWriteCommands>(),
+            Mock.Of<IItemDeletionCommands>(),
+            metadata,
+            Mock.Of<ILibraryItemOptions>(),
+            Mock.Of<IServerApplicationPaths>(),
+            NullLogger<LyricManager>.Instance,
+            files.Object,
+            Mock.Of<ILibraryMonitor>(),
+            mediaSources.Object,
+            [],
+            []);
+
+        Assert.False(metadata.IsValueCreated);
+        await manager.DeleteLyricsAsync(audio);
+
+        files.Verify(f => f.DeleteFile(lyricsPath), Times.Once);
+        dispatcher.Verify(
+            d => d.RefreshSingleItem(audio, It.IsAny<MetadataRefreshOptions>(), CancellationToken.None),
+            Times.Once);
+    }
+
     private static SubtitleManager CreateSubtitleManager(Storage storage, ILibraryItemOptions itemOptions, params ISubtitleProvider[] providers)
         => new(
             Mock.Of<IItemWriteCommands>(),
             Mock.Of<IItemDeletionCommands>(),
+            new Lazy<IItemMetadataDispatcher>(() => Mock.Of<IItemMetadataDispatcher>(MockBehavior.Strict)),
             itemOptions,
             storage.ApplicationPaths,
             NullLogger<SubtitleManager>.Instance,

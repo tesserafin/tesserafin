@@ -33,6 +33,7 @@ public class GuideManager : IGuideManager
     private readonly IItemWriteCommands _writes;
     private readonly IItemImageService _images;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IItemMetadataDispatcher _metadata;
     private readonly ILogger<GuideManager> _logger;
     private readonly IConfigurationManager _config;
     private readonly IFileSystem _fileSystem;
@@ -55,6 +56,7 @@ public class GuideManager : IGuideManager
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="images">Explicit image preparation and commit lifecycle.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="metadata">Runs metadata refreshes.</param>
     /// <param name="logger">The <see cref="ILogger{TCategoryName}"/>.</param>
     /// <param name="config">The <see cref="IConfigurationManager"/>.</param>
     /// <param name="fileSystem">The <see cref="IFileSystem"/>.</param>
@@ -69,6 +71,7 @@ public class GuideManager : IGuideManager
         IItemWriteCommands writes,
         IItemImageService images,
         IItemDeletionCommands deletions,
+        IItemMetadataDispatcher metadata,
         ILogger<GuideManager> logger,
         IConfigurationManager config,
         IFileSystem fileSystem,
@@ -83,6 +86,7 @@ public class GuideManager : IGuideManager
         _writes = writes;
         _images = images;
         _deletions = deletions;
+        _metadata = metadata;
         _logger = logger;
         _config = config;
         _fileSystem = fileSystem;
@@ -320,6 +324,7 @@ public class GuideManager : IGuideManager
 
                 await currentChannel.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataImport, cancellationToken).ConfigureAwait(false);
                 await currentChannel.RefreshMetadata(
+                    _metadata,
                     _deletions,
                     _writes,
                     new MetadataRefreshOptions(new DirectoryService(_fileSystem))

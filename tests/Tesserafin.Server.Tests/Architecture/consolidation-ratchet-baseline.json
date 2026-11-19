@@ -18,7 +18,6 @@
     "BaseItem.LocalizationManager",
     "BaseItem.MediaSegmentManager",
     "BaseItem.MediaSourceManager",
-    "BaseItem.ProviderManager",
     "BaseItem.UserDataManager",
     "CollectionFolder.ApplicationHost",
     "CollectionFolder.XmlSerializer",

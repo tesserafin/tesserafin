@@ -31,6 +31,7 @@ namespace Tesserafin.Providers.Subtitles
     {
         private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
+        private readonly Lazy<IItemMetadataDispatcher> _metadata;
         private readonly ILibraryItemOptions _itemOptions;
         private readonly IServerApplicationPaths _applicationPaths;
         private readonly ILogger<SubtitleManager> _logger;
@@ -45,6 +46,7 @@ namespace Tesserafin.Providers.Subtitles
         public SubtitleManager(
             IItemWriteCommands writes,
             IItemDeletionCommands deletions,
+            Lazy<IItemMetadataDispatcher> metadata,
             ILibraryItemOptions itemOptions,
             IServerApplicationPaths applicationPaths,
             ILogger<SubtitleManager> logger,
@@ -57,6 +59,7 @@ namespace Tesserafin.Providers.Subtitles
         {
             _writes = writes;
             _deletions = deletions;
+            _metadata = metadata;
             _itemOptions = itemOptions;
             _applicationPaths = applicationPaths;
             _logger = logger;
@@ -408,7 +411,7 @@ namespace Tesserafin.Providers.Subtitles
                 _monitor.ReportFileSystemChangeComplete(path, false);
             }
 
-            return item.RefreshMetadata(_deletions, _writes, CancellationToken.None);
+            return item.RefreshMetadata(_metadata.Value, _deletions, _writes, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), CancellationToken.None);
         }
 
         /// <inheritdoc />

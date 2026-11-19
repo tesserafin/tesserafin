@@ -19,6 +19,7 @@ public class PeopleValidator
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IItemMetadataDispatcher _metadata;
     private readonly IItemPeopleService _people;
     private readonly IItemRepository _items;
     private readonly IServerConfigurationManager _configuration;
@@ -28,15 +29,17 @@ public class PeopleValidator
     /// <summary>Initializes a new instance of the <see cref="PeopleValidator"/> class.</summary>
     /// <param name="writes">Explicit item writes.</param>
     /// <param name="deletions">Unreferenced item deletion.</param>
+    /// <param name="metadata">Runs metadata refreshes.</param>
     /// <param name="people">Credit and person reads.</param>
     /// <param name="items">Unreferenced person queries.</param>
     /// <param name="configuration">Managed person root configuration.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="files">Metadata refresh directory access.</param>
-    public PeopleValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, IItemPeopleService people, IItemRepository items, IServerConfigurationManager configuration, ILogger<PeopleValidator> logger, IFileSystem files)
+    public PeopleValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, IItemMetadataDispatcher metadata, IItemPeopleService people, IItemRepository items, IServerConfigurationManager configuration, ILogger<PeopleValidator> logger, IFileSystem files)
     {
         _writes = writes;
         _deletions = deletions;
+        _metadata = metadata;
         _people = people;
         _items = items;
         _configuration = configuration;
@@ -71,7 +74,7 @@ public class PeopleValidator
                         ImageRefreshMode = MetadataRefreshMode.ValidationOnly,
                         MetadataRefreshMode = MetadataRefreshMode.ValidationOnly
                     };
-                    await person.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
+                    await person.RefreshMetadata(_metadata, _deletions, _writes, options, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)

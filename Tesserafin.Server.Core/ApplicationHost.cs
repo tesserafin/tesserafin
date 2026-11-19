@@ -563,8 +563,8 @@ namespace Tesserafin.Server.Core
             // TODO: Refactor to eliminate the circular dependencies here so that Lazy<T> isn't required
             serviceCollection.AddTransient(provider => new Lazy<ILibraryMonitor>(provider.GetRequiredService<ILibraryMonitor>));
             serviceCollection.AddTransient(provider => new Lazy<IProviderManager>(provider.GetRequiredService<IProviderManager>));
-            // The provider manager also initiates folder validation, which consumes the scan context.
-            serviceCollection.AddTransient(provider => new Lazy<IItemMetadataDispatcher>(provider.GetRequiredService<IProviderManager>));
+            // Scan, subtitle, lyric and media source services refresh metadata after construction.
+            serviceCollection.AddTransient(provider => new Lazy<IItemMetadataDispatcher>(provider.GetRequiredService<IItemMetadataDispatcher>));
             serviceCollection.AddTransient(provider => new Lazy<IExternalDataManager>(provider.GetRequiredService<IExternalDataManager>));
             // Deletion can refresh metadata and remove channel data; these services themselves
             // consume the deletion port. Defer their construction, never their command completion.
@@ -648,6 +648,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<ILyricManager, LyricManager>();
 
             serviceCollection.AddSingleton<IProviderManager, ProviderManager>();
+            serviceCollection.AddSingleton<IItemMetadataDispatcher>(provider => provider.GetRequiredService<IProviderManager>());
 
             // TODO: Refactor to eliminate the circular dependency here so that Lazy<T> isn't required
             serviceCollection.AddTransient(provider => new Lazy<ILiveTvManager>(provider.GetRequiredService<ILiveTvManager>));
@@ -840,7 +841,6 @@ namespace Tesserafin.Server.Core
             BaseItem.Logger = Resolve<ILogger<BaseItem>>();
             BaseItem.MediaSegmentManager = Resolve<IMediaSegmentManager>();
             BaseItem.MediaSourceManager = Resolve<IMediaSourceManager>();
-            BaseItem.ProviderManager = Resolve<IProviderManager>();
             BaseItem.UserDataManager = Resolve<IUserDataManager>();
             CollectionFolder.XmlSerializer = _xmlSerializer;
             CollectionFolder.ApplicationHost = this;

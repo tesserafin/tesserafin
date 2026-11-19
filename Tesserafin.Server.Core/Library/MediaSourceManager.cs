@@ -47,6 +47,7 @@ namespace Tesserafin.Server.Core.Library
 
         private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
+        private readonly Lazy<IItemMetadataDispatcher> _metadata;
 
         private readonly IServerApplicationHost _appHost;
         private readonly IItemRepository _itemRepo;
@@ -72,6 +73,7 @@ namespace Tesserafin.Server.Core.Library
         public MediaSourceManager(
             IItemWriteCommands writes,
             IItemDeletionCommands deletions,
+            Lazy<IItemMetadataDispatcher> metadata,
             IServerApplicationHost appHost,
             IItemRepository itemRepo,
             IApplicationPaths applicationPaths,
@@ -90,6 +92,7 @@ namespace Tesserafin.Server.Core.Library
         {
             _writes = writes;
             _deletions = deletions;
+            _metadata = metadata;
             _appHost = appHost;
             _itemRepo = itemRepo;
             _userManager = userManager;
@@ -199,6 +202,7 @@ namespace Tesserafin.Server.Core.Library
                     || (item.MediaType == MediaType.Audio && mediaSources[0].MediaStreams.All(i => i.Type != MediaStreamType.Audio))))
             {
                 await item.RefreshMetadata(
+                    _metadata.Value,
                     _deletions,
                     _writes,
                     new MetadataRefreshOptions(_directoryService)

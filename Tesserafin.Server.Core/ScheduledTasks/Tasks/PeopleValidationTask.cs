@@ -27,6 +27,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IItemMetadataDispatcher _metadata;
     private readonly IItemLookupService _lookup;
     private readonly PeopleValidator _validator;
     private readonly ILibraryScanCoordinator _scans;
@@ -41,6 +42,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="metadata">Runs metadata refreshes.</param>
     /// <param name="scans">Library scan scheduling and state.</param>
     /// <param name="lookup">Item lookup for person image refresh.</param>
     /// <param name="validator">People validation ownership.</param>
@@ -52,6 +54,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     public PeopleValidationTask(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
+        IItemMetadataDispatcher metadata,
         IItemLookupService lookup,
         PeopleValidator validator,
         ILibraryScanCoordinator scans,
@@ -63,6 +66,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     {
         _writes = writes;
         _deletions = deletions;
+        _metadata = metadata;
         _lookup = lookup;
         _validator = validator;
         _scans = scans;
@@ -264,7 +268,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
                 MetadataRefreshMode = hasOverview ? MetadataRefreshMode.ValidationOnly : MetadataRefreshMode.Default
             };
 
-            await item.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
+            await item.RefreshMetadata(_metadata, _deletions, _writes, options, cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (OperationCanceledException)

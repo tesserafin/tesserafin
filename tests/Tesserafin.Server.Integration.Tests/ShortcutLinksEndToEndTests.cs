@@ -27,6 +27,7 @@ public sealed class ShortcutLinksEndToEndTests(TesserafinApplicationFactory fact
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.AddAuthHeader(await AuthHelper.CompleteStartupAsync(client));
         var writes = factory.Services.GetRequiredService<IItemWriteCommands>();
+        var metadata = factory.Services.GetRequiredService<IItemMetadataDispatcher>();
         var deletions = factory.Services.GetRequiredService<IItemDeletionCommands>();
         var resolution = factory.Services.GetRequiredService<IItemResolutionService>();
         var lookup = factory.Services.GetRequiredService<IItemLookupService>();
@@ -85,7 +86,7 @@ public sealed class ShortcutLinksEndToEndTests(TesserafinApplicationFactory fact
                 await database.Database.ExecuteSqlRawAsync("DROP TRIGGER reject_shortcut_links;", TestContext.Current.CancellationToken);
             }
 
-            await owner.RefreshMetadata(deletions, writes, Options(), TestContext.Current.CancellationToken);
+            await owner.RefreshMetadata(metadata, deletions, writes, Options(), TestContext.Current.CancellationToken);
             Assert.Equal(first.Id, Assert.Single(links.GetLinkedChildrenIds(owner.Id, (int)LinkedChildType.Shortcut)));
             Assert.Equal(manual.Id, Assert.Single(links.GetLinkedChildrenIds(owner.Id, (int)LinkedChildType.Manual)));
             Assert.True(owner.GetLinkedChildren().Select(item => item.Id).ToHashSet().SetEquals([first.Id, manual.Id]));
@@ -103,7 +104,7 @@ public sealed class ShortcutLinksEndToEndTests(TesserafinApplicationFactory fact
             Assert.Equal(first.Id, Assert.Single(links.GetLinkedChildrenIds(owner.Id, (int)LinkedChildType.Shortcut)));
             File.Delete(bad);
             File.Delete(duplicate);
-            await owner.RefreshMetadata(deletions, writes, Options(), TestContext.Current.CancellationToken);
+            await owner.RefreshMetadata(metadata, deletions, writes, Options(), TestContext.Current.CancellationToken);
             Assert.Equal(second.Id, Assert.Single(links.GetLinkedChildrenIds(owner.Id, (int)LinkedChildType.Shortcut)));
 
             var pendingShortcut = Path.Combine(ownerPath, "pending.mblink");

@@ -1383,3 +1383,12 @@ albums, extras and owned video parts or versions use the same dispatch.
 The scan context resolves it when metadata work begins so the provider
 manager can initiate a scan without a construction cycle. Top-folder
 refreshes build their directory service from the traversal's filesystem.
+
+## 60. Explicit metadata dispatch at refresh entry points
+
+Metadata refreshes for playback probing, sidecars, people and named items,
+playlists, and Live TV pass the registered dispatcher into the item refresh
+method. Callers create default directory services from their injected
+filesystem. Services also used by the provider manager resolve the dispatcher
+when refresh work starts. The static provider property and implicit item
+refresh overloads are removed.

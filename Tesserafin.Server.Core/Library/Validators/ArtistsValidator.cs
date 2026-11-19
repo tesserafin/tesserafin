@@ -8,7 +8,9 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
+using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.Library.Validators;
 
@@ -19,6 +21,8 @@ public class ArtistsValidator
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IItemMetadataDispatcher _metadata;
+    private readonly IFileSystem _fileSystem;
 
     /// <summary>
     /// The library manager.
@@ -36,13 +40,17 @@ public class ArtistsValidator
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="metadata">Runs metadata refreshes.</param>
+    /// <param name="fileSystem">Filesystem access for metadata refreshes.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
-    public ArtistsValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, ILibraryManager libraryManager, ILogger<ArtistsValidator> logger, IItemRepository itemRepo)
+    public ArtistsValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, IItemMetadataDispatcher metadata, IFileSystem fileSystem, ILibraryManager libraryManager, ILogger<ArtistsValidator> logger, IItemRepository itemRepo)
     {
         _writes = writes;
         _deletions = deletions;
+        _metadata = metadata;
+        _fileSystem = fileSystem;
         _libraryManager = libraryManager;
         _logger = logger;
         _itemRepo = itemRepo;
@@ -85,7 +93,7 @@ public class ArtistsValidator
 
                 if (isNew || neverRefreshed)
                 {
-                    await item.RefreshMetadata(_deletions, _writes, cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(_metadata, _deletions, _writes, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), cancellationToken).ConfigureAwait(false);
                     refreshed++;
                 }
             }

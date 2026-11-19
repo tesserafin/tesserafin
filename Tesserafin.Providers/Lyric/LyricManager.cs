@@ -31,6 +31,7 @@ public class LyricManager : ILyricManager
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly Lazy<IItemMetadataDispatcher> _metadata;
     private readonly ILibraryItemOptions _itemOptions;
     private readonly IServerApplicationPaths _applicationPaths;
     private readonly ILogger<LyricManager> _logger;
@@ -46,6 +47,7 @@ public class LyricManager : ILyricManager
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="metadata">Runs metadata refreshes after construction.</param>
     /// <param name="itemOptions">Effective library options for lyrics.</param>
     /// <param name="applicationPaths">The internal metadata root.</param>
     /// <param name="logger">Instance of the <see cref="ILogger{LyricManager}"/> interface.</param>
@@ -57,6 +59,7 @@ public class LyricManager : ILyricManager
     public LyricManager(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
+        Lazy<IItemMetadataDispatcher> metadata,
         ILibraryItemOptions itemOptions,
         IServerApplicationPaths applicationPaths,
         ILogger<LyricManager> logger,
@@ -68,6 +71,7 @@ public class LyricManager : ILyricManager
     {
         _writes = writes;
         _deletions = deletions;
+        _metadata = metadata;
         _itemOptions = itemOptions;
         _applicationPaths = applicationPaths;
         _logger = logger;
@@ -273,7 +277,7 @@ public class LyricManager : ILyricManager
             }
         }
 
-        return audio.RefreshMetadata(_deletions, _writes, CancellationToken.None);
+        return audio.RefreshMetadata(_metadata.Value, _deletions, _writes, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), CancellationToken.None);
     }
 
     /// <inheritdoc />

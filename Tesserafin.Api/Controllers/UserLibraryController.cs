@@ -36,6 +36,7 @@ public class UserLibraryController : BaseTesserafinApiController
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IItemMetadataDispatcher _metadata;
     private readonly IPlaybackIntroService _intros;
     private readonly IUserManager _userManager;
     private readonly IUserDataManager _userDataRepository;
@@ -49,6 +50,7 @@ public class UserLibraryController : BaseTesserafinApiController
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="metadata">Runs metadata refreshes.</param>
     /// <param name="intros">Resolves visible playback intros.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="userDataRepository">Instance of the <see cref="IUserDataManager"/> interface.</param>
@@ -59,6 +61,7 @@ public class UserLibraryController : BaseTesserafinApiController
     public UserLibraryController(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
+        IItemMetadataDispatcher metadata,
         IPlaybackIntroService intros,
         IUserManager userManager,
         IUserDataManager userDataRepository,
@@ -69,6 +72,7 @@ public class UserLibraryController : BaseTesserafinApiController
     {
         _writes = writes;
         _deletions = deletions;
+        _metadata = metadata;
         _intros = intros;
         _userManager = userManager;
         _userDataRepository = userDataRepository;
@@ -669,7 +673,7 @@ public class UserLibraryController : BaseTesserafinApiController
                     ForceSave = true
                 };
 
-                await item.RefreshMetadata(_deletions, _writes, options, CancellationToken.None).ConfigureAwait(false);
+                await item.RefreshMetadata(_metadata, _deletions, _writes, options, CancellationToken.None).ConfigureAwait(false);
             }
         }
     }

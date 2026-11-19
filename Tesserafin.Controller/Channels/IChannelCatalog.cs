@@ -19,8 +19,8 @@ namespace Tesserafin.Controller.Channels
     /// eager construction-graph edge to <see cref="IChannelManager"/>, <c>ILibraryManager</c>,
     /// <c>IUserViewManager</c> or <c>ILiveTvManager</c>) and for the documented behavioral subset
     /// this leaf actually covers (lookup-only; on-the-fly channel materialization stays
-    /// <c>ChannelManager</c>'s responsibility, since it reaches into <c>IProviderManager</c>/the
-    /// static <c>BaseItem.ProviderManager</c> - exactly what this port exists to avoid).
+    /// <c>ChannelManager</c>'s responsibility, including refreshing metadata through the provider
+    /// manager).
     /// <c>IChannelManager</c> keeps <c>GetChannelsInternalAsync</c> for its own consumers (the DTO
     /// variant <c>GetChannelsAsync</c>, refresh, delete); this port does not replace it.
     /// </remarks>

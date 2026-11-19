@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
+using Tesserafin.Controller.Providers;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.Library.Validators;
 
@@ -14,6 +16,8 @@ public class ArtistsPostScanTask : ILibraryPostScanTask
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IItemMetadataDispatcher _metadata;
+    private readonly IFileSystem _fileSystem;
 
     /// <summary>
     /// The _library manager.
@@ -27,18 +31,24 @@ public class ArtistsPostScanTask : ILibraryPostScanTask
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="metadata">Runs metadata refreshes.</param>
+    /// <param name="fileSystem">Filesystem access for metadata refreshes.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
     public ArtistsPostScanTask(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
+        IItemMetadataDispatcher metadata,
+        IFileSystem fileSystem,
         ILibraryManager libraryManager,
         ILogger<ArtistsValidator> logger,
         IItemRepository itemRepo)
     {
         _writes = writes;
         _deletions = deletions;
+        _metadata = metadata;
+        _fileSystem = fileSystem;
         _libraryManager = libraryManager;
         _logger = logger;
         _itemRepo = itemRepo;
@@ -52,6 +62,6 @@ public class ArtistsPostScanTask : ILibraryPostScanTask
     /// <returns>Task.</returns>
     public Task Run(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        return new ArtistsValidator(_writes, _deletions, _libraryManager, _logger, _itemRepo).Run(progress, cancellationToken);
+        return new ArtistsValidator(_writes, _deletions, _metadata, _fileSystem, _libraryManager, _logger, _itemRepo).Run(progress, cancellationToken);
     }
 }

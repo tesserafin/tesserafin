@@ -15,6 +15,7 @@ using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Globalization;
+using Tesserafin.Model.IO;
 using Tesserafin.Model.Tasks;
 
 namespace Tesserafin.Providers.MediaInfo
@@ -23,6 +24,8 @@ namespace Tesserafin.Providers.MediaInfo
     {
         private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
+        private readonly IItemMetadataDispatcher _metadata;
+        private readonly IFileSystem _fileSystem;
         private readonly ILibraryRootFolderProvider _roots;
         private readonly ILibraryItemOptions _libraryOptions;
         private readonly IItemQueryService _itemQueries;
@@ -35,6 +38,8 @@ namespace Tesserafin.Providers.MediaInfo
         public SubtitleScheduledTask(
             IItemWriteCommands writes,
             IItemDeletionCommands deletions,
+            IItemMetadataDispatcher metadata,
+            IFileSystem fileSystem,
             ILibraryRootFolderProvider roots,
             ILibraryItemOptions libraryOptions,
             IItemQueryService itemQueries,
@@ -46,6 +51,8 @@ namespace Tesserafin.Providers.MediaInfo
         {
             _writes = writes;
             _deletions = deletions;
+            _metadata = metadata;
+            _fileSystem = fileSystem;
             _roots = roots;
             _libraryOptions = libraryOptions;
             _itemQueries = itemQueries;
@@ -190,7 +197,7 @@ namespace Tesserafin.Providers.MediaInfo
             // Rescan
             if (downloadedLanguages.Count > 0)
             {
-                await video.RefreshMetadata(_deletions, _writes, cancellationToken).ConfigureAwait(false);
+                await video.RefreshMetadata(_metadata, _deletions, _writes, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), cancellationToken).ConfigureAwait(false);
                 return false;
             }
 

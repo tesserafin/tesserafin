@@ -9,6 +9,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaSegments;
+using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
@@ -34,6 +35,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library
         {
             IFixture fixture = new Fixture().Customize(new AutoMoqCustomization { ConfigureMembers = true });
             fixture.Inject<IFileSystem>(fixture.Create<ManagedFileSystem>());
+            fixture.Inject(new Lazy<IItemMetadataDispatcher>(() => Mock.Of<IItemMetadataDispatcher>(MockBehavior.Strict)));
 
             _mockUserDataManager = fixture.Freeze<Mock<IUserDataManager>>();
             _mockUserDataManager.Setup(m => m.GetUserData(It.IsAny<User>(), It.IsAny<BaseItem>())).Returns(new UserItemData() { Key = "key" });
