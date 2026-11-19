@@ -20,6 +20,7 @@ using Tesserafin.Controller.TV;
 using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Querying;
 using MetadataProvider = Tesserafin.Model.Entities.MetadataProvider;
@@ -85,37 +86,61 @@ namespace Tesserafin.Controller.Entities.TV
 
         public override string CreatePresentationUniqueKey()
         {
-            if (LibraryManager.GetLibraryOptions(this).EnableAutomaticSeriesGrouping)
-            {
-                var userdatakeys = GetUserDataKeys();
-
-                if (userdatakeys.Count > 1)
-                {
-                    return AddLibrariesToPresentationUniqueKey(userdatakeys[0]);
-                }
-            }
-
-            return base.CreatePresentationUniqueKey();
+            var key = GetGroupingKey(LibraryManager.GetLibraryOptions(this).EnableAutomaticSeriesGrouping);
+            return key is null
+                ? base.CreatePresentationUniqueKey()
+                : FormatGroupingKey(key, GetPreferredMetadataLanguage(), LibraryManager.GetCollectionFolders(this));
         }
 
-        private string AddLibrariesToPresentationUniqueKey(string key)
+        /// <summary>Computes the series presentation key from the supplied catalogue and settings.</summary>
+        /// <param name="options">The effective library options.</param>
+        /// <param name="lookup">The lookup for parent language inheritance.</param>
+        /// <param name="collections">The library membership resolver.</param>
+        /// <param name="configuration">The server metadata defaults.</param>
+        /// <returns>The presentation key.</returns>
+        public string CreatePresentationUniqueKey(
+            LibraryOptions options,
+            IItemLookupService lookup,
+            ICollectionFolderResolver collections,
+            ServerConfiguration configuration)
         {
-            var lang = GetPreferredMetadataLanguage();
-            if (!string.IsNullOrEmpty(lang))
+            var key = GetGroupingKey(options.EnableAutomaticSeriesGrouping);
+            if (key is null)
             {
-                key += "-" + lang;
+                return base.CreatePresentationUniqueKey();
             }
 
-            var folders = LibraryManager.GetCollectionFolders(this)
-                .Select(i => i.Id.ToString("N", CultureInfo.InvariantCulture))
-                .ToArray();
+            var libraries = collections.GetCollectionFolders(this);
+            var language = GetPreferredMetadataLanguage(
+                GetParents(lookup),
+                () => libraries,
+                () => options.PreferredMetadataLanguage,
+                () => configuration.PreferredMetadataLanguage);
 
-            if (folders.Length == 0)
+            return FormatGroupingKey(key, language, libraries);
+        }
+
+        private string GetGroupingKey(bool enableAutomaticSeriesGrouping)
+        {
+            if (!enableAutomaticSeriesGrouping)
             {
-                return key;
+                return null;
             }
 
-            return key + "-" + string.Join('-', folders);
+            var keys = GetUserDataKeys();
+            return keys.Count > 1 ? keys[0] : null;
+        }
+
+        private static string FormatGroupingKey(string key, string language, IReadOnlyList<Folder> libraries)
+        {
+            if (!string.IsNullOrEmpty(language))
+            {
+                key += "-" + language;
+            }
+
+            return libraries.Count == 0
+                ? key
+                : key + "-" + string.Join('-', libraries.Select(library => library.Id.ToString("N", CultureInfo.InvariantCulture)));
         }
 
         private static string GetUniqueSeriesKey(BaseItem series)

@@ -1733,31 +1733,46 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <returns>System.String.</returns>
         public string GetPreferredMetadataLanguage()
+            => GetPreferredMetadataLanguage(
+                GetParents(),
+                () => LibraryManager.GetCollectionFolders(this),
+                () => LibraryManager.GetLibraryOptions(this).PreferredMetadataLanguage,
+                () => ConfigurationManager.Configuration.PreferredMetadataLanguage);
+
+        /// <summary>Resolves the item's language followed by the parent, library and server defaults.</summary>
+        /// <param name="parents">The item's parents in nearest-first order.</param>
+        /// <param name="getLibraries">Resolves the item's libraries in catalogue order.</param>
+        /// <param name="getLibraryLanguage">Reads the language in the effective library options.</param>
+        /// <param name="getServerLanguage">Reads the server's default language.</param>
+        /// <returns>The preferred metadata language.</returns>
+        protected string GetPreferredMetadataLanguage(
+            IEnumerable<BaseItem> parents,
+            Func<IEnumerable<Folder>> getLibraries,
+            Func<string> getLibraryLanguage,
+            Func<string> getServerLanguage)
         {
             string lang = PreferredMetadataLanguage;
 
             if (string.IsNullOrEmpty(lang))
             {
-                lang = GetParents()
-                    .Select(i => i.PreferredMetadataLanguage)
+                lang = parents.Select(i => i.PreferredMetadataLanguage)
                     .FirstOrDefault(i => !string.IsNullOrEmpty(i));
             }
 
             if (string.IsNullOrEmpty(lang))
             {
-                lang = LibraryManager.GetCollectionFolders(this)
-                    .Select(i => i.PreferredMetadataLanguage)
+                lang = getLibraries().Select(i => i.PreferredMetadataLanguage)
                     .FirstOrDefault(i => !string.IsNullOrEmpty(i));
             }
 
             if (string.IsNullOrEmpty(lang))
             {
-                lang = LibraryManager.GetLibraryOptions(this).PreferredMetadataLanguage;
+                lang = getLibraryLanguage();
             }
 
             if (string.IsNullOrEmpty(lang))
             {
-                lang = ConfigurationManager.Configuration.PreferredMetadataLanguage;
+                lang = getServerLanguage();
             }
 
             return lang;
