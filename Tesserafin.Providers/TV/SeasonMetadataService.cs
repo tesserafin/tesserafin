@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
@@ -11,6 +13,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
@@ -68,6 +71,10 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 
     /// <inheritdoc />
     protected override bool EnableUpdatingPremiereDateFromChildren => true;
+
+    /// <inheritdoc />
+    protected override ValueTask<bool> BeforeMetadataRefreshAsync(Season item, LibraryOptions libraryOptions, bool replaceAllMetadata, CancellationToken cancellationToken)
+        => ValueTask.FromResult(item.BeforeMetadataRefresh(replaceAllMetadata, ItemNamingService, _lookup));
 
     /// <inheritdoc />
     protected override SeasonInfo GetLookupInfo(Season item)

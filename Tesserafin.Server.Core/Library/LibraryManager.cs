@@ -43,7 +43,6 @@ using Tesserafin.Naming.Common;
 using Tesserafin.Naming.Video;
 using Tesserafin.Server.Core.Library.Resolvers;
 using Tesserafin.Server.Core.Library.Validators;
-using Episode = Tesserafin.Controller.Entities.TV.Episode;
 using Genre = Tesserafin.Controller.Entities.Genre;
 using Person = Tesserafin.Controller.Entities.Person;
 
@@ -71,7 +70,6 @@ namespace Tesserafin.Server.Core.Library
         private readonly IItemCountService _countService;
         private readonly ILinkedChildrenService _linkedChildrenService;
         private readonly IItemSortService _itemSortService;
-        private readonly IItemNamingService _itemNamingService;
         private readonly IItemPeopleService _itemPeopleService;
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemAccessService _itemAccessService;
@@ -96,7 +94,6 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="countService">The item count service.</param>
         /// <param name="linkedChildrenService">The linked children service.</param>
         /// <param name="itemSortService">The item sort service.</param>
-        /// <param name="itemNamingService">The item naming service.</param>
         /// <param name="itemPeopleService">The item people service.</param>
         /// <param name="mediaStreamLanguageService">The media stream language service.</param>
         /// <param name="itemLookupService">The item lookup service (read side of the item lookup cache; see PR75/PR76).</param>
@@ -117,7 +114,6 @@ namespace Tesserafin.Server.Core.Library
             IItemCountService countService,
             ILinkedChildrenService linkedChildrenService,
             IItemSortService itemSortService,
-            IItemNamingService itemNamingService,
             IItemPeopleService itemPeopleService,
             IMediaStreamLanguageService mediaStreamLanguageService,
             IItemLookupService itemLookupService,
@@ -138,7 +134,6 @@ namespace Tesserafin.Server.Core.Library
             _countService = countService;
             _linkedChildrenService = linkedChildrenService;
             _itemSortService = itemSortService;
-            _itemNamingService = itemNamingService;
             _itemPeopleService = itemPeopleService;
 
             _itemLookupService = itemLookupService;
@@ -754,24 +749,6 @@ namespace Tesserafin.Server.Core.Library
             }
 
             return RootFolder;
-        }
-
-        /// <inheritdoc />
-        public int? GetSeasonNumberFromPath(string path, Guid? parentId)
-        {
-            var parentPath = parentId.HasValue ? GetItemById(parentId.Value)?.ContainingFolderPath : null;
-            return _itemNamingService.GetSeasonNumberFromPath(path, parentPath);
-        }
-
-        /// <inheritdoc />
-        public bool FillMissingEpisodeNumbersFromPath(Episode episode, bool forceRefresh)
-        {
-            return _itemNamingService.FillMissingEpisodeNumbersFromPath(episode, forceRefresh);
-        }
-
-        public ItemLookupInfo ParseName(string name)
-        {
-            return _itemNamingService.ParseName(name);
         }
 
         public string GetPathAfterNetworkSubstitution(string path, BaseItem? ownerItem)

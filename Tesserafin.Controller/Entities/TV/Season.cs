@@ -396,32 +396,22 @@ namespace Tesserafin.Controller.Entities.TV
             return id;
         }
 
-        /// <summary>
-        /// This is called before any metadata refresh and returns true or false indicating if changes were made.
-        /// </summary>
-        /// <param name="replaceAllMetadata"><c>true</c> to replace metadata, <c>false</c> to not.</param>
-        /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
-        /// <returns><c>true</c> if XXXX, <c>false</c> otherwise.</returns>
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        /// <summary>Prepares the season name and infers a missing season number from its path.</summary>
+        /// <param name="replaceAllMetadata">Whether to replace all metadata.</param>
+        /// <param name="itemNamingService">The season path parser.</param>
+        /// <param name="lookup">The catalogue lookup for the season folder's parent.</param>
+        /// <returns>Whether the preparation changed the season.</returns>
+        public bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IItemLookupService lookup)
         {
             var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
-
-            if (!IndexNumber.HasValue && !string.IsNullOrEmpty(Path))
+            if (IndexNumber.HasValue || string.IsNullOrEmpty(Path))
             {
-                // Legacy parentId -> parentPath lookup stays on the BaseItem.LibraryManager
-                // static (GetParent(), out of scope for this migration); only the naming
-                // computation itself moves to the injected service (PR34/PR35 boundary).
-                var parentPath = GetParent()?.ContainingFolderPath;
-                IndexNumber ??= itemNamingService.GetSeasonNumberFromPath(Path, parentPath);
-
-                // If a change was made record it
-                if (IndexNumber.HasValue)
-                {
-                    hasChanges = true;
-                }
+                return hasChanges;
             }
 
-            return hasChanges;
+            var parentPath = GetParent(lookup)?.ContainingFolderPath;
+            IndexNumber = itemNamingService.GetSeasonNumberFromPath(Path, parentPath);
+            return hasChanges || IndexNumber.HasValue;
         }
     }
 }
