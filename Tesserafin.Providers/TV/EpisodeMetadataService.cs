@@ -26,6 +26,7 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
 {
     private readonly IMediaEncoder _mediaEncoder;
     private readonly IMediaSourceManager _mediaSourceManager;
+    private readonly IItemLookupService _lookup;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EpisodeMetadataService"/> class.
@@ -43,6 +44,10 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     /// <param name="mediaEncoder">Reads the episode information embedded in the file.</param>
     /// <param name="mediaSourceManager">Supplies the episode's media source to read.</param>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
+    /// <param name="mediaSources">Resolves the episode's media sources.</param>
+    /// <param name="mediaSegments">Provides segment support when building the media source.</param>
+    /// <param name="channels">Provides channel sources when building media sources.</param>
+    /// <param name="lookup">The item identity lookup.</param>
     public EpisodeMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -56,11 +61,13 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
         IItemRepository itemRepository,
         IMediaEncoder mediaEncoder,
         IMediaSourceManager mediaSourceManager,
-        ILocalizationManager localizationManager)
+        ILocalizationManager localizationManager,
+        IItemLookupService lookup)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
         _mediaEncoder = mediaEncoder;
         _mediaSourceManager = mediaSourceManager;
+        _lookup = lookup;
     }
 
     /// <inheritdoc />
@@ -119,39 +126,44 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     }
 
     /// <inheritdoc />
+    protected override EpisodeInfo GetLookupInfo(Episode item)
+        => item.GetLookupInfo(_lookup, ItemRepository);
+
+    /// <inheritdoc />
     protected override ItemUpdateType BeforeSaveInternal(Episode item, bool isFullRefresh, ItemUpdateType updateType)
     {
         var updatedType = base.BeforeSaveInternal(item, isFullRefresh, updateType);
 
-        var seriesName = item.FindSeriesName();
+        var series = item.GetSeries(_lookup);
+        var seriesName = series is null ? item.SeriesName : series.Name;
         if (!string.Equals(item.SeriesName, seriesName, StringComparison.Ordinal))
         {
             item.SeriesName = seriesName;
             updatedType |= ItemUpdateType.MetadataImport;
         }
 
-        var seasonName = item.FindSeasonName();
+        var seasonName = item.FindSeasonName(_lookup, ItemRepository);
         if (!string.Equals(item.SeasonName, seasonName, StringComparison.Ordinal))
         {
             item.SeasonName = seasonName;
             updatedType |= ItemUpdateType.MetadataImport;
         }
 
-        var seriesId = item.FindSeriesId();
+        var seriesId = item.FindSeriesId(_lookup);
         if (!item.SeriesId.Equals(seriesId))
         {
             item.SeriesId = seriesId;
             updatedType |= ItemUpdateType.MetadataImport;
         }
 
-        var seasonId = item.FindSeasonId();
+        var seasonId = item.FindSeasonId(_lookup, ItemRepository);
         if (!item.SeasonId.Equals(seasonId))
         {
             item.SeasonId = seasonId;
             updatedType |= ItemUpdateType.MetadataImport;
         }
 
-        var seriesPresentationUniqueKey = item.FindSeriesPresentationUniqueKey();
+        var seriesPresentationUniqueKey = item.GetSeries(_lookup)?.PresentationUniqueKey;
         if (!string.Equals(item.SeriesPresentationUniqueKey, seriesPresentationUniqueKey, StringComparison.Ordinal))
         {
             item.SeriesPresentationUniqueKey = seriesPresentationUniqueKey;

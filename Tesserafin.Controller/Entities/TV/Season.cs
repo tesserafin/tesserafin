@@ -146,18 +146,16 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         public override string CreatePresentationUniqueKey()
-        {
-            if (IndexNumber.HasValue)
-            {
-                var series = Series;
-                if (series is not null)
-                {
-                    return series.PresentationUniqueKey + "-" + IndexNumber.Value.ToString("000", CultureInfo.InvariantCulture);
-                }
-            }
+            => IndexNumber is int number ? CreatePresentationUniqueKey(Series, number) : base.CreatePresentationUniqueKey();
 
-            return base.CreatePresentationUniqueKey();
-        }
+        /// <summary>Creates the presentation key using the supplied lookup for the owning series.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <returns>The presentation key.</returns>
+        public string CreatePresentationUniqueKey(IItemLookupService lookup)
+            => IndexNumber is int number ? CreatePresentationUniqueKey(GetSeries(lookup), number) : base.CreatePresentationUniqueKey();
+
+        private string CreatePresentationUniqueKey(Series series, int number)
+            => series is null ? base.CreatePresentationUniqueKey() : series.PresentationUniqueKey + "-" + number.ToString("000", CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Creates the name of the sort.
@@ -377,10 +375,17 @@ namespace Tesserafin.Controller.Entities.TV
         /// </summary>
         /// <returns>SeasonInfo.</returns>
         public SeasonInfo GetLookupInfo()
+            => CreateLookupInfo(Series);
+
+        /// <summary>Builds provider lookup information using the supplied lookup for the owning series.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <returns>The lookup information.</returns>
+        public SeasonInfo GetLookupInfo(IItemLookupService lookup)
+            => CreateLookupInfo(GetSeries(lookup));
+
+        private SeasonInfo CreateLookupInfo(Series series)
         {
             var id = GetItemLookupInfo<SeasonInfo>();
-
-            var series = Series;
 
             if (series is not null)
             {

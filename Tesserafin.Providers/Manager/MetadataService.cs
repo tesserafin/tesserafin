@@ -105,6 +105,8 @@ namespace Tesserafin.Providers.Manager
 
         protected virtual TIdType GetLookupInfo(TItemType item) => item.GetLookupInfo();
 
+        protected virtual string CreatePresentationUniqueKey(TItemType item) => item.CreatePresentationUniqueKey();
+
         public virtual async Task<ItemUpdateType> RefreshMetadata(BaseItem item, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
         {
             var itemOfType = (TItemType)item;
@@ -384,7 +386,7 @@ namespace Tesserafin.Providers.Manager
                 updateType = UpdateMetadataFromChildren(item, children, isFullRefresh, updateType);
             }
 
-            var presentationUniqueKey = item.CreatePresentationUniqueKey();
+            var presentationUniqueKey = CreatePresentationUniqueKey(item);
             if (!string.Equals(item.PresentationUniqueKey, presentationUniqueKey, StringComparison.Ordinal))
             {
                 item.PresentationUniqueKey = presentationUniqueKey;
