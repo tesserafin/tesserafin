@@ -101,6 +101,8 @@ namespace Tesserafin.Providers.Manager
         protected virtual ValueTask<bool> BeforeMetadataRefreshAsync(TItemType item, LibraryOptions libraryOptions, bool replaceAllMetadata, CancellationToken cancellationToken)
             => ValueTask.FromResult(item.BeforeMetadataRefresh(replaceAllMetadata, ItemNamingService));
 
+        protected virtual TIdType GetLookupInfo(TItemType item) => item.GetLookupInfo();
+
         public virtual async Task<ItemUpdateType> RefreshMetadata(BaseItem item, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
         {
             var itemOfType = (TItemType)item;
@@ -187,7 +189,7 @@ namespace Tesserafin.Providers.Manager
 
                 if (providers.Count > 0)
                 {
-                    var id = itemOfType.GetLookupInfo();
+                    var id = GetLookupInfo(itemOfType);
 
                     if (refreshOptions.SearchResult is not null)
                     {

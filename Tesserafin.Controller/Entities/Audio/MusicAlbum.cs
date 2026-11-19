@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data;
 using Tesserafin.Data.Entities;
@@ -65,27 +66,11 @@ namespace Tesserafin.Controller.Entities.Audio
         [JsonIgnore]
         public IEnumerable<Audio> Tracks => GetRecursiveChildren(i => i is Audio).Cast<Audio>();
 
+        public IReadOnlyList<BaseItem> GetCatalogueTracks(IItemRepository repository, IItemLookupService lookup, LinkedChildResolver links)
+            => GetRecursiveCatalogueChildren(repository, lookup, links, static item => item is Audio);
+
         public MusicArtist GetMusicArtist()
-        {
-            var parents = GetParents();
-            foreach (var parent in parents)
-            {
-                if (parent is MusicArtist artist)
-                {
-                    return artist;
-                }
-            }
-
-            var name = AlbumArtist;
-            if (!string.IsNullOrEmpty(name))
-            {
-                return LibraryManager.GetArtists([name]).TryGetValue(name, out var artists)
-                    ? artists.OrderBy(artist => artist.IsAccessedByName ? 1 : 0).ThenBy(artist => artist.Id).FirstOrDefault()
-                    : null;
-            }
-
-            return null;
-        }
+            => FindMusicArtist(GetParents(), name => LibraryManager.GetArtists([name]));
 
         protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user)
         {
@@ -135,38 +120,16 @@ namespace Tesserafin.Controller.Entities.Audio
         }
 
         public AlbumInfo GetLookupInfo()
-        {
-            var id = GetItemLookupInfo<AlbumInfo>();
+            => BuildLookupInfo(GetMusicArtist(), Tracks);
 
-            id.AlbumArtists = AlbumArtists;
-
-            var artist = GetMusicArtist();
-
-            if (artist is not null)
-            {
-                id.ArtistProviderIds = artist.ProviderIds;
-            }
-
-            id.SongInfos = GetRecursiveChildren(i => i is Audio)
-                .Cast<Audio>()
-                .Select(i => i.GetLookupInfo())
-                .ToList();
-
-            var album = id.SongInfos
-                .Select(i => i.Album)
-                .FirstOrDefault(i => !string.IsNullOrEmpty(i));
-
-            if (!string.IsNullOrEmpty(album))
-            {
-                id.Name = album;
-            }
-
-            return id;
-        }
+        public AlbumInfo GetLookupInfo(IItemRepository repository, IItemLookupService lookup, LinkedChildResolver links, ILinkedChildrenService artists)
+            => BuildLookupInfo(
+                FindMusicArtist(GetParents(lookup), name => artists.FindArtists([name])),
+                GetCatalogueTracks(repository, lookup, links).Cast<Audio>());
 
         public async Task RefreshAllMetadata(LibraryScanContext context, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
-            var items = GetRecursiveCatalogueChildren(context);
+            var items = GetRecursiveCatalogueChildren(context.Repository, context.Lookup, context.Links);
 
             var totalItems = items.Count;
             var numComplete = 0;
@@ -202,6 +165,54 @@ namespace Tesserafin.Controller.Entities.Audio
             {
                 await RefreshArtists(context, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
+        }
+
+        private MusicArtist FindMusicArtist(IEnumerable<BaseItem> parents, Func<string, IReadOnlyDictionary<string, MusicArtist[]>> findArtists)
+        {
+            foreach (var parent in parents)
+            {
+                if (parent is MusicArtist artist)
+                {
+                    return artist;
+                }
+            }
+
+            var name = AlbumArtist;
+            if (!string.IsNullOrEmpty(name))
+            {
+                return findArtists(name).TryGetValue(name, out var artists)
+                    ? artists.OrderBy(artist => artist.IsAccessedByName ? 1 : 0).ThenBy(artist => artist.Id).FirstOrDefault()
+                    : null;
+            }
+
+            return null;
+        }
+
+        private AlbumInfo BuildLookupInfo(MusicArtist artist, IEnumerable<Audio> tracks)
+        {
+            var id = GetItemLookupInfo<AlbumInfo>();
+
+            id.AlbumArtists = AlbumArtists;
+
+            if (artist is not null)
+            {
+                id.ArtistProviderIds = artist.ProviderIds;
+            }
+
+            id.SongInfos = tracks
+                .Select(i => i.GetLookupInfo())
+                .ToList();
+
+            var album = id.SongInfos
+                .Select(i => i.Album)
+                .FirstOrDefault(i => !string.IsNullOrEmpty(i));
+
+            if (!string.IsNullOrEmpty(album))
+            {
+                id.Name = album;
+            }
+
+            return id;
         }
 
         private async Task RefreshArtists(LibraryScanContext context, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
