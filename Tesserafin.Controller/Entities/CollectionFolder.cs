@@ -204,6 +204,7 @@ namespace Tesserafin.Controller.Entities
         /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
+        /// <param name="refreshProgress">Progress of active recursive scans.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
         /// <param name="refreshChildMetadata">if set to <c>true</c> [refresh child metadata].</param>
