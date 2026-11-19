@@ -65,10 +65,9 @@ public class EpisodeMetadataServiceTests
         var encoder = new Mock<IMediaEncoder>(MockBehavior.Strict);
         var naming = new Mock<IItemNamingService>(MockBehavior.Strict);
         var service = new TestEpisodeMetadataService(encoder.Object, naming.Object);
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
+        var cancellationToken = new CancellationToken(canceled: true);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.PrepareAsync(CreateMp4Episode().Object, cancellation.Token).AsTask());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.PrepareAsync(CreateMp4Episode().Object, cancellationToken).AsTask());
 
         encoder.VerifyNoOtherCalls();
         naming.VerifyNoOtherCalls();
@@ -143,6 +142,15 @@ public class EpisodeMetadataServiceTests
         Assert.Equal(1, target.Item.ParentIndexNumber);
     }
 
+    private static Mock<Episode> CreateMp4Episode()
+    {
+        var episode = new Mock<Episode> { CallBase = true };
+        episode.SetupGet(e => e.SourceType).Returns(SourceType.Library);
+        episode.Object.Name = "Episode";
+        episode.Object.Container = "MP4";
+        return episode;
+    }
+
     private sealed class TestEpisodeMetadataService : EpisodeMetadataService
     {
         public TestEpisodeMetadataService(
@@ -176,14 +184,5 @@ public class EpisodeMetadataServiceTests
         {
             MergeData(source, target, Array.Empty<MetadataField>(), replaceData, mergeMetadataSettings);
         }
-    }
-
-    private static Mock<Episode> CreateMp4Episode()
-    {
-        var episode = new Mock<Episode> { CallBase = true };
-        episode.SetupGet(e => e.SourceType).Returns(SourceType.Library);
-        episode.Object.Name = "Episode";
-        episode.Object.Container = "MP4";
-        return episode;
     }
 }
