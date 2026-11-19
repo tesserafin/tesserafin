@@ -3,6 +3,7 @@ using Moq;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Xunit;
 
 namespace Tesserafin.Server.Implementations.Tests.Library;
@@ -71,5 +72,29 @@ public class EpisodeGetSeriesTests
     {
         var episode = new Episode { Id = Guid.NewGuid(), SeriesId = Guid.NewGuid() };
         Assert.Throws<ArgumentNullException>(() => episode.GetSeries(null!));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void FindSeasonId_PrefersThePhysicalParentThenReadsTheSeriesCatalogue(bool hasSeasonParent)
+    {
+        SetStrictLibraryManagerStatic();
+        var series = new Series { Id = Guid.NewGuid() };
+        var physicalParent = new Season { Id = Guid.NewGuid(), IndexNumber = 3 };
+        var numberedSeason = new Season { Id = Guid.NewGuid(), IndexNumber = 2 };
+        var episode = new Episode
+        {
+            ParentId = hasSeasonParent ? physicalParent.Id : series.Id,
+            ParentIndexNumber = numberedSeason.IndexNumber
+        };
+        var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
+        lookup.Setup(l => l.GetItemById(series.Id)).Returns(series);
+        lookup.Setup(l => l.GetItemById(physicalParent.Id)).Returns(physicalParent);
+        var repository = new Mock<IItemRepository>(MockBehavior.Strict);
+        repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.ParentId.Equals(series.Id)))).Returns([numberedSeason]);
+
+        Assert.Equal(hasSeasonParent ? physicalParent.Id : numberedSeason.Id, episode.FindSeasonId(lookup.Object, repository.Object));
+        repository.Verify(r => r.GetItemList(It.IsAny<InternalItemsQuery>()), hasSeasonParent ? Times.Never() : Times.Once());
     }
 }
