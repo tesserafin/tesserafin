@@ -25,6 +25,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 {
     private readonly IItemListingServices _listing;
     private readonly IItemSortService _itemSortService;
+    private readonly IItemLookupService _lookup;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SeasonMetadataService"/> class.
@@ -42,6 +43,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="listing">Sort and channel services for episode listing.</param>
+    /// <param name="lookup">The item identity lookup.</param>
     public SeasonMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -55,11 +57,13 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
         IItemRepository itemRepository,
         IItemSortService itemSortService,
         ILocalizationManager localizationManager,
-        IItemListingServices listing)
+        IItemListingServices listing,
+        IItemLookupService lookup)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
         _listing = listing;
         _itemSortService = itemSortService;
+        _lookup = lookup;
     }
 
     /// <inheritdoc />
@@ -107,7 +111,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 
     /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(Season item)
-        => item.GetEpisodes(null, new DtoOptions(true), true, _listing);
+        => item.GetCatalogueEpisodes(new DtoOptions(true), ItemRepository, _lookup, _itemSortService);
 
     /// <inheritdoc />
     protected override ItemUpdateType UpdateMetadataFromChildren(Season item, IReadOnlyList<BaseItem> children, bool isFullRefresh, ItemUpdateType currentUpdateType)

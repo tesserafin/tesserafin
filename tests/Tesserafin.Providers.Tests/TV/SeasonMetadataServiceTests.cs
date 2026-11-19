@@ -53,7 +53,8 @@ public sealed class SeasonMetadataServiceTests
             Mock.Of<IItemNamingService>(),
             Mock.Of<IExternalDataManager>(),
             Mock.Of<IItemRepository>(),
-            Mock.Of<IItemSortService>())
+            Mock.Of<IItemSortService>(),
+            Mock.Of<IItemLookupService>())
     {
         public ItemUpdateType Prepare(Season season) => BeforeSaveInternal(season, false, ItemUpdateType.None);
     }

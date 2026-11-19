@@ -7,6 +7,7 @@ using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
@@ -495,6 +496,57 @@ public class SeriesGetSeasonEpisodesTests
         libraryManager.Verify(
             x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()),
             Times.Once);
+    }
+
+    [Fact]
+    public void SeriesGetCatalogueEpisodes_ReadsPresentationGroupAndDeduplicatesSpecials()
+    {
+        SetDisplaySpecialsWithinSeasons(true);
+        BaseItem.LibraryManager = Mock.Of<ILibraryManager>(MockBehavior.Strict);
+        var series = CreateSeries();
+        var specials = CreateSeason(0);
+        var season = CreateSeason(1);
+        var special = CreateEpisode("Special", 0, 1, airsAfterSeasonNumber: 1);
+        var missing = CreateEpisode("Missing", 1, 2);
+        missing.IsVirtualItem = true;
+        var episode = CreateEpisode("S01E01", 1, 1);
+        var repository = new Mock<IItemRepository>(MockBehavior.Strict);
+        repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q =>
+                q.User == null && q.SeriesPresentationUniqueKey == "series-key" && q.IsMissing == null
+                && q.IncludeItemTypes.SequenceEqual(new[] { BaseItemKind.Episode, BaseItemKind.Season }))))
+            .Returns([specials, season, missing, special, episode]);
+
+        var result = series.GetCatalogueEpisodes(new DtoOptions(), repository.Object, new RecordingItemSortService());
+
+        Assert.Equal(new BaseItem[] { special, episode, missing }, result);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SeasonGetCatalogueEpisodes_ResolvesSeriesAndReadsConfiguredGroup(bool includeSpecials)
+    {
+        SetDisplaySpecialsWithinSeasons(includeSpecials);
+        BaseItem.LibraryManager = Mock.Of<ILibraryManager>(MockBehavior.Strict);
+        var series = CreateSeries();
+        var season = CreateSeason(1);
+        season.SeriesId = series.Id;
+        var episode = CreateEpisode("S01E01", 1, 1);
+        var special = CreateEpisode("Special", 0, 1, airsAfterSeasonNumber: 1);
+        var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
+        lookup.Setup(l => l.GetItemById(series.Id)).Returns(series);
+        var repository = new Mock<IItemRepository>(MockBehavior.Strict);
+        repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q =>
+                q.User == null && q.IsMissing == null
+                && q.IncludeItemTypes.SequenceEqual(new[] { BaseItemKind.Episode })
+                && q.SeriesPresentationUniqueKey == (includeSpecials ? "series-key" : null)
+                && q.AncestorWithPresentationUniqueKey == (includeSpecials ? null : "season-key"))))
+            .Returns([episode, special]);
+
+        var result = season.GetCatalogueEpisodes(new DtoOptions(true), repository.Object, lookup.Object, new RecordingItemSortService());
+
+        BaseItem[] expected = includeSpecials ? [special, episode] : [episode];
+        Assert.Equal(expected, result);
     }
 
     /// <summary>
