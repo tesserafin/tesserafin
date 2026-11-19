@@ -23,6 +23,7 @@ namespace Tesserafin.Providers.TV;
 public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 {
     private readonly IItemSortService _itemSortService;
+    private readonly IItemLookupService _lookup;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SeasonMetadataService"/> class.
@@ -38,6 +39,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
+    /// <param name="lookup">The item identity lookup.</param>
     public SeasonMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -49,10 +51,12 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
-        IItemSortService itemSortService)
+        IItemSortService itemSortService,
+        IItemLookupService lookup)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository)
     {
         _itemSortService = itemSortService;
+        _lookup = lookup;
     }
 
     /// <inheritdoc />
@@ -100,7 +104,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 
     /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(Season item)
-        => item.GetEpisodes(null, new DtoOptions(true), true, _itemSortService);
+        => item.GetCatalogueEpisodes(new DtoOptions(true), ItemRepository, _lookup, _itemSortService);
 
     /// <inheritdoc />
     protected override ItemUpdateType UpdateMetadataFromChildren(Season item, IReadOnlyList<BaseItem> children, bool isFullRefresh, ItemUpdateType currentUpdateType)

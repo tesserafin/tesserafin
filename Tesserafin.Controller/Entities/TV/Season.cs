@@ -13,6 +13,7 @@ using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
@@ -249,6 +250,19 @@ namespace Tesserafin.Controller.Entities.TV
         {
             return GetEpisodes(Series, user, options, shouldIncludeMissingEpisodes, itemSortService);
         }
+
+        /// <summary>Reads grouped season episodes, including missing entries, for a background metadata refresh.</summary>
+        /// <param name="options">The item data to load.</param>
+        /// <param name="repository">The item repository.</param>
+        /// <param name="lookup">The lookup used to resolve the owning series.</param>
+        /// <param name="itemSortService">The episode sort service.</param>
+        /// <returns>The season episodes in display order.</returns>
+        public IReadOnlyList<BaseItem> GetCatalogueEpisodes(
+            DtoOptions options,
+            IItemRepository repository,
+            IItemLookupService lookup,
+            IItemSortService itemSortService)
+            => GetSeries(lookup)?.GetCatalogueSeasonEpisodes(this, options, repository, itemSortService) ?? [];
 
         public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes)
         {

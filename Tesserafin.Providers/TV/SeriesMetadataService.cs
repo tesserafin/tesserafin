@@ -222,7 +222,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             var seasonNumber = virtualSeason.IndexNumber;
             // If there's a physical season with the same number or no episodes in the season, delete it
             if ((seasonNumber.HasValue && physicalSeasonNumbers.Contains(seasonNumber.Value))
-                || virtualSeason.GetEpisodes(null, new DtoOptions(true), true, _itemSortService).Count == 0)
+                || virtualSeason.GetCatalogueEpisodes(new DtoOptions(true), ItemRepository, _lookup, _itemSortService).Count == 0)
             {
                 Logger.LogInformation("Removing virtual season {SeasonNumber} in series {SeriesName}", virtualSeason.IndexNumber, series.Name);
 
@@ -240,7 +240,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 
     private async Task RemoveObsoleteEpisodes(Series series, CancellationToken cancellationToken)
     {
-        var episodesBySeason = series.GetEpisodes(null, new DtoOptions(), true, _itemSortService)
+        var episodesBySeason = series.GetCatalogueEpisodes(new DtoOptions(), ItemRepository, _itemSortService)
                         .OfType<Episode>()
                         .GroupBy(e => e.ParentIndexNumber)
                         .ToList();

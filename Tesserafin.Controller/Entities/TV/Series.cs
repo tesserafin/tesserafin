@@ -13,6 +13,7 @@ using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
@@ -276,6 +277,22 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         public IEnumerable<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+            => ReadEpisodes(user, options, shouldIncludeMissingEpisodes, itemSortService, static query => LibraryManager.GetItemList(query));
+
+        /// <summary>Reads grouped episodes, including missing entries, for a background metadata refresh.</summary>
+        /// <param name="options">The item data to load.</param>
+        /// <param name="repository">The item repository.</param>
+        /// <param name="itemSortService">The episode sort service.</param>
+        /// <returns>The grouped episodes in display order.</returns>
+        public IEnumerable<BaseItem> GetCatalogueEpisodes(DtoOptions options, IItemRepository repository, IItemSortService itemSortService)
+            => ReadEpisodes(null, options, true, itemSortService, repository.GetItemList);
+
+        private IEnumerable<BaseItem> ReadEpisodes(
+            User user,
+            DtoOptions options,
+            bool shouldIncludeMissingEpisodes,
+            IItemSortService itemSortService,
+            Func<InternalItemsQuery, IReadOnlyList<BaseItem>> readItems)
         {
             var seriesKey = GetUniqueSeriesKey(this);
 
@@ -293,7 +310,7 @@ namespace Tesserafin.Controller.Entities.TV
                 query.IsMissing = false;
             }
 
-            var allItems = LibraryManager.GetItemList(query);
+            var allItems = readItems(query);
 
             var allSeriesEpisodes = allItems.OfType<Episode>().ToList();
 
@@ -380,6 +397,18 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+            => ReadSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, itemSortService, static query => LibraryManager.GetItemList(query));
+
+        internal List<BaseItem> GetCatalogueSeasonEpisodes(Season parentSeason, DtoOptions options, IItemRepository repository, IItemSortService itemSortService)
+            => ReadSeasonEpisodes(parentSeason, null, options, true, itemSortService, repository.GetItemList);
+
+        private List<BaseItem> ReadSeasonEpisodes(
+            Season parentSeason,
+            User user,
+            DtoOptions options,
+            bool shouldIncludeMissingEpisodes,
+            IItemSortService itemSortService,
+            Func<InternalItemsQuery, IReadOnlyList<BaseItem>> readItems)
         {
             var queryFromSeries = ConfigurationManager.Configuration.DisplaySpecialsWithinSeasons;
 
@@ -419,7 +448,7 @@ namespace Tesserafin.Controller.Entities.TV
             }
             else
             {
-                allItems = LibraryManager.GetItemList(query);
+                allItems = readItems(query);
             }
 
             return GetSeasonEpisodes(parentSeason, user, allItems, options, shouldIncludeMissingEpisodes, itemSortService);
