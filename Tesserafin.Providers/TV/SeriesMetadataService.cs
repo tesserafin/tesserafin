@@ -15,6 +15,7 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Extensions;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
@@ -106,6 +107,13 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         }
 
         return await base.RefreshMetadata(item, refreshOptions, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    protected override SeriesInfo GetLookupInfo(Series item, LibraryOptions libraryOptions)
+    {
+        var locale = item.GetMetadataLocale(_lookup, _collections, libraryOptions, ServerConfigurationManager.Configuration);
+        return item.GetLookupInfo(locale);
     }
 
     /// <inheritdoc />

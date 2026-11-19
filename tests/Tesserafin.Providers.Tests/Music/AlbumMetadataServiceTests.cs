@@ -9,6 +9,7 @@ using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.Music;
 using Xunit;
@@ -110,6 +111,6 @@ public sealed class AlbumMetadataServiceTests
     {
         public IReadOnlyList<BaseItem> ReadTracks(MusicAlbum album) => GetChildrenForMetadataUpdates(album);
 
-        public AlbumInfo ReadLookupInfo(MusicAlbum album) => GetLookupInfo(album);
+        public AlbumInfo ReadLookupInfo(MusicAlbum album) => GetLookupInfo(album, new LibraryOptions());
     }
 }

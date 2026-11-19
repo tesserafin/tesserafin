@@ -112,7 +112,7 @@ namespace Tesserafin.Controller.Entities.TV
 
             var libraries = collections.GetCollectionFolders(this);
             var language = GetPreferredMetadataLanguage(
-                GetParents(lookup),
+                () => GetParents(lookup),
                 () => libraries,
                 () => options.PreferredMetadataLanguage,
                 () => configuration.PreferredMetadataLanguage);
@@ -564,6 +564,9 @@ namespace Tesserafin.Controller.Entities.TV
 
             return info;
         }
+
+        public SeriesInfo GetLookupInfo((string Language, string CountryCode) locale)
+            => GetItemLookupInfo<SeriesInfo>(locale);
 
         public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
         {

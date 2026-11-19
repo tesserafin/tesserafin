@@ -26,6 +26,7 @@ using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
@@ -1725,95 +1726,101 @@ namespace Tesserafin.Controller.Entities
         /// <returns>System.String.</returns>
         public string GetPreferredMetadataLanguage()
             => GetPreferredMetadataLanguage(
-                GetParents(),
+                GetParents,
                 () => LibraryManager.GetCollectionFolders(this),
                 () => LibraryManager.GetLibraryOptions(this).PreferredMetadataLanguage,
                 () => ConfigurationManager.Configuration.PreferredMetadataLanguage);
 
         /// <summary>Resolves the item's language followed by the parent, library and server defaults.</summary>
-        /// <param name="parents">The item's parents in nearest-first order.</param>
+        /// <param name="getParents">Reads the item's parents in nearest-first order.</param>
         /// <param name="getLibraries">Resolves the item's libraries in catalogue order.</param>
         /// <param name="getLibraryLanguage">Reads the language in the effective library options.</param>
         /// <param name="getServerLanguage">Reads the server's default language.</param>
         /// <returns>The preferred metadata language.</returns>
         protected string GetPreferredMetadataLanguage(
-            IEnumerable<BaseItem> parents,
+            Func<IEnumerable<BaseItem>> getParents,
             Func<IEnumerable<Folder>> getLibraries,
             Func<string> getLibraryLanguage,
             Func<string> getServerLanguage)
-        {
-            string lang = PreferredMetadataLanguage;
+            => ResolveMetadataPreference(
+                PreferredMetadataLanguage,
+                getParents,
+                getLibraries,
+                static item => item.PreferredMetadataLanguage,
+                getLibraryLanguage,
+                getServerLanguage);
 
-            if (string.IsNullOrEmpty(lang))
-            {
-                lang = parents.Select(i => i.PreferredMetadataLanguage)
-                    .FirstOrDefault(i => !string.IsNullOrEmpty(i));
-            }
-
-            if (string.IsNullOrEmpty(lang))
-            {
-                lang = getLibraries().Select(i => i.PreferredMetadataLanguage)
-                    .FirstOrDefault(i => !string.IsNullOrEmpty(i));
-            }
-
-            if (string.IsNullOrEmpty(lang))
-            {
-                lang = getLibraryLanguage();
-            }
-
-            if (string.IsNullOrEmpty(lang))
-            {
-                lang = getServerLanguage();
-            }
-
-            return lang;
-        }
-
-        /// <summary>
-        /// Gets the preferred metadata country code.
-        /// </summary>
-        /// <returns>System.String.</returns>
+        /// <summary>Gets the preferred metadata country code.</summary>
+        /// <returns>The country code.</returns>
         public string GetPreferredMetadataCountryCode()
-        {
-            return GetPreferredMetadataCountryCode(null);
-        }
+            => GetPreferredMetadataCountryCode(null);
 
         private string GetPreferredMetadataCountryCode(IStandaloneVisibilityService scope)
-        {
-            string lang = PreferredMetadataCountryCode;
-
-            if (string.IsNullOrEmpty(lang))
-            {
-                lang = (scope?.GetParents(this) ?? GetParents())
-                    .Select(i => i.PreferredMetadataCountryCode)
-                    .FirstOrDefault(i => !string.IsNullOrEmpty(i));
-            }
-
-            if (string.IsNullOrEmpty(lang))
-            {
-                lang = (scope?.GetCollectionFolders(this) ?? LibraryManager.GetCollectionFolders(this))
-                    .Select(i => i.PreferredMetadataCountryCode)
-                    .FirstOrDefault(i => !string.IsNullOrEmpty(i));
-            }
-
-            if (string.IsNullOrEmpty(lang))
-            {
-                // The options of the item itself when it is a library, else of its first library (DEBT-SERVER-7).
-                var options = scope is null
-                    ? LibraryManager.GetLibraryOptions(this)
-                    : scope.GetLibraryOptions(this);
-                lang = options?.MetadataCountryCode;
-            }
-
-            if (string.IsNullOrEmpty(lang))
-            {
-                // The server's, through the service when it supplies it (DEBT-SERVER-8).
-                lang = scope is null
+            => ResolveMetadataPreference(
+                PreferredMetadataCountryCode,
+                () => scope?.GetParents(this) ?? GetParents(),
+                () => scope?.GetCollectionFolders(this) ?? LibraryManager.GetCollectionFolders(this),
+                static item => item.PreferredMetadataCountryCode,
+                () => (scope is null ? LibraryManager.GetLibraryOptions(this) : scope.GetLibraryOptions(this))?.MetadataCountryCode,
+                () => scope is null
                     ? ConfigurationManager.Configuration.MetadataCountryCode
-                    : scope.GetServerMetadataCountryCode();
+                    : scope.GetServerMetadataCountryCode());
+
+        /// <summary>Resolves inherited metadata preferences from the supplied catalogue and settings.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <param name="collections">The library membership resolver.</param>
+        /// <param name="options">The effective library options.</param>
+        /// <param name="configuration">The server-wide metadata defaults.</param>
+        /// <returns>The preferred metadata language and country code.</returns>
+        public (string Language, string CountryCode) GetMetadataLocale(
+            IItemLookupService lookup,
+            ICollectionFolderResolver collections,
+            LibraryOptions options,
+            ServerConfiguration configuration)
+        {
+            List<Folder> libraries = null;
+            IEnumerable<BaseItem> ReadParents() => GetParents(lookup);
+            IEnumerable<Folder> ReadLibraries() => libraries ??= collections.GetCollectionFolders(this);
+
+            var language = GetPreferredMetadataLanguage(
+                ReadParents,
+                ReadLibraries,
+                () => options.PreferredMetadataLanguage,
+                () => configuration.PreferredMetadataLanguage);
+            var country = ResolveMetadataPreference(
+                PreferredMetadataCountryCode,
+                ReadParents,
+                ReadLibraries,
+                static item => item.PreferredMetadataCountryCode,
+                () => options.MetadataCountryCode,
+                () => configuration.MetadataCountryCode);
+            return (language, country);
+        }
+
+        private static string ResolveMetadataPreference(
+            string value,
+            Func<IEnumerable<BaseItem>> getParents,
+            Func<IEnumerable<Folder>> getLibraries,
+            Func<BaseItem, string> getPreference,
+            Func<string> getLibraryDefault,
+            Func<string> getServerDefault)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                value = getParents().Select(getPreference).FirstOrDefault(preference => !string.IsNullOrEmpty(preference));
             }
 
-            return lang;
+            if (string.IsNullOrEmpty(value))
+            {
+                value = getLibraries().Select(getPreference).FirstOrDefault(preference => !string.IsNullOrEmpty(preference));
+            }
+
+            if (string.IsNullOrEmpty(value))
+            {
+                value = getLibraryDefault();
+            }
+
+            return string.IsNullOrEmpty(value) ? getServerDefault() : value;
         }
 
         /// <summary>
@@ -2508,14 +2515,14 @@ namespace Tesserafin.Controller.Entities
             return GetItemLookupInfo<ItemLookupInfo>();
         }
 
-        protected T GetItemLookupInfo<T>()
+        protected T GetItemLookupInfo<T>((string Language, string CountryCode)? locale = null)
             where T : ItemLookupInfo, new()
         {
             return new T
             {
                 Path = Path,
-                MetadataCountryCode = GetPreferredMetadataCountryCode(),
-                MetadataLanguage = GetPreferredMetadataLanguage(),
+                MetadataCountryCode = locale.HasValue ? locale.Value.CountryCode : GetPreferredMetadataCountryCode(),
+                MetadataLanguage = locale.HasValue ? locale.Value.Language : GetPreferredMetadataLanguage(),
                 Name = GetNameForMetadataLookup(),
                 OriginalTitle = OriginalTitle,
                 ProviderIds = ProviderIds,

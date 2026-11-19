@@ -27,6 +27,7 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     private readonly IMediaEncoder _mediaEncoder;
     private readonly IMediaSourceManager _mediaSourceManager;
     private readonly IItemLookupService _lookup;
+    private readonly ICollectionFolderResolver _collections;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EpisodeMetadataService"/> class.
@@ -48,6 +49,7 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     /// <param name="mediaSegments">Provides segment support when building the media source.</param>
     /// <param name="channels">Provides channel sources when building media sources.</param>
     /// <param name="lookup">The item identity lookup.</param>
+    /// <param name="collections">The library membership resolver.</param>
     public EpisodeMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -62,12 +64,17 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
         IMediaEncoder mediaEncoder,
         IMediaSourceManager mediaSourceManager,
         ILocalizationManager localizationManager,
-        IItemLookupService lookup)
+        IItemLookupService lookup,
+        IMediaSourceManager mediaSources,
+        IMediaSegmentManager mediaSegments,
+        IChannelManager channels,
+        ICollectionFolderResolver collections)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
         _mediaEncoder = mediaEncoder;
         _mediaSourceManager = mediaSourceManager;
         _lookup = lookup;
+        _collections = collections;
     }
 
     /// <inheritdoc />
@@ -126,8 +133,11 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     }
 
     /// <inheritdoc />
-    protected override EpisodeInfo GetLookupInfo(Episode item)
-        => item.GetLookupInfo(_lookup, ItemRepository);
+    protected override EpisodeInfo GetLookupInfo(Episode item, LibraryOptions libraryOptions)
+    {
+        var locale = item.GetMetadataLocale(_lookup, _collections, libraryOptions, ServerConfigurationManager.Configuration);
+        return item.GetLookupInfo(_lookup, ItemRepository, locale);
+    }
 
     /// <inheritdoc />
     protected override ItemUpdateType BeforeSaveInternal(Episode item, bool isFullRefresh, ItemUpdateType updateType)

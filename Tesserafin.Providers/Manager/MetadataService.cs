@@ -103,7 +103,7 @@ namespace Tesserafin.Providers.Manager
             }
         }
 
-        protected virtual TIdType GetLookupInfo(TItemType item) => item.GetLookupInfo();
+        protected virtual TIdType GetLookupInfo(TItemType item, LibraryOptions libraryOptions) => item.GetLookupInfo();
 
         protected virtual string CreatePresentationUniqueKey(TItemType item) => item.CreatePresentationUniqueKey();
 
@@ -198,7 +198,7 @@ namespace Tesserafin.Providers.Manager
 
                 if (providers.Count > 0)
                 {
-                    var id = GetLookupInfo(itemOfType);
+                    var id = GetLookupInfo(itemOfType, libraryOptions);
 
                     if (refreshOptions.SearchResult is not null)
                     {

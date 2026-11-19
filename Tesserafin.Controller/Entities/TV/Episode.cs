@@ -347,14 +347,14 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         public EpisodeInfo GetLookupInfo()
-            => CreateLookupInfo(Series, Season);
+            => CreateLookupInfo(Series, Season, null);
 
-        public EpisodeInfo GetLookupInfo(IItemLookupService lookup, IItemRepository repository)
-            => CreateLookupInfo(GetSeries(lookup), GetSeason(lookup, repository));
+        public EpisodeInfo GetLookupInfo(IItemLookupService lookup, IItemRepository repository, (string Language, string CountryCode) locale)
+            => CreateLookupInfo(GetSeries(lookup), GetSeason(lookup, repository), locale);
 
-        private EpisodeInfo CreateLookupInfo(Series series, Season season)
+        private EpisodeInfo CreateLookupInfo(Series series, Season season, (string Language, string CountryCode)? locale)
         {
-            var id = GetItemLookupInfo<EpisodeInfo>();
+            var id = GetItemLookupInfo<EpisodeInfo>(locale);
 
             if (series is not null)
             {
