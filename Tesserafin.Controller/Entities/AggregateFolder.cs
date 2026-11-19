@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
 using Tesserafin.Model.IO;
@@ -137,11 +138,11 @@ namespace Tesserafin.Controller.Entities
             return base.GetNonCachedChildren(resolution, directoryService, cancellationToken).Concat(_virtualChildren);
         }
 
-        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, ILibraryRefreshProgress refreshProgress, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, ILibraryRefreshProgress refreshProgress, ILimitedConcurrencyLibraryScheduler scheduler, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             ClearCache();
 
-            await base.ValidateChildrenInternal(deletions, writes, images, resolution, refreshProgress, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken)
+            await base.ValidateChildrenInternal(deletions, writes, images, resolution, refreshProgress, scheduler, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken)
                 .ConfigureAwait(false);
 
             ClearCache();

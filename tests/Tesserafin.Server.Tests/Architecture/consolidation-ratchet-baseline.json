@@ -24,7 +24,6 @@
     "CollectionFolder.XmlSerializer",
     "Episode.MediaEncoder",
     "Folder.CollectionManager",
-    "Folder.LimitedConcurrencyLibraryScheduler",
     "Folder.UserViewManager",
     "UserView.TVSeriesManager",
     "Video.RecordingsManager"

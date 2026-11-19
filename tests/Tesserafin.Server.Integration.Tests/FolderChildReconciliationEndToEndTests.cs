@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Database.Implementations;
@@ -169,6 +170,7 @@ public sealed class FolderChildReconciliationEndToEndTests(TesserafinApplication
                 images,
                 resolution,
                 factory.Services.GetRequiredService<ILibraryRefreshProgress>(),
+                factory.Services.GetRequiredService<ILimitedConcurrencyLibraryScheduler>(),
                 new Progress<double>(),
                 new MetadataRefreshOptions(new DirectoryService(files)) { MetadataRefreshMode = MetadataRefreshMode.None, ImageRefreshMode = MetadataRefreshMode.None },
                 recursive: false,

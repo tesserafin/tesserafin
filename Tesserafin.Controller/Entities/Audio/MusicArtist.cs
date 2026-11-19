@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data;
 using Tesserafin.Data.Entities;
@@ -115,7 +116,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return base.IsSaveLocalMetadataEnabled();
         }
 
-        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, ILibraryRefreshProgress refreshProgress, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IItemResolutionService resolution, ILibraryRefreshProgress refreshProgress, ILimitedConcurrencyLibraryScheduler scheduler, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             if (IsAccessedByName)
             {
@@ -123,7 +124,7 @@ namespace Tesserafin.Controller.Entities.Audio
                 return;
             }
 
-            await base.ValidateChildrenInternal(deletions, writes, images, resolution, refreshProgress, progress, recursive, refreshChildMetadata, false, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
+            await base.ValidateChildrenInternal(deletions, writes, images, resolution, refreshProgress, scheduler, progress, recursive, refreshChildMetadata, false, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
         }
 
         public override List<string> GetUserDataKeys()

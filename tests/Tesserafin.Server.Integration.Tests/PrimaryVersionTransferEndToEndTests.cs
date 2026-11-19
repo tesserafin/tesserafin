@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.Providers;
@@ -159,6 +160,7 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
                 images,
                 resolution,
                 factory.Services.GetRequiredService<ILibraryRefreshProgress>(),
+                factory.Services.GetRequiredService<ILimitedConcurrencyLibraryScheduler>(),
                 new Progress<double>(),
                 new MetadataRefreshOptions(new DirectoryService(files)) { MetadataRefreshMode = MetadataRefreshMode.None, ImageRefreshMode = MetadataRefreshMode.None },
                 recursive: false,
