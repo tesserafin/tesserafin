@@ -72,4 +72,6 @@ internal sealed class LibraryScanTraversal(
     public void ClearIgnoreRuleCache() => ignore.ClearDirectoryCache();
 
     public void UpdateInheritedValues() => persistence.UpdateInheritedValues();
+
+    private MetadataRefreshOptions CreateRefreshOptions() => new(new DirectoryService(fileSystem));
 }

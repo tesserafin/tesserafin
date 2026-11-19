@@ -115,7 +115,7 @@ namespace Tesserafin.Controller.Entities
             return true;
         }
 
-        protected override Task<bool> RefreshOwnedItemsAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
+        protected override Task<bool> RefreshOwnedItemsAsync(IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
             => writes.RefreshCollectionFolderMembershipAsync(this, options.DirectoryService, cancellationToken);
 
         /// <summary>

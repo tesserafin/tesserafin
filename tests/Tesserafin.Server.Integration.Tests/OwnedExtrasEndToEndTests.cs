@@ -27,6 +27,7 @@ public sealed class OwnedExtrasEndToEndTests(TesserafinApplicationFactory factor
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.AddAuthHeader(await AuthHelper.CompleteStartupAsync(client));
         var writes = factory.Services.GetRequiredService<IItemWriteCommands>();
+        var metadata = factory.Services.GetRequiredService<IProviderManager>();
         var resolution = factory.Services.GetRequiredService<IItemResolutionService>();
         var repository = factory.Services.GetRequiredService<IItemRepository>();
         var lookup = factory.Services.GetRequiredService<IItemLookupService>();
@@ -103,6 +104,7 @@ public sealed class OwnedExtrasEndToEndTests(TesserafinApplicationFactory factor
 
             Task<bool> RefreshAsync(string path) => writes.RefreshExtrasAsync(
                 owner,
+                metadata,
                 deletions,
                 new MetadataRefreshOptions(new DirectoryService(files))
                 {

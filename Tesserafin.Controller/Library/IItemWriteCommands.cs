@@ -37,30 +37,33 @@ public interface IItemWriteCommands
 
     /// <summary>Reconciles and refreshes discovered bonus items, preserving source files and non-extra owned versions.</summary>
     /// <param name="owner">The owning media item.</param>
+    /// <param name="metadata">The provider dispatch used to refresh owned items.</param>
     /// <param name="deletions">Explicit catalogue deletion operations.</param>
     /// <param name="options">Refresh options; never mutated.</param>
     /// <param name="fileSystemChildren">The owner's filesystem neighbours.</param>
     /// <param name="cancellationToken">Cancellation between discovery and mutations.</param>
     /// <returns>Whether the owner needs saving after extra reconciliation.</returns>
-    Task<bool> RefreshExtrasAsync(BaseItem owner, IItemDeletionCommands deletions, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken);
+    Task<bool> RefreshExtrasAsync(BaseItem owner, IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken);
 
     /// <summary>Copies optional title metadata and refreshes one owned item.</summary>
     /// <param name="owner">The source of title metadata.</param>
     /// <param name="ownedItem">The staged item to refresh.</param>
     /// <param name="copyTitleMetadata">Whether to inherit the owner's descriptive metadata.</param>
+    /// <param name="metadata">The provider dispatch used to refresh owned items.</param>
     /// <param name="deletions">Explicit deletion operations used during refresh.</param>
     /// <param name="options">Refresh options; never mutated.</param>
     /// <param name="cancellationToken">The refresh cancellation token.</param>
     /// <returns>The owned-item refresh task.</returns>
-    Task RefreshOwnedMetadataAsync(BaseItem owner, BaseItem ownedItem, bool copyTitleMetadata, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken);
+    Task RefreshOwnedMetadataAsync(BaseItem owner, BaseItem ownedItem, bool copyTitleMetadata, IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken);
 
     /// <summary>Refreshes typed local versions and multipart videos through explicit write ports.</summary>
     /// <param name="owner">The owning file-backed video in the library tree.</param>
+    /// <param name="metadata">The provider dispatch used to refresh owned items.</param>
     /// <param name="deletions">Explicit catalogue-only cleanup operations.</param>
     /// <param name="options">Refresh options; never mutated.</param>
     /// <param name="cancellationToken">Cancels admission and refresh work.</param>
     /// <returns>Whether the owner's version paths or link count changed.</returns>
-    Task<bool> RefreshOwnedVideosAsync(Video owner, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken);
+    Task<bool> RefreshOwnedVideosAsync(Video owner, IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken);
 
     /// <summary>Transfers a removed primary's versions before deleting only its catalogue entry.</summary>
     /// <param name="previous">The previous primary identity.</param>

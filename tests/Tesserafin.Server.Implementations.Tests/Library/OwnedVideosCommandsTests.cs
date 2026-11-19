@@ -38,7 +38,7 @@ public sealed class OwnedVideosCommandsTests
         var options = context.Options();
         options.SearchResult = new RemoteSearchResult { Name = "owner search" };
 
-        Assert.True(await context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, options, TestContext.Current.CancellationToken));
+        Assert.True(await context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Provider.Object, context.Deletions.Object, options, TestContext.Current.CancellationToken));
 
         Assert.Equal(new[] { alternate.Path }, context.Owner.LocalAlternateVersions);
         Assert.Equal(2, context.Refreshed.Count);
@@ -75,7 +75,7 @@ public sealed class OwnedVideosCommandsTests
         context.Files.Setup(f => f.FileExists("/media/missing.mkv")).Returns(false);
         context.Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>())).ThrowsAsync(new IOException("refresh rejected"));
 
-        await Assert.ThrowsAsync<IOException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<IOException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
 
         Assert.Equal(Guid.Empty, alternate.OwnerId);
         Assert.Null(alternate.PrimaryVersionId);
@@ -90,7 +90,7 @@ public sealed class OwnedVideosCommandsTests
                 await context.Commands.UpdateItemAsync(item, null, ItemUpdateType.MetadataEdit, token);
                 return ItemUpdateType.MetadataEdit;
             });
-        Assert.True(await context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
+        Assert.True(await context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
         var saved = Assert.IsType<Movie>(context.Persisted[alternate.Id]);
         Assert.Equal(context.Owner.Id, saved.OwnerId);
         Assert.Equal(context.Owner.Id, saved.PrimaryVersionId);
@@ -118,7 +118,7 @@ public sealed class OwnedVideosCommandsTests
         context.Persisted[alternate.Id] = alternate;
         context.Owner.LocalAlternateVersions = [alternate.Path];
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
 
         context.Provider.VerifyNoOtherCalls();
         context.Persistence.VerifyNoOtherCalls();
@@ -136,7 +136,7 @@ public sealed class OwnedVideosCommandsTests
         context.Persisted[generic.Id] = generic;
         context.Owner.LocalAlternateVersions = [path];
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
 
         context.Deletions.VerifyNoOtherCalls();
         context.Provider.VerifyNoOtherCalls();
@@ -158,7 +158,7 @@ public sealed class OwnedVideosCommandsTests
             context.Owner.LocalAlternateVersions = [context.Owner.Path];
         }
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
 
         context.Provider.VerifyNoOtherCalls();
         context.Persistence.VerifyNoOtherCalls();
@@ -173,7 +173,7 @@ public sealed class OwnedVideosCommandsTests
         context.Owner.AdditionalParts = [part.Path];
         context.Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>())).ThrowsAsync(new IOException("provider rejected"));
 
-        await Assert.ThrowsAsync<IOException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<IOException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
 
         var published = Assert.IsType<Video>(context.Lookup.GetItemById(part.Id));
         Assert.Equal(context.Owner.Id, published.OwnerId);
@@ -193,7 +193,7 @@ public sealed class OwnedVideosCommandsTests
         context.Owner.AdditionalParts = [part.Path];
         context.Files.Setup(f => f.FileExists(part.Path)).Returns(false);
 
-        Assert.False(await context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
+        Assert.False(await context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), TestContext.Current.CancellationToken));
 
         context.Deletions.Verify(d => d.DeleteAsync(part, It.Is<DeleteOptions>(o => !o.DeleteFileLocation), It.IsAny<CancellationToken>()), Times.Once);
         context.Provider.VerifyNoOtherCalls();
@@ -215,7 +215,7 @@ public sealed class OwnedVideosCommandsTests
         var release = new TaskCompletionSource<ItemUpdateType>(TaskCreationOptions.RunContinuationsAsynchronously);
         context.Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>())).Returns(CancelAndWaitAsync);
 
-        var refresh = context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, context.Options(), cancellation.Token);
+        var refresh = context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), cancellation.Token);
         Assert.False(refresh.IsCompleted);
         release.SetResult(ItemUpdateType.None);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => refresh);
@@ -235,7 +235,7 @@ public sealed class OwnedVideosCommandsTests
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Deletions.Object, context.Options(), cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => context.Commands.RefreshOwnedVideosAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), cancellation.Token));
 
         context.Files.VerifyNoOtherCalls();
         context.Resolution.VerifyNoOtherCalls();
@@ -246,7 +246,6 @@ public sealed class OwnedVideosCommandsTests
 
     private sealed class Context : IDisposable
     {
-        private readonly IProviderManager _previousProvider = BaseItem.ProviderManager;
         private readonly ILibraryManager _previousManager = BaseItem.LibraryManager;
         private readonly Dictionary<(string Path, Type Type), Guid> _identities = [];
 
@@ -283,7 +282,6 @@ public sealed class OwnedVideosCommandsTests
                 });
             Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>()))
                 .Callback((BaseItem item, MetadataRefreshOptions options, CancellationToken _) => Refreshed.Add(((Video)item, options))).ReturnsAsync(ItemUpdateType.None);
-            BaseItem.ProviderManager = Provider.Object;
             BaseItem.LibraryManager = new Mock<ILibraryManager>(MockBehavior.Strict).Object;
             Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, itemOptions.Object, Lookup, Linked.Object), Persistence.Object, Cache, Lookup, Linked.Object, Mock.Of<IItemMetadataExporter>(), Files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(configuration.Object, Files.Object), Resolution.Object, Repository.Object, itemOptions.Object, new FolderChildReconciler(Lookup, Mock.Of<IFileSystem>(), NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
         }
@@ -308,7 +306,7 @@ public sealed class OwnedVideosCommandsTests
 
         public Mock<IItemDeletionCommands> Deletions { get; } = new();
 
-        public Mock<IProviderManager> Provider { get; } = new();
+        public Mock<IItemMetadataDispatcher> Provider { get; } = new();
 
         public List<(Video Item, MetadataRefreshOptions Options)> Refreshed { get; } = [];
 
@@ -327,7 +325,6 @@ public sealed class OwnedVideosCommandsTests
 
         public void Dispose()
         {
-            BaseItem.ProviderManager = _previousProvider;
             BaseItem.LibraryManager = _previousManager;
         }
     }

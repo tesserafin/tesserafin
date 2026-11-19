@@ -37,7 +37,7 @@ public sealed class OwnedExtrasCommandsTests
         context.Owned = [removed, alternate];
         var options = context.Options();
 
-        Assert.True(await context.Commands.RefreshExtrasAsync(context.Owner, context.Deletions.Object, options, [], TestContext.Current.CancellationToken));
+        Assert.True(await context.Commands.RefreshExtrasAsync(context.Owner, context.Provider.Object, context.Deletions.Object, options, [], TestContext.Current.CancellationToken));
 
         context.Deletions.Verify(d => d.DeleteAsync(removed, It.Is<DeleteOptions>(o => !o.DeleteFileLocation), It.IsAny<CancellationToken>()), Times.Once);
         context.Deletions.Verify(d => d.DeleteAsync(alternate, It.IsAny<DeleteOptions>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -61,7 +61,7 @@ public sealed class OwnedExtrasCommandsTests
         context.Candidates = [extra];
         context.Owned = [extra, new Video { Id = Guid.NewGuid(), OwnerId = context.Owner.Id }];
 
-        Assert.False(await context.Commands.RefreshExtrasAsync(context.Owner, context.Deletions.Object, context.Options(), [], TestContext.Current.CancellationToken));
+        Assert.False(await context.Commands.RefreshExtrasAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), [], TestContext.Current.CancellationToken));
 
         Assert.Empty(context.Refreshed);
         context.Deletions.VerifyNoOtherCalls();
@@ -77,7 +77,7 @@ public sealed class OwnedExtrasCommandsTests
         var options = context.Options();
         options.SearchResult = new RemoteSearchResult { Name = "owner lookup" };
 
-        await context.Commands.RefreshOwnedMetadataAsync(context.Owner, extra, inherit, context.Deletions.Object, options, TestContext.Current.CancellationToken);
+        await context.Commands.RefreshOwnedMetadataAsync(context.Owner, extra, inherit, context.Provider.Object, context.Deletions.Object, options, TestContext.Current.CancellationToken);
 
         var refresh = Assert.Single(context.Refreshed);
         Assert.Equal(inherit ? context.Owner.Overview : "original", extra.Overview);
@@ -96,7 +96,7 @@ public sealed class OwnedExtrasCommandsTests
         context.Candidates = [extra];
         context.Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>())).ThrowsAsync(new IOException("refresh failed"));
 
-        await Assert.ThrowsAsync<IOException>(() => context.Commands.RefreshExtrasAsync(context.Owner, context.Deletions.Object, context.Options(), [], TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<IOException>(() => context.Commands.RefreshExtrasAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), [], TestContext.Current.CancellationToken));
 
         Assert.Equal(Guid.Empty, extra.OwnerId);
         Assert.Equal("saved", extra.Overview);
@@ -110,7 +110,7 @@ public sealed class OwnedExtrasCommandsTests
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => context.Commands.RefreshExtrasAsync(context.Owner, context.Deletions.Object, context.Options(), [], cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => context.Commands.RefreshExtrasAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), [], cancellation.Token));
 
         context.Resolution.VerifyNoOtherCalls();
         context.Repository.VerifyNoOtherCalls();
@@ -128,7 +128,7 @@ public sealed class OwnedExtrasCommandsTests
         var release = new TaskCompletionSource<ItemUpdateType>(TaskCreationOptions.RunContinuationsAsynchronously);
         context.Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>())).Returns(CancelAndWaitAsync);
 
-        var refresh = context.Commands.RefreshExtrasAsync(context.Owner, context.Deletions.Object, context.Options(), [], cancellation.Token);
+        var refresh = context.Commands.RefreshExtrasAsync(context.Owner, context.Provider.Object, context.Deletions.Object, context.Options(), [], cancellation.Token);
         Assert.False(refresh.IsCompleted);
         release.SetResult(ItemUpdateType.None);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => refresh);
@@ -152,7 +152,7 @@ public sealed class OwnedExtrasCommandsTests
             BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>(m => m.GetPathProtocol(It.IsAny<string>()) == MediaProtocol.File);
             var owner = new CancelledOwner { Path = "/Owner.mkv" };
 
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => owner.RefreshMetadata(context.Deletions.Object, context.Commands, context.Options(), cancellation.Token));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => owner.RefreshMetadata(context.Provider.Object, context.Deletions.Object, context.Commands, context.Options(), cancellation.Token));
 
             context.Provider.VerifyNoOtherCalls();
         }
@@ -178,13 +178,12 @@ public sealed class OwnedExtrasCommandsTests
     {
         protected override bool SupportsOwnedItems => true;
 
-        protected override Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        protected override Task<bool> RefreshedOwnedItems(IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
             => Task.FromCanceled<bool>(cancellationToken);
     }
 
     private sealed class Context : IDisposable
     {
-        private readonly IProviderManager _previousProvider = BaseItem.ProviderManager;
         private readonly ILibraryManager _previousManager = BaseItem.LibraryManager;
 
         public Context()
@@ -196,7 +195,6 @@ public sealed class OwnedExtrasCommandsTests
             Repository.Setup(r => r.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(() => Owned);
             Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>()))
                 .Callback((BaseItem item, MetadataRefreshOptions options, CancellationToken _) => Refreshed.Add((item, options))).ReturnsAsync(ItemUpdateType.MetadataEdit);
-            BaseItem.ProviderManager = Provider.Object;
             BaseItem.LibraryManager = new Mock<ILibraryManager>(MockBehavior.Strict).Object;
             Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, Mock.Of<ILibraryItemOptions>(), lookup, Mock.Of<ILinkedChildrenService>()), Mock.Of<IItemPersistenceService>(), lookup, lookup, Mock.Of<ILinkedChildrenService>(), Mock.Of<IItemMetadataExporter>(), Mock.Of<IFileSystem>(), Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(configuration.Object, Mock.Of<IFileSystem>()), Resolution.Object, Repository.Object, Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(lookup, Mock.Of<IFileSystem>(), NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
         }
@@ -215,7 +213,7 @@ public sealed class OwnedExtrasCommandsTests
 
         public Mock<IItemDeletionCommands> Deletions { get; } = new();
 
-        public Mock<IProviderManager> Provider { get; } = new();
+        public Mock<IItemMetadataDispatcher> Provider { get; } = new();
 
         public ItemWriteCommands Commands { get; }
 
@@ -223,7 +221,6 @@ public sealed class OwnedExtrasCommandsTests
 
         public void Dispose()
         {
-            BaseItem.ProviderManager = _previousProvider;
             BaseItem.LibraryManager = _previousManager;
         }
     }

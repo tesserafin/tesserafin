@@ -473,7 +473,7 @@ namespace Tesserafin.Controller.Entities
         {
             var hasChanges = await base.RefreshedOwnedItems(deletions, writes, providers, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
 
-            var videoChanges = await writes.RefreshOwnedVideosAsync(this, deletions, options, cancellationToken).ConfigureAwait(false);
+            var videoChanges = await writes.RefreshOwnedVideosAsync(this, metadata, deletions, options, cancellationToken).ConfigureAwait(false);
             return hasChanges || videoChanges;
         }
 

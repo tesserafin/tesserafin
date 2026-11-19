@@ -74,7 +74,8 @@ public sealed class FolderValidationTests
             scheduler.Object,
             lookup.Object,
             repository.Object,
-            store.Object);
+            store.Object,
+            new Lazy<IItemMetadataDispatcher>(() => Mock.Of<IItemMetadataDispatcher>(MockBehavior.Strict)));
 
         await root.ValidateChildren(
             context,

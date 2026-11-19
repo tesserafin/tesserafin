@@ -22,7 +22,7 @@ internal sealed partial class ItemWriteCommands(
     IItemCacheStore cache,
     IItemLookupService lookup,
     ILinkedChildrenService linkedChildren,
-    IItemMetadataExporter metadata,
+    IItemMetadataExporter metadataExporter,
     IFileSystem files,
     IItemChangePublisher changes,
     ActiveRecordings recordings,
@@ -291,7 +291,7 @@ internal sealed partial class ItemWriteCommands(
             draft.DateLastSaved = DateTime.UtcNow;
             if (!string.IsNullOrEmpty(draft.Path) && files.IsPathFile(draft.Path))
             {
-                await metadata.SaveAsync(draft, propagated.Contains(draft.Id) ? ItemUpdateType.MetadataDownload : reason, cancellationToken).ConfigureAwait(false);
+                await metadataExporter.SaveAsync(draft, propagated.Contains(draft.Id) ? ItemUpdateType.MetadataDownload : reason, cancellationToken).ConfigureAwait(false);
             }
 
             draft.DateLastSaved = DateTime.UtcNow;
@@ -365,7 +365,7 @@ internal sealed partial class ItemWriteCommands(
         target.DateLastSaved = source.DateLastSaved;
     }
 
-    public async Task<bool> RefreshOwnedVideosAsync(Video owner, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken)
+    public async Task<bool> RefreshOwnedVideosAsync(Video owner, IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (owner.ParentId.Equals(Guid.Empty) || !files.IsPathFile(owner.Path))
@@ -381,8 +381,8 @@ internal sealed partial class ItemWriteCommands(
             .DistinctBy(path => _resolution.GetNewItemId(path, owner.GetType())).ToArray();
         var existingCount = linkedChildren.GetLinkedChildrenIds(owner.Id, (int)LinkedChildType.LocalAlternateVersion).Count;
 
-        await Task.WhenAll(parts.Select(path => RefreshOwnedVideoAsync(owner, path, false, deletions, options, cancellationToken))).ConfigureAwait(false);
-        await Task.WhenAll(paths.Select(path => RefreshOwnedVideoAsync(owner, path, true, deletions, options, cancellationToken))).ConfigureAwait(false);
+        await Task.WhenAll(parts.Select(path => RefreshOwnedVideoAsync(owner, path, false, metadata, deletions, options, cancellationToken))).ConfigureAwait(false);
+        await Task.WhenAll(paths.Select(path => RefreshOwnedVideoAsync(owner, path, true, metadata, deletions, options, cancellationToken))).ConfigureAwait(false);
 
         var changed = !owner.LocalAlternateVersions.SequenceEqual(paths, StringComparer.Ordinal);
         // Publish the pruned paths only after all admitted refreshes complete successfully.
@@ -394,7 +394,7 @@ internal sealed partial class ItemWriteCommands(
         return changed || existingCount != paths.Length;
     }
 
-    private async Task RefreshOwnedVideoAsync(Video owner, string path, bool alternate, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken)
+    private async Task RefreshOwnedVideoAsync(Video owner, string path, bool alternate, IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var type = alternate ? owner.GetType() : typeof(Video);
@@ -483,7 +483,7 @@ internal sealed partial class ItemWriteCommands(
             refresh.ForceSave = true;
         }
 
-        await RefreshOwnedMetadataAsync(owner, staged, !alternate, deletions, refresh, cancellationToken).ConfigureAwait(false);
+        await RefreshOwnedMetadataAsync(owner, staged, !alternate, metadata, deletions, refresh, cancellationToken).ConfigureAwait(false);
         if (alternate)
         {
             UpsertLinkedChild(owner.Id, staged.Id, LinkedChildType.LocalAlternateVersion, cancellationToken);
@@ -556,7 +556,7 @@ internal sealed partial class ItemWriteCommands(
 
         foreach (var parent in parents)
         {
-            await metadata.SaveAsync(parent, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+            await metadataExporter.SaveAsync(parent, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
         }
     }
 

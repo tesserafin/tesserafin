@@ -214,7 +214,7 @@ namespace Tesserafin.Controller.Entities.Audio
                     continue;
                 }
 
-                var artist = writes.GetOrCreateNamedItem<MusicArtist>(i, cancellationToken);
+                var artist = context.Writes.GetOrCreateNamedItem<MusicArtist>(i, cancellationToken);
 
                 if (!artist.IsAccessedByName)
                 {

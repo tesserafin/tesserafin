@@ -551,6 +551,8 @@ namespace Tesserafin.Server.Core
             // TODO: Refactor to eliminate the circular dependencies here so that Lazy<T> isn't required
             serviceCollection.AddTransient(provider => new Lazy<ILibraryMonitor>(provider.GetRequiredService<ILibraryMonitor>));
             serviceCollection.AddTransient(provider => new Lazy<IProviderManager>(provider.GetRequiredService<IProviderManager>));
+            // The provider manager also initiates folder validation, which consumes the scan context.
+            serviceCollection.AddTransient(provider => new Lazy<IItemMetadataDispatcher>(provider.GetRequiredService<IProviderManager>));
             serviceCollection.AddTransient(provider => new Lazy<IExternalDataManager>(provider.GetRequiredService<IExternalDataManager>));
             // Deletion can refresh metadata and remove channel data; these services themselves
             // consume the deletion port. Defer their construction, never their command completion.
