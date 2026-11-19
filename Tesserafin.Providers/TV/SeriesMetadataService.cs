@@ -85,11 +85,11 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     {
         if (item is Series series)
         {
-            var seasons = series.GetRecursiveCatalogueChildren(ItemRepository, _lookup, _links, static child => child is Season);
+            var seasons = series.GetRecursiveCatalogueChildren(ItemRepository, _lookup, _links, static child => child is Season).Cast<Season>();
 
             foreach (var season in seasons)
             {
-                var hasUpdate = refreshOptions is not null && season.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, ItemNamingService);
+                var hasUpdate = refreshOptions is not null && season.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, ItemNamingService, _lookup);
                 if (hasUpdate)
                 {
                     await season.UpdateToRepositoryAsync(Writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);

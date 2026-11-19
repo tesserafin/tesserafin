@@ -5,8 +5,10 @@ using System.IO;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.MediaInfo;
 using Tesserafin.Naming.Common;
 using Tesserafin.Naming.TV;
 using NamingEpisodeInfo = Tesserafin.Naming.TV.EpisodeInfo;
@@ -18,10 +20,20 @@ namespace Tesserafin.Server.Core.Library;
 public class ItemNamingService : IItemNamingService
 {
     private readonly NamingOptions _namingOptions;
+    private readonly IItemLookupService _lookup;
+    private readonly IItemRepository _repository;
+    private readonly Lazy<IMediaSourceManager> _mediaSources;
 
-    public ItemNamingService(NamingOptions namingOptions)
+    public ItemNamingService(
+        NamingOptions namingOptions,
+        IItemLookupService lookup,
+        IItemRepository repository,
+        Lazy<IMediaSourceManager> mediaSources)
     {
         _namingOptions = namingOptions;
+        _lookup = lookup;
+        _repository = repository;
+        _mediaSources = mediaSources;
     }
 
     public int? GetSeasonNumberFromPath(string path, string? parentPath)
@@ -31,7 +43,7 @@ public class ItemNamingService : IItemNamingService
 
     public bool FillMissingEpisodeNumbersFromPath(Episode episode, bool forceRefresh)
     {
-        var series = episode.Series;
+        var series = episode.GetSeries(_lookup);
         bool? isAbsoluteNaming = series is not null && string.Equals(series.DisplayOrder, "absolute", StringComparison.OrdinalIgnoreCase);
         if (!isAbsoluteNaming.Value)
         {
@@ -44,12 +56,11 @@ public class ItemNamingService : IItemNamingService
         var isFolder = episode.VideoType == VideoType.BluRay || episode.VideoType == VideoType.Dvd;
 
         NamingEpisodeInfo? episodeInfo = null;
-        if (episode.IsFileProtocol)
+        if (!string.IsNullOrEmpty(episode.Path) && _mediaSources.Value.GetPathProtocol(episode.Path) == MediaProtocol.File)
         {
             episodeInfo = resolver.Resolve(episode.Path, isFolder, null, null, isAbsoluteNaming);
             // Resolve from parent folder if it's not the Season folder
-            var parent = episode.GetParent();
-            if (episodeInfo is null && parent.GetType() == typeof(Folder))
+            if (episodeInfo is null && episode.GetParent(_lookup) is Folder parent && parent.GetType() == typeof(Folder))
             {
                 episodeInfo = resolver.Resolve(parent.Path, true, null, null, isAbsoluteNaming);
                 if (episodeInfo is not null)
@@ -138,7 +149,7 @@ public class ItemNamingService : IItemNamingService
 
         if (!episode.ParentIndexNumber.HasValue)
         {
-            var season = episode.Season;
+            var season = episode.GetSeason(_lookup, _repository);
 
             if (season is not null)
             {

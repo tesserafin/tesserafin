@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.Configuration;
@@ -64,9 +66,40 @@ public sealed class SeasonMetadataServiceTests
         Assert.Equal("series-provider", service.ReadLookupInfo(season).SeriesProviderIds["Tvdb"]);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData(7)]
+    public async Task BeforeRefresh_UsesTheParentPathOnlyForMissingSeasonNumbers(int? existingNumber)
+    {
+        var parent = new Series { Id = Guid.NewGuid(), Path = "/media/Example" };
+        var season = new Season
+        {
+            Name = "Season",
+            ParentId = parent.Id,
+            Path = "/media/Example/Season 02",
+            IndexNumber = existingNumber
+        };
+        var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
+        var naming = new Mock<IItemNamingService>(MockBehavior.Strict);
+        if (!existingNumber.HasValue)
+        {
+            lookup.Setup(l => l.GetItemById(parent.Id)).Returns(parent);
+            naming.Setup(n => n.GetSeasonNumberFromPath(season.Path, parent.Path)).Returns(2);
+        }
+
+        var service = new TestSeasonMetadataService(Mock.Of<ILibraryItemOptions>(), lookup.Object, naming.Object);
+        var changed = await service.PrepareRefreshAsync(season, TestContext.Current.CancellationToken);
+
+        Assert.Equal(!existingNumber.HasValue, changed);
+        Assert.Equal(existingNumber ?? 2, season.IndexNumber);
+    }
+
     private static Season Specials() => new() { Id = Guid.NewGuid(), Name = "Original", IndexNumber = 0 };
 
-    private sealed class TestSeasonMetadataService(ILibraryItemOptions itemOptions, IItemLookupService? lookup = null)
+    private sealed class TestSeasonMetadataService(
+        ILibraryItemOptions itemOptions,
+        IItemLookupService? lookup = null,
+        IItemNamingService? naming = null)
         : SeasonMetadataService(
             Mock.Of<IItemWriteCommands>(),
             Mock.Of<IItemPeopleCommands>(),
@@ -75,13 +108,16 @@ public sealed class SeasonMetadataServiceTests
             Mock.Of<IProviderManager>(),
             Mock.Of<IFileSystem>(),
             itemOptions,
-            Mock.Of<IItemNamingService>(),
+            naming ?? Mock.Of<IItemNamingService>(),
             Mock.Of<IExternalDataManager>(),
             Mock.Of<IItemRepository>(),
             Mock.Of<IItemSortService>(),
             lookup ?? Mock.Of<IItemLookupService>())
     {
         public ItemUpdateType Prepare(Season season) => BeforeSaveInternal(season, false, ItemUpdateType.None);
+
+        public ValueTask<bool> PrepareRefreshAsync(Season season, CancellationToken cancellationToken)
+            => BeforeMetadataRefreshAsync(season, new LibraryOptions(), false, cancellationToken);
 
         public SeasonInfo ReadLookupInfo(Season season) => GetLookupInfo(season);
     }

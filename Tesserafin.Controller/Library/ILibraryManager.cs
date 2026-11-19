@@ -18,7 +18,6 @@ using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.Querying;
-using Episode = Tesserafin.Controller.Entities.TV.Episode;
 using Genre = Tesserafin.Controller.Entities.Genre;
 using LinkedChildType = Tesserafin.Controller.Entities.LinkedChildType;
 using Person = Tesserafin.Controller.Entities.Person;
@@ -227,29 +226,6 @@ namespace Tesserafin.Controller.Library
             BaseItem parent,
             CollectionType? viewType,
             string sortName);
-
-        /// <summary>
-        /// Gets the season number from path.
-        /// </summary>
-        /// <param name="path">The path.</param>
-        /// <param name="parentId">The parent id.</param>
-        /// <returns>System.Nullable&lt;System.Int32&gt;.</returns>
-        int? GetSeasonNumberFromPath(string path, Guid? parentId);
-
-        /// <summary>
-        /// Fills the missing episode numbers from path.
-        /// </summary>
-        /// <param name="episode">Episode to use.</param>
-        /// <param name="forceRefresh">Option to force refresh of episode numbers.</param>
-        /// <returns>True if successful.</returns>
-        bool FillMissingEpisodeNumbersFromPath(Episode episode, bool forceRefresh);
-
-        /// <summary>
-        /// Parses the name.
-        /// </summary>
-        /// <param name="name">The name.</param>
-        /// <returns>ItemInfo.</returns>
-        ItemLookupInfo ParseName(string name);
 
         /// <summary>
         /// Gets the collection folders.
