@@ -137,8 +137,14 @@ namespace Tesserafin.Controller.Entities.Audio
         }
 
         public SongInfo GetLookupInfo()
+            => BuildLookupInfo(null);
+
+        public SongInfo GetLookupInfo((string Language, string CountryCode) locale)
+            => BuildLookupInfo(locale);
+
+        private SongInfo BuildLookupInfo((string Language, string CountryCode)? locale)
         {
-            var info = GetItemLookupInfo<SongInfo>();
+            var info = GetItemLookupInfo<SongInfo>(locale);
 
             info.AlbumArtists = AlbumArtists;
             info.Album = Album;
