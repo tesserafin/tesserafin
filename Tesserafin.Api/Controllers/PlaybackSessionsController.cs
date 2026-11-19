@@ -670,7 +670,8 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             ItemId = item.Id,
             UserId = userId,
             Profile = ReverseDlnaAdapter.ToDeviceProfile(request.Capabilities),
-            MediaSourceId = request.MediaSourceId,
+            // A channel is planned on the one tuner source the session opened, whatever the client named.
+            MediaSourceId = liveStreamId is null ? request.MediaSourceId : mediaSources[0].Id,
             // PR115a: the canary cohort key is deterministic on user+device, so v2 authority for a
             // session depends on the requesting device being identifiable here.
             DeviceId = User.GetDeviceId(),
@@ -707,9 +708,14 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             return ([held.Item1], heldLiveStreamId);
         }
 
-        var source = (string.IsNullOrEmpty(request.MediaSourceId)
+        // A channel's own id names no tuner source: some clients send it where a media source id goes.
+        var named = string.IsNullOrEmpty(request.MediaSourceId)
+            || (Guid.TryParse(request.MediaSourceId, out var namedId) && namedId.Equals(request.ItemId))
+                ? null
+                : request.MediaSourceId;
+        var source = (named is null
                 ? channelSources.FirstOrDefault()
-                : channelSources.FirstOrDefault(s => string.Equals(s.Id, request.MediaSourceId, StringComparison.Ordinal)))
+                : channelSources.FirstOrDefault(s => string.Equals(s.Id, named, StringComparison.Ordinal)))
             ?? throw new ResourceNotFoundException();
         if (!source.RequiresOpening || string.IsNullOrEmpty(source.OpenToken))
         {

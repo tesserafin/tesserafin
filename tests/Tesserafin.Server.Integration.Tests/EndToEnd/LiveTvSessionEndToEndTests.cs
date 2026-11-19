@@ -174,7 +174,8 @@ public sealed class LiveTvSessionEndToEndTests : IClassFixture<DirectPlayFilmEnd
     private static async Task<PlaybackSessionResponse> CreateSessionAsync(HttpClient client, Guid channelId, Guid userId, string playSessionId)
     {
         var (capabilities, constraints) = EndToEndCapabilityPresets.BrowserRemuxOverHls();
-        var request = new CreatePlaybackSessionRequest(channelId, userId, capabilities, constraints, PlaySessionId: playSessionId);
+        // The web client names the channel itself where a media source id goes; that is no tuner source.
+        var request = new CreatePlaybackSessionRequest(channelId, userId, capabilities, constraints, MediaSourceId: channelId.ToString("N", System.Globalization.CultureInfo.InvariantCulture), PlaySessionId: playSessionId);
         using var response = await client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, TestContext.Current.CancellationToken);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.True(response.IsSuccessStatusCode, FormattableString.Invariant($"POST Playback/Sessions: {(int)response.StatusCode} {body}"));
