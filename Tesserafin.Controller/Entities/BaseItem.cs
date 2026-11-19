@@ -15,7 +15,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Channels;
-using Tesserafin.Controller.Chapters;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities.TV;
@@ -480,8 +479,6 @@ namespace Tesserafin.Controller.Entities
         public static ILocalizationManager LocalizationManager { get; set; }
 
         public static IItemRepository ItemRepository { get; set; }
-
-        public static IChapterManager ChapterManager { get; set; }
 
         public static IFileSystem FileSystem { get; set; }
 
@@ -2252,36 +2249,6 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        /// <summary>
-        /// Deletes the image.
-        /// </summary>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="type">The type.</param>
-        /// <param name="index">The index.</param>
-        /// <returns>A task.</returns>
-        public async Task DeleteImageAsync(IItemWriteCommands writes, ImageType type, int index)
-        {
-            var info = GetImageInfo(type, index);
-
-            if (info is null)
-            {
-                // Nothing to do
-                return;
-            }
-
-            // Remove from file system
-            var path = info.Path;
-            if (info.IsLocalFile && !string.IsNullOrWhiteSpace(path))
-            {
-                FileSystem.DeleteFile(path);
-            }
-
-            // Remove from item
-            RemoveImage(info);
-
-            await UpdateToRepositoryAsync(writes, ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
-        }
-
         public void RemoveImage(ItemImageInfo image)
         {
             RemoveImages([image]);
@@ -2348,78 +2315,12 @@ namespace Tesserafin.Controller.Entities
         public string GetImagePath(ImageType imageType, int imageIndex)
             => GetImageInfo(imageType, imageIndex)?.Path;
 
-        /// <summary>
-        /// Gets the image information.
-        /// </summary>
-        /// <param name="imageType">Type of the image.</param>
-        /// <param name="imageIndex">Index of the image.</param>
-        /// <returns>ItemImageInfo.</returns>
+        /// <summary>Gets an image stored on the item.</summary>
+        /// <param name="imageType">The image type.</param>
+        /// <param name="imageIndex">The index within that type.</param>
+        /// <returns>The image, or null if absent or stored as chapter metadata.</returns>
         public ItemImageInfo GetImageInfo(ImageType imageType, int imageIndex)
-        {
-            if (imageType == ImageType.Chapter)
-            {
-                var chapter = ChapterManager.GetChapter(Id, imageIndex);
-
-                if (chapter is null)
-                {
-                    return null;
-                }
-
-                var path = chapter.ImagePath;
-
-                if (string.IsNullOrEmpty(path))
-                {
-                    return null;
-                }
-
-                return new ItemImageInfo
-                {
-                    Path = path,
-                    DateModified = chapter.ImageDateModified,
-                    Type = imageType
-                };
-            }
-
-            return GetImages(imageType)
-                .ElementAtOrDefault(imageIndex);
-        }
-
-        /// <summary>
-        /// Computes image index for given image or raises if no matching image found.
-        /// </summary>
-        /// <param name="image">Image to compute index for.</param>
-        /// <exception cref="ArgumentException">Image index cannot be computed as no matching image found.
-        /// </exception>
-        /// <returns>Image index.</returns>
-        public int GetImageIndex(ItemImageInfo image)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-
-            if (image.Type == ImageType.Chapter)
-            {
-                var chapters = ChapterManager.GetChapters(Id);
-                for (var i = 0; i < chapters.Count; i++)
-                {
-                    if (chapters[i].ImagePath == image.Path)
-                    {
-                        return i;
-                    }
-                }
-
-                throw new ArgumentException("No chapter index found for image path", image.Path);
-            }
-
-            var images = GetImages(image.Type).ToArray();
-            for (var i = 0; i < images.Length; i++)
-            {
-                if (images[i].Path == image.Path)
-                {
-                    return i;
-                }
-            }
-
-            throw new ArgumentException("No image index found for image path", image.Path);
-        }
+            => imageType == ImageType.Chapter ? null : GetImages(imageType).ElementAtOrDefault(imageIndex);
 
         public IEnumerable<ItemImageInfo> GetImages(ImageType imageType)
         {
@@ -2539,45 +2440,6 @@ namespace Tesserafin.Controller.Entities
         public bool AllowsMultipleImages(ImageType type)
         {
             return type == ImageType.Backdrop || type == ImageType.Chapter;
-        }
-
-        public Task SwapImagesAsync(IItemWriteCommands writes, ImageType type, int index1, int index2)
-        {
-            if (!AllowsMultipleImages(type))
-            {
-                throw new ArgumentException("The change index operation is only applicable to backdrops and screen shots");
-            }
-
-            var info1 = GetImageInfo(type, index1);
-            var info2 = GetImageInfo(type, index2);
-
-            if (info1 is null || info2 is null)
-            {
-                // Nothing to do
-                return Task.CompletedTask;
-            }
-
-            if (!info1.IsLocalFile || !info2.IsLocalFile)
-            {
-                // TODO: Not supported  yet
-                return Task.CompletedTask;
-            }
-
-            var path1 = info1.Path;
-            var path2 = info2.Path;
-
-            FileSystem.SwapFiles(path1, path2);
-
-            // Refresh these values
-            info1.DateModified = FileSystem.GetLastWriteTimeUtc(info1.Path);
-            info2.DateModified = FileSystem.GetLastWriteTimeUtc(info2.Path);
-
-            info1.Width = 0;
-            info1.Height = 0;
-            info2.Width = 0;
-            info2.Height = 0;
-
-            return UpdateToRepositoryAsync(writes, ItemUpdateType.ImageUpdate, CancellationToken.None);
         }
 
         public virtual bool IsPlayed(User user, UserItemData userItemData)

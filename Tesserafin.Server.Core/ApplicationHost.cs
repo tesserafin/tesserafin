@@ -831,7 +831,6 @@ namespace Tesserafin.Server.Core
         private void SetStaticProperties()
         {
             // For now there's no real way to inject these properly
-            BaseItem.ChapterManager = Resolve<IChapterManager>();
             BaseItem.ChannelManager = Resolve<IChannelManager>();
             BaseItem.ConfigurationManager = ConfigurationManager;
             BaseItem.FileSystem = Resolve<IFileSystem>();

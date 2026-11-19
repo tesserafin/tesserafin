@@ -26,6 +26,7 @@ using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Branding;
@@ -45,6 +46,7 @@ public class ImageController : BaseTesserafinApiController
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemImageService _images;
+    private readonly IChapterRepository _chapters;
     private readonly IUserManager _userManager;
     private readonly INamedItemCatalog _namedItems;
     private readonly ILibraryManager _libraryManager;
@@ -61,6 +63,7 @@ public class ImageController : BaseTesserafinApiController
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+    /// <param name="chapters">Reads thumbnail information stored with the chapters.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="namedItems">Read-only named catalogue.</param>
     /// <param name="people">Read-only people catalogue.</param>
@@ -74,6 +77,7 @@ public class ImageController : BaseTesserafinApiController
     public ImageController(
         IItemWriteCommands writes,
         IItemImageService images,
+        IChapterRepository chapters,
         IUserManager userManager,
         INamedItemCatalog namedItems,
         ILibraryManager libraryManager,
@@ -87,6 +91,7 @@ public class ImageController : BaseTesserafinApiController
     {
         _writes = writes;
         _images = images;
+        _chapters = chapters;
         _userManager = userManager;
         _namedItems = namedItems;
         _libraryManager = libraryManager;
@@ -320,7 +325,7 @@ public class ImageController : BaseTesserafinApiController
             return NotFound();
         }
 
-        await item.DeleteImageAsync(_writes, imageType, imageIndex ?? 0).ConfigureAwait(false);
+        await DeleteImageAsync(item, imageType, imageIndex ?? 0).ConfigureAwait(false);
         return NoContent();
     }
 
@@ -348,7 +353,7 @@ public class ImageController : BaseTesserafinApiController
             return NotFound();
         }
 
-        await item.DeleteImageAsync(_writes, imageType, imageIndex).ConfigureAwait(false);
+        await DeleteImageAsync(item, imageType, imageIndex).ConfigureAwait(false);
         return NoContent();
     }
 
@@ -464,7 +469,27 @@ public class ImageController : BaseTesserafinApiController
             return NotFound();
         }
 
-        await item.SwapImagesAsync(_writes, imageType, imageIndex, newIndex).ConfigureAwait(false);
+        if (!item.AllowsMultipleImages(imageType))
+        {
+            throw new ArgumentException("The change index operation is only applicable to backdrops and screen shots");
+        }
+
+        var source = FindItemImage(item, imageType, imageIndex);
+        var destination = FindItemImage(item, imageType, newIndex);
+        if (source is not { IsLocalFile: true } || destination is not { IsLocalFile: true })
+        {
+            return NoContent();
+        }
+
+        _fileSystem.SwapFiles(source.Path, destination.Path);
+        source.DateModified = _fileSystem.GetLastWriteTimeUtc(source.Path);
+        destination.DateModified = _fileSystem.GetLastWriteTimeUtc(destination.Path);
+        source.Width = 0;
+        source.Height = 0;
+        destination.Width = 0;
+        destination.Height = 0;
+
+        await item.UpdateToRepositoryAsync(_writes, ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
         return NoContent();
     }
 
@@ -1840,6 +1865,44 @@ public class ImageController : BaseTesserafinApiController
         }
     }
 
+    private ItemImageInfo? FindItemImage(BaseItem item, ImageType type, int index)
+    {
+        if (type != ImageType.Chapter)
+        {
+            return item.GetImageInfo(type, index);
+        }
+
+        var chapter = _chapters.GetChapter(item.Id, index);
+        if (string.IsNullOrEmpty(chapter?.ImagePath))
+        {
+            return null;
+        }
+
+        return new ItemImageInfo
+        {
+            Path = chapter.ImagePath,
+            Type = ImageType.Chapter,
+            DateModified = chapter.ImageDateModified
+        };
+    }
+
+    private async Task DeleteImageAsync(BaseItem item, ImageType type, int index)
+    {
+        var image = FindItemImage(item, type, index);
+        if (image is null)
+        {
+            return;
+        }
+
+        if (image.IsLocalFile && !string.IsNullOrWhiteSpace(image.Path))
+        {
+            _fileSystem.DeleteFile(image.Path);
+        }
+
+        item.RemoveImage(image);
+        await item.UpdateToRepositoryAsync(_writes, ItemUpdateType.ImageUpdate, CancellationToken.None).ConfigureAwait(false);
+    }
+
     private async Task<ActionResult> GetImageInternal(
         Guid itemId,
         ImageType imageType,
@@ -1884,13 +1947,10 @@ public class ImageController : BaseTesserafinApiController
             unplayedCount = null;
         }
 
+        imageInfo ??= item is null ? null : FindItemImage(item, imageType, imageIndex ?? 0);
         if (imageInfo is null)
         {
-            imageInfo = item?.GetImageInfo(imageType, imageIndex ?? 0);
-            if (imageInfo is null)
-            {
-                return NotFound(string.Format(NumberFormatInfo.InvariantInfo, "{0} does not have an image of type {1}", item?.Name, imageType));
-            }
+            return NotFound(string.Format(NumberFormatInfo.InvariantInfo, "{0} does not have an image of type {1}", item?.Name, imageType));
         }
 
         var outputFormats = GetOutputFormats(format);

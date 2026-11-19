@@ -10,7 +10,6 @@
   ],
   "entityStaticServices": [
     "BaseItem.ChannelManager",
-    "BaseItem.ChapterManager",
     "BaseItem.ConfigurationManager",
     "BaseItem.FileSystem",
     "BaseItem.ItemRepository",

@@ -1400,3 +1400,11 @@ media encoder and media source services. For eligible episodes it reads the
 tags before the filename fallback and before provider lookup. Cancellation
 of the refresh stops the probe and filename fallback. The episode encoder
 and base item media segment statics are removed.
+
+## 62. Chapter thumbnail lookup
+
+The image controller resolves chapter thumbnails through the chapter
+repository. Serving an image, deleting its file, and swapping thumbnail
+files use the same lookup and the controller's filesystem. The base item
+image collection continues to own the images stored directly on the item.
+The static chapter manager is removed from the entity and from startup.
