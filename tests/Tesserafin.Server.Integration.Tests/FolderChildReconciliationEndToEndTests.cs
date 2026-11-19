@@ -168,6 +168,7 @@ public sealed class FolderChildReconciliationEndToEndTests(TesserafinApplication
                 writes,
                 images,
                 resolution,
+                factory.Services.GetRequiredService<ILibraryRefreshProgress>(),
                 new Progress<double>(),
                 new MetadataRefreshOptions(new DirectoryService(files)) { MetadataRefreshMode = MetadataRefreshMode.None, ImageRefreshMode = MetadataRefreshMode.None },
                 recursive: false,

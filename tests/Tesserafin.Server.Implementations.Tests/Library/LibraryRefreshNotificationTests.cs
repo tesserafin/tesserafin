@@ -7,7 +7,6 @@ using Moq;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Session;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Events;
@@ -42,9 +41,9 @@ public sealed class LibraryRefreshNotificationTests
         lookup.Setup(l => l.GetItemById(missing)).Returns((BaseItem?)null);
         var collections = new Mock<ICollectionFolderResolver>(MockBehavior.Strict);
         collections.Setup(c => c.GetCollectionFolders(active)).Returns([library]);
-        var providers = new Mock<IProviderManager>();
-        providers.SetupSequence(p => p.GetRefreshProgress(active.Id)).Returns(40).Returns((double?)null);
-        providers.SetupSequence(p => p.GetRefreshProgress(other.Id)).Returns(85).Returns((double?)null);
+        var refreshProgress = new Mock<ILibraryRefreshProgress>();
+        refreshProgress.SetupSequence(p => p.GetRefreshProgress(active.Id)).Returns(40).Returns((double?)null);
+        refreshProgress.SetupSequence(p => p.GetRefreshProgress(other.Id)).Returns(85).Returns((double?)null);
         var messages = new List<(string Item, string Progress)>();
         var sessions = new Mock<ISessionManager>();
         sessions.Setup(s => s.SendMessageToAdminSessions(SessionMessageType.RefreshProgress, It.IsAny<Dictionary<string, string>>(), CancellationToken.None))
@@ -59,15 +58,15 @@ public sealed class LibraryRefreshNotificationTests
             sessions.Object,
             Mock.Of<IUserManager>(),
             NullLogger<LibraryChangedNotifier>.Instance,
-            providers.Object,
+            refreshProgress.Object,
             Mock.Of<IItemSortService>());
 
         var token = TestContext.Current.CancellationToken;
         await notifier.StartAsync(token);
         try
         {
-            providers.Raise(p => p.RefreshProgress += null, new GenericEventArgs<Tuple<BaseItem, double>>(Tuple.Create<BaseItem, double>(active, 40)));
-            providers.Raise(p => p.RefreshCompleted += null, new GenericEventArgs<BaseItem>(active));
+            refreshProgress.Raise(p => p.RefreshProgress += null, new GenericEventArgs<Tuple<BaseItem, double>>(Tuple.Create<BaseItem, double>(active, 40)));
+            refreshProgress.Raise(p => p.RefreshCompleted += null, new GenericEventArgs<BaseItem>(active));
         }
         finally
         {
@@ -77,7 +76,7 @@ public sealed class LibraryRefreshNotificationTests
         Assert.Equal(
             new[] { (active.Id.ToString("N"), "40"), (library.Id.ToString("N"), "62.5"), (active.Id.ToString("N"), "100"), (library.Id.ToString("N"), "0") },
             messages);
-        providers.Verify(p => p.GetRefreshProgress(missing), Times.Never);
-        providers.Verify(p => p.GetRefreshProgress(wrongType.Id), Times.Never);
+        refreshProgress.Verify(p => p.GetRefreshProgress(missing), Times.Never);
+        refreshProgress.Verify(p => p.GetRefreshProgress(wrongType.Id), Times.Never);
     }
 }

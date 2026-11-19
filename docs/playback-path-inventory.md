@@ -1341,3 +1341,11 @@ lookup, trying the owner before the parent. It queues a high-priority metadata
 refresh with a directory service built from the monitor's filesystem. The
 provider manager is resolved when the callback needs the queue, after monitor
 construction. The entity's filesystem change hook is removed.
+
+## 55. Recursive library refresh progress
+
+`LibraryRefreshProgress` owns the active-scan state and its start, progress
+and completion events. Scan traversal and provider-initiated scans pass it
+through recursive folder validation. The library notifier and the virtual
+folders endpoint read the same active state. Pending work still comes from
+the metadata refresh queue.

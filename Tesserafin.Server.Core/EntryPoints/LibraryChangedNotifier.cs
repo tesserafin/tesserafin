@@ -12,7 +12,6 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Session;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Entities;
@@ -33,7 +32,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     private readonly IItemLookupService _lookup;
     private readonly IItemChangeEvents _changes;
     private readonly IServerConfigurationManager _configurationManager;
-    private readonly IProviderManager _providerManager;
+    private readonly ILibraryRefreshProgress _refreshProgress;
     private readonly ISessionManager _sessionManager;
     private readonly IUserManager _userManager;
     private readonly ILogger<LibraryChangedNotifier> _logger;
@@ -60,7 +59,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     /// <param name="sessionManager">The <see cref="ISessionManager"/>.</param>
     /// <param name="userManager">The <see cref="IUserManager"/>.</param>
     /// <param name="logger">The <see cref="ILogger"/>.</param>
-    /// <param name="providerManager">The <see cref="IProviderManager"/>.</param>
+    /// <param name="refreshProgress">Progress of active recursive scans.</param>
     /// <param name="itemSortService">The <see cref="IItemSortService"/>.</param>
     public LibraryChangedNotifier(
         ICollectionFolderResolver collectionFolders,
@@ -71,7 +70,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         ISessionManager sessionManager,
         IUserManager userManager,
         ILogger<LibraryChangedNotifier> logger,
-        IProviderManager providerManager,
+        ILibraryRefreshProgress refreshProgress,
         IItemSortService itemSortService)
     {
         _collectionFolders = collectionFolders;
@@ -82,7 +81,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         _sessionManager = sessionManager;
         _userManager = userManager;
         _logger = logger;
-        _providerManager = providerManager;
+        _refreshProgress = refreshProgress;
         _itemSortService = itemSortService;
     }
 
@@ -93,9 +92,9 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         _changes.ItemUpdated += OnLibraryItemUpdated;
         _changes.ItemRemoved += OnLibraryItemRemoved;
 
-        _providerManager.RefreshCompleted += OnProviderRefreshCompleted;
-        _providerManager.RefreshStarted += OnProviderRefreshStarted;
-        _providerManager.RefreshProgress += OnProviderRefreshProgress;
+        _refreshProgress.RefreshCompleted += OnLibraryRefreshCompleted;
+        _refreshProgress.RefreshStarted += OnLibraryRefreshStarted;
+        _refreshProgress.RefreshProgress += OnLibraryRefreshProgress;
 
         return Task.CompletedTask;
     }
@@ -107,14 +106,14 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         _changes.ItemUpdated -= OnLibraryItemUpdated;
         _changes.ItemRemoved -= OnLibraryItemRemoved;
 
-        _providerManager.RefreshCompleted -= OnProviderRefreshCompleted;
-        _providerManager.RefreshStarted -= OnProviderRefreshStarted;
-        _providerManager.RefreshProgress -= OnProviderRefreshProgress;
+        _refreshProgress.RefreshCompleted -= OnLibraryRefreshCompleted;
+        _refreshProgress.RefreshStarted -= OnLibraryRefreshStarted;
+        _refreshProgress.RefreshProgress -= OnLibraryRefreshProgress;
 
         return Task.CompletedTask;
     }
 
-    private void OnProviderRefreshProgress(object? sender, GenericEventArgs<Tuple<BaseItem, double>> e)
+    private void OnLibraryRefreshProgress(object? sender, GenericEventArgs<Tuple<BaseItem, double>> e)
     {
         var item = e.Argument.Item1;
 
@@ -167,12 +166,12 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         }
     }
 
-    private void OnProviderRefreshStarted(object? sender, GenericEventArgs<BaseItem> e)
-        => OnProviderRefreshProgress(sender, new GenericEventArgs<Tuple<BaseItem, double>>(new Tuple<BaseItem, double>(e.Argument, 0)));
+    private void OnLibraryRefreshStarted(object? sender, GenericEventArgs<BaseItem> e)
+        => OnLibraryRefreshProgress(sender, new GenericEventArgs<Tuple<BaseItem, double>>(new Tuple<BaseItem, double>(e.Argument, 0)));
 
-    private void OnProviderRefreshCompleted(object? sender, GenericEventArgs<BaseItem> e)
+    private void OnLibraryRefreshCompleted(object? sender, GenericEventArgs<BaseItem> e)
     {
-        OnProviderRefreshProgress(sender, new GenericEventArgs<Tuple<BaseItem, double>>(new Tuple<BaseItem, double>(e.Argument, 100)));
+        OnLibraryRefreshProgress(sender, new GenericEventArgs<Tuple<BaseItem, double>>(new Tuple<BaseItem, double>(e.Argument, 100)));
 
         _lastProgressMessageTimes.TryRemove(e.Argument.Id, out _);
     }
@@ -181,11 +180,11 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     {
         if (library is not CollectionFolder collection)
         {
-            return _providerManager.GetRefreshProgress(library.Id) ?? 0;
+            return _refreshProgress.GetRefreshProgress(library.Id) ?? 0;
         }
 
         return collection.GetPhysicalFolders(_lookup)
-            .Select(folder => _providerManager.GetRefreshProgress(folder.Id))
+            .Select(folder => _refreshProgress.GetRefreshProgress(folder.Id))
             .Average() ?? 0;
     }
 
