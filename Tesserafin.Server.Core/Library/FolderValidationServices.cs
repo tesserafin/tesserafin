@@ -15,6 +15,7 @@ internal sealed class FolderValidationServices(
     IItemWriteCommands writes,
     IItemImageService images,
     IItemResolutionService resolution,
+    IItemLookupService lookup,
     ILimitedConcurrencyLibraryScheduler scheduler,
     ILibraryRefreshProgress refreshProgress,
     Lazy<IChannelManager> channels,
@@ -31,6 +32,9 @@ internal sealed class FolderValidationServices(
 
     /// <inheritdoc />
     public IItemResolutionService Resolution { get; } = resolution;
+
+    /// <inheritdoc />
+    public IItemLookupService Lookup { get; } = lookup;
 
     /// <inheritdoc />
     public ILimitedConcurrencyLibraryScheduler Scheduler { get; } = scheduler;

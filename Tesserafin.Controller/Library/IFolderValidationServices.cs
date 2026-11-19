@@ -26,6 +26,9 @@ public interface IFolderValidationServices
     /// <summary>Gets the filesystem candidate resolver for the scan.</summary>
     IItemResolutionService Resolution { get; }
 
+    /// <summary>Gets the catalogue hierarchy reader.</summary>
+    IItemLookupService Lookup { get; }
+
     /// <summary>Gets the bounded-concurrency scheduler.</summary>
     ILimitedConcurrencyLibraryScheduler Scheduler { get; }
 

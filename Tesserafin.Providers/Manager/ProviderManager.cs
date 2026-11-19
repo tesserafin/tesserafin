@@ -22,7 +22,6 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Lyrics;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
@@ -54,9 +53,6 @@ namespace Tesserafin.Providers.Manager
     {
         private readonly IFolderValidationServices _validation;
         private readonly IItemWriteCommands _writes;
-        private readonly IItemResolutionService _resolution;
-        private readonly ILibraryRefreshProgress _refreshProgress;
-        private readonly ILimitedConcurrencyLibraryScheduler _scheduler;
         private readonly IItemMetadataExporter _metadataExporter;
         private readonly IItemImageService _images;
         private readonly IRemoteImageSource _remoteImages;
@@ -101,9 +97,6 @@ namespace Tesserafin.Providers.Manager
         /// <param name="writes">Explicit item write/resolution ownership.</param>
         /// <param name="metadataExporter">Metadata saver selection and execution.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
-        /// <param name="resolution">Filesystem candidate resolution for the scan.</param>
-        /// <param name="refreshProgress">Progress of active recursive scans.</param>
-        /// <param name="scheduler">The shared library scan scheduler.</param>
         /// <param name="deletions">Item deletion operations.</param>
         /// <param name="validation">The services folder validation runs with.</param>
         /// <param name="libraryOptions">The persisted library options, whose updates invalidate cached provider choices.</param>
@@ -127,9 +120,6 @@ namespace Tesserafin.Providers.Manager
             IItemWriteCommands writes,
             IItemMetadataExporter metadataExporter,
             IItemImageService images,
-            IItemResolutionService resolution,
-            ILibraryRefreshProgress refreshProgress,
-            ILimitedConcurrencyLibraryScheduler scheduler,
             IItemDeletionCommands deletions,
             IFolderValidationServices validation,
             ILibraryOptionsStore libraryOptions,
@@ -154,9 +144,6 @@ namespace Tesserafin.Providers.Manager
             _writes = writes;
             _metadataExporter = metadataExporter;
             _images = images;
-            _resolution = resolution;
-            _refreshProgress = refreshProgress;
-            _scheduler = scheduler;
             _deletions = deletions;
             _libraryOptions = libraryOptions;
             _logger = logger;

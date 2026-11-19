@@ -21,7 +21,6 @@ using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
@@ -319,9 +318,13 @@ namespace Tesserafin.Controller.Entities
 
             try
             {
-                if (GetParents().Any(f => f.Id.Equals(Id)))
+                var ancestorIds = new HashSet<Guid> { Id };
+                foreach (var parent in GetParents(services.Lookup))
                 {
-                    throw new InvalidOperationException("Recursive datastructure detected abort processing this item.");
+                    if (!ancestorIds.Add(parent.Id))
+                    {
+                        throw new InvalidOperationException("Recursive datastructure detected abort processing this item.");
+                    }
                 }
 
                 await ValidateChildrenInternal2(services, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);

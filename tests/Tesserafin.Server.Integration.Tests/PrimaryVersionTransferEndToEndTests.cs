@@ -10,7 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.Providers;
@@ -31,8 +30,7 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.AddAuthHeader(await AuthHelper.CompleteStartupAsync(client));
         var writes = factory.Services.GetRequiredService<IItemWriteCommands>();
-        var deletions = factory.Services.GetRequiredService<IItemDeletionCommands>();
-        var images = factory.Services.GetRequiredService<IItemImageService>();
+        var scanContext = factory.Services.GetRequiredService<IFolderValidationServices>();
         var resolution = factory.Services.GetRequiredService<IItemResolutionService>();
         var repository = factory.Services.GetRequiredService<IItemRepository>();
         var lookup = factory.Services.GetRequiredService<IItemLookupService>();
@@ -155,12 +153,7 @@ public sealed class PrimaryVersionTransferEndToEndTests(TesserafinApplicationFac
             };
 
             Task ScanAsync(ControlledScanFolder target) => target.ValidateChildren(
-                deletions,
-                writes,
-                images,
-                resolution,
-                factory.Services.GetRequiredService<ILibraryRefreshProgress>(),
-                factory.Services.GetRequiredService<ILimitedConcurrencyLibraryScheduler>(),
+                scanContext,
                 new Progress<double>(),
                 new MetadataRefreshOptions(new DirectoryService(files)) { MetadataRefreshMode = MetadataRefreshMode.None, ImageRefreshMode = MetadataRefreshMode.None },
                 recursive: false,
