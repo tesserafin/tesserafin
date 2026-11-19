@@ -8,7 +8,6 @@ using Moq;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
-using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
 using Tesserafin.Model.Dto;
@@ -265,9 +264,6 @@ namespace Tesserafin.Server.Implementations.Tests.Library
             mediaSourceManager.Setup(x => x.GetMediaStreams(It.IsAny<Guid>())).Returns(new List<MediaStream>());
             mediaSourceManager.Setup(x => x.GetMediaAttachments(It.IsAny<Guid>())).Returns(new List<MediaAttachment>());
 
-            var segmentManager = new Mock<IMediaSegmentManager>();
-            segmentManager.Setup(x => x.IsTypeSupported(It.IsAny<BaseItem>())).Returns(false);
-
             var libraryManager = new Mock<ILibraryManager>();
             libraryManager.Setup(x => x.GetLinkedAlternateVersions(It.IsAny<Video>())).Returns(Array.Empty<Video>());
             libraryManager.Setup(x => x.GetLocalAlternateVersionIds(primary)).Returns(new[] { alt1.Id, alt2.Id });
@@ -280,7 +276,6 @@ namespace Tesserafin.Server.Implementations.Tests.Library
             var recordingsManager = new Mock<IRecordingsManager>();
             recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
 
-            BaseItem.MediaSegmentManager = segmentManager.Object;
             BaseItem.MediaSourceManager = mediaSourceManager.Object;
             BaseItem.LibraryManager = libraryManager.Object;
             Video.RecordingsManager = recordingsManager.Object;

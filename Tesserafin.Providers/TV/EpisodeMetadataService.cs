@@ -1,11 +1,19 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.MediaEncoding;
+using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Data.Enums;
+using Tesserafin.Model.Configuration;
+using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.Manager;
@@ -17,6 +25,11 @@ namespace Tesserafin.Providers.TV;
 /// </summary>
 public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
 {
+    private readonly IMediaEncoder _mediaEncoder;
+    private readonly IMediaSourceManager _mediaSources;
+    private readonly IMediaSegmentManager _mediaSegments;
+    private readonly IChannelManager _channels;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="EpisodeMetadataService"/> class.
     /// </summary>
@@ -30,6 +43,10 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
+    /// <param name="mediaEncoder">Reads embedded metadata from the episode file.</param>
+    /// <param name="mediaSources">Resolves the episode's media sources.</param>
+    /// <param name="mediaSegments">Provides segment support when building the media source.</param>
+    /// <param name="channels">Provides channel sources when building media sources.</param>
     public EpisodeMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -40,9 +57,43 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
         ILibraryItemOptions itemOptions,
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
-        IItemRepository itemRepository)
+        IItemRepository itemRepository,
+        IMediaEncoder mediaEncoder,
+        IMediaSourceManager mediaSources,
+        IMediaSegmentManager mediaSegments,
+        IChannelManager channels)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository)
     {
+        _mediaEncoder = mediaEncoder;
+        _mediaSources = mediaSources;
+        _mediaSegments = mediaSegments;
+        _channels = channels;
+    }
+
+    /// <inheritdoc />
+    protected override async ValueTask<bool> BeforeMetadataRefreshAsync(Episode item, LibraryOptions libraryOptions, bool replaceAllMetadata, CancellationToken cancellationToken)
+    {
+        var hasChanges = await base.BeforeMetadataRefreshAsync(item, libraryOptions, replaceAllMetadata, cancellationToken).ConfigureAwait(false);
+        if (item.IsLocked || item.SourceType is not (SourceType.Library or SourceType.LiveTV))
+        {
+            return hasChanges;
+        }
+
+        if (libraryOptions.EnableEmbeddedEpisodeInfos && string.Equals(item.Container, "mp4", StringComparison.OrdinalIgnoreCase))
+        {
+            await ReadEmbeddedEpisodeInfoAsync(item, cancellationToken).ConfigureAwait(false);
+        }
+
+        try
+        {
+            hasChanges |= ItemNamingService.FillMissingEpisodeNumbersFromPath(item, replaceAllMetadata);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in FillMissingEpisodeNumbersFromPath. Episode: {Episode}", item.Path ?? item.Name ?? item.Id.ToString());
+        }
+
+        return hasChanges;
     }
 
     /// <inheritdoc />
@@ -124,6 +175,44 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
             && targetItem.ParentIndexNumber != sourceItem.ParentIndexNumber)
         {
             targetItem.ParentIndexNumber = sourceItem.ParentIndexNumber;
+        }
+    }
+
+    private async Task ReadEmbeddedEpisodeInfoAsync(Episode episode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var request = new MediaInfoRequest
+            {
+                MediaSource = episode.GetMediaSources(false, _mediaSources, _mediaSegments, _channels)[0],
+                MediaType = DlnaProfileType.Video
+            };
+            var mediaInfo = await _mediaEncoder.GetMediaInfo(request, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (mediaInfo.ParentIndexNumber > 0)
+            {
+                episode.ParentIndexNumber = mediaInfo.ParentIndexNumber;
+            }
+
+            if (mediaInfo.IndexNumber > 0)
+            {
+                episode.IndexNumber = mediaInfo.IndexNumber;
+            }
+
+            if (!string.IsNullOrEmpty(mediaInfo.ShowName))
+            {
+                episode.SeriesName = mediaInfo.ShowName;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error reading the episode information with ffprobe. Episode: {EpisodeInfo}", episode.Path);
         }
     }
 }

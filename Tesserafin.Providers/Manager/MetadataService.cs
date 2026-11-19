@@ -98,6 +98,9 @@ namespace Tesserafin.Providers.Manager
             }
         }
 
+        protected virtual ValueTask<bool> BeforeMetadataRefreshAsync(TItemType item, LibraryOptions libraryOptions, bool replaceAllMetadata, CancellationToken cancellationToken)
+            => ValueTask.FromResult(item.BeforeMetadataRefresh(replaceAllMetadata, ItemNamingService));
+
         public virtual async Task<ItemUpdateType> RefreshMetadata(BaseItem item, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
         {
             var itemOfType = (TItemType)item;
@@ -176,7 +179,7 @@ namespace Tesserafin.Providers.Manager
 
                 if (providers.Count > 0 || isFirstRefresh || requiresRefresh)
                 {
-                    if (item.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, ItemNamingService))
+                    if (await BeforeMetadataRefreshAsync(itemOfType, libraryOptions, refreshOptions.ReplaceAllMetadata, cancellationToken).ConfigureAwait(false))
                     {
                         updateType |= ItemUpdateType.MetadataImport;
                     }

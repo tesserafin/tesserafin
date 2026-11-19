@@ -491,8 +491,6 @@ namespace Tesserafin.Controller.Entities
 
         public static IMediaSourceManager MediaSourceManager { get; set; }
 
-        public static IMediaSegmentManager MediaSegmentManager { get; set; }
-
         /// <summary>
         /// Gets or sets the name of the forced sort.
         /// </summary>

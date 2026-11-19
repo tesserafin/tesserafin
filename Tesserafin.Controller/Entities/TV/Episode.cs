@@ -7,14 +7,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json.Serialization;
-using System.Threading;
-using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
-using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 
@@ -25,8 +21,6 @@ namespace Tesserafin.Controller.Entities.TV
     /// </summary>
     public class Episode : Video, IHasTrailers, IHasLookupInfo<EpisodeInfo>, IHasSeries
     {
-        public static IMediaEncoder MediaEncoder { get; set; }
-
         /// <inheritdoc />
         [JsonIgnore]
         public IReadOnlyList<BaseItem> LocalTrailers => GetExtras([Tesserafin.Model.Entities.ExtraType.Trailer]).ToArray();
@@ -360,68 +354,6 @@ namespace Tesserafin.Controller.Entities.TV
             id.IndexNumberEnd = IndexNumberEnd;
 
             return id;
-        }
-
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
-        {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
-
-            if (!IsLocked)
-            {
-                if (SourceType == SourceType.Library || SourceType == SourceType.LiveTV)
-                {
-                    var libraryOptions = LibraryManager.GetLibraryOptions(this);
-                    if (libraryOptions.EnableEmbeddedEpisodeInfos && string.Equals(Container, "mp4", StringComparison.OrdinalIgnoreCase))
-                    {
-                        try
-                        {
-                            // BeforeMetadataRefresh isn't part of the GetMediaSources/GetMediaStreams
-                            // chain the mediaSourceManager/mediaSegmentManager/channelManager
-                            // parameters were threaded through (out of scope: a much wider virtual
-                            // with 15 overrides/17 callers) — falls back to the statics here.
-                            var mediaInfo = MediaEncoder.GetMediaInfo(
-                                new MediaInfoRequest
-                                {
-                                    MediaSource = GetMediaSources(false, MediaSourceManager, MediaSegmentManager, ChannelManager)[0],
-                                    MediaType = DlnaProfileType.Video
-                                },
-                                CancellationToken.None).GetAwaiter().GetResult();
-                            if (mediaInfo.ParentIndexNumber > 0)
-                            {
-                                ParentIndexNumber = mediaInfo.ParentIndexNumber;
-                            }
-
-                            if (mediaInfo.IndexNumber > 0)
-                            {
-                                IndexNumber = mediaInfo.IndexNumber;
-                            }
-
-                            if (!string.IsNullOrEmpty(mediaInfo.ShowName))
-                            {
-                                SeriesName = mediaInfo.ShowName;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.LogError(ex, "Error reading the episode information with ffprobe. Episode: {EpisodeInfo}", Path);
-                        }
-                    }
-
-                    try
-                    {
-                        if (itemNamingService.FillMissingEpisodeNumbersFromPath(this, replaceAllMetadata))
-                        {
-                            hasChanges = true;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError(ex, "Error in FillMissingEpisodeNumbersFromPath. Episode: {Episode}", Path ?? Name ?? Id.ToString());
-                    }
-                }
-            }
-
-            return hasChanges;
         }
     }
 }

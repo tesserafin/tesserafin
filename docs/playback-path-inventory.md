@@ -1392,3 +1392,11 @@ method. Callers create default directory services from their injected
 filesystem. Services also used by the provider manager resolve the dispatcher
 when refresh work starts. The static provider property and implicit item
 refresh overloads are removed.
+
+## 61. Embedded episode metadata probing
+
+The episode metadata service reads embedded MP4 tags through its injected
+media encoder and media source services. For eligible episodes it reads the
+tags before the filename fallback and before provider lookup. Cancellation
+of the refresh stops the probe and filename fallback. The episode encoder
+and base item media segment statics are removed.
