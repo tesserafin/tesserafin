@@ -34,6 +34,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     private readonly IItemSortService _itemSortService;
     private readonly IItemLookupService _lookup;
     private readonly LinkedChildResolver _links;
+    private readonly ICollectionFolderResolver _collections;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SeriesMetadataService"/> class.
@@ -55,6 +56,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// <param name="listing">Sort and channel services for episode listing.</param>
     /// <param name="lookup">The item identity lookup.</param>
     /// <param name="links">The saved link resolver.</param>
+    /// <param name="collections">The library membership resolver.</param>
     public SeriesMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -72,7 +74,8 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         IItemSortService itemSortService,
         IItemListingServices listing,
         IItemLookupService lookup,
-        LinkedChildResolver links)
+        LinkedChildResolver links,
+        ICollectionFolderResolver collections)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
         _listing = listing;
@@ -82,6 +85,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         _itemSortService = itemSortService;
         _lookup = lookup;
         _links = links;
+        _collections = collections;
     }
 
     /// <inheritdoc />
@@ -103,6 +107,14 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 
         return await base.RefreshMetadata(item, refreshOptions, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <inheritdoc />
+    protected override string CreatePresentationUniqueKey(Series item)
+        => item.CreatePresentationUniqueKey(
+            ItemOptions.GetLibraryOptions(item),
+            _lookup,
+            _collections,
+            ServerConfigurationManager.Configuration);
 
     /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(Series item)
@@ -143,7 +155,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     {
         // Reload children so episode numbers / seasons persisted earlier in the refresh are seen.
         series.InvalidateCatalogueChildren(_lookup);
-        var seriesKey = series.GetPresentationUniqueKey();
+        var seriesKey = series.PresentationUniqueKey ?? CreatePresentationUniqueKey(series);
         var children = series.GetRecursiveCatalogueChildren(ItemRepository, _lookup, _links, static child => child is Season or Episode);
         var seasons = children.OfType<Season>().ToList();
 
@@ -437,7 +449,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             IsVirtualItem = false,
             SeriesId = series.Id,
             SeriesName = series.Name,
-            SeriesPresentationUniqueKey = series.GetPresentationUniqueKey()
+            SeriesPresentationUniqueKey = series.PresentationUniqueKey ?? CreatePresentationUniqueKey(series)
         };
 
         series.AddChild(Writes, season);

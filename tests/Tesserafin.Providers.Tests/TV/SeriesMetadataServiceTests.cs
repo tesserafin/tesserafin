@@ -9,6 +9,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
@@ -50,26 +51,98 @@ public sealed class SeriesMetadataServiceTests
         repository.Verify(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.ParentId.Equals(season.Id))), Times.Once());
     }
 
+    [Theory]
+    [InlineData("it", "nl", "de", "pt", "it")]
+    [InlineData("", "nl", "de", "pt", "nl")]
+    [InlineData("", "", "de", "pt", "de")]
+    [InlineData("", "", "", "pt", "pt")]
+    [InlineData("", "", "", "", "fr")]
+    public void PresentationKey_PreservesProviderPriorityLanguageInheritanceAndLibraryOrder(
+        string itemLanguage,
+        string parentLanguage,
+        string folderLanguage,
+        string libraryLanguage,
+        string expectedLanguage)
+    {
+        var parent = new Folder { Id = Guid.NewGuid(), PreferredMetadataLanguage = parentLanguage };
+        var series = new Series
+        {
+            Id = Guid.NewGuid(),
+            ParentId = parent.Id,
+            PreferredMetadataLanguage = itemLanguage
+        };
+        series.ProviderIds["Imdb"] = "imdb-1";
+        series.ProviderIds["Tvdb"] = "tvdb-2";
+        series.ProviderIds["Custom"] = "chosen-id";
+        var first = new CollectionFolder { Id = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff") };
+        var second = new CollectionFolder { Id = Guid.Parse("00000000-0000-0000-0000-000000000001"), PreferredMetadataLanguage = folderLanguage };
+        var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
+        lookup.Setup(l => l.GetItemById(parent.Id)).Returns(parent);
+        var collections = new Mock<ICollectionFolderResolver>(MockBehavior.Strict);
+        collections.Setup(c => c.GetCollectionFolders(series)).Returns([first, second]);
+        var options = new LibraryOptions { EnableAutomaticSeriesGrouping = true, PreferredMetadataLanguage = libraryLanguage };
+        var itemOptions = Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(series) == options);
+        var configuration = new ServerConfiguration { PreferredMetadataLanguage = "fr" };
+        var server = Mock.Of<IServerConfigurationManager>(c => c.Configuration == configuration);
+        var service = new TestSeriesMetadataService(
+            Mock.Of<IItemRepository>(MockBehavior.Strict),
+            lookup.Object,
+            CreateLinks(lookup.Object),
+            itemOptions,
+            collections.Object,
+            server);
+
+        var key = service.ReadPresentationKey(series);
+
+        Assert.Equal($"chosen-id-{expectedLanguage}-{first.Id:N}-{second.Id:N}", key);
+        collections.Verify(c => c.GetCollectionFolders(series), Times.Once());
+    }
+
+    [Fact]
+    public void PresentationKey_UsesItemIdWhenGroupingIsDisabled()
+    {
+        var series = new Series { Id = Guid.NewGuid() };
+        series.ProviderIds["Tvdb"] = "tvdb-2";
+        var lookup = Mock.Of<IItemLookupService>(MockBehavior.Strict);
+        var options = new LibraryOptions { EnableAutomaticSeriesGrouping = false };
+        var service = new TestSeriesMetadataService(
+            Mock.Of<IItemRepository>(MockBehavior.Strict),
+            lookup,
+            CreateLinks(lookup),
+            Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(series) == options));
+
+        Assert.Equal(series.Id.ToString("N"), service.ReadPresentationKey(series));
+    }
+
+    private static LinkedChildResolver CreateLinks(IItemLookupService lookup)
+        => new(
+            Mock.Of<IItemRepository>(MockBehavior.Strict),
+            lookup,
+            Mock.Of<IItemPathLookupService>(MockBehavior.Strict),
+            Mock.Of<IFileSystem>(MockBehavior.Strict),
+            NullLogger<LinkedChildResolver>.Instance);
+
     private sealed class TestSeries : Series
     {
         public override string GetClientTypeName() => nameof(Series);
-
-        public override string CreatePresentationUniqueKey() => "series-key";
     }
 
     private sealed class TestSeriesMetadataService(
         IItemRepository repository,
         IItemLookupService lookup,
-        LinkedChildResolver links)
+        LinkedChildResolver links,
+        ILibraryItemOptions? itemOptions = null,
+        ICollectionFolderResolver? collections = null,
+        IServerConfigurationManager? configuration = null)
         : SeriesMetadataService(
             Mock.Of<IItemWriteCommands>(),
             Mock.Of<IItemPeopleCommands>(),
             Mock.Of<IItemDeletionCommands>(),
-            Mock.Of<IServerConfigurationManager>(),
+            configuration ?? Mock.Of<IServerConfigurationManager>(),
             NullLogger<SeriesMetadataService>.Instance,
             Mock.Of<IProviderManager>(),
             Mock.Of<IFileSystem>(),
-            Mock.Of<ILibraryItemOptions>(),
+            itemOptions ?? Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(It.IsAny<BaseItem>()) == new LibraryOptions()),
             Mock.Of<IItemStore>(),
             Mock.Of<IItemNamingService>(),
             Mock.Of<ILocalizationManager>(),
@@ -77,8 +150,11 @@ public sealed class SeriesMetadataServiceTests
             repository,
             Mock.Of<IItemSortService>(),
             lookup,
-            links)
+            links,
+            collections ?? Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict))
     {
         public ItemUpdateType Prepare(Series series) => BeforeSaveInternal(series, false, ItemUpdateType.None);
+
+        public string ReadPresentationKey(Series series) => CreatePresentationUniqueKey(series);
     }
 }
