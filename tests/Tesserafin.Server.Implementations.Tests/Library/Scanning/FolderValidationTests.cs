@@ -57,7 +57,7 @@ public sealed class FolderValidationTests
         var refreshed = new CollectionFolder { Id = original.Id, Name = "Refreshed" };
         var repository = new Mock<IItemRepository>(MockBehavior.Strict);
         repository.SetupSequence(r => r.GetItemList(It.Is<InternalItemsQuery>(query =>
-            ReferenceEquals(query.Parent, root) && !query.GroupByPresentationUniqueKey)))
+            query.ParentId.Equals(root.Id) && !query.GroupByPresentationUniqueKey)))
             .Returns([original])
             .Returns([refreshed]);
 
@@ -103,7 +103,7 @@ public sealed class FolderValidationTests
         var original = new Folder { Id = Guid.NewGuid() };
         var refreshed = new Folder { Id = Guid.NewGuid() };
         var repository = new Mock<IItemRepository>(MockBehavior.Strict);
-        repository.SetupSequence(r => r.GetItemList(It.Is<InternalItemsQuery>(query => ReferenceEquals(query.Parent, physical))))
+        repository.SetupSequence(r => r.GetItemList(It.Is<InternalItemsQuery>(query => query.ParentId.Equals(physical.Id))))
             .Returns([original])
             .Returns([refreshed]);
         var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
