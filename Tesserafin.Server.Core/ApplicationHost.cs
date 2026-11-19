@@ -729,6 +729,8 @@ namespace Tesserafin.Server.Core
                 provider.GetRequiredService<IV2PlanStore>(),
                 provider.GetRequiredService<ILogger<LocalMediaPlanner>>()));
 
+            serviceCollection.AddSingleton<PlaybackSessionLiveStreams>();
+
             serviceCollection.AddSingleton<IPlaybackSessionManager>(provider => new PlaybackSessionManager(
                 provider.GetRequiredService<IPlaybackSessionPlanner>(),
                 provider.GetRequiredService<ITranscodeManager>(),
@@ -743,7 +745,9 @@ namespace Tesserafin.Server.Core
                 provider.GetService<IRequestCorrelationAccessor>(),
                 // Issue #71: the removal-side lifecycle log. Required (unlike the accessor above) -
                 // ILoggerFactory is registered by every host that builds this service collection.
-                provider.GetRequiredService<ILogger<PlaybackSessionManager>>()));
+                provider.GetRequiredService<ILogger<PlaybackSessionManager>>(),
+                null,
+                provider.GetRequiredService<PlaybackSessionLiveStreams>()));
 
             // PR114a: registered so DI wiring exists ahead of the PR115 canary. PR115a: reads the
             // authoritative IV2PlanStore singleton (not IShadowDiagnosticsStore, which only ever holds

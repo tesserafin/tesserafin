@@ -51,6 +51,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     private static readonly TimeSpan ExpiryTtl = TimeSpan.FromHours(6);
     private static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(30);
 
+    private readonly PlaybackSessionLiveStreams? _liveStreams;
     private readonly IPlaybackSessionPlanner _planner;
     private readonly ITranscodeManager _transcodeManager;
     private readonly ISessionManager _sessionManager;
@@ -154,6 +155,10 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     /// <see cref="SweepExpired"/> at a chosen point, instead of sleeping. Defaults to
     /// <see cref="TimeProvider.System"/>; production behaviour is unchanged.
     /// </param>
+    /// <param name="liveStreams">
+    /// The Live TV tuner streams sessions opened; every removal path releases the removed session's
+    /// one. Optional: without it no session holds a live stream.
+    /// </param>
     public PlaybackSessionManager(
         IPlaybackSessionPlanner planner,
         ITranscodeManager transcodeManager,
@@ -164,8 +169,10 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         PlaybackOperationalMetrics? operationalMetrics = null,
         IRequestCorrelationAccessor? requestCorrelation = null,
         ILogger<PlaybackSessionManager>? logger = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        PlaybackSessionLiveStreams? liveStreams = null)
     {
+        _liveStreams = liveStreams;
         _logger = logger ?? NullLogger<PlaybackSessionManager>.Instance;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _requestCorrelation = requestCorrelation ?? NullRequestCorrelationAccessor.Instance;
@@ -649,6 +656,10 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         // PR115c: evicts whatever live-wiring outcome was retained for this session, if any - same
         // removal paths as the two stores above.
         _liveWiringDiagnosticsStore.Remove(id);
+
+        // A Live TV session holds one reference on its tuner stream; every removal path releases it
+        // (the close itself runs outside this lock).
+        _liveStreams?.Release(id);
 
         return true;
     }

@@ -23,6 +23,8 @@ using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Model.Dlna;
+using Tesserafin.Model.Dto;
+using Tesserafin.Model.MediaInfo;
 using Tesserafin.Model.Session;
 using Tesserafin.Playback.Contract.Diagnostics;
 using Tesserafin.Playback.Decision;
@@ -51,6 +53,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     private readonly IUserManager _userManager;
     private readonly IMediaSourceManager _mediaSourceManager;
     private readonly IV2PlanStore _v2PlanStore;
+    private readonly PlaybackSessionLiveStreams? _liveStreams;
     private readonly IPlaybackLiveStreamResolver _liveStreamResolver;
     private readonly IPlaybackLiveWiringDiagnosticsStore _liveWiringDiagnosticsStore;
     private readonly IMediaEncoder _mediaEncoder;
@@ -98,6 +101,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     /// <param name="transcodeManager">#301: ends the session's own jobs when the session is deleted.</param>
     /// <param name="credentialService">#301: revokes the session's capabilities when the session is deleted.</param>
     /// <param name="recordingsManager">Tells a Live TV recording still being written from a library video; none is active when null.</param>
+    /// <param name="liveStreams">The tuner streams Live TV sessions hold; a channel cannot be planned without it.</param>
     public PlaybackSessionsController(
         IPlaybackSessionManager playbackSessionManager,
         IItemAccessService itemAccessService,
@@ -111,8 +115,10 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         IShadowDiagnosticsStore? shadowDiagnosticsStore = null,
         ITranscodeManager? transcodeManager = null,
         IPlaybackCredentialService? credentialService = null,
-        IRecordingsManager? recordingsManager = null)
+        IRecordingsManager? recordingsManager = null,
+        PlaybackSessionLiveStreams? liveStreams = null)
     {
+        _liveStreams = liveStreams;
         _recordingsManager = recordingsManager;
         _transcodeManager = transcodeManager;
         _credentialService = credentialService;
@@ -150,7 +156,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
 
         using var attemptScope = BeginAttemptScope(request.PlaybackAttemptId);
 
-        var (kind, options, isLocalMedia) = await ResolveOptions(request, HttpContext.RequestAborted).ConfigureAwait(false);
+        var (kind, options, isLocalMedia, liveStreamId) = await ResolveOptions(request, request.PlaySessionId, null, HttpContext.RequestAborted).ConfigureAwait(false);
 
         // Issue #75: the ambient scope carrying the two request-scoped facts the shadow run cannot
         // recover on its own. Content-Length is read from the HEADER only - request buffering stays
@@ -171,7 +177,18 @@ public class PlaybackSessionsController : BaseTesserafinApiController
 
         if (session is null)
         {
+            // A channel's tuner stream was opened for this request: it must not outlive it.
+            if (liveStreamId is not null && _liveStreams is not null)
+            {
+                await _liveStreams.CloseUnattachedAsync(liveStreamId).ConfigureAwait(false);
+            }
+
             return NoViablePlan();
+        }
+
+        if (liveStreamId is not null)
+        {
+            _liveStreams!.Attach(session.Id, liveStreamId);
         }
 
         // A POST naming a play session that already has one replaces that session in place. When
@@ -238,7 +255,9 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             return authorization;
         }
 
-        var (kind, options, isLocalMedia) = await ResolveOptions(request, HttpContext.RequestAborted).ConfigureAwait(false);
+        // A Live TV session re-plans on the tuner stream it already holds: a PUT never opens a
+        // second one for the same playback.
+        var (kind, options, isLocalMedia, liveStreamId) = await ResolveOptions(request, existingSession.PlaySessionId, _liveStreams?.Get(id), HttpContext.RequestAborted).ConfigureAwait(false);
 
         // PR #38 (docs/design-playback-v2-lifecycle.md, decided in 2cf777d2): the session was just
         // proven to exist above, so a null here can only mean re-planning produced NO viable plan -
@@ -260,6 +279,11 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         if (session is null)
         {
             return NoViablePlan();
+        }
+
+        if (liveStreamId is not null)
+        {
+            _liveStreams!.Attach(session.Id, liveStreamId);
         }
 
         // The plan just changed and the play session did not: see StopJobsOfAnEnginePlan. Whether
@@ -613,14 +637,27 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             ? value as ContractStructuralScan
             : null;
 
-    private async Task<(PlaybackMediaKind Kind, MediaOptions Options, bool IsLocalMedia)> ResolveOptions(PlaybackPlanRequestBase request, CancellationToken cancellationToken)
+    private async Task<(PlaybackMediaKind Kind, MediaOptions Options, bool IsLocalMedia, string? LiveStreamId)> ResolveOptions(
+        PlaybackPlanRequestBase request,
+        string? playSessionId,
+        string? heldLiveStreamId,
+        CancellationToken cancellationToken)
     {
         var userId = RequestHelpers.GetUserId(User, request.UserId);
         var user = _userManager.GetUserById(userId) ?? throw new ResourceNotFoundException();
         var item = _itemAccessService.GetVisibleItemById<BaseItem>(request.ItemId, user) ?? throw new ResourceNotFoundException();
 
-        var mediaSources = await _mediaSourceManager.GetPlaybackMediaSources(item, user, true, true, cancellationToken)
+        IReadOnlyList<MediaSourceInfo> mediaSources = await _mediaSourceManager.GetPlaybackMediaSources(item, user, true, true, cancellationToken)
             .ConfigureAwait(false);
+
+        // A Live TV channel is planned on its opened tuner stream, which this session holds until it
+        // ends (PlaybackSessionLiveStreams). The server's FFmpeg reads that stream through its
+        // provider (pipe:0), never through the [Authorize]d LiveStreamFiles route.
+        string? liveStreamId = null;
+        if (item is LiveTvChannel && _liveStreams is not null)
+        {
+            (mediaSources, liveStreamId) = await OpenChannelStream(request, mediaSources, userId, playSessionId, heldLiveStreamId, cancellationToken).ConfigureAwait(false);
+        }
 
         // PR112b: the request now carries ClientCapabilities/PlaybackConstraints (PR91 decision
         // vocabulary), never a raw DeviceProfile - ReverseDlnaAdapter is the TEMPORARY translation
@@ -649,7 +686,54 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         }
 
         var kind = item.MediaType == MediaType.Audio ? PlaybackMediaKind.Audio : PlaybackMediaKind.Video;
-        return (kind, options, kind == PlaybackMediaKind.Video ? IsLibraryVideo(item) : IsLibraryAudio(item));
+        return (kind, options, kind == PlaybackMediaKind.Video ? IsLibraryVideo(item) : IsLibraryAudio(item), liveStreamId);
+    }
+
+    /// <summary>
+    /// The channel's opened tuner stream as its one media source: the stream this session already
+    /// holds when it re-plans, otherwise a new open of the source the request names (or the first).
+    /// </summary>
+    private async Task<(IReadOnlyList<MediaSourceInfo> Sources, string LiveStreamId)> OpenChannelStream(
+        PlaybackPlanRequestBase request,
+        IReadOnlyList<MediaSourceInfo> channelSources,
+        Guid userId,
+        string? playSessionId,
+        string? heldLiveStreamId,
+        CancellationToken cancellationToken)
+    {
+        if (heldLiveStreamId is not null)
+        {
+            var held = await _mediaSourceManager.GetLiveStreamWithDirectStreamProvider(heldLiveStreamId, cancellationToken).ConfigureAwait(false);
+            return ([held.Item1], heldLiveStreamId);
+        }
+
+        var source = (string.IsNullOrEmpty(request.MediaSourceId)
+                ? channelSources.FirstOrDefault()
+                : channelSources.FirstOrDefault(s => string.Equals(s.Id, request.MediaSourceId, StringComparison.Ordinal)))
+            ?? throw new ResourceNotFoundException();
+        if (!source.RequiresOpening || string.IsNullOrEmpty(source.OpenToken))
+        {
+            throw new ResourceNotFoundException();
+        }
+
+        var opened = await _mediaSourceManager.OpenLiveStream(
+            new LiveStreamRequest
+            {
+                OpenToken = source.OpenToken,
+                UserId = userId,
+                ItemId = request.ItemId,
+                PlaySessionId = playSessionId,
+                StartTimeTicks = request.Constraints.StartTimeTicks,
+                AudioStreamIndex = request.Constraints.PreferredAudioStreamIndex,
+                SubtitleStreamIndex = request.Constraints.PreferredSubtitleStreamIndex,
+                MaxStreamingBitrate = request.Constraints.MaxBitrate,
+                EnableDirectPlay = request.Constraints.AllowDirectPlay,
+                EnableDirectStream = request.Constraints.AllowDirectStream,
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        var openedSource = opened.MediaSource;
+        return ([openedSource], openedSource.LiveStreamId);
     }
 
     /// <summary>
