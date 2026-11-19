@@ -140,7 +140,7 @@ public class LibraryManagerItemLookupTests
     public void GetItemById_ItemPreRegisteredInCache_DoesNotCallRepository()
     {
         var folder = new Folder { Id = Guid.NewGuid(), Name = "Folder" };
-        _libraryManager.RegisterItem(folder);
+        _itemLookupService.Register(folder);
 
         var result = _libraryManager.GetItemById(folder.Id);
 
@@ -255,7 +255,7 @@ public class LibraryManagerItemLookupTests
     public void GetItemByIdGeneric_UserId_EmptyValidatesNothing_AndAnIdThatNamesNoUserSeesNothing()
     {
         var folder = new Folder { Id = Guid.NewGuid(), Name = "Folder" };
-        _libraryManager.RegisterItem(folder);
+        _itemLookupService.Register(folder);
 
         // An API key and a system caller carry no user id.
         Assert.Same(folder, _libraryManager.GetItemById<Folder>(folder.Id, Guid.Empty));
@@ -265,16 +265,16 @@ public class LibraryManagerItemLookupTests
     }
 
     [Fact]
-    public void RegisterItem_NewInstanceSameId_ReplacesCachedInstance()
+    public void Register_NewInstanceSameId_ReplacesCachedInstance()
     {
         var id = Guid.NewGuid();
         var original = new Folder { Id = id, Name = "Original" };
         var replacement = new Folder { Id = id, Name = "Replacement" };
 
-        _libraryManager.RegisterItem(original);
+        _itemLookupService.Register(original);
         Assert.Same(original, _libraryManager.GetItemById(id));
 
-        _libraryManager.RegisterItem(replacement);
+        _itemLookupService.Register(replacement);
 
         var result = _libraryManager.GetItemById(id);
         Assert.Same(replacement, result);
@@ -311,7 +311,7 @@ public class LibraryManagerItemLookupTests
         // attempted. This lets us exercise the cache-invalidation tail of DeleteItem without pulling
         // in the Video alternate-version machinery or real file I/O.
         var channel = new LiveTvChannel { Id = Guid.NewGuid(), Name = "Channel" };
-        _libraryManager.RegisterItem(channel);
+        _itemLookupService.Register(channel);
         Assert.Same(channel, _libraryManager.GetItemById(channel.Id));
 
         await _deletions.DeleteAsync(channel, new DeleteOptions { DeleteFileLocation = false }, null, TestContext.Current.CancellationToken);
@@ -334,7 +334,7 @@ public class LibraryManagerItemLookupTests
         SetConfigurationManagerStatic(_configurationManagerMock.Object);
 
         var channel = new LiveTvChannel { Id = Guid.NewGuid(), Name = "Channel" };
-        _libraryManager.RegisterItem(channel);
+        _itemLookupService.Register(channel);
         Assert.Same(channel, _libraryManager.GetItemById(channel.Id));
 
         await _deletions.DeleteUnreferencedAsync(new List<BaseItem> { channel }, deleteSourceFiles: false, TestContext.Current.CancellationToken);
@@ -361,7 +361,7 @@ public class LibraryManagerItemLookupTests
     public void GetItemById_ViaIItemLookupServiceReference_SameCacheBehaviorAndInstanceAsILibraryManager()
     {
         var folder = new Folder { Id = Guid.NewGuid(), Name = "Folder" };
-        _libraryManager.RegisterItem(folder);
+        _itemLookupService.Register(folder);
 
         IItemLookupService lookupService = _libraryManager;
 
@@ -395,13 +395,13 @@ public class LibraryManagerItemLookupTests
         SetLibraryManagerStatic(new Mock<ILibraryManager>(MockBehavior.Strict).Object);
 
         var parentFolder = new Folder { Id = Guid.NewGuid(), Name = "Parent" };
-        _libraryManager.RegisterItem(parentFolder);
+        _itemLookupService.Register(parentFolder);
 
         // LiveTvChannel keeps DeleteItem's side paths inert (see DeleteItem_CacheableItem_
         // InvalidatesCache above): SourceType is LiveTV, IsFolder is false, and Path is null,
         // so only the cache-invalidation / event-notification tail runs.
         var channel = new LiveTvChannel { Id = Guid.NewGuid(), Name = "Channel", ParentId = parentFolder.Id };
-        _libraryManager.RegisterItem(channel);
+        _itemLookupService.Register(channel);
 
         ItemChangeEventArgs? raisedArgs = null;
         _changes.ItemRemoved += (_, args) => raisedArgs = args;
@@ -486,7 +486,7 @@ public class LibraryManagerItemLookupTests
         SetLibraryManagerStatic(_libraryManager);
 
         var parent = new Folder { Id = Guid.NewGuid(), Name = "Parent" };
-        _libraryManager.RegisterItem(parent);
+        _itemLookupService.Register(parent);
         var child = new Movie { Id = Guid.NewGuid(), Name = "Child", ParentId = parent.Id };
 
         var viaStatic = child.GetParent();
@@ -504,7 +504,7 @@ public class LibraryManagerItemLookupTests
         SetLibraryManagerStatic(_libraryManager);
 
         var owner = new Movie { Id = Guid.NewGuid(), Name = "Owner" };
-        _libraryManager.RegisterItem(owner);
+        _itemLookupService.Register(owner);
         var item = new Movie { Id = Guid.NewGuid(), Name = "Item", OwnerId = owner.Id };
 
         var viaStatic = item.GetOwner();
@@ -565,7 +565,7 @@ public class LibraryManagerItemLookupTests
     {
         // The heavy machinery (root construction, metadata refresh, children validation) is
         // neutralized: stub root folders are supplied through their dedicated provider ports,
-        // their ValidateChildrenInternal/Children members are overridden to no-ops, and the
+        // their validation is stubbed and the user root lists controlled children, and the
         // BaseItem statics used by the non-virtual RefreshMetadata path are pointed at mocks.
         // What remains under test is exactly the PR75 fix: the missing-directory cleanup loop in
         // ValidateTopLibraryFolders must invalidate the cache entry after deleting from the DB.
@@ -582,7 +582,7 @@ public class LibraryManagerItemLookupTests
             Path = "/reefin-test-nonexistent/" + Guid.NewGuid()
         };
 
-        _libraryManager.RegisterItem(missing);
+        _itemLookupService.Register(missing);
         Assert.Same(missing, _libraryManager.GetItemById(missing.Id));
         _itemRepositoryMock.Verify(r => r.RetrieveItem(missing.Id), Times.Never);
 
@@ -594,7 +594,16 @@ public class LibraryManagerItemLookupTests
             .Returns(new StubUserRootFolder { StubChildren = [missing] });
 
         var roots = Mock.Of<ILibraryRootFolderProvider>(p => p.GetRootFolder() == new StubAggregateFolder());
-        var context = new LibraryScanContext(_deletions, _writes, Mock.Of<IItemImageService>(), Mock.Of<IItemResolutionService>(), Mock.Of<ILibraryRefreshProgress>(), Mock.Of<ILimitedConcurrencyLibraryScheduler>(), _itemLookupService);
+        var context = new LibraryScanContext(
+            _deletions,
+            _writes,
+            Mock.Of<IItemImageService>(),
+            Mock.Of<IItemResolutionService>(),
+            Mock.Of<ILibraryRefreshProgress>(),
+            Mock.Of<ILimitedConcurrencyLibraryScheduler>(),
+            _itemLookupService,
+            _itemRepositoryMock.Object,
+            Mock.Of<IItemStore>());
         var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(context, roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
         await traversal.RefreshTopFoldersAsync(TestContext.Current.CancellationToken, false);
 
@@ -610,12 +619,6 @@ public class LibraryManagerItemLookupTests
 
     private sealed class StubAggregateFolder : AggregateFolder
     {
-        public override IEnumerable<BaseItem> Children
-        {
-            get => [];
-            set { }
-        }
-
         protected override System.Threading.Tasks.Task ValidateChildrenInternal(LibraryScanContext context, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
             => System.Threading.Tasks.Task.CompletedTask;
     }
@@ -624,11 +627,8 @@ public class LibraryManagerItemLookupTests
     {
         public IReadOnlyList<BaseItem> StubChildren { get; set; } = [];
 
-        public override IEnumerable<BaseItem> Children
-        {
-            get => StubChildren;
-            set { }
-        }
+        public override IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
+            => StubChildren;
 
         protected override System.Threading.Tasks.Task ValidateChildrenInternal(LibraryScanContext context, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
             => System.Threading.Tasks.Task.CompletedTask;

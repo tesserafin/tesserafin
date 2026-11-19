@@ -127,11 +127,7 @@ public class ItemStoreTests
 
         _itemStore.CreateItem(item, parentFolder);
 
-        // Read the backing field directly, not the Children property: the getter lazily reloads via
-        // LoadChildren() when the backing field is null ("_children ??= LoadChildren()",
-        // Folder.cs:140), which touches BaseItem statics this test does not set up. Asserting the
-        // reset itself (not the reload the real code never triggers here) is what CreateItem's
-        // contract actually characterizes.
+        // The public getter would reload the just-invalidated cache from the catalogue.
         var childrenField = typeof(Folder).GetField("_children", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
         Assert.Null(childrenField.GetValue(parentFolder));
         Assert.Null(parentFolder.UserData);

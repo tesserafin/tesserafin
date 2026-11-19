@@ -13,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
@@ -86,14 +87,20 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public override IEnumerable<BaseItem> Children
         {
-            get => GetPhysicalFolders(LibraryManager).SelectMany(folder => folder.Children);
-            set
+            get => GetCatalogueChildren(ItemRepository, LibraryManager);
+            set => InvalidateCatalogueChildren(LibraryManager);
+        }
+
+        /// <inheritdoc />
+        public override IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
+            => GetPhysicalFolders(lookup).SelectMany(folder => folder.GetCatalogueChildren(repository, lookup));
+
+        /// <inheritdoc />
+        public override void InvalidateCatalogueChildren(IItemLookupService lookup)
+        {
+            foreach (var folder in GetPhysicalFolders(lookup))
             {
-                // The getter delegates to physical folders, so invalidate their caches.
-                foreach (var folder in GetPhysicalFolders(LibraryManager))
-                {
-                    folder.Children = null;
-                }
+                folder.InvalidateCatalogueChildren(lookup);
             }
         }
 

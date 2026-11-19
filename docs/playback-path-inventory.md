@@ -1365,3 +1365,12 @@ the catalogue and scheduling services. Each call supplies its own refresh
 options and progress. Validation reads the parent chain through the
 catalogue lookup and rejects cycles anywhere in that chain. A rejected
 recursive scan still clears its active progress entry.
+
+## 58. Catalogue children and library cache refresh
+
+Folder reconciliation, nested metadata refresh and top-folder scans read
+direct children through the scan context's repository and identity lookup.
+Collection folders still delegate reads and cache invalidation to their
+physical folders. The user root reloads its library definitions after
+validation and registers them through `IItemStore`. The library manager
+facade no longer exposes a cache registration method.

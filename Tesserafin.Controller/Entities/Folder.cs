@@ -133,7 +133,7 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public virtual IEnumerable<BaseItem> Children
         {
-            get => _children ??= LoadChildren();
+            get => GetCatalogueChildren(ItemRepository, LibraryManager);
             set => _children = value;
         }
 
@@ -272,16 +272,30 @@ namespace Tesserafin.Controller.Entities
             return base.IsVisible(user, skipAllowedTagsCheck, tagVisibility);
         }
 
-        /// <summary>
-        /// Loads our children.  Validation will occur externally.
-        /// We want this synchronous.
-        /// </summary>
-        /// <returns>Returns children.</returns>
-        protected virtual IReadOnlyList<BaseItem> LoadChildren()
+        /// <summary>Gets the direct catalogue children using the supplied repository and identity lookup.</summary>
+        /// <param name="repository">The item repository.</param>
+        /// <param name="lookup">The identity lookup for folders that cache child identities.</param>
+        /// <returns>The folder's catalogue children.</returns>
+        public virtual IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
+            => _children ??= LoadChildren(repository, lookup);
+
+        /// <summary>Invalidates the cached direct children.</summary>
+        /// <param name="lookup">The identity lookup for folders that delegate to physical folders.</param>
+        public virtual void InvalidateCatalogueChildren(IItemLookupService lookup)
+            => Children = null;
+
+        /// <summary>Loads the folder's direct children from the catalogue.</summary>
+        /// <param name="repository">The item repository.</param>
+        /// <param name="lookup">The identity lookup for folders that cache child identities.</param>
+        /// <returns>The folder's persisted children.</returns>
+        protected virtual IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
-            // logger.LogDebug("Loading children from {0} {1} {2}", GetType().Name, Id, Path);
-            // just load our children from the repo - the library will be validated and maintained in other processes
-            return GetCachedChildren();
+            return repository.GetItemList(new InternalItemsQuery
+            {
+                Parent = this,
+                GroupByPresentationUniqueKey = false,
+                DtoOptions = new DtoOptions(true)
+            });
         }
 
         /// <summary>
@@ -296,7 +310,7 @@ namespace Tesserafin.Controller.Entities
         /// <returns>Task.</returns>
         public Task ValidateChildren(LibraryScanContext context, IProgress<double> progress, MetadataRefreshOptions metadataRefreshOptions, bool recursive = true, bool allowRemoveRoot = false, CancellationToken cancellationToken = default)
         {
-            Children = null; // invalidate cached children.
+            InvalidateCatalogueChildren(context.Lookup);
             return ValidateChildrenInternal(context, progress, recursive, true, allowRemoveRoot, metadataRefreshOptions, metadataRefreshOptions.DirectoryService, cancellationToken);
         }
 
@@ -385,8 +399,8 @@ namespace Tesserafin.Controller.Entities
                     context.RefreshProgress.OnRefreshProgress(this, ProgressHelpers.RetrievedChildren);
                 }
 
-                Children = null;
-                var reconciliation = await context.Writes.ReconcileFolderChildrenAsync(this, Children.ToArray(), nonCachedChildren, directoryService, allowRemoveRoot, context.Deletions, context.Images, cancellationToken).ConfigureAwait(false);
+                InvalidateCatalogueChildren(context.Lookup);
+                var reconciliation = await context.Writes.ReconcileFolderChildrenAsync(this, GetCatalogueChildren(context.Repository, context.Lookup).ToArray(), nonCachedChildren, directoryService, allowRemoveRoot, context.Deletions, context.Images, cancellationToken).ConfigureAwait(false);
                 if (reconciliation.Skipped)
                 {
                     return;
@@ -423,7 +437,7 @@ namespace Tesserafin.Controller.Entities
 
                 if (validChildrenNeedGeneration)
                 {
-                    validChildren = Children.ToList();
+                    validChildren = GetCatalogueChildren(context.Repository, context.Lookup).ToList();
                     validChildrenNeedGeneration = false;
                 }
 
@@ -462,8 +476,8 @@ namespace Tesserafin.Controller.Entities
                 {
                     if (validChildrenNeedGeneration)
                     {
-                        Children = null; // invalidate cached children.
-                        validChildren = Children.ToList();
+                        InvalidateCatalogueChildren(context.Lookup);
+                        validChildren = GetCatalogueChildren(context.Repository, context.Lookup).ToList();
                     }
 
                     await RefreshMetadataRecursive(context, accessibleChildren, refreshOptions, recursive, innerProgress, cancellationToken).ConfigureAwait(false);
@@ -505,8 +519,8 @@ namespace Tesserafin.Controller.Entities
 
                 if (recursive && child is Folder folder)
                 {
-                    folder.Children = null; // invalidate cached children.
-                    await folder.RefreshMetadataRecursive(context, folder.Children.Except([this, child]).ToList(), refreshOptions, true, progress, cancellationToken).ConfigureAwait(false);
+                    folder.InvalidateCatalogueChildren(context.Lookup);
+                    await folder.RefreshMetadataRecursive(context, folder.GetCatalogueChildren(context.Repository, context.Lookup).Except([this, child]).ToList(), refreshOptions, true, progress, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -536,20 +550,6 @@ namespace Tesserafin.Controller.Entities
         /// <returns>The children resolved from the current filesystem entries.</returns>
         protected virtual IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
             => resolution.ResolveFolderChildren(this, GetFileSystemChildren(directoryService), directoryService, cancellationToken);
-
-        /// <summary>
-        /// Get our children from the repo - stubbed for now.
-        /// </summary>
-        /// <returns>IEnumerable{BaseItem}.</returns>
-        protected IReadOnlyList<BaseItem> GetCachedChildren()
-        {
-            return ItemRepository.GetItemList(new InternalItemsQuery
-            {
-                Parent = this,
-                GroupByPresentationUniqueKey = false,
-                DtoOptions = new DtoOptions(true)
-            });
-        }
 
         public virtual int GetChildCount(User user)
         {

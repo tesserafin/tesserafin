@@ -1,4 +1,5 @@
 using Tesserafin.Controller.LibraryTaskScheduler;
+using Tesserafin.Controller.Persistence;
 
 namespace Tesserafin.Controller.Library;
 
@@ -12,6 +13,8 @@ namespace Tesserafin.Controller.Library;
 /// <param name="RefreshProgress">Tracks active recursive refreshes.</param>
 /// <param name="Scheduler">Schedules nested discovery and metadata work.</param>
 /// <param name="Lookup">Reads the catalogue hierarchy.</param>
+/// <param name="Repository">Reads the persisted children of each folder.</param>
+/// <param name="Store">Registers refreshed library definitions in the item cache.</param>
 public sealed record LibraryScanContext(
     IItemDeletionCommands Deletions,
     IItemWriteCommands Writes,
@@ -19,4 +22,6 @@ public sealed record LibraryScanContext(
     IItemResolutionService Resolution,
     ILibraryRefreshProgress RefreshProgress,
     ILimitedConcurrencyLibraryScheduler Scheduler,
-    IItemLookupService Lookup);
+    IItemLookupService Lookup,
+    IItemRepository Repository,
+    IItemStore Store);

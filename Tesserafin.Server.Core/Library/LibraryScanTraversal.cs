@@ -25,17 +25,17 @@ internal sealed class LibraryScanTraversal(
     {
         cancellationToken.ThrowIfCancellationRequested();
         var root = roots.GetRootFolder();
-        root.Children = null;
+        root.InvalidateCatalogueChildren(context.Lookup);
         await root.RefreshMetadata(context.Deletions, context.Writes, cancellationToken).ConfigureAwait(false);
         await root.ValidateChildren(context, new Progress<double>(), new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         var userRoot = userRoots.GetUserRootFolder();
-        userRoot.Children = null;
+        userRoot.InvalidateCatalogueChildren(context.Lookup);
         await userRoot.RefreshMetadata(context.Deletions, context.Writes, cancellationToken).ConfigureAwait(false);
         await userRoot.ValidateChildren(context, new Progress<double>(), new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         var deleted = new List<Guid>();
-        foreach (var child in userRoot.Children!.OfType<Folder>())
+        foreach (var child in userRoot.GetCatalogueChildren(context.Repository, context.Lookup).OfType<Folder>())
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (child is CollectionFolder && !Directory.Exists(child.Path))

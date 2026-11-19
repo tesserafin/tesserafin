@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data;
 using Tesserafin.Data.Entities;
@@ -57,19 +58,9 @@ namespace Tesserafin.Controller.Entities.Audio
         [JsonIgnore]
         public override string ContainingFolderPath => Path;
 
-        [JsonIgnore]
-        public override IEnumerable<BaseItem> Children
-        {
-            get
-            {
-                if (IsAccessedByName)
-                {
-                    return Enumerable.Empty<BaseItem>();
-                }
-
-                return base.Children;
-            }
-        }
+        /// <inheritdoc />
+        public override IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
+            => IsAccessedByName ? [] : base.GetCatalogueChildren(repository, lookup);
 
         [JsonIgnore]
         public override bool SupportsPeople => false;

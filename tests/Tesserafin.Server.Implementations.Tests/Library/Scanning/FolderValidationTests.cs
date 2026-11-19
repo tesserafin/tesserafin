@@ -1,9 +1,11 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LibraryTaskScheduler;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Xunit;
 
@@ -33,7 +35,9 @@ public sealed class FolderValidationTests
             Mock.Of<IItemResolutionService>(MockBehavior.Strict),
             refreshProgress.Object,
             Mock.Of<ILimitedConcurrencyLibraryScheduler>(MockBehavior.Strict),
-            lookup.Object);
+            lookup.Object,
+            Mock.Of<IItemRepository>(MockBehavior.Strict),
+            Mock.Of<IItemStore>(MockBehavior.Strict));
         var options = new MetadataRefreshOptions(Mock.Of<IDirectoryService>(MockBehavior.Strict));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => folder.ValidateChildren(
@@ -43,5 +47,70 @@ public sealed class FolderValidationTests
         lookup.Verify(service => service.GetItemById(second.Id), Times.Once);
         refreshProgress.Verify(progress => progress.OnRefreshStart(folder), Times.Once);
         refreshProgress.Verify(progress => progress.OnRefreshComplete(folder), Times.Once);
+    }
+
+    [Fact]
+    public async Task ValidateUserRoot_RegistersFreshLibraryDefinitionsAndResolvesTheirCachedIds()
+    {
+        var root = new UserRootFolder { Id = Guid.NewGuid() };
+        var original = new CollectionFolder { Id = Guid.NewGuid(), Name = "Original" };
+        var refreshed = new CollectionFolder { Id = original.Id, Name = "Refreshed" };
+        var repository = new Mock<IItemRepository>(MockBehavior.Strict);
+        repository.SetupSequence(r => r.GetItemList(It.Is<InternalItemsQuery>(query =>
+            ReferenceEquals(query.Parent, root) && !query.GroupByPresentationUniqueKey)))
+            .Returns([original])
+            .Returns([refreshed]);
+
+        var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
+        lookup.Setup(service => service.GetItemById(refreshed.Id)).Returns(refreshed);
+        var store = new Mock<IItemStore>(MockBehavior.Strict);
+        store.Setup(service => service.RegisterItem(It.Is<BaseItem>(item => ReferenceEquals(item, refreshed))));
+
+        var scheduler = new Mock<ILimitedConcurrencyLibraryScheduler>(MockBehavior.Strict);
+        scheduler.Setup(service => service.Enqueue(
+            It.Is<BaseItem[]>(items => items.Length == 0),
+            It.IsAny<Func<BaseItem, IProgress<double>, Task>>(),
+            It.IsAny<IProgress<double>>(),
+            It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var context = new LibraryScanContext(
+            Mock.Of<IItemDeletionCommands>(MockBehavior.Strict),
+            Mock.Of<IItemWriteCommands>(MockBehavior.Strict),
+            Mock.Of<IItemImageService>(MockBehavior.Strict),
+            Mock.Of<IItemResolutionService>(MockBehavior.Strict),
+            Mock.Of<ILibraryRefreshProgress>(MockBehavior.Strict),
+            scheduler.Object,
+            lookup.Object,
+            repository.Object,
+            store.Object);
+
+        await root.ValidateChildren(
+            context,
+            new Progress<double>(),
+            new MetadataRefreshOptions(Mock.Of<IDirectoryService>(MockBehavior.Strict)),
+            recursive: false,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        store.Verify(service => service.RegisterItem(It.Is<BaseItem>(item => ReferenceEquals(item, refreshed))), Times.Once);
+        Assert.Same(refreshed, Assert.Single(root.GetCatalogueChildren(repository.Object, lookup.Object)));
+        lookup.Verify(service => service.GetItemById(refreshed.Id), Times.Once);
+    }
+
+    [Fact]
+    public void InvalidateCollectionChildren_ReloadsThePhysicalFoldersThroughTheSuppliedCatalogue()
+    {
+        var physical = new Folder { Id = Guid.NewGuid() };
+        var library = new CollectionFolder { PhysicalFolderIds = [physical.Id] };
+        var original = new Folder { Id = Guid.NewGuid() };
+        var refreshed = new Folder { Id = Guid.NewGuid() };
+        var repository = new Mock<IItemRepository>(MockBehavior.Strict);
+        repository.SetupSequence(r => r.GetItemList(It.Is<InternalItemsQuery>(query => ReferenceEquals(query.Parent, physical))))
+            .Returns([original])
+            .Returns([refreshed]);
+        var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
+        lookup.Setup(service => service.GetItemById(physical.Id)).Returns(physical);
+
+        Assert.Same(original, Assert.Single(library.GetCatalogueChildren(repository.Object, lookup.Object)));
+        library.InvalidateCatalogueChildren(lookup.Object);
+        Assert.Same(refreshed, Assert.Single(library.GetCatalogueChildren(repository.Object, lookup.Object)));
     }
 }
