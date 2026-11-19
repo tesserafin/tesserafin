@@ -97,7 +97,9 @@ public static class EnginePlanEncodingRequest
         request.SegmentContainer = plan.Container;
         request.MinSegments = 1;
         request.VideoCodec = plan.VideoCodec;
-        request.AudioCodec = plan.AudioCodec;
+        // An audio-only request takes its output codec as it is: the executor weighs a stream copy
+        // for video requests only. A copied audio stream is therefore named "copy" here.
+        request.AudioCodec = plan.VideoStreamIndex is null && copiesAudio ? "copy" : plan.AudioCodec;
         request.VideoStreamIndex = plan.VideoStreamIndex;
         request.AudioStreamIndex = plan.AudioStreamIndex;
         request.EnableAutoStreamCopy = copiesVideo || copiesAudio;

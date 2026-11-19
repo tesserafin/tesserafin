@@ -266,6 +266,20 @@ public sealed class EnginePlanEncodingRequestTests
         Assert.Equal(2, request.TranscodingMaxAudioChannels);
         Assert.Equal(EnginePlanEncodingRequest.DefaultAudioBitratePerChannelPair, request.AudioBitRate);
         Assert.IsType<Tesserafin.Controller.Streaming.VideoRequestDto>(EnginePlanEncodingRequest.Build(_audioOnly, Guid.NewGuid(), "ps", "device", Source("ac3"), null));
+
+        // An audio remux names the copy itself: the executor does not weigh one for audio.
+        var remux = EnginePlanEncodingRequest.Build(
+            plan with { Method = PlaybackMethod.Remux, Transforms = [TransformKind.RemuxContainer, TransformKind.CopyAudio] },
+            Guid.NewGuid(),
+            "ps",
+            "device",
+            null,
+            null);
+        Assert.IsNotType<Tesserafin.Controller.Streaming.VideoRequestDto>(remux);
+        Assert.Equal("copy", remux.AudioCodec);
+        Assert.True(remux.AllowAudioStreamCopy);
+        Assert.Null(remux.AudioBitRate);
+        Assert.Null(remux.TranscodingMaxAudioChannels);
     }
 
     [Fact]

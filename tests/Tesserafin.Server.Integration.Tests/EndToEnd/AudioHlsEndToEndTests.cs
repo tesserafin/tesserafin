@@ -26,10 +26,11 @@ using Xunit;
 namespace Tesserafin.Server.Integration.Tests.EndToEnd;
 
 /// <summary>
-/// Consolidation step 1, audio transcode (docs/playback-path-inventory.md §7): a library audio track
-/// read from a local file, in a format the client does not play, is decided by the v2 engine alone
-/// and executed on the session's own HLS route, which builds an audio-only encoding request from
-/// the retained plan. The host replaces the legacy planner and the live-stream resolver with
+/// Consolidation step 1, audio over HLS (docs/playback-path-inventory.md §7): a library audio track
+/// read from a local file that the client does not play as it is - a codec it does not decode
+/// (transcoded to AAC) or a codec it decodes in a container it does not (remuxed, the audio copied)
+/// - is decided by the v2 engine alone and executed on the session's own HLS route, which builds an
+/// audio-only encoding request from the retained plan. The host replaces the legacy planner and the live-stream resolver with
 /// implementations that throw (<see cref="DirectPlayFilmEndToEndTests.LegacyFreeFactory"/>). What
 /// the output is, is read from the FFmpeg command the server ran and from the segments it
 /// produced, not from the decision's label.
@@ -38,7 +39,7 @@ namespace Tesserafin.Server.Integration.Tests.EndToEnd;
 /// Not <c>Category=Smoke</c>, and required by name in the hosted integration job, for the reasons
 /// given on <see cref="DirectPlayFilmEndToEndTests"/>.
 /// </remarks>
-public sealed class TranscodeAudioEndToEndTests : IClassFixture<DirectPlayFilmEndToEndTests.LegacyFreeFactory>, IAsyncLifetime
+public sealed class AudioHlsEndToEndTests : IClassFixture<DirectPlayFilmEndToEndTests.LegacyFreeFactory>, IAsyncLifetime
 {
     private const int FixtureSeconds = 12;
     private const string Password = "audio-transcode-password";
@@ -50,7 +51,7 @@ public sealed class TranscodeAudioEndToEndTests : IClassFixture<DirectPlayFilmEn
     private IPlaybackSessionManager _sessionManager = null!;
     private string _logDirectory = null!;
 
-    public TranscodeAudioEndToEndTests(DirectPlayFilmEndToEndTests.LegacyFreeFactory factory)
+    public AudioHlsEndToEndTests(DirectPlayFilmEndToEndTests.LegacyFreeFactory factory)
     {
         _factory = factory;
     }
@@ -89,6 +90,53 @@ public sealed class TranscodeAudioEndToEndTests : IClassFixture<DirectPlayFilmEn
 
     [Fact]
     public Task TranscodeAudio_FlacWithCoverArt_EncodesAudioOnlyOverTheSessionHlsRoute() => EncodesAacOverTheSessionHlsRouteAsync(withCoverArt: true, "audio-flac-cover");
+
+    [Fact]
+    public async Task RemuxAudio_AacInMatroska_CopiesTheAudioOverTheSessionHlsRoute()
+    {
+        const string playSession = "audio-remux-ps";
+        var (client, userId) = await SignInAsync("audio-remux");
+        var itemId = await SeedAacInMatroskaAsync();
+        var session = await CreateSessionAsync(client, itemId, userId, playSession, EndToEndCapabilityPresets.AudioRemuxOverHls());
+
+        Assert.Equal(PlaybackMethod.Remux, session.Method);
+        Assert.Equal(MediaKind.Audio, session.Kind);
+        Assert.Equal(PlaybackEngine.EngineVersion, session.DecisionVersion);
+        Assert.Equal([TransformKind.RemuxContainer, TransformKind.CopyAudio], session.Transforms);
+
+        var descriptor = await GetDescriptorAsync(client, session.Id);
+        Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/Hls/main.m3u8?"), descriptor.Url, StringComparison.Ordinal);
+        Assert.Equal(StreamingProtocol.Hls, descriptor.Protocol);
+        Assert.Equal(PlaybackEngine.EngineVersion, descriptor.ServedBy);
+        Assert.Null(descriptor.FallbackReason);
+
+        var playlist = await ReadPlaylistAsync(client, descriptor.Url);
+        Assert.True(playlist.Segments.Count >= 2, FormattableString.Invariant($"expected several segments, got {playlist.Segments.Count}"));
+        var init = await GetBytesAsync(client, playlist.Init);
+        var first = await GetBytesAsync(client, playlist.Segments[0]);
+        Assert.NotEmpty(await GetBytesAsync(client, playlist.Segments[^1]));
+        Assert.Equal(["audio,aac"], await ProbeProducedAsync(init, first));
+
+        // What FFmpeg was told: copy the audio, map no video, encode nothing.
+        var commands = await FfmpegCommandsAsync(itemId);
+        Assert.NotEmpty(commands);
+        Assert.All(commands, command =>
+        {
+            Assert.Contains("-vn", command, StringComparison.Ordinal);
+            Assert.Contains("-acodec copy", command, StringComparison.Ordinal);
+            Assert.DoesNotMatch(@"-acodec (aac|libfdk_aac)\b", command);
+        });
+
+        var tracked = Assert.Single(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, playSession, StringComparison.Ordinal));
+        Assert.Null(tracked.Plan.StreamInfo);
+        var job = _transcodeManager.GetTranscodingJob(playSession);
+        Assert.NotNull(job);
+        Assert.Equal(userId, job.UserId);
+
+        await StopAsync(client, session.Id);
+        Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, descriptor.Url));
+        Assert.Null(_transcodeManager.GetTranscodingJob(playSession));
+    }
 
     [Fact]
     public async Task TranscodeAudio_AnotherUser_CanNeitherReadNorStopNorTakeTheJob()
@@ -206,6 +254,20 @@ public sealed class TranscodeAudioEndToEndTests : IClassFixture<DirectPlayFilmEn
             TimeSpan.FromSeconds(FixtureSeconds).Ticks);
     }
 
+    private async Task<Guid> SeedAacInMatroskaAsync()
+    {
+        var directory = Directory.CreateDirectory(Path.Combine(_workDir, "track-" + Guid.NewGuid().ToString("N"))).FullName;
+        var path = await EndToEndMediaFixtures.CreateAacInMatroskaAsync(directory, FixtureSeconds);
+        return LibraryItemSeeder.SeedAudio(
+            _factory.Services.GetRequiredService<IItemWriteCommands>(),
+            _factory.Services.GetRequiredService<IMediaStreamRepository>(),
+            path,
+            "mka",
+            [new MediaStream { Index = 0, Type = MediaStreamType.Audio, Codec = "aac", Channels = 2, SampleRate = 44100, BitRate = 128_000, IsDefault = true }],
+            $"Consolidation audio remux {Guid.NewGuid()}",
+            TimeSpan.FromSeconds(FixtureSeconds).Ticks);
+    }
+
     private async Task<List<string>> FfmpegCommandsAsync(Guid mediaSourceId)
     {
         var commands = new List<string>();
@@ -235,9 +297,17 @@ public sealed class TranscodeAudioEndToEndTests : IClassFixture<DirectPlayFilmEn
             .ToList();
     }
 
-    private static async Task<PlaybackSessionResponse> CreateSessionAsync(HttpClient client, Guid itemId, Guid userId, string playSessionId)
+    private static Task<PlaybackSessionResponse> CreateSessionAsync(HttpClient client, Guid itemId, Guid userId, string playSessionId)
+        => CreateSessionAsync(client, itemId, userId, playSessionId, EndToEndCapabilityPresets.AudioTranscodeOverHls());
+
+    private static async Task<PlaybackSessionResponse> CreateSessionAsync(
+        HttpClient client,
+        Guid itemId,
+        Guid userId,
+        string playSessionId,
+        (ClientCapabilities Capabilities, PlaybackConstraints Constraints) preset)
     {
-        var (capabilities, constraints) = EndToEndCapabilityPresets.AudioTranscodeOverHls();
+        var (capabilities, constraints) = preset;
         var request = new CreatePlaybackSessionRequest(itemId, userId, capabilities, constraints, PlaySessionId: playSessionId);
         using var response = await client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, TestContext.Current.CancellationToken);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);

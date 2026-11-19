@@ -264,7 +264,7 @@ those paths: §7.
 Outside this slice: HDR tone mapping and subtitle burn-in (explicitly), a transcode over plain HTTP,
 target codecs other than H.264/AAC, other media families, the global flag and the shadow.
 
-## 7. Loop 4 slice: every local library video, then local audio (direct play, transcode), on the same journey
+## 7. Loop 4 slice: every local library video, then local audio (direct play, remux, transcode), on the same journey
 
 Scenario: an `Episode` in a local file, played by the same client and in the same three ways as
 a film: direct play (§4), HLS remux (§5) and SDR H.264/AAC transcode (§6). Nothing about the
@@ -320,15 +320,24 @@ video stream for `MediaKind.Audio`, even when the file carries an embedded pictu
 audio-only request makes it map no video (`-vn`). `IsThePlan` refuses an audio request whose
 executed state has video, or whose audio stream is not the plan's (the executor picks the
 source's default audio stream for audio, so a plan naming another one is refused rather than
-played as something else). An audio remux (copy into HLS) is still not owned. Proof:
-`TranscodeAudioEndToEndTests` (WMA; FLAC with an embedded picture, output probed as AAC only;
-another user), required by name, on the host where the legacy planner throws.
+played as something else). Proof: `AudioHlsEndToEndTests` (WMA; FLAC with an embedded picture,
+output probed as AAC only; another user), required by name, on the host where the legacy planner
+throws.
+
+Audio, third slice: a codec the client decodes in a container it does not play (AAC in Matroska)
+is remuxed on the same route (`LocalMediaPlanner.IsExecutableAudioRemux`: one audio stream, no
+video stream, no subtitle, the audio copied, fMP4 or MPEG-TS segments). The executor weighs a
+stream copy for video requests only and takes an audio-only request's codec as it is, so
+`EnginePlanEncodingRequest.Build` names a copied audio stream `copy`. Proof:
+`AudioHlsEndToEndTests.RemuxAudio_AacInMatroska_…` (`-vn -acodec copy`, output probed as AAC),
+required by name. Every local library audio track a client declares an AAC-over-HLS output for is
+now played from its session.
 
 Remaining consumers by name. Nothing is deleted globally while one of them still needs it:
 
 | Legacy path | Still reached by |
 | --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | audio that needs a remux, or a transcode to a target other than AAC over HLS, Live TV, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
+| `PlaybackSessionPlanner` / `StreamBuilder` | audio for a client that declares no AAC-over-HLS output, Live TV, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
 | Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio the server does not serve from the session, Live TV, channel-plugin items; a library video the server does not serve from the session |

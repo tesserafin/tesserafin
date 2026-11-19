@@ -254,6 +254,33 @@ public static class EndToEndMediaFixtures
     }
 
     /// <summary>
+    /// Synthesizes a real AAC track in a Matroska audio container: a codec a browser decodes, in a
+    /// container it does not play as it is.
+    /// </summary>
+    /// <param name="directory">The directory to write the fixture into.</param>
+    /// <param name="durationSeconds">The duration of the fixture, in seconds.</param>
+    /// <returns>The full path to the synthesized file.</returns>
+    public static async Task<string> CreateAacInMatroskaAsync(string directory, int durationSeconds = DurationSeconds)
+    {
+        var path = Path.Combine(directory, "fixture.mka");
+        var duration = durationSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        await RunFfmpegAsync(
+        [
+            "-hide_banner", "-y",
+            "-f", "lavfi", "-i", $"sine=frequency=440:duration={duration}",
+            "-c:a", "aac", "-b:a", "128k", "-ac", "2",
+            "-f", "matroska", path,
+        ]).ConfigureAwait(false);
+
+        if (!File.Exists(path) || new FileInfo(path).Length == 0)
+        {
+            throw new InvalidOperationException($"ffmpeg did not produce a non-empty fixture at {path}.");
+        }
+
+        return path;
+    }
+
+    /// <summary>
     /// Runs the REAL ffprobe binary against a file on disk and returns, per stream, its type, codec
     /// and (for video) width: what was actually produced, not what a command line or a label says.
     /// </summary>

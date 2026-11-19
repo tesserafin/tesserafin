@@ -264,6 +264,71 @@ public sealed class LocalMediaPlannerTests
     }
 
     [Fact]
+    public void An_audio_track_whose_codec_the_client_decodes_in_another_container_is_remuxed_without_the_legacy_planner()
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var track = Track("track", "aac");
+        track.Container = "mka";
+        track.Path = "track.mka";
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(AudioPlayer(["mp3", "aac"]), _declared));
+        var plan = planner.PlanAudio(Options(track));
+        var record = store.TakeCaptured();
+
+        Assert.Equal(PlayMethod.DirectStream, plan?.PlayMethod);
+        Assert.Null(plan?.StreamInfo);
+        var executed = record?.ExecutionPlan;
+        Assert.NotNull(executed);
+        Assert.Equal(PlaybackMethod.Remux, executed.Method);
+        Assert.Null(executed.VideoStreamIndex);
+        Assert.Equal(0, executed.AudioStreamIndex);
+        Assert.Contains(TransformKind.CopyAudio, executed.Transforms);
+        Assert.True(LocalMediaPlanner.IsExecutableAudioRemux(executed));
+        Assert.True(LocalMediaPlanner.IsExecutableHlsOutput(executed));
+    }
+
+    [Fact]
+    public void Only_an_hls_copy_of_one_audio_stream_is_an_executable_audio_remux()
+    {
+        var remux = new PlaybackExecutionPlan(
+            PlaybackMethod.Remux,
+            SourceId: "track",
+            Container: "mp4",
+            Protocol: StreamingProtocol.Hls,
+            VideoStreamIndex: null,
+            VideoCodec: null,
+            VideoBitrate: null,
+            Resolution: null,
+            VideoRange: null,
+            AudioStreamIndex: 0,
+            AudioCodec: "aac",
+            AudioBitrate: null,
+            AudioChannels: null,
+            SubtitleStreamIndex: null,
+            SubtitleFormat: null,
+            SubtitleDelivery: null,
+            TotalBitrate: null,
+            Transforms: [TransformKind.RemuxContainer, TransformKind.CopyAudio]);
+
+        Assert.True(LocalMediaPlanner.IsExecutableAudioRemux(remux));
+        Assert.True(LocalMediaPlanner.IsExecutableAudioRemux(remux with { Container = "ts" }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioRemux(remux with { Container = "mka" }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioRemux(remux with { AudioCodec = null }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioRemux(remux with { Protocol = StreamingProtocol.Http }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioRemux(remux with { Method = PlaybackMethod.Transcode }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioRemux(remux with { Transforms = [TransformKind.RemuxContainer, TransformKind.TranscodeAudio] }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioRemux(remux with { Transforms = [TransformKind.RemuxContainer, TransformKind.CopyAudio, TransformKind.Downmix] }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioRemux(remux with { AudioStreamIndex = null }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioRemux(remux with { VideoStreamIndex = 1, VideoCodec = "h264", Transforms = [TransformKind.RemuxContainer, TransformKind.CopyVideo, TransformKind.CopyAudio] }));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioRemux(null));
+
+        // An audio remux is neither a video remux nor an audio transcode.
+        Assert.False(LocalMediaPlanner.IsExecutableRemux(remux));
+        Assert.False(LocalMediaPlanner.IsExecutableAudioTranscode(remux));
+    }
+
+    [Fact]
     public void Only_an_hls_aac_transcode_of_one_audio_stream_is_an_executable_audio_transcode()
     {
         var audio = new PlaybackExecutionPlan(

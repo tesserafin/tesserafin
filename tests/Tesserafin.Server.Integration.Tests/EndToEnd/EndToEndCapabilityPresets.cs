@@ -78,6 +78,27 @@ public static class EndToEndCapabilityPresets
         return (direct with { OutputProfiles = [new PlaybackOutputProfile(MediaKind.Audio, StreamingProtocol.Hls, "mp4", [], ["aac"], null, null, null)] }, constraints);
     }
 
+    /// <summary>
+    /// A browser-like audio client that decodes MP3 and AAC in their own containers only, and
+    /// declares one audio output, AAC in fMP4 HLS segments. Against AAC in Matroska the engine's
+    /// answer is an audio remux through that output: the codec is copied, the container changes.
+    /// </summary>
+    /// <returns>Audio capabilities with an AAC-over-HLS output profile.</returns>
+    public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) AudioRemuxOverHls()
+    {
+        var decode = new DecodeCapabilities(
+            DirectPlayProfiles: [new DecodeProfile(MediaKind.Audio, ["mp3", "aac", "m4a"], [], ["mp3", "aac"])],
+            VideoCodecs: [],
+            AudioCodecs: [new AudioCodecCapability("mp3", null, null, null, null), new AudioCodecCapability("aac", null, null, null, null)],
+            SubtitleDelivery: [],
+            SupportsHls: true,
+            SupportsDash: false);
+
+        return (
+            new ClientCapabilities(decode, OutputProfiles: [new PlaybackOutputProfile(MediaKind.Audio, StreamingProtocol.Hls, "mp4", [], ["aac"], null, null, null)]),
+            BaseConstraints(allowDirectPlay: true, allowDirectStream: true, allowTranscoding: true));
+    }
+
     public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) Remux()
     {
         var decode = new DecodeCapabilities(

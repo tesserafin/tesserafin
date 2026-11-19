@@ -374,9 +374,10 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayAudioEndToEndTests.Audio_StartAndSeek_ServesRangesFromTheSessionFile
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayAudioEndToEndTests.Audio_Stop_DeletesTheSessionAndRevokesItsCapability
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayAudioEndToEndTests.Audio_AnotherUser_CanNeitherReadNorStopTheSession
-          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeAudioEndToEndTests.TranscodeAudio_WmaTheClientDoesNotDecode_EncodesAacOverTheSessionHlsRoute
-          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeAudioEndToEndTests.TranscodeAudio_FlacWithCoverArt_EncodesAudioOnlyOverTheSessionHlsRoute
-          --require Tesserafin.Server.Integration.Tests.EndToEnd.TranscodeAudioEndToEndTests.TranscodeAudio_AnotherUser_CanNeitherReadNorStopNorTakeTheJob
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.AudioHlsEndToEndTests.TranscodeAudio_WmaTheClientDoesNotDecode_EncodesAacOverTheSessionHlsRoute
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.AudioHlsEndToEndTests.TranscodeAudio_FlacWithCoverArt_EncodesAudioOnlyOverTheSessionHlsRoute
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.AudioHlsEndToEndTests.TranscodeAudio_AnotherUser_CanNeitherReadNorStopNorTakeTheJob
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.AudioHlsEndToEndTests.RemuxAudio_AacInMatroska_CopiesTheAudioOverTheSessionHlsRoute
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_ParametersThatDoNotMatchTheSession_AreNotServed
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_Stop_DeletesTheSessionAndRevokesItsCapability
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_AnotherUser_CanNeitherReadNorStopTheSession
