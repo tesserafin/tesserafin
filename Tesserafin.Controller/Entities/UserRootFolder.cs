@@ -66,8 +66,7 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>
-        /// Gets the libraries as <see cref="Children"/> does, resolving them through the given lookup
-        /// instead of the static <see cref="BaseItem.LibraryManager"/> (DEBT-SERVER-4).
+        /// Gets the libraries, resolving cached child IDs through the supplied lookup.
         /// </summary>
         /// <param name="lookup">The id lookup.</param>
         /// <returns>The libraries.</returns>
