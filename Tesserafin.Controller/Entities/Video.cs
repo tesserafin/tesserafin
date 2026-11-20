@@ -386,11 +386,6 @@ namespace Tesserafin.Controller.Entities
             return base.CanDelete(deletion);
         }
 
-        public IEnumerable<Guid> GetAdditionalPartIds()
-        {
-            return AdditionalParts.Select(i => LibraryManager.GetNewItemId(i, typeof(Video)));
-        }
-
         private string GetUserDataKey(string providerId)
         {
             var key = providerId + "-" + ExtraType.ToString().ToLowerInvariant();
@@ -402,19 +397,6 @@ namespace Tesserafin.Controller.Entities
             }
 
             return key;
-        }
-
-        /// <summary>
-        /// Gets the additional parts.
-        /// </summary>
-        /// <param name="user">The user to apply parental restrictions for, or <c>null</c> to skip restriction checks.</param>
-        /// <returns>IEnumerable{Video}.</returns>
-        public IOrderedEnumerable<Video> GetAdditionalParts(User user = null)
-        {
-            return GetAdditionalPartIds()
-                .Select(i => LibraryManager.GetItemById<Video>(i, user))
-                .Where(i => i is not null)
-                .OrderBy(i => i.SortName);
         }
 
         internal override ItemUpdateType UpdateFromResolvedItem(BaseItem newItem)

@@ -14,6 +14,7 @@ using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
+using Tesserafin.Model.Querying;
 using Xunit;
 
 namespace Tesserafin.Server.Integration.Tests;
@@ -104,6 +105,12 @@ public sealed class OwnedVideosEndToEndTests(TesserafinApplicationFactory factor
             var detail = await client.GetFromJsonAsync<BaseItemDto>($"Items/{owner.Id}?fields=MediaSources", JsonDefaults.Options, TestContext.Current.CancellationToken);
             Assert.NotNull(detail);
             Assert.Contains(detail.MediaSources, source => string.Equals(source.Id, alternateId.ToString("N"), StringComparison.OrdinalIgnoreCase));
+
+            var parts = await client.GetFromJsonAsync<QueryResult<BaseItemDto>>($"Videos/{owner.Id}/AdditionalParts", JsonDefaults.Options, TestContext.Current.CancellationToken);
+            Assert.NotNull(parts);
+            Assert.NotEmpty(parts.Items);
+            Assert.All(parts.Items, item => Assert.Equal(part.Id, item.Id));
+
             foreach (var path in paths)
             {
                 Assert.Equal(bytes, await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken));

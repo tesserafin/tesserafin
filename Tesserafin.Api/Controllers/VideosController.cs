@@ -130,8 +130,12 @@ public class VideosController : BaseTesserafinApiController
         BaseItemDto[] items;
         if (item is Video video)
         {
-            items = video.GetAdditionalParts(user)
-                .Select(i => _dtoService.GetBaseItemDto(i, dtoOptions, user, video))
+            items = video.AdditionalParts
+                .Select(path => _libraryManager.GetNewItemId(path, typeof(Video)))
+                .Select(id => _libraryManager.GetItemById<Video>(id, user))
+                .OfType<Video>()
+                .OrderBy(part => part.SortName)
+                .Select(part => _dtoService.GetBaseItemDto(part, dtoOptions, user, video))
                 .ToArray();
         }
         else
