@@ -482,7 +482,7 @@ namespace Tesserafin.Controller.Entities
             return hasChanges || videoChanges;
         }
 
-        public override IEnumerable<FileSystemMetadata> GetDeletePaths()
+        public override IEnumerable<FileSystemMetadata> GetDeletePaths(IFileSystem fileSystem)
         {
             if (!IsInMixedFolder)
             {
@@ -496,7 +496,7 @@ namespace Tesserafin.Controller.Entities
                 };
             }
 
-            return base.GetDeletePaths();
+            return base.GetDeletePaths(fileSystem);
         }
 
         public virtual MediaStream GetDefaultVideoStream()

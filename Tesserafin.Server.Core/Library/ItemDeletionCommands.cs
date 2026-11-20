@@ -133,7 +133,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         var pathMaps = items.Select(e =>
             (Item: e,
             InternalPath: GetInternalMetadataPaths(e),
-            DeletePaths: deleteSourceFiles ? e.GetDeletePaths() : [])).ToArray();
+            DeletePaths: deleteSourceFiles ? e.GetDeletePaths(_fileSystem) : [])).ToArray();
 
         foreach (var (item, internalPaths, pathsToDelete) in pathMaps)
         {
@@ -231,7 +231,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
             // Add this flag to GetDeletePaths if required in the future
             var isRequiredForDelete = true;
 
-            foreach (var fileSystemInfo in item.GetDeletePaths())
+            foreach (var fileSystemInfo in item.GetDeletePaths(_fileSystem))
             {
                 DeleteItemPath(item, isRequiredForDelete, fileSystemInfo);
 

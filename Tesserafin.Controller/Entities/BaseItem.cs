@@ -2460,16 +2460,17 @@ namespace Tesserafin.Controller.Entities
         /// <summary>
         /// Gets the file system path to delete when the item is to be deleted.
         /// </summary>
+        /// <param name="fileSystem">The filesystem that supplies source and sidecar metadata.</param>
         /// <returns>The metadata for the deleted paths.</returns>
-        public virtual IEnumerable<FileSystemMetadata> GetDeletePaths()
+        public virtual IEnumerable<FileSystemMetadata> GetDeletePaths(IFileSystem fileSystem)
         {
             return new[]
             {
-                FileSystem.GetFileSystemInfo(Path)
-            }.Concat(GetLocalMetadataFilesToDelete());
+                fileSystem.GetFileSystemInfo(Path)
+            }.Concat(GetLocalMetadataFilesToDelete(fileSystem));
         }
 
-        protected List<FileSystemMetadata> GetLocalMetadataFilesToDelete()
+        protected List<FileSystemMetadata> GetLocalMetadataFilesToDelete(IFileSystem fileSystem)
         {
             if (IsFolder || !IsInMixedFolder)
             {
@@ -2478,7 +2479,7 @@ namespace Tesserafin.Controller.Entities
 
             var filename = System.IO.Path.GetFileNameWithoutExtension(Path);
 
-            return FileSystem.GetFiles(System.IO.Path.GetDirectoryName(Path), _supportedExtensions, false, false)
+            return fileSystem.GetFiles(System.IO.Path.GetDirectoryName(Path), _supportedExtensions, false, false)
                 .Where(i => System.IO.Path.GetFileNameWithoutExtension(i.FullName).StartsWith(filename, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
