@@ -49,6 +49,7 @@ namespace Tesserafin.Api.Controllers;
 public class LibraryController : BaseTesserafinApiController
 {
     private readonly IItemDeletionCommands _deletions;
+    private readonly IItemExtrasService _extras;
     private readonly ItemDeletionContext _deletionContext;
     private readonly IProviderManager _providerManager;
     private readonly ISimilarItemsManager _similarItemsManager;
@@ -68,6 +69,7 @@ public class LibraryController : BaseTesserafinApiController
     /// Initializes a new instance of the <see cref="LibraryController"/> class.
     /// </summary>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="extras">Reads the item extras.</param>
     /// <param name="deletionContext">Dependencies for checking item deletion eligibility.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="similarItemsManager">Instance of the <see cref="ISimilarItemsManager"/> interface.</param>
@@ -84,6 +86,7 @@ public class LibraryController : BaseTesserafinApiController
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     public LibraryController(
         IItemDeletionCommands deletions,
+        IItemExtrasService extras,
         ItemDeletionContext deletionContext,
         IProviderManager providerManager,
         ISimilarItemsManager similarItemsManager,
@@ -100,6 +103,7 @@ public class LibraryController : BaseTesserafinApiController
         IItemSortService itemSortService)
     {
         _deletions = deletions;
+        _extras = extras;
         _deletionContext = deletionContext;
         _providerManager = providerManager;
         _similarItemsManager = similarItemsManager;
@@ -196,7 +200,7 @@ public class LibraryController : BaseTesserafinApiController
         while (true)
         {
             themeItems = _itemSortService.Sort(
-                item.GetExtras(user).Where(e => e.ExtraType == Tesserafin.Model.Entities.ExtraType.ThemeSong),
+                _extras.GetExtras(item, user).Where(e => e.ExtraType == Tesserafin.Model.Entities.ExtraType.ThemeSong),
                 user,
                 orderBy).ToArray();
 
@@ -272,7 +276,7 @@ public class LibraryController : BaseTesserafinApiController
         while (true)
         {
             themeItems = _itemSortService.Sort(
-                item.GetExtras(user).Where(e => e.ExtraType == Tesserafin.Model.Entities.ExtraType.ThemeVideo),
+                _extras.GetExtras(item, user).Where(e => e.ExtraType == Tesserafin.Model.Entities.ExtraType.ThemeVideo),
                 user,
                 orderBy).ToArray();
 

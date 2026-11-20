@@ -62,7 +62,8 @@ public class DtoServiceTests
             Mock.Of<IVideoVersionCatalog>(),
             new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")),
             LibraryWriteFixture.CreateDeletionContext(Mock.Of<IFileSystem>(MockBehavior.Strict)),
-            Mock.Of<IStandaloneVisibilityService>(MockBehavior.Strict));
+            Mock.Of<IStandaloneVisibilityService>(MockBehavior.Strict),
+            Mock.Of<IItemExtrasService>(MockBehavior.Strict));
 
         // Episode.Series / Episode.Season resolve through the static BaseItem.LibraryManager.
         BaseItem.LibraryManager = _libraryManagerMock.Object;

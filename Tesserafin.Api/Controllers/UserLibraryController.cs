@@ -36,6 +36,7 @@ public class UserLibraryController : BaseTesserafinApiController
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IItemExtrasService _extras;
     private readonly IItemMetadataDispatcher _metadata;
     private readonly IPlaybackIntroService _intros;
     private readonly IUserManager _userManager;
@@ -50,6 +51,7 @@ public class UserLibraryController : BaseTesserafinApiController
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="extras">Reads the item extras.</param>
     /// <param name="metadata">Runs metadata refreshes.</param>
     /// <param name="intros">Resolves visible playback intros.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
@@ -61,6 +63,7 @@ public class UserLibraryController : BaseTesserafinApiController
     public UserLibraryController(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
+        IItemExtrasService extras,
         IItemMetadataDispatcher metadata,
         IPlaybackIntroService intros,
         IUserManager userManager,
@@ -72,6 +75,7 @@ public class UserLibraryController : BaseTesserafinApiController
     {
         _writes = writes;
         _deletions = deletions;
+        _extras = extras;
         _metadata = metadata;
         _intros = intros;
         _userManager = userManager;
@@ -446,7 +450,7 @@ public class UserLibraryController : BaseTesserafinApiController
 
         var dtoOptions = new DtoOptions();
 
-        return Ok(item.GetExtras([ExtraType.Trailer], user)
+        return Ok(_extras.GetExtras(item, user, [ExtraType.Trailer])
             .Select(i => _dtoService.GetBaseItemDto(i, dtoOptions, user, item)));
     }
 
@@ -496,8 +500,7 @@ public class UserLibraryController : BaseTesserafinApiController
 
         var dtoOptions = new DtoOptions();
 
-        return Ok(item
-            .GetExtras(user)
+        return Ok(_extras.GetExtras(item, user)
             .Where(i => i.ExtraType.HasValue && BaseItem.DisplayExtraTypes.Contains(i.ExtraType.Value))
             .Select(i => _dtoService.GetBaseItemDto(i, dtoOptions, user, item)));
     }

@@ -543,6 +543,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemCountService, ItemCountService>();
             serviceCollection.AddSingleton<ILinkedChildrenService, LinkedChildrenService>();
             serviceCollection.AddSingleton<IVideoVersionCatalog, VideoVersionCatalog>();
+            serviceCollection.AddSingleton<IItemExtrasService, ItemExtrasService>();
             serviceCollection.AddSingleton<IItemSortService, ItemSortService>();
             serviceCollection.AddSingleton<IItemNamingService, ItemNamingService>();
             serviceCollection.AddSingleton<IItemPeopleService, ItemPeopleService>();

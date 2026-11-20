@@ -145,6 +145,7 @@ public class DtoServiceImageInheritanceTests
             Mock.Of<IVideoVersionCatalog>(),
             new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")),
             LibraryWriteFixture.CreateDeletionContext(Mock.Of<IFileSystem>(MockBehavior.Strict)),
-            Mock.Of<IStandaloneVisibilityService>(MockBehavior.Strict));
+            Mock.Of<IStandaloneVisibilityService>(MockBehavior.Strict),
+            Mock.Of<IItemExtrasService>(MockBehavior.Strict));
     }
 }

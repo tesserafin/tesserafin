@@ -133,6 +133,7 @@ namespace Tesserafin.Server.Core.Dto
         private readonly Lazy<IChannelManager> _channels;
         private readonly ItemDeletionContext _deletionContext;
         private readonly IStandaloneVisibilityService _visibility;
+        private readonly IItemExtrasService _extras;
 
         public DtoService(
             ILogger<DtoService> logger,
@@ -152,7 +153,8 @@ namespace Tesserafin.Server.Core.Dto
             IVideoVersionCatalog versions,
             Lazy<IChannelManager> channels,
             ItemDeletionContext deletionContext,
-            IStandaloneVisibilityService visibility)
+            IStandaloneVisibilityService visibility,
+            IItemExtrasService extras)
         {
             _logger = logger;
             _namedItems = namedItems;
@@ -172,6 +174,7 @@ namespace Tesserafin.Server.Core.Dto
             _channels = channels;
             _deletionContext = deletionContext;
             _visibility = visibility;
+            _extras = extras;
         }
 
         private ILiveTvManager LivetvManager => _livetvManagerFactory.Value;
@@ -1353,23 +1356,23 @@ namespace Tesserafin.Server.Core.Dto
                 }
             }
 
-            BaseItem[]? allExtras = null;
+            IReadOnlyList<BaseItem>? allExtras = null;
 
             if (options.ContainsField(ItemFields.SpecialFeatureCount))
             {
-                allExtras = item.GetExtras().ToArray();
+                allExtras = _extras.GetExtras(item);
                 dto.SpecialFeatureCount = allExtras.Count(i => i.ExtraType.HasValue && BaseItem.DisplayExtraTypes.Contains(i.ExtraType.Value));
             }
 
             if (options.ContainsField(ItemFields.LocalTrailerCount))
             {
-                if (item is IHasTrailers hasTrailers)
+                if (item is IHasTrailers)
                 {
-                    dto.LocalTrailerCount = hasTrailers.LocalTrailers.Count;
+                    dto.LocalTrailerCount = _extras.GetExtras(item, extraTypes: [ExtraType.Trailer]).Count;
                 }
                 else
                 {
-                    dto.LocalTrailerCount = (allExtras ?? item.GetExtras()).Count(i => i.ExtraType == ExtraType.Trailer);
+                    dto.LocalTrailerCount = (allExtras ?? _extras.GetExtras(item)).Count(i => i.ExtraType == ExtraType.Trailer);
                 }
             }
 

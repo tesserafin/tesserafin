@@ -56,10 +56,6 @@ namespace Tesserafin.Controller.Entities.TV
         [JsonIgnore]
         public override bool SupportsPeople => true;
 
-        /// <inheritdoc />
-        [JsonIgnore]
-        public IReadOnlyList<BaseItem> LocalTrailers => GetExtras([Tesserafin.Model.Entities.ExtraType.Trailer]).ToArray();
-
         /// <summary>
         /// Gets or sets the display order.
         /// </summary>

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using Moq;
 using Tesserafin.Controller.Channels;
@@ -200,20 +199,17 @@ public class BaseItemTests
     }
 
     [Fact]
-    public void GetAllItemsForMediaSources_FromAnyVersion_HasNoDuplicates()
+    public void GetCatalogueMediaSourceIds_FromAnyVersion_HasNoDuplicates()
     {
         var (primary, alt1, alt2) = SetupVersionGroup();
-
-        var method = typeof(Video).GetMethod("GetAllItemsForMediaSources", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(method);
+        var context = CreateVersionGroupReadContext(primary, alt1, alt2);
 
         // Each version must surface exactly once, regardless of which member the list is built from.
         // Building from an alternate previously re-added that alternate as a "local alternate" of the
         // primary, producing a duplicate entry in the version dropdown.
         foreach (var source in new[] { primary, alt1, alt2 })
         {
-            var items = (IEnumerable<(BaseItem Item, MediaSourceType MediaSourceType)>)method!.Invoke(source, null)!;
-            var ids = items.Select(i => i.Item.Id).ToList();
+            var ids = source.GetCatalogueMediaSourceIds(context.Items, context.Links).ToList();
 
             Assert.Equal(3, ids.Count);
             Assert.Equal(ids.Count, ids.Distinct().Count());
