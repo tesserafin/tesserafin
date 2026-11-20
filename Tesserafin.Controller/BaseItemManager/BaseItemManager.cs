@@ -12,14 +12,17 @@ namespace Tesserafin.Controller.BaseItemManager
     public class BaseItemManager : IBaseItemManager
     {
         private readonly IServerConfigurationManager _serverConfigurationManager;
+        private readonly Lazy<IChannelManager> _channels;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BaseItemManager"/> class.
         /// </summary>
         /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
-        public BaseItemManager(IServerConfigurationManager serverConfigurationManager)
+        /// <param name="channels">The channel manager, resolved only for channel items.</param>
+        public BaseItemManager(IServerConfigurationManager serverConfigurationManager, Lazy<IChannelManager> channels)
         {
             _serverConfigurationManager = serverConfigurationManager;
+            _channels = channels;
         }
 
         /// <inheritdoc />
@@ -33,10 +36,7 @@ namespace Tesserafin.Controller.BaseItemManager
 
             if (baseItem.SourceType == SourceType.Channel)
             {
-                // Hack alert. channelManager not injectable here: IDtoService -> IProviderManager
-                // -> IBaseItemManager is an existing DI edge, and IChannelManager already depends
-                // on IDtoService, so IBaseItemManager -> IChannelManager would be circular.
-                return !baseItem.GetEnableMediaSourceDisplay(BaseItem.ChannelManager);
+                return !_channels.Value.EnableMediaSourceDisplay(baseItem);
             }
 
             if (libraryTypeOptions is not null)
@@ -59,10 +59,7 @@ namespace Tesserafin.Controller.BaseItemManager
 
             if (baseItem.SourceType == SourceType.Channel)
             {
-                // Hack alert. channelManager not injectable here: IDtoService -> IProviderManager
-                // -> IBaseItemManager is an existing DI edge, and IChannelManager already depends
-                // on IDtoService, so IBaseItemManager -> IChannelManager would be circular.
-                return !baseItem.GetEnableMediaSourceDisplay(BaseItem.ChannelManager);
+                return !_channels.Value.EnableMediaSourceDisplay(baseItem);
             }
 
             if (libraryTypeOptions is not null)

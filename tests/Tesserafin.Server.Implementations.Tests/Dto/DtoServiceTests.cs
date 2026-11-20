@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Common;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Chapters;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Dto;
@@ -56,7 +57,8 @@ public class DtoServiceTests
             new Mock<ITrickplayManager>().Object,
             new Mock<IChapterManager>().Object,
             new Mock<IItemCountService>().Object,
-            Mock.Of<IVideoVersionCatalog>());
+            Mock.Of<IVideoVersionCatalog>(),
+            new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")));
 
         // Episode.Series / Episode.Season resolve through the static BaseItem.LibraryManager.
         BaseItem.LibraryManager = _libraryManagerMock.Object;

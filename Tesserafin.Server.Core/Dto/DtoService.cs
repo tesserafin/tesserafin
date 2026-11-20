@@ -130,6 +130,7 @@ namespace Tesserafin.Server.Core.Dto
         private readonly IChapterManager _chapterManager;
         private readonly IItemCountService _itemCountService;
         private readonly IVideoVersionCatalog _versions;
+        private readonly Lazy<IChannelManager> _channels;
 
         public DtoService(
             ILogger<DtoService> logger,
@@ -146,7 +147,8 @@ namespace Tesserafin.Server.Core.Dto
             ITrickplayManager trickplayManager,
             IChapterManager chapterManager,
             IItemCountService itemCountService,
-            IVideoVersionCatalog versions)
+            IVideoVersionCatalog versions,
+            Lazy<IChannelManager> channels)
         {
             _logger = logger;
             _namedItems = namedItems;
@@ -163,6 +165,7 @@ namespace Tesserafin.Server.Core.Dto
             _chapterManager = chapterManager;
             _itemCountService = itemCountService;
             _versions = versions;
+            _channels = channels;
         }
 
         private ILiveTvManager LivetvManager => _livetvManagerFactory.Value;
@@ -1110,9 +1113,7 @@ namespace Tesserafin.Server.Core.Dto
 
             if (options.ContainsField(ItemFields.EnableMediaSourceDisplay))
             {
-                // channelManager not injectable here: IChannelManager already depends on
-                // IDtoService, so IDtoService -> IChannelManager would be circular.
-                dto.EnableMediaSourceDisplay = item.GetEnableMediaSourceDisplay(BaseItem.ChannelManager);
+                dto.EnableMediaSourceDisplay = item.GetEnableMediaSourceDisplay(_channels);
             }
 
             dto.PremiereDate = item.PremiereDate;

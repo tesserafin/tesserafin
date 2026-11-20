@@ -1164,20 +1164,16 @@ namespace Tesserafin.Controller.Entities
 
         /// <summary>
         /// Gets a value indicating whether media sources should be displayed for this item.
-        /// Was a property; converted to a method (a property getter can't take a parameter) so
-        /// <see cref="IChannelManager"/> is passed explicitly instead of read from the removed
-        /// <c>BaseItem.ChannelManager</c> static.
         /// </summary>
         /// <param name="channelManager">
-        /// Instance of the <see cref="IChannelManager"/> interface, needed only when this item's
-        /// <see cref="SourceType"/> is <see cref="SourceType.Channel"/>.
+        /// The channel manager, resolved only when <see cref="SourceType"/> is <see cref="SourceType.Channel"/>.
         /// </param>
         /// <returns><c>true</c> if media sources should be displayed; otherwise, <c>false</c>.</returns>
-        public bool GetEnableMediaSourceDisplay(IChannelManager channelManager)
+        public bool GetEnableMediaSourceDisplay(Lazy<IChannelManager> channelManager)
         {
             if (SourceType == SourceType.Channel)
             {
-                return channelManager.EnableMediaSourceDisplay(this);
+                return channelManager.Value.EnableMediaSourceDisplay(this);
             }
 
             return true;

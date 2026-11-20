@@ -1,6 +1,7 @@
 using System;
 using Moq;
 using Tesserafin.Common;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Chapters;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Dto;
@@ -139,6 +140,7 @@ public class DtoServiceImageInheritanceTests
             trickplayManager.Object,
             chapterManager.Object,
             itemCountService.Object,
-            Mock.Of<IVideoVersionCatalog>());
+            Mock.Of<IVideoVersionCatalog>(),
+            new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")));
     }
 }

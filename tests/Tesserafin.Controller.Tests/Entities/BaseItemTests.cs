@@ -224,7 +224,7 @@ public class BaseItemTests
     public void GetEnableMediaSourceDisplay_NonChannelItem_ReturnsTrueWithoutCallingChannelManager()
     {
         var movie = new Movie { Id = Guid.NewGuid() };
-        var channelManager = new Mock<IChannelManager>(MockBehavior.Strict);
+        var channelManager = new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access."));
 
         // Video.SourceType (touched via BaseItem.GetEnableMediaSourceDisplay) calls
         // Video.IsActiveRecording(), which reads the static Video.RecordingsManager. That static is
@@ -235,8 +235,7 @@ public class BaseItemTests
         recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
         Video.RecordingsManager = recordingsManager.Object;
 
-        Assert.True(movie.GetEnableMediaSourceDisplay(channelManager.Object));
-        channelManager.Verify(x => x.EnableMediaSourceDisplay(It.IsAny<BaseItem>()), Times.Never);
+        Assert.True(movie.GetEnableMediaSourceDisplay(channelManager));
     }
 
     [Theory]
@@ -257,7 +256,7 @@ public class BaseItemTests
         recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
         Video.RecordingsManager = recordingsManager.Object;
 
-        Assert.Equal(channelManagerResult, channelItem.GetEnableMediaSourceDisplay(channelManager.Object));
+        Assert.Equal(channelManagerResult, channelItem.GetEnableMediaSourceDisplay(new Lazy<IChannelManager>(() => channelManager.Object)));
     }
 
     [Fact]
