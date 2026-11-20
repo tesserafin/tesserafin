@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller;
+using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
@@ -21,14 +22,14 @@ internal sealed class CollectionFolderMembershipResolver(
     IItemRepository repository,
     IItemLookupService lookup,
     IFileSystem files,
-    IServerApplicationHost appHost,
+    IServerConfigurationManager configuration,
     ILogger<CollectionFolderMembershipResolver> logger)
 {
     public (string[] Locations, IReadOnlyList<Folder> Folders) Resolve(CollectionFolder owner, IDirectoryService directoryService, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var directory = files.GetDirectoryInfo(owner.ContainingFolderPath);
-        var discovery = FileData.ReadLibraryDirectory(directory, directoryService, files, appHost, logger, physicalRoot: false);
+        var discovery = FileData.ReadLibraryDirectory(directory, directoryService, files, configuration.ApplicationPaths, logger, physicalRoot: false);
         if (discovery.Entries is null)
         {
             throw new DirectoryNotFoundException($"Cannot read library directory {owner.ContainingFolderPath}.");

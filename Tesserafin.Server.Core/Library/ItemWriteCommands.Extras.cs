@@ -116,6 +116,6 @@ internal sealed partial class ItemWriteCommands
             }
         }
 
-        await ownedItem.RefreshMetadata(metadata, deletions, this, newOptions, cancellationToken).ConfigureAwait(false);
+        await ownedItem.RefreshMetadata(deletions, this, metadata, newOptions, cancellationToken).ConfigureAwait(false);
     }
 }

@@ -84,7 +84,7 @@ public sealed class PeopleReadValidationTests
         var deletions = new Mock<IItemDeletionCommands>();
         deletions.Setup(d => d.DeleteUnreferencedAsync(It.IsAny<IReadOnlyCollection<BaseItem>>(), true, It.IsAny<CancellationToken>()))
             .Callback((IReadOnlyCollection<BaseItem> items, bool _, CancellationToken _) => batchSizes.Add(items.Count)).Returns(Task.CompletedTask);
-        var validator = new PeopleValidator(Mock.Of<IItemWriteCommands>(), deletions.Object, Mock.Of<IProviderManager>(), reads.Object, repository.Object, context.Configuration.Object, NullLogger<PeopleValidator>.Instance, context.Files.Object);
+        var validator = new PeopleValidator(Mock.Of<IItemWriteCommands>(), deletions.Object, new Lazy<IItemMetadataDispatcher>(Mock.Of<IItemMetadataDispatcher>), reads.Object, repository.Object, context.Configuration.Object, NullLogger<PeopleValidator>.Instance, context.Files.Object);
         var progress = new List<double>();
 
         await validator.ValidatePeople(TestContext.Current.CancellationToken, new InlineProgress(progress.Add));
@@ -106,7 +106,7 @@ public sealed class PeopleReadValidationTests
         var reads = new Mock<IItemPeopleService>(MockBehavior.Strict);
         var deletions = new Mock<IItemDeletionCommands>(MockBehavior.Strict);
         var repository = new Mock<IItemRepository>(MockBehavior.Strict);
-        var validator = new PeopleValidator(Mock.Of<IItemWriteCommands>(), deletions.Object, Mock.Of<IProviderManager>(), reads.Object, repository.Object, context.Configuration.Object, NullLogger<PeopleValidator>.Instance, context.Files.Object);
+        var validator = new PeopleValidator(Mock.Of<IItemWriteCommands>(), deletions.Object, new Lazy<IItemMetadataDispatcher>(Mock.Of<IItemMetadataDispatcher>), reads.Object, repository.Object, context.Configuration.Object, NullLogger<PeopleValidator>.Instance, context.Files.Object);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => validator.ValidatePeople(cancellation.Token, new InlineProgress(_ => { })));
 

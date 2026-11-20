@@ -45,9 +45,6 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     /// <param name="mediaEncoder">Reads the episode information embedded in the file.</param>
     /// <param name="mediaSourceManager">Supplies the episode's media source to read.</param>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
-    /// <param name="mediaSources">Resolves the episode's media sources.</param>
-    /// <param name="mediaSegments">Provides segment support when building the media source.</param>
-    /// <param name="channels">Provides channel sources when building media sources.</param>
     /// <param name="lookup">The item identity lookup.</param>
     /// <param name="collections">The library membership resolver.</param>
     public EpisodeMetadataService(
@@ -65,9 +62,6 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
         IMediaSourceManager mediaSourceManager,
         ILocalizationManager localizationManager,
         IItemLookupService lookup,
-        IMediaSourceManager mediaSources,
-        IMediaSegmentManager mediaSegments,
-        IChannelManager channels,
         ICollectionFolderResolver collections)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {

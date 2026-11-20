@@ -79,6 +79,7 @@ public sealed class ScheduledSidecarDownloadTests
         var task = new SubtitleScheduledTask(
             Mock.Of<IItemWriteCommands>(),
             Mock.Of<IItemDeletionCommands>(),
+            Mock.Of<IProviderManager>(),
             PhysicalRoot(folder, disabledFolder),
             options.Object,
             queries.Object,

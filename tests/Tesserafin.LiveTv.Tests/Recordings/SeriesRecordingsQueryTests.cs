@@ -84,7 +84,7 @@ public sealed class SeriesRecordingsQueryTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var result = _repository.GetItemList(RecordingsManager.CreateSeriesRecordingsQuery(series.Id));
+        var result = _repository.GetItemList(RecordingRetentionReader.CreateSeriesRecordingsQuery(series.Id));
 
         Assert.Equal([newest.Id, middle.Id, oldest.Id], result.Select(item => item.Id));
     }

@@ -27,7 +27,6 @@ namespace Tesserafin.Controller.Entities
     /// </summary>
     public class CollectionFolder : Folder, ICollectionFolder
     {
-
         /// <summary>
         /// Initializes a new instance of the <see cref="CollectionFolder"/> class.
         /// </summary>
@@ -74,9 +73,12 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public override IEnumerable<BaseItem> Children
         {
-            get => GetCatalogueChildren(ItemRepository, LibraryManager);
+            get => GetCatalogueChildren(null, LibraryManager);
             set => InvalidateCatalogueChildren(LibraryManager);
         }
+
+        [JsonIgnore]
+        public override bool SupportsPeople => false;
 
         /// <inheritdoc />
         public override IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
@@ -90,9 +92,6 @@ namespace Tesserafin.Controller.Entities
                 folder.InvalidateCatalogueChildren(lookup);
             }
         }
-
-        [JsonIgnore]
-        public override bool SupportsPeople => false;
 
         public override bool CanDelete(IChannelManager channels)
         {
@@ -115,7 +114,7 @@ namespace Tesserafin.Controller.Entities
             return true;
         }
 
-        protected override Task<bool> RefreshOwnedItemsAsync(IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
+        protected override Task<bool> RefreshOwnedItemsAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, MetadataRefreshOptions options, CancellationToken cancellationToken)
             => writes.RefreshCollectionFolderMembershipAsync(this, options.DirectoryService, cancellationToken);
 
         /// <summary>

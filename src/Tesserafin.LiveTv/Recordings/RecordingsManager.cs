@@ -713,26 +713,6 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         }
     }
 
-    /// <summary>
-    /// Builds the retention query for a series folder: every real, non-folder item below it, newest first.
-    /// </summary>
-    /// <remarks>
-    /// A catalogue query scoped by ancestry, so it needs neither the entity's static services nor a
-    /// channel lookup; the series folder is a library folder, never a channel item.
-    /// </remarks>
-    /// <param name="seriesFolderId">The series folder id.</param>
-    /// <returns>The query.</returns>
-    internal static InternalItemsQuery CreateSeriesRecordingsQuery(Guid seriesFolderId)
-        => new()
-        {
-            AncestorIds = [seriesFolderId],
-            OrderBy = [(ItemSortBy.DateCreated, SortOrder.Descending)],
-            IsVirtualItem = false,
-            IsFolder = false,
-            Recursive = true,
-            DtoOptions = new DtoOptions(true)
-        };
-
     private async Task DeleteLibraryItemsForTimers(List<TimerInfo> timers)
     {
         foreach (var timer in timers)

@@ -59,12 +59,12 @@ namespace Tesserafin.Controller.Entities.Audio
         [JsonIgnore]
         public override string ContainingFolderPath => Path;
 
+        [JsonIgnore]
+        public override bool SupportsPeople => false;
+
         /// <inheritdoc />
         public override IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
             => IsAccessedByName ? [] : base.GetCatalogueChildren(repository, lookup);
-
-        [JsonIgnore]
-        public override bool SupportsPeople => false;
 
         public static string GetPath(string name)
         {

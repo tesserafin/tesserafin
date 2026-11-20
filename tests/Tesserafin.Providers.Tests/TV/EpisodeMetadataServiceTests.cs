@@ -2,12 +2,14 @@ using System;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.Configuration;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
@@ -130,23 +132,12 @@ public class EpisodeMetadataServiceTests
         Assert.Equal("season-provider", info.SeasonProviderIds["Tvdb"]);
     }
 
-    private static Mock<Episode> CreateMp4Episode()
-    {
-        var episode = new Mock<Episode> { CallBase = true };
-        episode.SetupGet(e => e.SourceType).Returns(SourceType.Library);
-        episode.Object.Name = "Episode";
-        episode.Object.Container = "MP4";
-        return episode;
-    }
-
     private sealed class TestEpisodeMetadataService : EpisodeMetadataService
     {
         public TestEpisodeMetadataService(
             IMediaEncoder? encoder = null,
             IItemNamingService? naming = null,
             IMediaSourceManager? sources = null,
-            IMediaSegmentManager? segments = null,
-            IChannelManager? channels = null,
             IItemLookupService? lookup = null,
             IItemRepository? repository = null)
             : base(
@@ -162,15 +153,11 @@ public class EpisodeMetadataServiceTests
                 repository ?? Mock.Of<IItemRepository>(),
                 encoder ?? Mock.Of<IMediaEncoder>(),
                 sources ?? Mock.Of<IMediaSourceManager>(),
-                segments ?? Mock.Of<IMediaSegmentManager>(),
-                channels ?? Mock.Of<IChannelManager>(),
+                Mock.Of<ILocalizationManager>(),
                 lookup ?? Mock.Of<IItemLookupService>(),
                 Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict))
         {
         }
-
-        public ValueTask<bool> PrepareAsync(Episode episode, CancellationToken cancellationToken)
-            => BeforeMetadataRefreshAsync(episode, new LibraryOptions { EnableEmbeddedEpisodeInfos = true }, false, cancellationToken);
 
         public ItemUpdateType PrepareSave(Episode episode) => BeforeSaveInternal(episode, false, ItemUpdateType.None);
 

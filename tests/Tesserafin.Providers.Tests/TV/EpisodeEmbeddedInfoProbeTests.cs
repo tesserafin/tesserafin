@@ -115,6 +115,7 @@ public sealed class EpisodeEmbeddedInfoProbeTests
         configuration.Setup(c => c.Configuration).Returns(new ServerConfiguration());
         var previousLibraryManager = BaseItem.LibraryManager;
         BaseItem.LibraryManager = libraryManager.Object;
+        var itemOptions = Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(It.IsAny<BaseItem>()) == _enabled);
         var naming = new Mock<IItemNamingService>();
         var episode = Mp4Episode();
         _encoder.Setup(e => e.GetMediaInfo(It.IsAny<MediaInfoRequest>(), It.IsAny<CancellationToken>()))
@@ -136,13 +137,15 @@ public sealed class EpisodeEmbeddedInfoProbeTests
             NullLogger<EpisodeMetadataService>.Instance,
             Mock.Of<IProviderManager>(),
             fileSystem,
-            libraryManager.Object,
+            itemOptions,
             naming.Object,
             Mock.Of<IExternalDataManager>(),
             Mock.Of<IItemRepository>(),
             _encoder.Object,
             _sources.Object,
-            Mock.Of<ILocalizationManager>());
+            Mock.Of<ILocalizationManager>(),
+            Mock.Of<IItemLookupService>(),
+            Mock.Of<ICollectionFolderResolver>());
 
         try
         {
@@ -173,13 +176,15 @@ public sealed class EpisodeEmbeddedInfoProbeTests
                 NullLogger<EpisodeMetadataService>.Instance,
                 Mock.Of<IProviderManager>(),
                 Mock.Of<IFileSystem>(),
-                Mock.Of<ILibraryManager>(),
+                Mock.Of<ILibraryItemOptions>(),
                 Mock.Of<IItemNamingService>(),
                 Mock.Of<IExternalDataManager>(),
                 Mock.Of<IItemRepository>(),
                 encoder,
                 sources,
-                Mock.Of<ILocalizationManager>())
+                Mock.Of<ILocalizationManager>(),
+                Mock.Of<IItemLookupService>(),
+                Mock.Of<ICollectionFolderResolver>())
         {
         }
 

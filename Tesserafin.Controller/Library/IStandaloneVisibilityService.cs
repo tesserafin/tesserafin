@@ -77,7 +77,7 @@ namespace Tesserafin.Controller.Library
         BaseItem? GetItemById(Guid id);
 
         /// <summary>
-        /// Finds the item at a path, as <see cref="ILibraryManager.FindByPath"/> does with no folder filter.
+        /// Finds the item at a path, as <see cref="IItemPathLookupService.FindByPath"/> does with no folder filter.
         /// </summary>
         /// <param name="path">The absolute path.</param>
         /// <returns>The newest item at that path; <c>null</c> when none.</returns>

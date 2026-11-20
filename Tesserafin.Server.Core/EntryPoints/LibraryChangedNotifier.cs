@@ -28,7 +28,6 @@ namespace Tesserafin.Server.Core.EntryPoints;
 public sealed class LibraryChangedNotifier : IHostedService, IDisposable
 {
     private readonly IStandaloneVisibilityService _visibility;
-    private readonly ILibraryManager _libraryManager;
     private readonly ICollectionFolderResolver _collectionFolders;
     private readonly IUserRootFolderProvider _roots;
     private readonly IItemLookupService _lookup;
@@ -78,7 +77,6 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         IStandaloneVisibilityService visibility)
     {
         _visibility = visibility;
-        _libraryManager = libraryManager;
         _collectionFolders = collectionFolders;
         _roots = roots;
         _lookup = lookup;

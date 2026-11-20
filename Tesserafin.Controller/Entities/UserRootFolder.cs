@@ -53,6 +53,7 @@ namespace Tesserafin.Controller.Entities
         public override bool SupportsRawQueryItems => false;
 
         // Keep only the IDs so a library edit is visible without waiting for the next root scan.
+
         /// <inheritdoc />
         public override IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
             => LoadChildren(repository, lookup);
@@ -74,7 +75,7 @@ namespace Tesserafin.Controller.Entities
         {
             ArgumentNullException.ThrowIfNull(lookup);
 
-            return LoadChildren(ItemRepository, lookup);
+            return LoadChildren(null, lookup);
         }
 
         protected override IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)

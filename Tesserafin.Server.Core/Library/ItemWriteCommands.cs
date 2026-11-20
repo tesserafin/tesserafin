@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
@@ -175,8 +176,8 @@ internal sealed partial class ItemWriteCommands(
         => new() { ItemId = source.ItemId, Type = source.Type, Path = source.Path, LibraryItemId = source.LibraryItemId };
 #pragma warning restore CS0618
 
-    public Task<FolderChildReconciliationResult> ReconcileFolderChildrenAsync(Folder parent, IReadOnlyList<BaseItem> currentChildren, IReadOnlyList<BaseItem> discovered, IDirectoryService directoryService, bool allowRemoveRoot, IItemDeletionCommands deletions, IItemImageService images, CancellationToken cancellationToken)
-        => childReconciler.ReconcileAsync(parent, currentChildren, discovered, directoryService, allowRemoveRoot, this, deletions, images, cancellationToken);
+    public Task<FolderChildReconciliationResult> ReconcileFolderChildrenAsync(Folder parent, IReadOnlyList<BaseItem> currentChildren, IReadOnlyList<BaseItem> discovered, IDirectoryService directoryService, bool allowRemoveRoot, IItemDeletionCommands deletions, IItemImageService images, IChannelManager channels, CancellationToken cancellationToken)
+        => childReconciler.ReconcileAsync(parent, currentChildren, discovered, directoryService, allowRemoveRoot, this, deletions, images, channels, cancellationToken);
 
     public T GetOrCreateNamedItem<T>(string name, CancellationToken cancellationToken)
         where T : BaseItem, new()

@@ -88,7 +88,7 @@ public sealed class OwnedVideosEndToEndTests(TesserafinApplicationFactory factor
                 await database.Database.ExecuteSqlRawAsync("DROP TRIGGER reject_owned_version;", TestContext.Current.CancellationToken);
             }
 
-            await owner.RefreshMetadata(metadata, deletions, writes, Options(), TestContext.Current.CancellationToken);
+            await owner.RefreshMetadata(deletions, writes, metadata, Options(), TestContext.Current.CancellationToken);
             Assert.Equal(alternatePath, Assert.Single(owner.LocalAlternateVersions));
             var alternate = Assert.IsType<Movie>(repository.RetrieveItem(alternateId));
             Assert.Equal(owner.Id, alternate.OwnerId);

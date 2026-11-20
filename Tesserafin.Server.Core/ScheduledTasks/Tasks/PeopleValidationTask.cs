@@ -27,7 +27,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
-    private readonly IProviderManager _providers;
+    private readonly Lazy<IItemMetadataDispatcher> _providers;
     private readonly IItemLookupService _lookup;
     private readonly PeopleValidator _validator;
     private readonly ILibraryScanCoordinator _scans;
@@ -42,7 +42,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
-    /// <param name="providers">The provider manager for metadata refreshes.</param>
+    /// <param name="providers">Runs metadata refreshes, resolved on first use.</param>
     /// <param name="lookup">Item lookup for person image refresh.</param>
     /// <param name="validator">People validation ownership.</param>
     /// <param name="scans">Library scan scheduling and state.</param>
@@ -54,7 +54,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     public PeopleValidationTask(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
-        IProviderManager providers,
+        Lazy<IItemMetadataDispatcher> providers,
         IItemLookupService lookup,
         PeopleValidator validator,
         ILibraryScanCoordinator scans,
@@ -268,7 +268,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
                 MetadataRefreshMode = hasOverview ? MetadataRefreshMode.ValidationOnly : MetadataRefreshMode.Default
             };
 
-            await item.RefreshMetadata(_deletions, _writes, _providers, options, cancellationToken).ConfigureAwait(false);
+            await item.RefreshMetadata(_deletions, _writes, _providers.Value, options, cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (OperationCanceledException)

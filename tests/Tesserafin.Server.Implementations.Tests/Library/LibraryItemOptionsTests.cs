@@ -32,7 +32,7 @@ public sealed class LibraryItemOptionsTests
         var files = new Mock<IFileSystem>();
         files.Setup(f => f.AreEqual(It.IsAny<string>(), It.IsAny<string>())).Returns((string a, string b) => string.Equals(a, b, StringComparison.Ordinal));
         files.Setup(f => f.ContainsSubPath(It.IsAny<string>(), It.IsAny<string>())).Returns((string a, string b) => b.StartsWith(a + "/", StringComparison.Ordinal));
-        var options = new LibraryItemOptions(Mock.Of<ICollectionFolderResolver>(), lookup.Object, roots.Object, manager.Object, files.Object);
+        var options = new LibraryItemOptions(Mock.Of<ICollectionFolderResolver>(), lookup.Object, roots.Object, manager.Object, files.Object, Mock.Of<ILibraryOptionsStore>());
         configuration.ContentTypes = [new NameValuePair { Name = "/library/feature", Value = "movies" }];
         Assert.Equal(CollectionType.movies, options.GetContentType(item));
         configuration.ContentTypes = [new NameValuePair { Name = "/library", Value = "musicvideos" }];

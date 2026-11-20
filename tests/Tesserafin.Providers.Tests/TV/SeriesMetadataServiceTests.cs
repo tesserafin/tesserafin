@@ -202,7 +202,7 @@ public sealed class SeriesMetadataServiceTests
             Mock.Of<ILocalizationManager>(),
             Mock.Of<IExternalDataManager>(),
             repository,
-            Mock.Of<IItemSortService>(),
+            Mock.Of<IItemListingServices>(),
             lookup,
             links,
             collections ?? Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict))

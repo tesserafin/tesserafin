@@ -36,6 +36,9 @@ public interface IFolderValidationServices
     /// <summary>Gets the item cache store.</summary>
     IItemStore Store { get; }
 
+    /// <summary>Gets the resolver for saved links.</summary>
+    LinkedChildResolver Links { get; }
+
     /// <summary>Gets the bounded-concurrency scheduler.</summary>
     ILimitedConcurrencyLibraryScheduler Scheduler { get; }
 

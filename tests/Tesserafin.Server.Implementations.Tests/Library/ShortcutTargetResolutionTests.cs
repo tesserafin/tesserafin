@@ -22,9 +22,8 @@ public sealed class ShortcutTargetResolutionTests
     [Fact]
     public void Resolution_ExpandsRelativeAndVirtualTargets_InStableOrder_AndIgnoresOtherEntries()
     {
-        var context = new Context();
         var expandedRoot = Path.Combine(Path.GetTempPath(), "shortcut-expanded");
-        context.Host.Setup(h => h.ExpandVirtualPath(It.IsAny<string>())).Returns((string path) => path.Replace("%ROOT%", expandedRoot, StringComparison.Ordinal));
+        var context = new Context(expandedRoot);
         context.Files.Setup(f => f.ResolveShortcut("a.mblink")).Returns("../relative");
         context.Files.Setup(f => f.ResolveShortcut("b.mblink")).Returns("%ROOT%/virtual");
 
@@ -84,24 +83,20 @@ public sealed class ShortcutTargetResolutionTests
         Assert.ThrowsAny<OperationCanceledException>(() => context.Service.ResolveShortcutTargets(context.Owner, [new() { FullName = "a.mblink" }], cancellation.Token));
 
         context.Files.VerifyNoOtherCalls();
-        context.Host.VerifyNoOtherCalls();
     }
 
     private sealed class Context
     {
-        public Context()
+        public Context(string dataPath = "/data")
         {
             Files.Setup(f => f.IsShortcut(It.IsAny<string>())).Returns((string path) => path.EndsWith(".mblink", StringComparison.OrdinalIgnoreCase));
             Files.Setup(f => f.MakeAbsolutePath(It.IsAny<string>(), It.IsAny<string>())).Returns((string parent, string path) => Path.GetFullPath(Path.Combine(parent, path)));
-            Host.Setup(h => h.ExpandVirtualPath(It.IsAny<string>())).Returns((string path) => path);
-            Service = new ItemResolutionService(Mock.Of<IServerConfigurationManager>(), Files.Object, Host.Object, Mock.Of<ILibraryItemOptions>(), Mock.Of<IItemLookupService>(), new NamingOptions(), NullLogger<ItemResolutionService>.Instance, NullLoggerFactory.Instance, Mock.Of<IDirectoryService>(), new DotIgnoreIgnoreRule());
+            Service = new ItemResolutionService(Mock.Of<IServerConfigurationManager>(c => c.ApplicationPaths == Mock.Of<IServerApplicationPaths>(p => p.VirtualDataPath == "%ROOT%" && p.DataPath == dataPath && p.VirtualInternalMetadataPath == "%MetadataPath%" && p.InternalMetadataPath == "/metadata")), Files.Object, Mock.Of<ILibraryItemOptions>(), Mock.Of<IItemLookupService>(), new NamingOptions(), NullLogger<ItemResolutionService>.Instance, NullLoggerFactory.Instance, Mock.Of<IDirectoryService>(), new DotIgnoreIgnoreRule());
         }
 
         public Folder Owner { get; } = new() { Id = Guid.NewGuid(), Path = Path.Combine(Path.GetTempPath(), "shortcut-owner") };
 
         public Mock<IFileSystem> Files { get; } = new();
-
-        public Mock<IServerApplicationHost> Host { get; } = new();
 
         public ItemResolutionService Service { get; }
     }

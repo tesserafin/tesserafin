@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tesserafin.Controller;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.IO;
@@ -44,10 +45,13 @@ public sealed class LibraryDirectoryDiscoveryTests
         files.Setup(f => f.GetDirectoryInfo(It.IsAny<string>())).Returns((string path) => Entry(path, true));
         files.Setup(f => f.ContainsSubPath(It.IsAny<string>(), It.IsAny<string>()))
             .Returns((string parent, string path) => path.StartsWith(parent + Path.DirectorySeparatorChar, StringComparison.Ordinal));
-        var host = new Mock<IServerApplicationHost>();
-        host.Setup(h => h.ExpandVirtualPath(It.IsAny<string>())).Returns((string path) => path == "%MEDIA%" ? target : path);
+        var paths = new Mock<IServerApplicationPaths>();
+        paths.SetupGet(p => p.VirtualDataPath).Returns("%MEDIA%");
+        paths.SetupGet(p => p.DataPath).Returns(target);
+        paths.SetupGet(p => p.VirtualInternalMetadataPath).Returns("%METADATA%");
+        paths.SetupGet(p => p.InternalMetadataPath).Returns(Path.Combine(Path.GetTempPath(), "metadata"));
 
-        var discovery = FileData.ReadLibraryDirectory(Entry(root, true), directories.Object, files.Object, host.Object, NullLogger.Instance, physicalRoot);
+        var discovery = FileData.ReadLibraryDirectory(Entry(root, true), directories.Object, files.Object, paths.Object, NullLogger.Instance, physicalRoot);
 
         Assert.NotNull(discovery.Entries);
         string[] entries = physicalRoot ? [target, marker] : [view, target, marker];
@@ -63,14 +67,14 @@ public sealed class LibraryDirectoryDiscoveryTests
         var root = Entry(Path.Combine(Path.GetTempPath(), "missing"));
         var directories = new Mock<IDirectoryService>(MockBehavior.Strict);
 
-        var discovery = FileData.ReadLibraryDirectory(root, directories.Object, Mock.Of<IFileSystem>(), Mock.Of<IServerApplicationHost>(), NullLogger.Instance, physicalRoot: true);
+        var discovery = FileData.ReadLibraryDirectory(root, directories.Object, Mock.Of<IFileSystem>(), Mock.Of<IServerApplicationPaths>(), NullLogger.Instance, physicalRoot: true);
 
         Assert.Null(discovery.Entries);
         Assert.Equal(root.FullName, Assert.Single(discovery.PhysicalLocations));
         directories.VerifyNoOtherCalls();
 
         directories.Setup(d => d.GetFileSystemEntries(root.FullName)).Returns([]);
-        var empty = FileData.ReadLibraryDirectory(Entry(root.FullName, true), directories.Object, Mock.Of<IFileSystem>(), Mock.Of<IServerApplicationHost>(), NullLogger.Instance, physicalRoot: true);
+        var empty = FileData.ReadLibraryDirectory(Entry(root.FullName, true), directories.Object, Mock.Of<IFileSystem>(), Mock.Of<IServerApplicationPaths>(), NullLogger.Instance, physicalRoot: true);
 
         Assert.NotNull(empty.Entries);
         Assert.Empty(empty.Entries);

@@ -89,6 +89,7 @@ public sealed class SidecarStoragePolicyTests
         var manager = new LyricManager(
             Mock.Of<IItemWriteCommands>(),
             Mock.Of<IItemDeletionCommands>(),
+            new Lazy<IProviderManager>(Mock.Of<IProviderManager>),
             itemOptions.Object,
             storage.ApplicationPaths,
             NullLogger<LyricManager>.Instance,
@@ -112,6 +113,7 @@ public sealed class SidecarStoragePolicyTests
         => new(
             Mock.Of<IItemWriteCommands>(),
             Mock.Of<IItemDeletionCommands>(),
+            new Lazy<IProviderManager>(Mock.Of<IProviderManager>),
             itemOptions,
             storage.ApplicationPaths,
             NullLogger<SubtitleManager>.Instance,

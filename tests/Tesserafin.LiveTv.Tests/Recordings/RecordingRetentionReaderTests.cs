@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Moq;
@@ -19,7 +18,7 @@ public sealed class RecordingRetentionReaderTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void GetExcessFiles_UsesTheExistingScopeAndKeepsTheNewestExistingFile(bool isSeries)
+    public void GetExcessFiles_ScopesByFolderAncestryAndKeepsTheNewestExistingFile(bool isSeries)
     {
         var directory = Directory.CreateTempSubdirectory();
         try
@@ -35,13 +34,6 @@ public sealed class RecordingRetentionReaderTests
 
             var paths = new Mock<IItemPathLookupService>(MockBehavior.Strict);
             paths.Setup(p => p.FindByPath(directory.FullName, true)).Returns(folder);
-            var scopes = new Mock<IItemQueryScopeService>(MockBehavior.Strict);
-            if (!isSeries)
-            {
-                scopes.Setup(s => s.SetTopParentIdsOrAncestors(It.IsAny<InternalItemsQuery>(), It.Is<IReadOnlyCollection<BaseItem>>(p => p.Single() == folder)))
-                    .Callback<InternalItemsQuery, IReadOnlyCollection<BaseItem>>((query, _) => query.AncestorIds = [folder.Id]);
-            }
-
             var repository = new Mock<IItemRepository>(MockBehavior.Strict);
             repository.Setup(r => r.GetItemList(It.IsAny<InternalItemsQuery>())).Returns((InternalItemsQuery query) =>
             {
@@ -50,23 +42,15 @@ public sealed class RecordingRetentionReaderTests
                 Assert.False(query.EnableTotalRecordCount);
                 Assert.True(query.Recursive);
                 Assert.Equal((ItemSortBy.DateCreated, SortOrder.Descending), Assert.Single(query.OrderBy));
-                if (isSeries)
-                {
-                    Assert.Equal(SeriesKey, query.SeriesPresentationUniqueKey);
-                    Assert.Equal([BaseItemKind.Episode, BaseItemKind.Season], query.IncludeItemTypes);
-                    Assert.Empty(query.AncestorIds);
-                }
-                else
-                {
-                    Assert.Null(query.SeriesPresentationUniqueKey);
-                    Assert.Equal(folder.Id, Assert.Single(query.AncestorIds));
-                    Assert.Empty(query.IncludeItemTypes);
-                }
+                // A series folder is scoped by ancestry too: two folders sharing a series key keep separate quotas.
+                Assert.Null(query.SeriesPresentationUniqueKey);
+                Assert.Equal(folder.Id, Assert.Single(query.AncestorIds));
+                Assert.Empty(query.IncludeItemTypes);
 
                 return new BaseItem[] { missing, newest, oldest };
             });
             var sources = Mock.Of<IMediaSourceManager>(s => s.GetPathProtocol(It.IsAny<string>()) == MediaProtocol.File);
-            var reader = new RecordingRetentionReader(paths.Object, scopes.Object, repository.Object, sources);
+            var reader = new RecordingRetentionReader(paths.Object, repository.Object, sources);
 
             Assert.Same(oldest, Assert.Single(reader.GetExcessFiles(directory.FullName, 1)));
         }
@@ -82,9 +66,8 @@ public sealed class RecordingRetentionReaderTests
         const string Path = "/recordings";
         var paths = new Mock<IItemPathLookupService>(MockBehavior.Strict);
         paths.Setup(p => p.FindByPath(Path, true)).Returns(new AggregateFolder());
-        var scope = new Mock<IItemQueryScopeService>(MockBehavior.Strict);
         var repository = new Mock<IItemRepository>(MockBehavior.Strict);
-        var reader = new RecordingRetentionReader(paths.Object, scope.Object, repository.Object, Mock.Of<IMediaSourceManager>());
+        var reader = new RecordingRetentionReader(paths.Object, repository.Object, Mock.Of<IMediaSourceManager>());
 
         Assert.Empty(reader.GetExcessFiles(Path, 1));
         repository.VerifyNoOtherCalls();

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -37,10 +38,20 @@ public sealed class RecordingRetentionReader(
             return [];
         }
 
-        // Retention is per recording folder: everything below this folder, newest first.
-        var query = new InternalItemsQuery
+        var query = CreateSeriesRecordingsQuery(folder.Id);
+
+        return repository.GetItemList(query)
+            .Where(item => !string.IsNullOrEmpty(item.Path) && mediaSources.GetPathProtocol(item.Path) == MediaProtocol.File && File.Exists(item.Path))
+            .Skip(keepCount);
+    }
+
+    /// <summary>Creates the retention query: every real file below the recording folder, newest first.</summary>
+    /// <param name="seriesFolderId">The recording folder.</param>
+    /// <returns>The query.</returns>
+    internal static InternalItemsQuery CreateSeriesRecordingsQuery(Guid seriesFolderId)
+        => new()
         {
-            AncestorIds = [folder.Id],
+            AncestorIds = [seriesFolderId],
             OrderBy = [(ItemSortBy.DateCreated, SortOrder.Descending)],
             IsVirtualItem = false,
             IsFolder = false,
@@ -48,9 +59,4 @@ public sealed class RecordingRetentionReader(
             EnableTotalRecordCount = false,
             DtoOptions = new DtoOptions(true)
         };
-
-        return repository.GetItemList(query)
-            .Where(item => !string.IsNullOrEmpty(item.Path) && mediaSources.GetPathProtocol(item.Path) == MediaProtocol.File && File.Exists(item.Path))
-            .Skip(keepCount);
-    }
 }

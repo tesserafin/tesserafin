@@ -27,7 +27,6 @@ namespace Tesserafin.Providers.TV;
 public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 {
     private readonly IItemListingServices _listing;
-    private readonly IItemSortService _itemSortService;
     private readonly IItemLookupService _lookup;
     private readonly ICollectionFolderResolver _collections;
 
@@ -44,7 +43,6 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
-    /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="listing">Sort and channel services for episode listing.</param>
     /// <param name="lookup">The item identity lookup.</param>
@@ -60,7 +58,6 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
-        IItemSortService itemSortService,
         ILocalizationManager localizationManager,
         IItemListingServices listing,
         IItemLookupService lookup,
@@ -68,7 +65,6 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
         _listing = listing;
-        _itemSortService = itemSortService;
         _lookup = lookup;
         _collections = collections;
     }
@@ -77,8 +73,8 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     protected override bool EnableUpdatingPremiereDateFromChildren => true;
 
     /// <inheritdoc />
-    protected override ValueTask<bool> BeforeMetadataRefreshAsync(Season item, LibraryOptions libraryOptions, bool replaceAllMetadata, CancellationToken cancellationToken)
-        => ValueTask.FromResult(item.BeforeMetadataRefresh(replaceAllMetadata, ItemNamingService, _lookup));
+    protected override bool BeforeMetadataRefresh(Season item, bool replaceAllMetadata)
+        => item.BeforeMetadataRefresh(replaceAllMetadata, ItemNamingService, _lookup);
 
     /// <inheritdoc />
     protected override SeasonInfo GetLookupInfo(Season item, LibraryOptions libraryOptions)
@@ -134,7 +130,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 
     /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(Season item)
-        => item.GetCatalogueEpisodes(new DtoOptions(true), ItemRepository, _lookup, _itemSortService);
+        => item.GetCatalogueEpisodes(new DtoOptions(true), ItemRepository, _lookup, _listing);
 
     /// <inheritdoc />
     protected override ItemUpdateType UpdateMetadataFromChildren(Season item, IReadOnlyList<BaseItem> children, bool isFullRefresh, ItemUpdateType currentUpdateType)

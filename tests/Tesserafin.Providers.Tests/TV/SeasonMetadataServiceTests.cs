@@ -12,6 +12,7 @@ using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.TV;
 using Xunit;
@@ -88,7 +89,7 @@ public sealed class SeasonMetadataServiceTests
         }
 
         var service = new TestSeasonMetadataService(Mock.Of<ILibraryItemOptions>(), lookup.Object, naming.Object);
-        var changed = await service.PrepareRefreshAsync(season, TestContext.Current.CancellationToken);
+        var changed = service.PrepareRefresh(season);
 
         Assert.Equal(!existingNumber.HasValue, changed);
         Assert.Equal(existingNumber ?? 2, season.IndexNumber);
@@ -111,14 +112,14 @@ public sealed class SeasonMetadataServiceTests
             naming ?? Mock.Of<IItemNamingService>(),
             Mock.Of<IExternalDataManager>(),
             Mock.Of<IItemRepository>(),
-            Mock.Of<IItemSortService>(),
+            Mock.Of<ILocalizationManager>(),
+            Mock.Of<IItemListingServices>(),
             lookup ?? Mock.Of<IItemLookupService>(),
             Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict))
     {
         public ItemUpdateType Prepare(Season season) => BeforeSaveInternal(season, false, ItemUpdateType.None);
 
-        public ValueTask<bool> PrepareRefreshAsync(Season season, CancellationToken cancellationToken)
-            => BeforeMetadataRefreshAsync(season, new LibraryOptions(), false, cancellationToken);
+        public bool PrepareRefresh(Season season) => BeforeMetadataRefresh(season, false);
 
         public SeasonInfo ReadLookupInfo(Season season) => GetLookupInfo(season, new LibraryOptions());
     }

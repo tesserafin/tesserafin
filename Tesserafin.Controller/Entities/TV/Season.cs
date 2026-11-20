@@ -253,14 +253,14 @@ namespace Tesserafin.Controller.Entities.TV
         /// <param name="options">The item data to load.</param>
         /// <param name="repository">The item repository.</param>
         /// <param name="lookup">The lookup used to resolve the owning series.</param>
-        /// <param name="itemSortService">The episode sort service.</param>
+        /// <param name="listing">Sort and channel services for episode listing.</param>
         /// <returns>The season episodes in display order.</returns>
         public IReadOnlyList<BaseItem> GetCatalogueEpisodes(
             DtoOptions options,
             IItemRepository repository,
             IItemLookupService lookup,
-            IItemSortService itemSortService)
-            => GetSeries(lookup)?.GetCatalogueSeasonEpisodes(this, options, repository, itemSortService) ?? [];
+            IItemListingServices listing)
+            => GetSeries(lookup)?.GetCatalogueSeasonEpisodes(this, options, repository, listing) ?? [];
 
         public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes)
         {
@@ -404,7 +404,7 @@ namespace Tesserafin.Controller.Entities.TV
         /// <returns>Whether the preparation changed the season.</returns>
         public bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IItemLookupService lookup)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = this.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
             if (IndexNumber.HasValue || string.IsNullOrEmpty(Path))
             {
                 return hasChanges;

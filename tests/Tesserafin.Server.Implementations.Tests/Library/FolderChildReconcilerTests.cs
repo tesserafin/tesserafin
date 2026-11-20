@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
@@ -221,7 +222,7 @@ public sealed class FolderChildReconcilerTests
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => context.Service.ReconcileAsync(context.Parent, [], [], context.Directory.Object, false, context.Writes.Object, context.Deletions.Object, context.Images.Object, cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => context.Service.ReconcileAsync(context.Parent, [], [], context.Directory.Object, false, context.Writes.Object, context.Deletions.Object, context.Images.Object, Mock.Of<IChannelManager>(), cancellation.Token));
 
         context.Lookup.VerifyNoOtherCalls();
         context.Files.VerifyNoOtherCalls();
@@ -261,18 +262,18 @@ public sealed class FolderChildReconcilerTests
         public BaseItem Item(string name) => new Leaf() { Id = Guid.NewGuid(), Path = "/library/" + name + ".mkv" };
 
         public Task<FolderChildReconciliationResult> RunAsync(IReadOnlyList<BaseItem> current, IReadOnlyList<BaseItem> discovered)
-            => Service.ReconcileAsync(Parent, current, discovered, Directory.Object, false, Writes.Object, Deletions.Object, Images.Object, TestContext.Current.CancellationToken);
+            => Service.ReconcileAsync(Parent, current, discovered, Directory.Object, false, Writes.Object, Deletions.Object, Images.Object, Mock.Of<IChannelManager>(), TestContext.Current.CancellationToken);
     }
 
     private sealed class Leaf : BaseItem
     {
-        public override bool CanDelete() => true;
+        public override bool CanDelete(IChannelManager channels) => true;
 
         public override List<string> GetUserDataKeys() => ["shared history key"];
     }
 
     private sealed class DeletableVideo : Video
     {
-        public override bool CanDelete() => true;
+        public override bool CanDelete(IChannelManager channels) => true;
     }
 }

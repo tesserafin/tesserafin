@@ -69,7 +69,7 @@ public sealed class FolderValidationTests
             It.IsAny<Func<BaseItem, IProgress<double>, Task>>(),
             It.IsAny<IProgress<double>>(),
             It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        var context = new LibraryScanContext(
+        var context = CreateServices(
             Mock.Of<IItemDeletionCommands>(MockBehavior.Strict),
             Mock.Of<IItemWriteCommands>(MockBehavior.Strict),
             Mock.Of<IItemImageService>(MockBehavior.Strict),
@@ -140,7 +140,7 @@ public sealed class FolderValidationTests
             .ReturnsAsync(ItemUpdateType.None);
 
         var lookup = Mock.Of<IItemLookupService>(MockBehavior.Strict);
-        var context = new LibraryScanContext(
+        var context = CreateServices(
             Mock.Of<IItemDeletionCommands>(MockBehavior.Strict),
             Mock.Of<IItemWriteCommands>(MockBehavior.Strict),
             Mock.Of<IItemImageService>(MockBehavior.Strict),
@@ -169,4 +169,36 @@ public sealed class FolderValidationTests
 
     private static LinkedChildResolver CreateLinks(IItemRepository repository, IItemLookupService lookup)
         => new(repository, lookup, Mock.Of<IItemPathLookupService>(MockBehavior.Strict), Mock.Of<IFileSystem>(MockBehavior.Strict), NullLogger<LinkedChildResolver>.Instance);
+
+    private static IFolderValidationServices CreateServices(
+        IItemDeletionCommands deletions,
+        IItemWriteCommands writes,
+        IItemImageService images,
+        IItemResolutionService resolution,
+        ILibraryRefreshProgress refreshProgress,
+        ILimitedConcurrencyLibraryScheduler scheduler,
+        IItemLookupService lookup,
+        IItemRepository repository,
+        IItemStore store,
+        Lazy<IItemMetadataDispatcher> metadata,
+        LinkedChildResolver links)
+    {
+        var services = new Mock<IFolderValidationServices>(MockBehavior.Strict);
+        services.SetupGet(s => s.Deletions).Returns(deletions);
+        services.SetupGet(s => s.Writes).Returns(writes);
+        services.SetupGet(s => s.Images).Returns(images);
+        services.SetupGet(s => s.Resolution).Returns(resolution);
+        services.SetupGet(s => s.RefreshProgress).Returns(refreshProgress);
+        services.SetupGet(s => s.Scheduler).Returns(scheduler);
+        services.SetupGet(s => s.Lookup).Returns(lookup);
+        services.SetupGet(s => s.Repository).Returns(repository);
+        services.SetupGet(s => s.Store).Returns(store);
+        services.SetupGet(s => s.Links).Returns(links);
+        var providers = new Mock<IProviderManager>(MockBehavior.Strict);
+        providers.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>()))
+            .Returns((BaseItem item, MetadataRefreshOptions options, CancellationToken token) => metadata.Value.RefreshSingleItem(item, options, token));
+        services.SetupGet(s => s.Providers).Returns(providers.Object);
+        services.SetupGet(s => s.Channels).Returns(Mock.Of<Tesserafin.Controller.Channels.IChannelManager>(MockBehavior.Strict));
+        return services.Object;
+    }
 }

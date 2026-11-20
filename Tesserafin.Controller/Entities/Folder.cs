@@ -21,6 +21,7 @@ using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
@@ -132,7 +133,7 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public virtual IEnumerable<BaseItem> Children
         {
-            get => GetCatalogueChildren(ItemRepository, LibraryManager);
+            get => GetCatalogueChildren(null, LibraryManager);
             set => _children = value;
         }
 
@@ -282,11 +283,16 @@ namespace Tesserafin.Controller.Entities
             => Children = null;
 
         /// <summary>Loads the folder's direct children from the catalogue.</summary>
-        /// <param name="repository">The item repository.</param>
+        /// <param name="repository">The item repository, or <c>null</c> to read through the attached catalogue services.</param>
         /// <param name="lookup">The identity lookup for folders that cache child identities.</param>
         /// <returns>The folder's persisted children.</returns>
         protected virtual IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
+            if (repository is null)
+            {
+                return GetCachedChildren();
+            }
+
             return repository.GetItemList(new InternalItemsQuery
             {
                 Parent = this,
@@ -397,7 +403,7 @@ namespace Tesserafin.Controller.Entities
                 }
 
                 Children = null;
-                var reconciliation = await services.Writes.ReconcileFolderChildrenAsync(this, Children.ToArray(), nonCachedChildren, directoryService, allowRemoveRoot, services.Deletions, services.Images, cancellationToken).ConfigureAwait(false);
+                var reconciliation = await services.Writes.ReconcileFolderChildrenAsync(this, GetCatalogueChildren(services.Repository, services.Lookup).ToArray(), nonCachedChildren, directoryService, allowRemoveRoot, services.Deletions, services.Images, services.Channels, cancellationToken).ConfigureAwait(false);
                 if (reconciliation.Skipped)
                 {
                     return;
@@ -499,7 +505,7 @@ namespace Tesserafin.Controller.Entities
                 await series.RefreshMetadata(services.Deletions, services.Writes, services.Providers, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
 
-            await container.RefreshAllMetadata(services.Deletions, services.Writes, services.Providers, services.Images, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
+            await container.RefreshAllMetadata(services, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
         }
 
         private async Task RefreshChildMetadata(IFolderValidationServices services, BaseItem child, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
@@ -518,7 +524,7 @@ namespace Tesserafin.Controller.Entities
                 if (recursive && child is Folder folder)
                 {
                     folder.Children = null; // invalidate cached children.
-                    await folder.RefreshMetadataRecursive(services, folder.Children.Except([this, child]).ToList(), refreshOptions, true, progress, cancellationToken).ConfigureAwait(false);
+                    await folder.RefreshMetadataRecursive(services, folder.GetCatalogueChildren(services.Repository, services.Lookup).Except([this, child]).ToList(), refreshOptions, true, progress, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -1459,14 +1465,14 @@ namespace Tesserafin.Controller.Entities
         public List<BaseItem> GetLinkedChildren()
             => CreateLinkedChildResolver().Resolve(this).Select(entry => entry.Item).ToList();
 
-        protected static LinkedChildResolver CreateLinkedChildResolver(IBoxSetVisibilityService scope = null)
+        protected static LinkedChildResolver CreateLinkedChildResolver(IStandaloneVisibilityService scope = null)
         {
             return new LinkedChildResolver(
                 scope is null ? query => LibraryManager.GetItemList(query) : null,
                 scope is null ? id => LibraryManager.GetItemById(id) : scope.GetItemById,
-                scope is ILinkedChildVisibilityService paths
-                    ? paths.FindByPath
-                    : path => LibraryManager.GetItemList(ItemPathQuery.Create(path, null)).FirstOrDefault(),
+                scope is null
+                    ? path => LibraryManager.GetItemList(ItemPathQuery.Create(path, null)).FirstOrDefault()
+                    : scope.FindByPath,
                 FileSystem,
                 Logger);
         }
@@ -1535,7 +1541,7 @@ namespace Tesserafin.Controller.Entities
             return list;
         }
 
-        protected override async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, IProviderManager providers, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        protected override async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
             var changesFound = false;
 

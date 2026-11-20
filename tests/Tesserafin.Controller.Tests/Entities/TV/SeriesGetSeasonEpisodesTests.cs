@@ -516,7 +516,7 @@ public class SeriesGetSeasonEpisodesTests
                 && q.IncludeItemTypes.SequenceEqual(new[] { BaseItemKind.Episode, BaseItemKind.Season }))))
             .Returns([specials, season, missing, special, episode]);
 
-        var result = series.GetCatalogueEpisodes(new DtoOptions(), repository.Object, new RecordingItemSortService());
+        var result = series.GetCatalogueEpisodes(new DtoOptions(), repository.Object, Mock.Of<IItemListingServices>(l => l.Sort == new RecordingItemSortService()));
 
         Assert.Equal(new BaseItem[] { special, episode, missing }, result);
     }
@@ -543,7 +543,7 @@ public class SeriesGetSeasonEpisodesTests
                 && q.AncestorWithPresentationUniqueKey == (includeSpecials ? null : "season-key"))))
             .Returns([episode, special]);
 
-        var result = season.GetCatalogueEpisodes(new DtoOptions(true), repository.Object, lookup.Object, new RecordingItemSortService());
+        var result = season.GetCatalogueEpisodes(new DtoOptions(true), repository.Object, lookup.Object, Mock.Of<IItemListingServices>(l => l.Sort == new RecordingItemSortService()));
 
         BaseItem[] expected = includeSpecials ? [special, episode] : [episode];
         Assert.Equal(expected, result);

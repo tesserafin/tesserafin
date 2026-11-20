@@ -39,7 +39,6 @@ namespace Tesserafin.Server.Core.Images
             return _linkedChildren.GetItems(playlist)
                 .Select(subItem =>
                 {
-
                     if (subItem is Episode episode)
                     {
                         var series = episode.Series;

@@ -19,7 +19,7 @@ public class PeopleValidator
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
-    private readonly IProviderManager _providers;
+    private readonly Lazy<IItemMetadataDispatcher> _providers;
     private readonly IItemPeopleService _people;
     private readonly IItemRepository _items;
     private readonly IServerConfigurationManager _configuration;
@@ -29,13 +29,13 @@ public class PeopleValidator
     /// <summary>Initializes a new instance of the <see cref="PeopleValidator"/> class.</summary>
     /// <param name="writes">Explicit item writes.</param>
     /// <param name="deletions">Unreferenced item deletion.</param>
-    /// <param name="providers">The provider manager for metadata refreshes.</param>
+    /// <param name="providers">Runs metadata refreshes, resolved on first use.</param>
     /// <param name="people">Credit and person reads.</param>
     /// <param name="items">Unreferenced person queries.</param>
     /// <param name="configuration">Managed person root configuration.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="files">Metadata refresh directory access.</param>
-    public PeopleValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, IProviderManager providers, IItemPeopleService people, IItemRepository items, IServerConfigurationManager configuration, ILogger<PeopleValidator> logger, IFileSystem files)
+    public PeopleValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, Lazy<IItemMetadataDispatcher> providers, IItemPeopleService people, IItemRepository items, IServerConfigurationManager configuration, ILogger<PeopleValidator> logger, IFileSystem files)
     {
         _writes = writes;
         _deletions = deletions;
@@ -74,7 +74,7 @@ public class PeopleValidator
                         ImageRefreshMode = MetadataRefreshMode.ValidationOnly,
                         MetadataRefreshMode = MetadataRefreshMode.ValidationOnly
                     };
-                    await person.RefreshMetadata(_deletions, _writes, _providers, options, cancellationToken).ConfigureAwait(false);
+                    await person.RefreshMetadata(_deletions, _writes, _providers.Value, options, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)

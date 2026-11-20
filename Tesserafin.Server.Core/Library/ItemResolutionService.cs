@@ -64,7 +64,7 @@ internal sealed class ItemResolutionService(
                 throw new IOException($"Shortcut has no target: {file.FullName}");
             }
 
-            var expanded = _appHost.ExpandVirtualPath(raw);
+            var expanded = VirtualPaths.Expand(_configurationManager.ApplicationPaths, raw);
             if (string.IsNullOrWhiteSpace(expanded))
             {
                 throw new IOException($"Shortcut has no target: {file.FullName}");

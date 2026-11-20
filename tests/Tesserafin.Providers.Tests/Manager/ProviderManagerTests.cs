@@ -624,15 +624,11 @@ namespace Tesserafin.Providers.Tests.Manager
             var deletions = Mock.Of<IItemDeletionCommands>();
             var repository = Mock.Of<IItemRepository>();
             itemLookup ??= Mock.Of<IItemLookupService>();
-            ProviderManager providerManager = null!;
-            var scanContext = new LibraryScanContext(
-                deletions,
+            var providerManager = new ProviderManager(
                 writes,
+                Mock.Of<IItemMetadataExporter>(),
                 images,
-                Mock.Of<IItemResolutionService>(),
-                Mock.Of<ILibraryRefreshProgress>(),
-                Mock.Of<ILimitedConcurrencyLibraryScheduler>(),
-                Mock.Of<IItemDeletionCommands>(),
+                deletions,
                 Mock.Of<IFolderValidationServices>(),
                 Mock.Of<ILibraryOptionsStore>(),
                 Mock.Of<IHttpClientFactory>(),

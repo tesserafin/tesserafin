@@ -31,27 +31,6 @@ public class FolderTests
             new Mock<IUserViewManager>(MockBehavior.Strict),
             new Mock<ITVSeriesManager>(MockBehavior.Strict));
 
-    [Theory]
-    [InlineData(20d, 80d, 50d)]
-    [InlineData(null, 80d, 80d)]
-    [InlineData(null, null, null)]
-    public void GetRefreshProgress_CollectionFolder_AveragesActivePhysicalFolders(double? firstProgress, double? secondProgress, double? expected)
-    {
-        var first = new Folder { Id = Guid.NewGuid() };
-        var second = new Folder { Id = Guid.NewGuid() };
-        var collection = new CollectionFolder { PhysicalFolderIds = [first.Id, second.Id] };
-        var library = new Mock<ILibraryManager>(MockBehavior.Strict);
-        library.Setup(manager => manager.GetItemById(first.Id)).Returns(first);
-        library.Setup(manager => manager.GetItemById(second.Id)).Returns(second);
-        BaseItem.LibraryManager = library.Object;
-
-        var providers = new Mock<IProviderManager>(MockBehavior.Strict);
-        providers.Setup(manager => manager.GetRefreshProgress(first.Id)).Returns(firstProgress);
-        providers.Setup(manager => manager.GetRefreshProgress(second.Id)).Returns(secondProgress);
-
-        Assert.Equal(expected, collection.GetRefreshProgress(providers.Object));
-    }
-
     [Fact]
     public void GetItems_NonChannelFolder_NoUser_ReturnsChildrenWithoutTouchingOtherManagers()
     {

@@ -134,9 +134,9 @@ namespace Tesserafin.Controller.Entities.Audio
                 GetCatalogueTracks(repository, lookup, links).Cast<Audio>().Select(getTrackLookupInfo),
                 locale);
 
-        public async Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IProviderManager providers, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
+        public async Task RefreshAllMetadata(IFolderValidationServices services, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
-            var items = GetRecursiveCatalogueChildren(context.Repository, context.Lookup, context.Links);
+            var items = GetRecursiveCatalogueChildren(services.Repository, services.Lookup, services.Links);
 
             var totalItems = items.Count;
             var numComplete = 0;
@@ -147,7 +147,7 @@ namespace Tesserafin.Controller.Entities.Audio
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var updateType = await item.RefreshMetadata(deletions, writes, providers, refreshOptions, cancellationToken).ConfigureAwait(false);
+                var updateType = await item.RefreshMetadata(services.Deletions, services.Writes, services.Providers, refreshOptions, cancellationToken).ConfigureAwait(false);
                 childUpdateType = childUpdateType | updateType;
 
                 numComplete++;
@@ -166,11 +166,11 @@ namespace Tesserafin.Controller.Entities.Audio
             }
 
             // Refresh current item
-            await RefreshMetadata(deletions, writes, providers, parentRefreshOptions, cancellationToken).ConfigureAwait(false);
+            await RefreshMetadata(services.Deletions, services.Writes, services.Providers, parentRefreshOptions, cancellationToken).ConfigureAwait(false);
 
             if (!refreshOptions.IsAutomated)
             {
-                await RefreshArtists(deletions, writes, providers, refreshOptions, cancellationToken).ConfigureAwait(false);
+                await RefreshArtists(services.Deletions, services.Writes, services.Providers, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -220,7 +220,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return id;
         }
 
-        private async Task RefreshArtists(IItemDeletionCommands deletions, IItemWriteCommands writes, IProviderManager providers, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
+        private async Task RefreshArtists(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
         {
             foreach (var i in this.GetAllArtists())
             {

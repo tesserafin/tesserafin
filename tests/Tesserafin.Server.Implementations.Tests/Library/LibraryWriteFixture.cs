@@ -1,6 +1,9 @@
+using System;
 using AutoFixture;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tesserafin.Controller;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
@@ -39,7 +42,7 @@ internal static class LibraryWriteFixture
             fixture.Create<IStandaloneVisibilityService>()));
         var options = new LibraryItemOptions(fixture.Create<ICollectionFolderResolver>(), fixture.Create<IItemLookupService>(), fixture.Create<IUserRootFolderProvider>(), configuration, fixture.Create<IFileSystem>(), store);
         fixture.Inject<ILibraryItemOptions>(options);
-        var resolution = new ItemResolutionService(configuration, fixture.Create<IFileSystem>(), fixture.Create<IServerApplicationHost>(), options, fixture.Create<IItemLookupService>(), fixture.Create<NamingOptions>(), NullLogger<ItemResolutionService>.Instance, NullLoggerFactory.Instance, fixture.Create<IDirectoryService>(), fixture.Create<DotIgnoreIgnoreRule>());
+        var resolution = new ItemResolutionService(configuration, fixture.Create<IFileSystem>(), options, fixture.Create<IItemLookupService>(), fixture.Create<NamingOptions>(), NullLogger<ItemResolutionService>.Instance, NullLoggerFactory.Instance, fixture.Create<IDirectoryService>(), fixture.Create<DotIgnoreIgnoreRule>());
         fixture.Inject<IItemResolutionService>(resolution);
         var versions = new ItemVersionGraphPlanner(resolution, options, fixture.Create<IItemLookupService>(), fixture.Create<ILinkedChildrenService>());
         fixture.Inject(versions);
@@ -52,5 +55,5 @@ internal static class LibraryWriteFixture
     }
 
     internal static CollectionFolderMembershipResolver CreateCollectionMembershipResolver()
-        => new(Mock.Of<ILibraryRootFolderProvider>(), Mock.Of<IItemRepository>(), Mock.Of<IItemLookupService>(), Mock.Of<IFileSystem>(), Mock.Of<IServerApplicationHost>(), NullLogger<CollectionFolderMembershipResolver>.Instance);
+        => new(Mock.Of<ILibraryRootFolderProvider>(), Mock.Of<IItemRepository>(), Mock.Of<IItemLookupService>(), Mock.Of<IFileSystem>(), Mock.Of<IServerConfigurationManager>(c => c.ApplicationPaths == Mock.Of<IServerApplicationPaths>(p => p.VirtualDataPath == "%DataPath%" && p.DataPath == "/data" && p.VirtualInternalMetadataPath == "%MetadataPath%" && p.InternalMetadataPath == "/metadata")), NullLogger<CollectionFolderMembershipResolver>.Instance);
 }

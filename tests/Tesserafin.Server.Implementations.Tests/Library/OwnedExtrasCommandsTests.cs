@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
@@ -146,20 +147,11 @@ public sealed class OwnedExtrasCommandsTests
         using var context = new Context();
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
-        var previous = BaseItem.MediaSourceManager;
-        try
-        {
-            BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>(m => m.GetPathProtocol(It.IsAny<string>()) == MediaProtocol.File);
-            var owner = new CancelledOwner { Path = "/Owner.mkv" };
+        var owner = new CancelledOwner { Path = "/Owner.mkv" };
 
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => owner.RefreshMetadata(context.Provider.Object, context.Deletions.Object, context.Commands, context.Options(), cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => owner.RefreshMetadata(context.Deletions.Object, context.Commands, context.Provider.Object, context.Options(), cancellation.Token));
 
-            context.Provider.VerifyNoOtherCalls();
-        }
-        finally
-        {
-            BaseItem.MediaSourceManager = previous;
-        }
+        context.Provider.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -178,7 +170,7 @@ public sealed class OwnedExtrasCommandsTests
     {
         protected override bool SupportsOwnedItems => true;
 
-        protected override Task<bool> RefreshedOwnedItems(IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        protected override Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
             => Task.FromCanceled<bool>(cancellationToken);
     }
 

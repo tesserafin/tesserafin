@@ -59,7 +59,8 @@ public sealed class LibraryRefreshNotificationTests
             Mock.Of<IUserManager>(),
             NullLogger<LibraryChangedNotifier>.Instance,
             refreshProgress.Object,
-            Mock.Of<IItemSortService>());
+            Mock.Of<IItemSortService>(),
+            Mock.Of<IStandaloneVisibilityService>());
 
         var token = TestContext.Current.CancellationToken;
         await notifier.StartAsync(token);

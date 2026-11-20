@@ -190,7 +190,7 @@ namespace Tesserafin.Providers.Manager
                         updateType |= ItemUpdateType.MetadataImport;
                     }
 
-                    if (item.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, ItemNamingService))
+                    if (BeforeMetadataRefresh(itemOfType, refreshOptions.ReplaceAllMetadata))
                     {
                         updateType |= ItemUpdateType.MetadataImport;
                     }
@@ -328,6 +328,13 @@ namespace Tesserafin.Providers.Manager
         /// <returns><c>true</c> when the item changed.</returns>
         protected virtual Task<bool> BeforeMetadataRefreshAsync(TItemType item, LibraryOptions libraryOptions, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
             => Task.FromResult(false);
+
+        /// <summary>Lets the item normalise its own metadata before providers run.</summary>
+        /// <param name="item">The item.</param>
+        /// <param name="replaceAllMetadata">Whether all metadata is being replaced.</param>
+        /// <returns><c>true</c> when the item changed.</returns>
+        protected virtual bool BeforeMetadataRefresh(TItemType item, bool replaceAllMetadata)
+            => item.BeforeMetadataRefresh(replaceAllMetadata, ItemNamingService);
 
         /// <summary>
         /// Normalises the original language to its two-letter code, then lets the item recompute what derives

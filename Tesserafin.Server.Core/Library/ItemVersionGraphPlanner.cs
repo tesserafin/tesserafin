@@ -170,5 +170,3 @@ internal sealed class ItemVersionGraphPlanner(IItemResolutionService resolution,
         return result;
     }
 }
-
-internal sealed record PrimaryVersionTransferPlan(Video Previous, Video Replacement, IReadOnlyList<BaseItem> Items);

@@ -25,6 +25,7 @@ public sealed class CollectionFolderMembershipEndToEndTests(TesserafinApplicatio
         var token = TestContext.Current.CancellationToken;
         var writes = factory.Services.GetRequiredService<IItemWriteCommands>();
         var deletions = factory.Services.GetRequiredService<IItemDeletionCommands>();
+        var providers = factory.Services.GetRequiredService<IProviderManager>();
         var lookup = factory.Services.GetRequiredService<IItemLookupService>();
         var repository = factory.Services.GetRequiredService<IItemRepository>();
         var links = factory.Services.GetRequiredService<ILinkedChildrenService>();
@@ -102,7 +103,7 @@ public sealed class CollectionFolderMembershipEndToEndTests(TesserafinApplicatio
             }
 
             var options = new MetadataRefreshOptions(directoryService) { MetadataRefreshMode = MetadataRefreshMode.None, ImageRefreshMode = MetadataRefreshMode.None };
-            await library.RefreshMetadata(deletions, writes, options, token);
+            await library.RefreshMetadata(deletions, writes, providers, options, token);
             AssertMembership(library, nestedPath, nested.Id, secondMovie.Id);
             AssertMembership(Assert.IsType<CollectionFolder>(repository.RetrieveItem(library.Id)), nestedPath, nested.Id, secondMovie.Id);
             Assert.Equal(nested.Id, Assert.Single(library.GetPhysicalFolders(lookup)).Id);

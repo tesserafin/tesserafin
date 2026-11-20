@@ -32,7 +32,6 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     private readonly IItemDeletionCommands _deletions;
     private readonly IItemStore _itemStore;
     private readonly ILocalizationManager _localizationManager;
-    private readonly IItemSortService _itemSortService;
     private readonly IItemLookupService _lookup;
     private readonly LinkedChildResolver _links;
     private readonly ICollectionFolderResolver _collections;
@@ -53,7 +52,6 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
-    /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     /// <param name="listing">Sort and channel services for episode listing.</param>
     /// <param name="lookup">The item identity lookup.</param>
     /// <param name="links">The saved link resolver.</param>
@@ -72,7 +70,6 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         ILocalizationManager localizationManager,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
-        IItemSortService itemSortService,
         IItemListingServices listing,
         IItemLookupService lookup,
         LinkedChildResolver links,
@@ -83,7 +80,6 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         _deletions = deletions;
         _itemStore = itemStore;
         _localizationManager = localizationManager;
-        _itemSortService = itemSortService;
         _lookup = lookup;
         _links = links;
         _collections = collections;
@@ -246,7 +242,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             var seasonNumber = virtualSeason.IndexNumber;
             // If there's a physical season with the same number or no episodes in the season, delete it
             if ((seasonNumber.HasValue && physicalSeasonNumbers.Contains(seasonNumber.Value))
-                || virtualSeason.GetCatalogueEpisodes(new DtoOptions(true), ItemRepository, _lookup, _itemSortService).Count == 0)
+                || virtualSeason.GetCatalogueEpisodes(new DtoOptions(true), ItemRepository, _lookup, _listing).Count == 0)
             {
                 Logger.LogInformation("Removing virtual season {SeasonNumber} in series {SeriesName}", virtualSeason.IndexNumber, series.Name);
 
@@ -264,7 +260,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 
     private async Task RemoveObsoleteEpisodes(Series series, CancellationToken cancellationToken)
     {
-        var episodesBySeason = series.GetCatalogueEpisodes(new DtoOptions(), ItemRepository, _itemSortService)
+        var episodesBySeason = series.GetCatalogueEpisodes(new DtoOptions(), ItemRepository, _listing)
                         .OfType<Episode>()
                         .GroupBy(e => e.ParentIndexNumber)
                         .ToList();

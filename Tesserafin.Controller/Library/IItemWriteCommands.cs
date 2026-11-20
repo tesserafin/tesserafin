@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.IO;
@@ -89,9 +90,10 @@ public interface IItemWriteCommands
     /// <param name="allowRemoveRoot">Whether collection folders are checked for removal.</param>
     /// <param name="deletions">Explicit catalogue deletion operations.</param>
     /// <param name="images">Explicit image refresh preparation and commit.</param>
+    /// <param name="channels">Decides whether channel items may be removed.</param>
     /// <param name="cancellationToken">Cancels admission and reconciliation operations.</param>
     /// <returns>Retained and refreshable children, or an inaccessible-storage skip.</returns>
-    Task<FolderChildReconciliationResult> ReconcileFolderChildrenAsync(Folder parent, IReadOnlyList<BaseItem> currentChildren, IReadOnlyList<BaseItem> discovered, IDirectoryService directoryService, bool allowRemoveRoot, IItemDeletionCommands deletions, IItemImageService images, CancellationToken cancellationToken);
+    Task<FolderChildReconciliationResult> ReconcileFolderChildrenAsync(Folder parent, IReadOnlyList<BaseItem> currentChildren, IReadOnlyList<BaseItem> discovered, IDirectoryService directoryService, bool allowRemoveRoot, IItemDeletionCommands deletions, IItemImageService images, IChannelManager channels, CancellationToken cancellationToken);
 
     void CreateItem(BaseItem item, BaseItem? parent);
 

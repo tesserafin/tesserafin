@@ -10,6 +10,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Configuration;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.Music;
 using Xunit;
@@ -129,6 +130,7 @@ public sealed class AlbumMetadataServiceTests
             Mock.Of<IItemNamingService>(),
             Mock.Of<IExternalDataManager>(),
             repository,
+            Mock.Of<ILocalizationManager>(),
             lookup,
             links,
             artists,
