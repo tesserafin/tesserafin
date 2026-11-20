@@ -163,6 +163,7 @@ public static class LibraryItemSeeder
     /// <param name="streams">The real, known media streams describing <paramref name="mediaPath"/>.</param>
     /// <param name="name">The track's display name.</param>
     /// <param name="runTimeTicks">The duration of <paramref name="mediaPath"/>.</param>
+    /// <param name="audioBook">Whether to seed an <see cref="AudioBook"/> rather than a music track.</param>
     /// <returns>The new item's id.</returns>
     public static Guid SeedAudio(
         IItemWriteCommands writes,
@@ -171,23 +172,22 @@ public static class LibraryItemSeeder
         string container,
         IReadOnlyList<MediaStream> streams,
         string name,
-        long runTimeTicks)
+        long runTimeTicks,
+        bool audioBook = false)
     {
         ArgumentNullException.ThrowIfNull(writes);
         ArgumentNullException.ThrowIfNull(mediaStreamRepository);
         ArgumentNullException.ThrowIfNull(streams);
 
-        var track = new Audio
-        {
-            Id = Guid.NewGuid(),
-            Name = name,
-            Path = mediaPath,
-            Container = container,
-            Size = new FileInfo(mediaPath).Length,
-            RunTimeTicks = runTimeTicks,
-            DateCreated = DateTime.UtcNow,
-            DateModified = DateTime.UtcNow,
-        };
+        var track = audioBook ? new AudioBook() : new Audio();
+        track.Id = Guid.NewGuid();
+        track.Name = name;
+        track.Path = mediaPath;
+        track.Container = container;
+        track.Size = new FileInfo(mediaPath).Length;
+        track.RunTimeTicks = runTimeTicks;
+        track.DateCreated = DateTime.UtcNow;
+        track.DateModified = DateTime.UtcNow;
         track.PresentationUniqueKey = track.CreatePresentationUniqueKey();
         writes.CreateItems([track], null, CancellationToken.None);
         mediaStreamRepository.SaveMediaStreams(track.Id, streams, CancellationToken.None);

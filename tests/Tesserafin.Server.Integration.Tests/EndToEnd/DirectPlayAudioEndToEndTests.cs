@@ -109,6 +109,24 @@ public sealed class DirectPlayAudioEndToEndTests : IClassFixture<DirectPlayFilmE
     }
 
     [Fact]
+    public async Task AudioBook_StartAndSeek_ServesRangesFromTheSessionFile()
+    {
+        var (client, userId) = await SignInAsync("audiobook-start");
+        var itemId = SeedTrack(audioBook: true);
+        var session = await CreateSessionAsync(client, itemId, userId, "audiobook-start-ps");
+
+        Assert.Equal(PlaybackMethod.DirectPlay, session.Method);
+        Assert.Equal(MediaKind.Audio, session.Kind);
+        Assert.Equal(PlaybackEngine.EngineVersion, session.DecisionVersion);
+
+        var descriptor = await GetDescriptorAsync(client, session.Id);
+        Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/File?"), descriptor.Url, StringComparison.Ordinal);
+        await AssertRangeAsync(client, descriptor.Url, 0, 99);
+        var middle = _fixtureBytes.Length / 2;
+        await AssertRangeAsync(client, descriptor.Url, middle, middle + 4095);
+    }
+
+    [Fact]
     public async Task Audio_Stop_DeletesTheSessionAndRevokesItsCapability()
     {
         var (client, userId) = await SignInAsync("audio-stop");
@@ -153,7 +171,7 @@ public sealed class DirectPlayAudioEndToEndTests : IClassFixture<DirectPlayFilmE
         await AssertRangeAsync(owner, descriptor.Url, 0, 9);
     }
 
-    private Guid SeedTrack() =>
+    private Guid SeedTrack(bool audioBook = false) =>
         LibraryItemSeeder.SeedAudio(
             _factory.Services.GetRequiredService<IItemWriteCommands>(),
             _factory.Services.GetRequiredService<IMediaStreamRepository>(),
@@ -161,7 +179,8 @@ public sealed class DirectPlayAudioEndToEndTests : IClassFixture<DirectPlayFilmE
             "mp3",
             _streams,
             $"Consolidation audio {Guid.NewGuid()}",
-            TimeSpan.FromSeconds(FixtureSeconds).Ticks);
+            TimeSpan.FromSeconds(FixtureSeconds).Ticks,
+            audioBook);
 
     private static async Task<PlaybackSessionResponse> CreateSessionAsync(HttpClient client, Guid itemId, Guid userId, string playSessionId)
     {
