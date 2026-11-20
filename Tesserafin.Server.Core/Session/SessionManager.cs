@@ -67,6 +67,7 @@ namespace Tesserafin.Server.Core.Session
         private readonly IPlaybackCredentialService _credentialService;
         private readonly IItemPlayedStateService _playedStateService;
         private readonly IVideoVersionCatalog _versions;
+        private readonly IStandaloneVisibilityService _visibility;
 
         private readonly ConcurrentDictionary<string, SessionInfo> _activeConnections
             = new(StringComparer.OrdinalIgnoreCase);
@@ -101,6 +102,7 @@ namespace Tesserafin.Server.Core.Session
         /// <param name="credentialService">Instance of the <see cref="IPlaybackCredentialService"/> interface.</param>
         /// <param name="playedStateService">Marks the other versions of a video played to completion.</param>
         /// <param name="versions">The catalogue versions used to resolve reported media sources.</param>
+        /// <param name="visibility">The catalogue data used for item visibility checks.</param>
         public SessionManager(
             ILogger<SessionManager> logger,
             IEventManager eventManager,
@@ -119,7 +121,8 @@ namespace Tesserafin.Server.Core.Session
             IItemSortService itemSortService,
             IPlaybackCredentialService credentialService,
             IItemPlayedStateService playedStateService,
-            IVideoVersionCatalog versions)
+            IVideoVersionCatalog versions,
+            IStandaloneVisibilityService visibility)
         {
             _logger = logger;
             _eventManager = eventManager;
@@ -139,6 +142,7 @@ namespace Tesserafin.Server.Core.Session
             _credentialService = credentialService;
             _playedStateService = playedStateService;
             _versions = versions;
+            _visibility = visibility;
 
             _deviceManager.DeviceOptionsUpdated += OnDeviceManagerDeviceOptionsUpdated;
         }
@@ -775,7 +779,7 @@ namespace Tesserafin.Server.Core.Session
             }
 
             var user = _userManager.GetUserById(session.UserId);
-            return user is not null && (item is UserRootFolder || item.IsVisibleStandalone(user)) ? item : null;
+            return user is not null && (item is UserRootFolder || item.IsVisibleStandalone(user, _visibility)) ? item : null;
         }
 
         /// <summary>

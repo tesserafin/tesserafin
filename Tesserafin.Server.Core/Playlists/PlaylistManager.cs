@@ -47,6 +47,7 @@ namespace Tesserafin.Server.Core.Playlists
         private readonly IItemQueryService _itemQueryService;
         private readonly IItemSortService _itemSortService;
         private readonly LinkedChildResolver _linkedChildren;
+        private readonly IStandaloneVisibilityService _visibility;
 
         public PlaylistManager(
             IItemWriteCommands writes,
@@ -60,7 +61,8 @@ namespace Tesserafin.Server.Core.Playlists
             IConfiguration appConfig,
             IItemQueryService itemQueryService,
             IItemSortService itemSortService,
-            LinkedChildResolver linkedChildren)
+            LinkedChildResolver linkedChildren,
+            IStandaloneVisibilityService visibility)
         {
             _writes = writes;
             _deletions = deletions;
@@ -74,6 +76,7 @@ namespace Tesserafin.Server.Core.Playlists
             _itemQueryService = itemQueryService;
             _itemSortService = itemSortService;
             _linkedChildren = linkedChildren;
+            _visibility = visibility;
         }
 
         public Playlist GetPlaylistForUser(Guid playlistId, Guid userId)
@@ -352,7 +355,7 @@ namespace Tesserafin.Server.Core.Playlists
 
             var user = _userManager.GetUserById(callingUserId);
             var children = _linkedChildren.Resolve(playlist).ToList();
-            var accessibleChildren = children.Where(c => c.Item.IsVisibleStandalone(user)).ToArray();
+            var accessibleChildren = children.Where(c => c.Item.IsVisibleStandalone(user, _visibility)).ToArray();
 
             var oldIndexAll = children.FindIndex(i => string.Equals(entryId, i.Link.ItemId?.ToString("N", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase));
             var oldIndexAccessible = accessibleChildren.FindIndex(i => string.Equals(entryId, i.Link.ItemId?.ToString("N", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase));

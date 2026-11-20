@@ -30,6 +30,7 @@ public class SearchManager : ISearchManager
     private readonly IUserManager _userManager;
     private readonly IDbContextFactory<TesserafinDbContext> _dbProvider;
     private readonly IItemQueryHelpers _queryHelpers;
+    private readonly IStandaloneVisibilityService _visibility;
     private readonly ILogger<SearchManager> _logger;
     private IExternalSearchProvider[] _externalProviders = [];
     private IInternalSearchProvider[] _internalProviders = [];
@@ -41,18 +42,21 @@ public class SearchManager : ISearchManager
     /// <param name="userManager">The user manager.</param>
     /// <param name="dbProvider">The database context factory.</param>
     /// <param name="queryHelpers">The shared item query helpers.</param>
+    /// <param name="visibility">The catalogue data used for item visibility checks.</param>
     /// <param name="logger">The logger.</param>
     public SearchManager(
         ILibraryManager libraryManager,
         IUserManager userManager,
         IDbContextFactory<TesserafinDbContext> dbProvider,
         IItemQueryHelpers queryHelpers,
+        IStandaloneVisibilityService visibility,
         ILogger<SearchManager> logger)
     {
         _libraryManager = libraryManager;
         _userManager = userManager;
         _dbProvider = dbProvider;
         _queryHelpers = queryHelpers;
+        _visibility = visibility;
         _logger = logger;
     }
 
@@ -247,7 +251,7 @@ public class SearchManager : ISearchManager
         // the libraries (GHSA-c5pr-6h39-jp86). Before the total and the paging below.
         if (user is not null)
         {
-            items = items.Where(i => i is not (BoxSet or Playlist) || i.IsVisibleStandalone(user)).ToList();
+            items = items.Where(i => i is not (BoxSet or Playlist) || i.IsVisibleStandalone(user, _visibility)).ToList();
         }
 
         var orderedResults = items

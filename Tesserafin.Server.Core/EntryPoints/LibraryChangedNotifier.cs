@@ -37,6 +37,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     private readonly IUserManager _userManager;
     private readonly ILogger<LibraryChangedNotifier> _logger;
     private readonly IItemSortService _itemSortService;
+    private readonly IStandaloneVisibilityService _visibility;
 
     private readonly Lock _libraryChangedSyncLock = new();
     private readonly List<Folder> _foldersAddedTo = new();
@@ -61,6 +62,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     /// <param name="logger">The <see cref="ILogger"/>.</param>
     /// <param name="refreshProgress">Progress of active recursive scans.</param>
     /// <param name="itemSortService">The <see cref="IItemSortService"/>.</param>
+    /// <param name="visibility">The catalogue data used for item visibility checks.</param>
     public LibraryChangedNotifier(
         ICollectionFolderResolver collectionFolders,
         IUserRootFolderProvider roots,
@@ -71,7 +73,8 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         IUserManager userManager,
         ILogger<LibraryChangedNotifier> logger,
         ILibraryRefreshProgress refreshProgress,
-        IItemSortService itemSortService)
+        IItemSortService itemSortService,
+        IStandaloneVisibilityService visibility)
     {
         _collectionFolders = collectionFolders;
         _roots = roots;
@@ -83,6 +86,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         _logger = logger;
         _refreshProgress = refreshProgress;
         _itemSortService = itemSortService;
+        _visibility = visibility;
     }
 
     /// <inheritdoc />
@@ -414,7 +418,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         }
 
         // Return it only if it's in the user's library
-        if (includeIfNotFound || item.IsVisibleStandalone(user))
+        if (includeIfNotFound || item.IsVisibleStandalone(user, _visibility))
         {
             return new[] { item };
         }
