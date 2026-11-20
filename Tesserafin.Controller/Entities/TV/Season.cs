@@ -191,7 +191,7 @@ namespace Tesserafin.Controller.Entities.TV
 
             var user = query.User;
 
-            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true), user, query, UserDataManager, LibraryManager);
+            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true), user, query, LibraryManager);
 
             return PostFilterAndSort(items, query, collectionManager);
         }
@@ -220,7 +220,7 @@ namespace Tesserafin.Controller.Entities.TV
 
             var user = query.User;
 
-            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true, query.Listing), user, query, UserDataManager, LibraryManager);
+            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true, query.Listing), user, query, LibraryManager);
 
             return PostFilterAndSort(items, query, collectionManager, itemSortService);
         }

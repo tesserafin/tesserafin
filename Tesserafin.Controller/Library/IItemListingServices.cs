@@ -28,6 +28,9 @@ namespace Tesserafin.Controller.Library
         /// <summary>Gets the TV series manager.</summary>
         ITVSeriesManager TVSeries { get; }
 
+        /// <summary>Gets the user data manager for item filters.</summary>
+        IUserDataManager UserData { get; }
+
         /// <summary>Gets the item sort service.</summary>
         IItemSortService Sort { get; }
     }

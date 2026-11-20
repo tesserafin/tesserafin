@@ -35,7 +35,6 @@ public class FolderGetChildrenCharacterizationTests
     private static void SetStatics(ILibraryManager libraryManager)
     {
         BaseItem.LibraryManager = libraryManager;
-        BaseItem.UserDataManager = Mock.Of<IUserDataManager>();
         BaseItem.ConfigurationManager = Mock.Of<IServerConfigurationManager>(x => x.Configuration == new ServerConfiguration());
         BaseItem.Logger = NullLogger<BaseItem>.Instance;
     }

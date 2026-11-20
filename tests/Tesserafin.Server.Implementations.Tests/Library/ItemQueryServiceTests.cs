@@ -51,7 +51,6 @@ public class ItemQueryServiceTests
 
         BaseItem.LibraryManager = libraryManager;
         BaseItem.ConfigurationManager = configurationManager;
-        BaseItem.UserDataManager = new Mock<IUserDataManager>().Object;
 
         return new ItemQueryService(channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object, configurationManager, itemSortService ?? new PassthroughItemSortService(), itemLookupService.Object, itemRepository.Object, scopeService.Object, PermissiveVisibility.Scope, Listing);
     }

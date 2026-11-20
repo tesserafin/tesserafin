@@ -826,7 +826,6 @@ namespace Tesserafin.Server.Core
             BaseItem.LibraryManager = Resolve<ILibraryManager>();
             BaseItem.Logger = Resolve<ILogger<BaseItem>>();
             BaseItem.ProviderManager = Resolve<IProviderManager>();
-            BaseItem.UserDataManager = Resolve<IUserDataManager>();
         }
 
         /// <summary>

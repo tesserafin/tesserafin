@@ -481,8 +481,6 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public IItemReadServices ReadServices { get; set; }
 
-        public static IUserDataManager UserDataManager { get; set; }
-
         /// <summary>
         /// Gets or sets the name of the forced sort.
         /// </summary>
@@ -2616,25 +2614,25 @@ namespace Tesserafin.Controller.Entities
             return UpdateToRepositoryAsync(writes, ItemUpdateType.ImageUpdate, CancellationToken.None);
         }
 
-        public virtual bool IsPlayed(User user, UserItemData userItemData)
+        public virtual bool IsPlayed(User user, IUserDataManager userDataManager, UserItemData userItemData = null)
         {
-            userItemData ??= UserDataManager.GetUserData(user, this);
+            userItemData ??= userDataManager.GetUserData(user, this);
 
             return userItemData is not null && userItemData.Played;
         }
 
-        public bool IsFavoriteOrLiked(User user, UserItemData userItemData)
+        public bool IsFavoriteOrLiked(User user, IUserDataManager userDataManager, UserItemData userItemData = null)
         {
-            userItemData ??= UserDataManager.GetUserData(user, this);
+            userItemData ??= userDataManager.GetUserData(user, this);
 
             return userItemData is not null && (userItemData.IsFavorite || (userItemData.Likes ?? false));
         }
 
-        public virtual bool IsUnplayed(User user, UserItemData userItemData)
+        public virtual bool IsUnplayed(User user, IUserDataManager userDataManager, UserItemData userItemData = null)
         {
             ArgumentNullException.ThrowIfNull(user);
 
-            userItemData ??= UserDataManager.GetUserData(user, this);
+            userItemData ??= userDataManager.GetUserData(user, this);
 
             return userItemData is null || !userItemData.Played;
         }

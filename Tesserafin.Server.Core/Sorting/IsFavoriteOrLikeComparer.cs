@@ -53,7 +53,7 @@ namespace Tesserafin.Server.Core.Sorting
         /// <returns>DateTime.</returns>
         private int GetValue(BaseItem x)
         {
-            return x.IsFavoriteOrLiked(User, userItemData: null) ? 0 : 1;
+            return x.IsFavoriteOrLiked(User, UserDataManager) ? 0 : 1;
         }
     }
 }

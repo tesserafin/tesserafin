@@ -112,7 +112,7 @@ namespace Tesserafin.Controller.Entities
                 parent = LibraryManager.GetItemById(ParentId) as Folder ?? parent;
             }
 
-            return new UserViewBuilder(userViewManager, LibraryManager, Logger, UserDataManager, tvSeriesManager, channelManager, collectionManager, null, query.RequireVisibility(), query.Listing)
+            return new UserViewBuilder(userViewManager, LibraryManager, Logger, tvSeriesManager, channelManager, collectionManager, null, query.RequireVisibility(), query.Listing)
                 .GetUserItems(parent, this, CollectionType, query);
         }
 
@@ -130,7 +130,7 @@ namespace Tesserafin.Controller.Entities
                 parent = LibraryManager.GetItemById(ParentId) as Folder ?? parent;
             }
 
-            return new UserViewBuilder(userViewManager, LibraryManager, Logger, UserDataManager, tvSeriesManager, channelManager, collectionManager, itemSortService, query.RequireVisibility(), query.Listing)
+            return new UserViewBuilder(userViewManager, LibraryManager, Logger, tvSeriesManager, channelManager, collectionManager, itemSortService, query.RequireVisibility(), query.Listing)
                 .GetUserItems(parent, this, CollectionType, query);
         }
 

@@ -1131,7 +1131,7 @@ namespace Tesserafin.Controller.Entities
 
             if (user is null)
             {
-                return UserViewBuilder.Filter(Children, user, query, UserDataManager, LibraryManager);
+                return UserViewBuilder.Filter(Children, user, query, LibraryManager);
             }
 
             // need to pass this param to the children.
@@ -1149,7 +1149,6 @@ namespace Tesserafin.Controller.Entities
                 getChildren(user, true, childQuery),
                 user,
                 query,
-                UserDataManager,
                 LibraryManager);
         }
 
@@ -1623,7 +1622,7 @@ namespace Tesserafin.Controller.Entities
                 .Where(e => e.IsVisible(user, false, scope))
                 .ToArray();
 
-            var realChildren = UserViewBuilder.Filter(visibleChildren, query.User, query, UserDataManager, LibraryManager)
+            var realChildren = UserViewBuilder.Filter(visibleChildren, query.User, query, LibraryManager)
                 .ToArray();
 
             var childCount = realChildren.Length;
@@ -1983,14 +1982,14 @@ namespace Tesserafin.Controller.Entities
             return false;
         }
 
-        public override bool IsPlayed(User user, UserItemData userItemData)
+        public override bool IsPlayed(User user, IUserDataManager userDataManager, UserItemData userItemData = null)
         {
             return RequireReadServices().IsPlayed(user, Id);
         }
 
-        public override bool IsUnplayed(User user, UserItemData userItemData)
+        public override bool IsUnplayed(User user, IUserDataManager userDataManager, UserItemData userItemData = null)
         {
-            return !IsPlayed(user, userItemData);
+            return !IsPlayed(user, userDataManager, userItemData);
         }
 
         public override void FillUserDataDtoValues(

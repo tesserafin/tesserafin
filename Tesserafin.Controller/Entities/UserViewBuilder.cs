@@ -27,7 +27,6 @@ namespace Tesserafin.Controller.Entities
         private readonly IUserViewManager _userViewManager;
         private readonly ILibraryManager _libraryManager;
         private readonly ILogger<BaseItem> _logger;
-        private readonly IUserDataManager _userDataManager;
         private readonly ITVSeriesManager _tvSeriesManager;
         private readonly IChannelManager _channelManager;
         private readonly ICollectionManager _collectionManager;
@@ -39,7 +38,6 @@ namespace Tesserafin.Controller.Entities
             IUserViewManager userViewManager,
             ILibraryManager libraryManager,
             ILogger<BaseItem> logger,
-            IUserDataManager userDataManager,
             ITVSeriesManager tvSeriesManager,
             IChannelManager channelManager,
             ICollectionManager collectionManager,
@@ -52,7 +50,6 @@ namespace Tesserafin.Controller.Entities
             _userViewManager = userViewManager;
             _libraryManager = libraryManager;
             _logger = logger;
-            _userDataManager = userDataManager;
             _tvSeriesManager = tvSeriesManager;
             _channelManager = channelManager;
             _collectionManager = collectionManager;
@@ -460,7 +457,7 @@ namespace Tesserafin.Controller.Entities
             InternalItemsQuery query)
             where T : BaseItem
         {
-            var filtered = Filter(items, query.User, query, _userDataManager, _libraryManager);
+            var filtered = Filter(items, query.User, query, _libraryManager);
 
             if (_itemSortService is not null)
             {
@@ -478,17 +475,15 @@ namespace Tesserafin.Controller.Entities
         /// <param name="items">The items to filter.</param>
         /// <param name="user">The user for filtering context.</param>
         /// <param name="query">The query parameters.</param>
-        /// <param name="userDataManager">The user data manager.</param>
         /// <param name="libraryManager">The library manager.</param>
         /// <returns>The filtered items.</returns>
         public static IEnumerable<BaseItem> Filter(
             IEnumerable<BaseItem> items,
             User user,
             InternalItemsQuery query,
-            IUserDataManager userDataManager,
             ILibraryManager libraryManager)
         {
-            var filtered = items.Where(i => Filter(i, user, query, userDataManager, libraryManager));
+            var filtered = items.Where(i => Filter(i, user, query, libraryManager));
 
             if (query.IsPlayed.HasValue && user is not null)
             {
@@ -576,7 +571,6 @@ namespace Tesserafin.Controller.Entities
             BaseItem item,
             User user,
             InternalItemsQuery query,
-            IUserDataManager userDataManager,
             ILibraryManager libraryManager)
         {
             if (!string.IsNullOrEmpty(query.NameStartsWith) && !item.SortName.StartsWith(query.NameStartsWith, StringComparison.InvariantCultureIgnoreCase))
@@ -621,11 +615,13 @@ namespace Tesserafin.Controller.Entities
                 return false;
             }
 
+            UserItemData GetUserData() => query.RequireListing().UserData.GetUserData(user, item);
+
             UserItemData userData = null;
 
             if (query.IsLiked.HasValue)
             {
-                userData = userDataManager.GetUserData(user, item);
+                userData = GetUserData();
                 if (!userData.Likes.HasValue || userData.Likes != query.IsLiked.Value)
                 {
                     return false;
@@ -634,7 +630,7 @@ namespace Tesserafin.Controller.Entities
 
             if (query.IsFavoriteOrLiked.HasValue)
             {
-                userData ??= userDataManager.GetUserData(user, item);
+                userData ??= GetUserData();
                 var isFavoriteOrLiked = userData.IsFavorite || (userData.Likes ?? false);
 
                 if (isFavoriteOrLiked != query.IsFavoriteOrLiked.Value)
@@ -645,7 +641,7 @@ namespace Tesserafin.Controller.Entities
 
             if (query.IsFavorite.HasValue)
             {
-                userData ??= userDataManager.GetUserData(user, item);
+                userData ??= GetUserData();
                 if (userData.IsFavorite != query.IsFavorite.Value)
                 {
                     return false;
@@ -654,7 +650,7 @@ namespace Tesserafin.Controller.Entities
 
             if (query.IsResumable.HasValue)
             {
-                userData ??= userDataManager.GetUserData(user, item);
+                userData ??= GetUserData();
                 var isResumable = userData.PlaybackPositionTicks > 0;
 
                 if (isResumable != query.IsResumable.Value)
@@ -669,8 +665,8 @@ namespace Tesserafin.Controller.Entities
                 // Folders are batch-filtered by the collection Filter() overload.
                 if (!item.IsFolder)
                 {
-                    userData ??= userDataManager.GetUserData(user, item);
-                    if (item.IsPlayed(user, userData) != query.IsPlayed.Value)
+                    userData ??= GetUserData();
+                    if (item.IsPlayed(user, query.RequireListing().UserData, userData) != query.IsPlayed.Value)
                     {
                         return false;
                     }

@@ -54,7 +54,7 @@ namespace Tesserafin.Server.Core.Sorting
         /// <returns>DateTime.</returns>
         private int GetValue(BaseItem x)
         {
-            return x.IsPlayed(User, userItemData: null) ? 0 : 1;
+            return x.IsPlayed(User, UserDataManager) ? 0 : 1;
         }
     }
 }
