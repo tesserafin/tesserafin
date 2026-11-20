@@ -153,7 +153,7 @@ namespace Tesserafin.Controller.Entities
             return changed;
         }
 
-        public override double? GetRefreshProgress()
+        public override double? GetRefreshProgress(IProviderManager providerManager)
         {
             var folders = GetPhysicalFolders(true).ToList();
             double totalProgresses = 0;
@@ -161,7 +161,7 @@ namespace Tesserafin.Controller.Entities
 
             foreach (var folder in folders)
             {
-                var progress = ProviderManager.GetRefreshProgress(folder.Id);
+                var progress = providerManager.GetRefreshProgress(folder.Id);
                 if (progress.HasValue)
                 {
                     totalProgresses += progress.Value;

@@ -494,7 +494,7 @@ namespace Tesserafin.Server.Core.Library
 
                 if (refreshQueue is not null)
                 {
-                    info.RefreshProgress = libraryFolder.GetRefreshProgress();
+                    info.RefreshProgress = libraryFolder.GetRefreshProgress(ProviderManager);
 
                     info.RefreshStatus = info.RefreshProgress.HasValue ? "Active" : refreshQueue.Contains(libraryFolder.Id) ? "Queued" : "Idle";
                 }

@@ -1,15 +1,16 @@
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.LibraryTaskScheduler;
+using Tesserafin.Controller.Providers;
 
 namespace Tesserafin.Controller.Library;
 
 /// <summary>
 /// The services a folder's validation and recursive refresh use: deletion, writes, image preparation, the
-/// bounded-concurrency scheduler and the channel manager (which decides whether a channel item may be removed).
+/// bounded-concurrency scheduler, refresh tracking and channel removal policy.
 /// </summary>
 /// <remarks>
 /// One port instead of a growing parameter list threaded through <c>Folder.ValidateChildren</c> and its overrides.
-/// The channel manager reaches validation itself, so implementations resolve it on first use.
+/// The channel and provider managers reach validation themselves, so implementations resolve them on first use.
 /// </remarks>
 public interface IFolderValidationServices
 {
@@ -24,6 +25,9 @@ public interface IFolderValidationServices
 
     /// <summary>Gets the bounded-concurrency scheduler.</summary>
     ILimitedConcurrencyLibraryScheduler Scheduler { get; }
+
+    /// <summary>Gets the provider manager that tracks refresh progress.</summary>
+    IProviderManager Providers { get; }
 
     /// <summary>Gets the channel manager.</summary>
     IChannelManager Channels { get; }

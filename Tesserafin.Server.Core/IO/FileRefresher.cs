@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Providers;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.IO
 {
@@ -17,19 +19,23 @@ namespace Tesserafin.Server.Core.IO
         private readonly ILogger _logger;
         private readonly ILibraryManager _libraryManager;
         private readonly IServerConfigurationManager _configurationManager;
+        private readonly IFileSystem _fileSystem;
+        private readonly Lazy<IProviderManager> _providers;
 
         private readonly List<string> _affectedPaths = new();
         private readonly Lock _timerLock = new();
         private Timer? _timer;
         private bool _disposed;
 
-        public FileRefresher(string path, IServerConfigurationManager configurationManager, ILibraryManager libraryManager, ILogger logger)
+        public FileRefresher(string path, IServerConfigurationManager configurationManager, ILibraryManager libraryManager, IFileSystem fileSystem, Lazy<IProviderManager> providers, ILogger logger)
         {
             logger.LogDebug("New file refresher created for {0}", path);
             Path = path;
 
             _configurationManager = configurationManager;
             _libraryManager = libraryManager;
+            _fileSystem = fileSystem;
+            _providers = providers;
             _logger = logger;
             AddPath(path);
         }
@@ -146,7 +152,7 @@ namespace Tesserafin.Server.Core.IO
 
                 try
                 {
-                    item.ChangedExternally();
+                    _providers.Value.QueueRefresh(item.Id, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), RefreshPriority.High);
                 }
                 catch (Exception ex)
                 {

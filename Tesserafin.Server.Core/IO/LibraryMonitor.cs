@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Providers;
 using Tesserafin.Model.IO;
 using Tesserafin.Server.Core.Library;
 
@@ -23,6 +24,7 @@ namespace Tesserafin.Server.Core.IO
         private readonly IItemChangeEvents _changes;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly IFileSystem _fileSystem;
+        private readonly Lazy<IProviderManager> _providers;
         private readonly DotIgnoreIgnoreRule _dotIgnoreIgnoreRule;
 
         /// <summary>
@@ -46,6 +48,7 @@ namespace Tesserafin.Server.Core.IO
         /// <param name="changes">The completed item change feed.</param>
         /// <param name="configurationManager">The configuration manager.</param>
         /// <param name="fileSystem">The filesystem.</param>
+        /// <param name="providers">The deferred provider manager that queues refreshes.</param>
         /// <param name="appLifetime">The <see cref="IHostApplicationLifetime"/>.</param>
         /// <param name="dotIgnoreIgnoreRule">The .ignore rule handler.</param>
         public LibraryMonitor(
@@ -55,6 +58,7 @@ namespace Tesserafin.Server.Core.IO
             IItemChangeEvents changes,
             IServerConfigurationManager configurationManager,
             IFileSystem fileSystem,
+            Lazy<IProviderManager> providers,
             IHostApplicationLifetime appLifetime,
             DotIgnoreIgnoreRule dotIgnoreIgnoreRule)
         {
@@ -64,6 +68,7 @@ namespace Tesserafin.Server.Core.IO
             _logger = logger;
             _configurationManager = configurationManager;
             _fileSystem = fileSystem;
+            _providers = providers;
             _dotIgnoreIgnoreRule = dotIgnoreIgnoreRule;
 
             appLifetime.ApplicationStarted.Register(Start);
@@ -421,7 +426,7 @@ namespace Tesserafin.Server.Core.IO
                     }
                 }
 
-                var newRefresher = new FileRefresher(path, _configurationManager, _libraryManager, _logger);
+                var newRefresher = new FileRefresher(path, _configurationManager, _libraryManager, _fileSystem, _providers, _logger);
                 newRefresher.Completed += OnNewRefresherCompleted;
                 _activeRefreshers.Add(newRefresher);
             }

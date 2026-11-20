@@ -150,7 +150,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
             var collectionFolderDict = new Dictionary<string, string>
             {
                 ["ItemId"] = collectionFolder.Id.ToString("N", CultureInfo.InvariantCulture),
-                ["Progress"] = (collectionFolder.GetRefreshProgress() ?? 0).ToString(CultureInfo.InvariantCulture)
+                ["Progress"] = (collectionFolder.GetRefreshProgress(_providerManager) ?? 0).ToString(CultureInfo.InvariantCulture)
             };
 
             try
