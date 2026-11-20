@@ -333,6 +333,65 @@ public sealed class LocalMediaPlannerTests
         Assert.Null(store.TakeCaptured());
     }
 
+    [Theory]
+    [InlineData("PGSSUB", false)]
+    [InlineData("ass", false)]
+    [InlineData("subrip", true)]
+    public void A_subtitle_the_client_cannot_render_is_burnt_in_by_an_owned_transcode(string codec, bool external)
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var film = Source("film", "h264", 1, 2, "mkv");
+        film.MediaStreams = [.. film.MediaStreams.Where(stream => stream.Type != MediaStreamType.Subtitle),
+            new MediaStream { Index = 2, Type = MediaStreamType.Subtitle, Codec = codec, IsExternal = external, Path = external ? "film.srt" : null }];
+        var noSubtitles = Browser(hlsOutput: true) with
+        {
+            Decode = Browser(hlsOutput: true).Decode with { SubtitleDelivery = [] },
+        };
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(noSubtitles, _declared with { PreferredSubtitleStreamIndex = 2 }));
+        var plan = planner.PlanVideo(Options(film));
+        var executed = store.TakeCaptured()?.ExecutionPlan;
+
+        Assert.Equal(PlayMethod.Transcode, plan?.PlayMethod);
+        Assert.NotNull(executed);
+        Assert.Equal(Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Burn, executed.SubtitleDelivery);
+        Assert.Equal(2, executed.SubtitleStreamIndex);
+        Assert.Contains(TransformKind.BurnInSubtitle, executed.Transforms);
+        Assert.Contains(TransformKind.TranscodeVideo, executed.Transforms);
+        Assert.True(LocalMediaPlanner.IsExecutableTranscode(executed));
+    }
+
+    [Fact]
+    public void A_burn_in_is_executable_only_with_the_video_encoded_to_h264()
+    {
+        var burn = new PlaybackExecutionPlan(
+            PlaybackMethod.Transcode,
+            SourceId: "film",
+            Container: "mp4",
+            Protocol: StreamingProtocol.Hls,
+            VideoStreamIndex: 0,
+            VideoCodec: "h264",
+            VideoBitrate: null,
+            Resolution: null,
+            VideoRange: null,
+            AudioStreamIndex: 1,
+            AudioCodec: "aac",
+            AudioBitrate: null,
+            AudioChannels: null,
+            SubtitleStreamIndex: 2,
+            SubtitleFormat: "PGSSUB",
+            SubtitleDelivery: Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Burn,
+            TotalBitrate: null,
+            Transforms: [TransformKind.RemuxContainer, TransformKind.TranscodeVideo, TransformKind.CopyAudio, TransformKind.BurnInSubtitle]);
+
+        Assert.True(LocalMediaPlanner.IsExecutableTranscode(burn));
+        Assert.False(LocalMediaPlanner.IsExecutableTranscode(burn with { SubtitleStreamIndex = null }));
+        Assert.False(LocalMediaPlanner.IsExecutableTranscode(burn with { Transforms = [TransformKind.RemuxContainer, TransformKind.CopyVideo, TransformKind.CopyAudio, TransformKind.BurnInSubtitle] }));
+        Assert.False(LocalMediaPlanner.IsExecutableTranscode(burn with { Transforms = [TransformKind.RemuxContainer, TransformKind.TranscodeVideo, TransformKind.CopyAudio] }));
+        Assert.False(LocalMediaPlanner.IsExecutableRemux(burn with { Method = PlaybackMethod.Remux }));
+    }
+
     [Fact]
     public void Only_an_hls_copy_of_one_audio_stream_is_an_executable_audio_remux()
     {

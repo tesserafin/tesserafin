@@ -254,6 +254,43 @@ public static class EndToEndMediaFixtures
     }
 
     /// <summary>
+    /// Synthesizes an H.264 + AAC Matroska film carrying an embedded ASS subtitle stream (index 2),
+    /// and writes an SRT sidecar next to it: two text subtitles a client that renders none must
+    /// have burnt in.
+    /// </summary>
+    /// <param name="directory">The directory to write the fixture into.</param>
+    /// <param name="durationSeconds">The duration of the fixture, in seconds.</param>
+    /// <returns>The film path and the sidecar path.</returns>
+    public static async Task<(string Film, string Sidecar)> CreateFilmWithTextSubtitlesAsync(string directory, int durationSeconds)
+    {
+        var film = Path.Combine(directory, "subtitled.mkv");
+        var ass = Path.Combine(directory, "embedded.ass");
+        var sidecar = Path.Combine(directory, "subtitled.en.srt");
+        var end = TimeSpan.FromSeconds(durationSeconds).ToString(@"h\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
+        await File.WriteAllTextAsync(ass, $"[Script Info]\nScriptType: v4.00+\nPlayResX: 320\nPlayResY: 180\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,DejaVu Sans,24,&H00FFFFFF,&H00000000,0,0,1,2,0,2,10,10,10,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,{end}.00,Default,,0,0,0,,Embedded subtitle\n").ConfigureAwait(false);
+        await File.WriteAllTextAsync(sidecar, $"1\n00:00:00,000 --> 0{end},000\nSidecar subtitle\n").ConfigureAwait(false);
+        var duration = durationSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        await RunFfmpegAsync(
+        [
+            "-hide_banner", "-y",
+            "-f", "lavfi", "-i", $"testsrc=size=320x180:rate=25:duration={duration}",
+            "-f", "lavfi", "-i", $"sine=frequency=440:duration={duration}",
+            "-i", ass,
+            "-map", "0:v", "-map", "1:a", "-map", "2:s",
+            "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-c:s", "ass", "-shortest",
+            "-f", "matroska", film,
+        ]).ConfigureAwait(false);
+
+        if (!File.Exists(film) || new FileInfo(film).Length == 0)
+        {
+            throw new InvalidOperationException($"ffmpeg did not produce a non-empty fixture at {film}.");
+        }
+
+        return (film, sidecar);
+    }
+
+    /// <summary>
     /// Synthesizes the body a software tuner serves for one channel: H.264 and AAC in MPEG-TS, the
     /// shape an M3U or HDHomeRun tuner delivers.
     /// </summary>

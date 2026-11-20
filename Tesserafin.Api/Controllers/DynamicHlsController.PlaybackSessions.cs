@@ -239,7 +239,20 @@ public partial class DynamicHlsController
             && (request is VideoRequestDto
                 ? IsThePlannedCodec(state.OutputVideoCodec, request.AllowVideoStreamCopy, request.VideoCodec)
                 : !state.IsOutputVideo && state.OutputVideoCodec is null)
-            && (state.AudioStream is null || IsThePlannedCodec(state.OutputAudioCodec, request.AllowAudioStreamCopy, request.AudioCodec));
+            && (state.AudioStream is null || IsThePlannedCodec(state.OutputAudioCodec, request.AllowAudioStreamCopy, request.AudioCodec))
+            && IsThePlannedSubtitle(state, request);
+
+    /// <summary>
+    /// A plan that burns a subtitle in is executed only with that stream overlaid on an encoded
+    /// video; a plan that does not burns nothing in.
+    /// </summary>
+    private static bool IsThePlannedSubtitle(StreamState state, StreamingRequestDto request)
+        => request.SubtitleMethod == SubtitleDeliveryMethod.Encode
+            ? request.SubtitleStreamIndex is int index
+                && state.SubtitleStream?.Index == index
+                && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode
+                && !EncodingHelper.IsCopyCodec(state.OutputVideoCodec)
+            : state.SubtitleDeliveryMethod != SubtitleDeliveryMethod.Encode || state.SubtitleStream is null;
 
     private static bool IsThePlannedCodec(string? outputCodec, bool planCopies, string? plannedCodec)
         => planCopies

@@ -111,7 +111,11 @@ public static class EnginePlanEncodingRequest
         request.AudioBitRate = audioBitrate;
         request.MaxAudioChannels = copiesAudio ? null : plan.AudioChannels;
         request.TranscodingMaxAudioChannels = copiesAudio ? null : plan.AudioChannels;
-        request.SubtitleMethod = Tesserafin.Model.Dlna.SubtitleDeliveryMethod.External;
+        // A burnt-in subtitle is part of the video encode: the executor overlays the plan's stream.
+        // Any other subtitle is the client's to fetch beside the stream.
+        var burns = plan.SubtitleDelivery == Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Burn;
+        request.SubtitleStreamIndex = burns ? plan.SubtitleStreamIndex : null;
+        request.SubtitleMethod = burns ? Tesserafin.Model.Dlna.SubtitleDeliveryMethod.Encode : Tesserafin.Model.Dlna.SubtitleDeliveryMethod.External;
         request.Context = EncodingContext.Streaming;
         request.TranscodeReasons = transcodeReasons;
         request.BuiltFromRetainedPlan = true;

@@ -354,6 +354,17 @@ Audiobooks: an `AudioBook` is an `Audio`, already decided and served by the sess
 the Web client now offers it to that journey too (`AudioBook_StartAndSeek_…`, required by name). No
 local audio item of the Web client reaches `/Audio/{id}/universal` any more.
 
+Burnt-in subtitles: a transcode whose selected subtitle the client cannot render is executed on
+the session's HLS route (`IsExecutableTranscode` accepts `BurnInSubtitle` with the subtitle stream
+named and the video encoded, never copied). `EnginePlanEncodingRequest` requests the plan's stream
+with `SubtitleMethod = Encode`; `IsThePlan` refuses a state that does not overlay exactly that
+stream on an encoded video, or that overlays one the plan does not burn. Proof:
+`BurnInSubtitleEndToEndTests` (an embedded ASS stream and an SRT sidecar; FFmpeg runs the
+`subtitles` filter on an H.264 encode; the output probes as H.264 + AAC with no subtitle stream),
+required by name. Bitmap subtitles (PGS, DVB) take the same path but have no synthetic fixture:
+FFmpeg has no PGS encoder. Break controls: planner refusing the burn (legacy planner reached),
+request without the subtitle (no `subtitles` filter).
+
 ### Plan to delete `PlaybackInfo` and the legacy planner
 
 The Android client never calls `PlaybackInfo` (its start is `POST Playback/Sessions` only). What
@@ -362,19 +373,20 @@ session, the same decisions on any client. Each step moves one row under the ses
 like the slices above (legacy-free host, real FFmpeg, real browser; a phone check where Android
 reaches it), then the deletion is one coordinated change.
 
-1. Burnt-in subtitles: execute a plan that burns a text (ASS/SRT) or bitmap (PGS/DVB) subtitle
-   from the session's HLS route (the executor gets the subtitle stream from the plan; the encoding
-   request carries it). Android reaches it: phone check.
+1. Burnt-in subtitles: done for text and bitmap streams (above); Android reaches it: phone check.
 2. HDR tone mapping: execute a plan whose `VideoRange` asks for SDR output (tonemap filter,
    software and the host's VAAPI), with an HDR10 fixture. Android reaches it: phone check.
-3. Targets other than H.264/AAC: either encode them from the plan (HEVC/AV1 behind the existing
-   `AllowHevcEncoding`/`AllowAv1Encoding`, MP3/Opus audio) or refuse them in the planner, which
-   then re-plans to H.264/AAC. Decision needed.
-4. A client with no HLS output: a session-owned progressive (HTTP) transcode route, or a refusal.
-   Decision needed.
-5. Non-local sources (channel-plugin items, `.strm`, remote HTTP): read through the media source
-   manager's provider like a tuner stream, or refuse. Decision needed.
-6. DLNA: keep it on `StreamBuilder` as its own consumer, or move it onto sessions. Decision needed.
+3. Targets other than H.264/AAC (decided 2026-11-20): a transcode to HEVC, AV1, MP3 or Opus is
+   re-planned to H.264/AAC when the client declares those, and refused explicitly otherwise; a
+   direct play or a remux of these codecs stays allowed when the client's profile accepts them.
+4. A client with no HLS output (decided): a session-owned progressive HTTP output for clients that
+   declare it, executing the same plan under the same access and stop rules as HLS.
+5. Non-local sources (decided): read through a session-managed provider on the tuner model - it
+   opens and closes the source and says whether seeking is possible; a source no provider handles
+   is refused.
+6. DLNA (decided): migrated onto sessions after step 4, through a DLNA adapter that turns the
+   player's profile into capabilities and announces the play url; `StreamBuilder` goes with this
+   last consumer.
 7. Deletion, once the rows above are empty: `GET/POST Items/{id}/PlaybackInfo`, the inner planner
    (`PlaybackSessionPlanner`/`StreamBuilder` for sessions), `PlaybackExecutionPlanAdapter.ToStreamInfo`,
    `PlaybackSessionStreamDescriptorMapper`, `PlaybackLiveStreamResolver`, the client-option HLS and

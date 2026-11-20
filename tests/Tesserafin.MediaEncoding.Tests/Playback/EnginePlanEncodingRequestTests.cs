@@ -283,6 +283,29 @@ public sealed class EnginePlanEncodingRequestTests
     }
 
     [Fact]
+    public void A_burnt_in_subtitle_is_requested_as_an_encode_of_the_plans_stream()
+    {
+        var burn = VideoOnly with
+        {
+            SubtitleStreamIndex = 2,
+            SubtitleFormat = "ass",
+            SubtitleDelivery = Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Burn,
+            Transforms = [TransformKind.RemuxContainer, TransformKind.TranscodeVideo, TransformKind.CopyAudio, TransformKind.BurnInSubtitle],
+        };
+
+        var request = EnginePlanEncodingRequest.Build(burn, Guid.NewGuid(), "ps", "device", Source("aac"), null);
+
+        Assert.Equal(2, request.SubtitleStreamIndex);
+        Assert.Equal(Tesserafin.Model.Dlna.SubtitleDeliveryMethod.Encode, request.SubtitleMethod);
+        Assert.False(request.AllowVideoStreamCopy);
+
+        // Without a burn-in nothing is overlaid: the subtitle is the client's to fetch.
+        var plain = EnginePlanEncodingRequest.Build(VideoOnly, Guid.NewGuid(), "ps", "device", Source("aac"), null);
+        Assert.Null(plain.SubtitleStreamIndex);
+        Assert.Equal(Tesserafin.Model.Dlna.SubtitleDeliveryMethod.External, plain.SubtitleMethod);
+    }
+
+    [Fact]
     public void A_plan_the_session_route_does_not_execute_has_no_request()
     {
         Assert.Throws<ArgumentException>(() => EnginePlanEncodingRequest.Build(_audioOnly with { Protocol = StreamingProtocol.Http }, Guid.NewGuid(), "ps", "device", null, null));

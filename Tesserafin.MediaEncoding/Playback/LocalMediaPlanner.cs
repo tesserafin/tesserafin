@@ -207,8 +207,9 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
     /// Determines whether a plan is a transcode this server executes from the plan alone: the
     /// engine chose <see cref="PlaybackMethod.Transcode"/>, delivered over HLS in fMP4 or MPEG-TS
     /// segments; each stream is either copied or re-encoded, video to H.264 and audio to AAC
-    /// (optionally down-mixed); the output stays in the source's video range. Tone mapping and a
-    /// burnt-in subtitle are not this definition: they are decided, but not executed from here.
+    /// (optionally down-mixed); the output stays in the source's video range. A subtitle is either
+    /// delivered beside the stream or burnt into the encoded video. Tone mapping is not this
+    /// definition: it is decided, but not executed from here.
     /// </summary>
     /// <param name="plan">The execution plan.</param>
     /// <returns><see langword="true"/> if the plan is an executable SDR transcode.</returns>
@@ -225,8 +226,23 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             && plan.Transforms.All(transform => transform is TransformKind.RemuxContainer
                 or TransformKind.TranscodeVideo or TransformKind.CopyVideo
                 or TransformKind.TranscodeAudio or TransformKind.CopyAudio or TransformKind.Downmix
-                or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle)
-            && plan.SubtitleDelivery is null or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External;
+                or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle or TransformKind.BurnInSubtitle)
+            && IsExecutableSubtitle(plan);
+
+    /// <summary>
+    /// A transcode's subtitle is executable from the plan when it is delivered beside the stream,
+    /// or burnt into a video stream this server encodes: the plan names the stream, and burning
+    /// it in is part of that video encode, never of a copy.
+    /// </summary>
+    private static bool IsExecutableSubtitle(PlaybackExecutionPlan plan)
+        => plan.SubtitleDelivery switch
+        {
+            null or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External => !plan.Transforms.Contains(TransformKind.BurnInSubtitle),
+            Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Burn => plan.SubtitleStreamIndex is not null
+                && plan.Transforms.Contains(TransformKind.BurnInSubtitle)
+                && plan.Transforms.Contains(TransformKind.TranscodeVideo),
+            _ => false,
+        };
 
     /// <summary>
     /// Determines whether a plan is a remux this server executes from the plan alone: the engine
