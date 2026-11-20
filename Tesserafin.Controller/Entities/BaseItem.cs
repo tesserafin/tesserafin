@@ -15,7 +15,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Channels;
-using Tesserafin.Controller.Chapters;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities.TV;
@@ -472,8 +471,6 @@ namespace Tesserafin.Controller.Entities
         public static IServerConfigurationManager ConfigurationManager { get; set; }
 
         public static IProviderManager ProviderManager { get; set; }
-
-        public static IChapterManager ChapterManager { get; set; }
 
         public static IFileSystem FileSystem { get; set; }
 
@@ -2460,71 +2457,7 @@ namespace Tesserafin.Controller.Entities
         /// <param name="imageIndex">Index of the image.</param>
         /// <returns>ItemImageInfo.</returns>
         public ItemImageInfo GetImageInfo(ImageType imageType, int imageIndex)
-        {
-            if (imageType == ImageType.Chapter)
-            {
-                var chapter = ChapterManager.GetChapter(Id, imageIndex);
-
-                if (chapter is null)
-                {
-                    return null;
-                }
-
-                var path = chapter.ImagePath;
-
-                if (string.IsNullOrEmpty(path))
-                {
-                    return null;
-                }
-
-                return new ItemImageInfo
-                {
-                    Path = path,
-                    DateModified = chapter.ImageDateModified,
-                    Type = imageType
-                };
-            }
-
-            return GetImages(imageType)
-                .ElementAtOrDefault(imageIndex);
-        }
-
-        /// <summary>
-        /// Computes image index for given image or raises if no matching image found.
-        /// </summary>
-        /// <param name="image">Image to compute index for.</param>
-        /// <exception cref="ArgumentException">Image index cannot be computed as no matching image found.
-        /// </exception>
-        /// <returns>Image index.</returns>
-        public int GetImageIndex(ItemImageInfo image)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-
-            if (image.Type == ImageType.Chapter)
-            {
-                var chapters = ChapterManager.GetChapters(Id);
-                for (var i = 0; i < chapters.Count; i++)
-                {
-                    if (chapters[i].ImagePath == image.Path)
-                    {
-                        return i;
-                    }
-                }
-
-                throw new ArgumentException("No chapter index found for image path", image.Path);
-            }
-
-            var images = GetImages(image.Type).ToArray();
-            for (var i = 0; i < images.Length; i++)
-            {
-                if (images[i].Path == image.Path)
-                {
-                    return i;
-                }
-            }
-
-            throw new ArgumentException("No image index found for image path", image.Path);
-        }
+            => GetImages(imageType).ElementAtOrDefault(imageIndex);
 
         public IEnumerable<ItemImageInfo> GetImages(ImageType imageType)
         {

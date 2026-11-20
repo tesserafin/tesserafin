@@ -21,6 +21,7 @@ using Tesserafin.Api.Extensions;
 using Tesserafin.Api.Helpers;
 using Tesserafin.Common.Api;
 using Tesserafin.Common.Configuration;
+using Tesserafin.Controller.Chapters;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Entities;
@@ -44,6 +45,7 @@ public class ImageController : BaseTesserafinApiController
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemImageService _images;
+    private readonly IChapterManager _chapterManager;
     private readonly IUserManager _userManager;
     private readonly ILibraryManager _libraryManager;
     private readonly IProviderManager _providerManager;
@@ -58,6 +60,7 @@ public class ImageController : BaseTesserafinApiController
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+    /// <param name="chapterManager">Instance of the <see cref="IChapterManager"/> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
@@ -69,6 +72,7 @@ public class ImageController : BaseTesserafinApiController
     public ImageController(
         IItemWriteCommands writes,
         IItemImageService images,
+        IChapterManager chapterManager,
         IUserManager userManager,
         ILibraryManager libraryManager,
         IProviderManager providerManager,
@@ -80,6 +84,7 @@ public class ImageController : BaseTesserafinApiController
     {
         _writes = writes;
         _images = images;
+        _chapterManager = chapterManager;
         _userManager = userManager;
         _libraryManager = libraryManager;
         _providerManager = providerManager;
@@ -1877,7 +1882,13 @@ public class ImageController : BaseTesserafinApiController
 
         if (imageInfo is null)
         {
-            imageInfo = item?.GetImageInfo(imageType, imageIndex ?? 0);
+            if (item is not null)
+            {
+                imageInfo = imageType == ImageType.Chapter
+                    ? GetChapterImage(item.Id, imageIndex ?? 0)
+                    : item.GetImageInfo(imageType, imageIndex ?? 0);
+            }
+
             if (imageInfo is null)
             {
                 return NotFound(string.Format(NumberFormatInfo.InvariantInfo, "{0} does not have an image of type {1}", item?.Name, imageType));
@@ -1935,6 +1946,22 @@ public class ImageController : BaseTesserafinApiController
             cacheDuration,
             responseHeaders,
             tag).ConfigureAwait(false);
+    }
+
+    private ItemImageInfo? GetChapterImage(Guid itemId, int imageIndex)
+    {
+        var chapter = _chapterManager.GetChapter(itemId, imageIndex);
+        if (string.IsNullOrEmpty(chapter?.ImagePath))
+        {
+            return null;
+        }
+
+        return new ItemImageInfo
+        {
+            Path = chapter.ImagePath,
+            DateModified = chapter.ImageDateModified,
+            Type = ImageType.Chapter
+        };
     }
 
     private ImageFormat[] GetOutputFormats(ImageFormat? format)
