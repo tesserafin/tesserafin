@@ -114,6 +114,19 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             && !string.IsNullOrEmpty(source.Path);
 
     /// <summary>
+    /// Determines whether a media source is a local disc structure - a DVD or Blu-ray folder rip -
+    /// that the session's executor reads as one input (a concatenation of its title files). It is
+    /// remuxed or transcoded into a session output, never handed to the client as it is (decided
+    /// 2026-11-20).
+    /// </summary>
+    /// <param name="source">The media source.</param>
+    /// <returns><see langword="true"/> if the source is a local DVD or Blu-ray folder.</returns>
+    public static bool IsLocalDiscSource(MediaSourceInfo? source)
+        => source is { Protocol: MediaProtocol.File, IsRemote: false, IsInfiniteStream: false, RequiresOpening: false, IsoType: null, VideoType: VideoType.Dvd or VideoType.BluRay }
+            && string.IsNullOrEmpty(source.LiveStreamId)
+            && !string.IsNullOrEmpty(source.Path);
+
+    /// <summary>
     /// Determines whether a media source is a remote file the server reads over HTTP (a remote url, a
     /// <c>.strm</c> target): one the session's executor reads from its url, and can seek in because
     /// its duration is known (decided 2026-11-20: non-local sources go through a provider that says
@@ -354,19 +367,19 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             return null;
         }
 
-        if (!sources.All(source => live ? IsSessionLiveSource(source, request.LiveStreamId) : IsLocalFileSource(source) || IsSeekableRemoteSource(source)))
+        if (!sources.All(source => live ? IsSessionLiveSource(source, request.LiveStreamId) : IsLocalFileSource(source) || IsSeekableRemoteSource(source) || IsLocalDiscSource(source)))
         {
             // A non-local source no session provider reads (another protocol, a remote stream with
             // no known duration): refused, not handed to the existing chain (decided 2026-11-20). A
-            // local disc structure (DVD, Blu-ray, ISO) is not that: it stays with the existing chain.
+            // local ISO image is not that: it stays with the existing chain.
             refused = !live && sources.Any(source => source.Protocol != MediaProtocol.File);
             return null;
         }
 
-        // An opened tuner stream and a remote file are reachable by the server only (through its
-        // provider, or its url): they are remuxed or transcoded into a session output, never handed
-        // to the client as they are.
-        var serverOnly = live || sources.Any(IsSeekableRemoteSource);
+        // An opened tuner stream, a remote file and a disc structure are readable by the server only
+        // (through its provider, its url, or a concatenation of its title files): they are remuxed or
+        // transcoded into a session output, never handed to the client as they are.
+        var serverOnly = live || sources.Any(source => IsSeekableRemoteSource(source) || IsLocalDiscSource(source));
         var constraints = serverOnly ? request.Constraints with { AllowDirectPlay = false } : request.Constraints;
 
         var context = DlnaPlaybackAdapter.ToContext(options.ItemId, options.UserId, options.MediaSourceId, kind, PlaybackEngine.EngineVersion);

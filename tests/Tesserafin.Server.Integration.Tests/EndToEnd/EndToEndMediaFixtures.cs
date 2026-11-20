@@ -255,6 +255,33 @@ public static class EndToEndMediaFixtures
     }
 
     /// <summary>
+    /// Synthesizes a DVD folder rip: <c>VIDEO_TS</c> holding one title split over two VOB files
+    /// (MPEG-2 video and AC-3 audio in MPEG program streams), the layout the executor concatenates.
+    /// </summary>
+    /// <param name="directory">The directory to create the rip in.</param>
+    /// <param name="durationSeconds">The duration of each VOB, in seconds.</param>
+    /// <returns>The rip's folder and its first VOB.</returns>
+    public static async Task<(string Folder, string FirstVob)> CreateDvdFolderAsync(string directory, int durationSeconds)
+    {
+        var folder = Path.Combine(directory, "DVD Probe");
+        var videoTs = Directory.CreateDirectory(Path.Combine(folder, "VIDEO_TS")).FullName;
+        var duration = durationSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        foreach (var part in new[] { 1, 2 })
+        {
+            await RunFfmpegAsync(
+            [
+                "-hide_banner", "-y",
+                "-f", "lavfi", "-i", $"testsrc=size=320x240:rate=25:duration={duration}",
+                "-f", "lavfi", "-i", $"sine=frequency=440:duration={duration}",
+                "-c:v", "mpeg2video", "-b:v", "2M", "-c:a", "ac3", "-ac", "2", "-shortest",
+                "-f", "vob", Path.Combine(videoTs, FormattableString.Invariant($"VTS_01_{part}.VOB")),
+            ]).ConfigureAwait(false);
+        }
+
+        return (folder, Path.Combine(videoTs, "VTS_01_1.VOB"));
+    }
+
+    /// <summary>
     /// Synthesizes an HDR10 film: HEVC Main10 tagged BT.2020 / SMPTE ST 2084 (PQ), with AAC, in
     /// Matroska - the source a client that only shows SDR must be served tone-mapped.
     /// </summary>

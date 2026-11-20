@@ -418,6 +418,15 @@ HLS output with FFmpeg reading the url; an RTSP source refused with 422), requir
 control: remote provider removed (refused). The kill-switch contract moves to `PlaybackInfo`, the one
 caller the live wiring still serves, read from `IPlaybackLiveWiringDiagnosticsStore`.
 
+Local disc structures (decided 2026-11-20): a DVD or Blu-ray folder rip (`IsLocalDiscSource`) is
+executed by the session - the executor concatenates its title files into one input - with direct
+play forbidden; the delivery guard accepts the folder while it exists. Proof:
+`DiscSourceEndToEndTests` (a synthesized two-VOB DVD title, `-f concat` in the command, output
+probed as H.264 + AAC), required by name; break control: disc source removed (legacy planner
+reached). A Blu-ray folder takes the same path but cannot be synthesized here (it needs a real BDMV
+structure). An ISO image stays with the existing chain: the executor reads only a Blu-ray ISO
+directly, and neither can be proven here.
+
 ### Plan to delete `PlaybackInfo` and the legacy planner
 
 The Android client never calls `PlaybackInfo` (its start is `POST Playback/Sessions` only). What
@@ -433,9 +442,9 @@ reaches it), then the deletion is one coordinated change.
 4. A client with no HLS output: done (above).
 5. Non-local sources: done for remote HTTP files (above); channel-plugin items and local disc
    structures remain with the existing chain.
-6. DLNA (decided): migrated onto sessions after step 4, through a DLNA adapter that turns the
-   player's profile into capabilities and announces the play url; `StreamBuilder` goes with this
-   last consumer.
+6. DLNA: not applicable (decided 2026-11-20). Tesserafin ships no DLNA server; "Dlna" only names
+   the legacy `DeviceProfile`/`StreamBuilder` model, which goes with step 7. An external DLNA plugin
+   is not supported.
 7. Deletion, once the rows above are empty: `GET/POST Items/{id}/PlaybackInfo`, the inner planner
    (`PlaybackSessionPlanner`/`StreamBuilder` for sessions), `PlaybackExecutionPlanAdapter.ToStreamInfo`,
    `PlaybackSessionStreamDescriptorMapper`, `PlaybackLiveStreamResolver`, the client-option HLS and
@@ -446,7 +455,7 @@ Remaining consumers by name. Nothing is deleted globally while one of them still
 
 | Legacy path | Still reached by |
 | --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | a session of a channel-plugin item or a local disc structure (DVD, Blu-ray, ISO), Live TV through `PlaybackInfo`, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
+| `PlaybackSessionPlanner` / `StreamBuilder` | a session of a channel-plugin item or a local ISO image, Live TV through `PlaybackInfo`, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
 | Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio the server does not serve from the session, Live TV, channel-plugin items; a library video the server does not serve from the session |
