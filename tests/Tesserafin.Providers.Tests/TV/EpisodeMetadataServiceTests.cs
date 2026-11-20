@@ -3,14 +3,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
-using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Configuration;
@@ -32,12 +30,10 @@ public class EpisodeMetadataServiceTests
     [Fact]
     public async Task BeforeRefresh_ReadsEmbeddedEpisodeInfoBeforeTheFilenameFallback()
     {
-        var sources = Mock.Of<IMediaSourceManager>();
-        var segments = Mock.Of<IMediaSegmentManager>();
-        var channels = Mock.Of<IChannelManager>();
+        var sources = new Mock<IMediaSourceManager>(MockBehavior.Strict);
         var source = new MediaSourceInfo { Path = "episode.mp4" };
         var episode = CreateMp4Episode();
-        episode.Setup(e => e.GetMediaSources(false, sources, segments, channels)).Returns([source]);
+        sources.Setup(manager => manager.GetStaticMediaSources(episode.Object, false, null)).Returns([source]);
 
         var token = TestContext.Current.CancellationToken;
         var encoder = new Mock<IMediaEncoder>(MockBehavior.Strict);
@@ -51,7 +47,7 @@ public class EpisodeMetadataServiceTests
             .Callback(() => embeddedAtFallback = (episode.Object.ParentIndexNumber, episode.Object.IndexNumber, episode.Object.SeriesName))
             .Returns(false);
 
-        var service = new TestEpisodeMetadataService(encoder.Object, naming.Object, sources, segments, channels);
+        var service = new TestEpisodeMetadataService(encoder.Object, naming.Object, sources.Object);
         await service.PrepareAsync(episode.Object, token);
 
         Assert.Equal(2, embeddedAtFallback.Season);
@@ -197,8 +193,6 @@ public class EpisodeMetadataServiceTests
             IMediaEncoder? encoder = null,
             IItemNamingService? naming = null,
             IMediaSourceManager? sources = null,
-            IMediaSegmentManager? segments = null,
-            IChannelManager? channels = null,
             IItemLookupService? lookup = null,
             IItemRepository? repository = null)
             : base(
@@ -214,8 +208,6 @@ public class EpisodeMetadataServiceTests
                 repository ?? Mock.Of<IItemRepository>(),
                 encoder ?? Mock.Of<IMediaEncoder>(),
                 sources ?? Mock.Of<IMediaSourceManager>(),
-                segments ?? Mock.Of<IMediaSegmentManager>(),
-                channels ?? Mock.Of<IChannelManager>(),
                 lookup ?? Mock.Of<IItemLookupService>(),
                 Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict))
         {

@@ -5,9 +5,11 @@ using AutoFixture;
 using AutoFixture.AutoMoq;
 using Castle.Components.DictionaryAdapter;
 using Moq;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
 using Tesserafin.Model.Dto;
@@ -27,6 +29,8 @@ namespace Tesserafin.Server.Implementations.Tests.Library
         private readonly Mock<IUserDataManager> _mockUserDataManager;
         private readonly Mock<ILocalizationManager> _mockLocalizationManager;
         private readonly Mock<IItemAccessService> _mockItemAccessService;
+        private readonly Mock<IItemLookupService> _itemLookup;
+        private readonly Mock<ILinkedChildrenService> _linkedChildren;
         private Video _item;
         private User _user;
 
@@ -35,6 +39,11 @@ namespace Tesserafin.Server.Implementations.Tests.Library
             IFixture fixture = new Fixture().Customize(new AutoMoqCustomization { ConfigureMembers = true });
             fixture.Inject<IFileSystem>(fixture.Create<ManagedFileSystem>());
             fixture.Inject(new Lazy<IItemMetadataDispatcher>(() => Mock.Of<IItemMetadataDispatcher>(MockBehavior.Strict)));
+            fixture.Inject(new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")));
+            fixture.Inject(new ActiveRecordings());
+            _itemLookup = fixture.Freeze<Mock<IItemLookupService>>();
+            _linkedChildren = fixture.Freeze<Mock<ILinkedChildrenService>>();
+            _linkedChildren.Setup(links => links.GetLinkedChildrenIds(It.IsAny<Guid>(), It.IsAny<int?>())).Returns([]);
 
             _mockUserDataManager = fixture.Freeze<Mock<IUserDataManager>>();
             _mockUserDataManager.Setup(m => m.GetUserData(It.IsAny<User>(), It.IsAny<BaseItem>())).Returns(new UserItemData() { Key = "key" });
@@ -259,33 +268,16 @@ namespace Tesserafin.Server.Implementations.Tests.Library
                     .ToDictionary(i => i.Id, i => userData[i.Id]));
         }
 
-        private static (Video Primary, Video Alt1, Video Alt2) SetupVersionGroup()
+        private (Video Primary, Video Alt1, Video Alt2) SetupVersionGroup()
         {
             var primary = new Video { Id = Guid.NewGuid(), Path = "/Movies/Movie/Movie.mkv" };
             var alt1 = new Video { Id = Guid.NewGuid(), Path = "/Movies/Movie/Movie - 1080p.mkv", PrimaryVersionId = primary.Id };
             var alt2 = new Video { Id = Guid.NewGuid(), Path = "/Movies/Movie/Movie - 4K.mkv", PrimaryVersionId = primary.Id };
 
-            // BaseItem.GetMediaSources runs against the static service locators.
-            var mediaSourceManager = new Mock<IMediaSourceManager>();
-            mediaSourceManager.Setup(x => x.GetPathProtocol(It.IsAny<string>())).Returns(MediaProtocol.File);
-            mediaSourceManager.Setup(x => x.GetMediaStreams(It.IsAny<Guid>())).Returns(new List<MediaStream>());
-            mediaSourceManager.Setup(x => x.GetMediaAttachments(It.IsAny<Guid>())).Returns(new List<MediaAttachment>());
-
-            var libraryManager = new Mock<ILibraryManager>();
-            libraryManager.Setup(x => x.GetLinkedAlternateVersions(It.IsAny<Video>())).Returns(Array.Empty<Video>());
-            libraryManager.Setup(x => x.GetLocalAlternateVersionIds(primary)).Returns(new[] { alt1.Id, alt2.Id });
-            libraryManager.Setup(x => x.GetLocalAlternateVersionIds(alt1)).Returns(Array.Empty<Guid>());
-            libraryManager.Setup(x => x.GetLocalAlternateVersionIds(alt2)).Returns(Array.Empty<Guid>());
-            libraryManager.Setup(x => x.GetItemById(primary.Id)).Returns(primary);
-            libraryManager.Setup(x => x.GetItemById(alt1.Id)).Returns(alt1);
-            libraryManager.Setup(x => x.GetItemById(alt2.Id)).Returns(alt2);
-
-            var recordingsManager = new Mock<IRecordingsManager>();
-            recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-
-            BaseItem.MediaSourceManager = mediaSourceManager.Object;
-            BaseItem.LibraryManager = libraryManager.Object;
-            Video.RecordingsManager = recordingsManager.Object;
+            _linkedChildren.Setup(links => links.GetLinkedChildrenIds(primary.Id, (int)Tesserafin.Controller.Entities.LinkedChildType.LocalAlternateVersion)).Returns([alt1.Id, alt2.Id]);
+            _itemLookup.Setup(items => items.GetItemById(primary.Id)).Returns(primary);
+            _itemLookup.Setup(items => items.GetItemById(alt1.Id)).Returns(alt1);
+            _itemLookup.Setup(items => items.GetItemById(alt2.Id)).Returns(alt2);
 
             return (primary, alt1, alt2);
         }

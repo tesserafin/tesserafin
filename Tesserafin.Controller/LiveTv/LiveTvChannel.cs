@@ -8,7 +8,6 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json.Serialization;
-using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaSegments;
@@ -125,7 +124,7 @@ namespace Tesserafin.Controller.LiveTv
 
         public IEnumerable<BaseItem> GetTaggedItems() => [];
 
-        public override IReadOnlyList<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, IChannelManager channelManager)
+        public override IReadOnlyList<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, MediaSourceReadContext context)
         {
             var info = new MediaSourceInfo
             {

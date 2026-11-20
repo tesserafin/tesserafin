@@ -7,11 +7,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
@@ -26,8 +24,6 @@ public class CleanDatabaseScheduledTask : ILibraryPostScanTask
     private readonly IDbContextFactory<TesserafinDbContext> _dbProvider;
     private readonly IPathManager _pathManager;
     private readonly IMediaSourceManager _mediaSourceManager;
-    private readonly IMediaSegmentManager _mediaSegmentManager;
-    private readonly IChannelManager _channelManager;
 
     public CleanDatabaseScheduledTask(
         IItemDeletionCommands deletions,
@@ -35,9 +31,7 @@ public class CleanDatabaseScheduledTask : ILibraryPostScanTask
         ILogger<CleanDatabaseScheduledTask> logger,
         IDbContextFactory<TesserafinDbContext> dbProvider,
         IPathManager pathManager,
-        IMediaSourceManager mediaSourceManager,
-        IMediaSegmentManager mediaSegmentManager,
-        IChannelManager channelManager)
+        IMediaSourceManager mediaSourceManager)
     {
         _deletions = deletions;
         _libraryManager = libraryManager;
@@ -45,8 +39,6 @@ public class CleanDatabaseScheduledTask : ILibraryPostScanTask
         _dbProvider = dbProvider;
         _pathManager = pathManager;
         _mediaSourceManager = mediaSourceManager;
-        _mediaSegmentManager = mediaSegmentManager;
-        _channelManager = channelManager;
     }
 
     public async Task Run(IProgress<double> progress, CancellationToken cancellationToken)
@@ -81,7 +73,7 @@ public class CleanDatabaseScheduledTask : ILibraryPostScanTask
             {
                 _logger.LogInformation("Cleaning item {Item} type: {Type} path: {Path}", item.Name, item.GetType().Name, item.Path ?? string.Empty);
 
-                foreach (var mediaSource in item.GetMediaSources(false, _mediaSourceManager, _mediaSegmentManager, _channelManager))
+                foreach (var mediaSource in _mediaSourceManager.GetStaticMediaSources(item, false))
                 {
                     // Delete extracted data
                     var mediaSourceItem = _libraryManager.GetItemById(mediaSource.Id);

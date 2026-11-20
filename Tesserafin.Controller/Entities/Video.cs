@@ -537,13 +537,33 @@ namespace Tesserafin.Controller.Entities
         /// <param name="links">The persisted version links.</param>
         /// <returns>The distinct catalogue source IDs.</returns>
         public IEnumerable<Guid> GetCatalogueMediaSourceIds(IItemLookupService lookup, ILinkedChildrenService links)
-            => ReadMediaSourceItems(
-                lookup.GetItemById,
-                video => links.GetLinkedChildrenIds(video.Id, (int)LinkedChildType.LinkedAlternateVersion)
+            => GetCatalogueMediaSourceItems(lookup, links, orderLinkedVersions: false).Select(source => source.Item.Id);
+
+        /// <summary>Reads this video and its versions from the catalogue in media source order.</summary>
+        /// <param name="lookup">The item lookup.</param>
+        /// <param name="links">The persisted version links.</param>
+        /// <returns>The distinct video versions.</returns>
+        public IReadOnlyList<Video> GetCatalogueVersions(IItemLookupService lookup, ILinkedChildrenService links)
+            => GetCatalogueMediaSourceItems(lookup, links).Select(source => source.Item).OfType<Video>().ToArray();
+
+        internal IEnumerable<(BaseItem Item, MediaSourceType MediaSourceType)> GetCatalogueMediaSourceItems(
+            IItemLookupService lookup,
+            ILinkedChildrenService links,
+            bool orderLinkedVersions = true)
+        {
+            IEnumerable<Video> GetLinkedVersions(Video video)
+            {
+                var versions = links.GetLinkedChildrenIds(video.Id, (int)LinkedChildType.LinkedAlternateVersion)
                     .Select(lookup.GetItemById)
-                    .OfType<Video>(),
-                video => links.GetLinkedChildrenIds(video.Id, (int)LinkedChildType.LocalAlternateVersion))
-                .Select(source => source.Item.Id);
+                    .OfType<Video>();
+                return orderLinkedVersions ? versions.OrderBy(version => version.SortName) : versions;
+            }
+
+            return ReadMediaSourceItems(
+                lookup.GetItemById,
+                GetLinkedVersions,
+                video => links.GetLinkedChildrenIds(video.Id, (int)LinkedChildType.LocalAlternateVersion));
+        }
 
         private IEnumerable<(BaseItem Item, MediaSourceType MediaSourceType)> ReadMediaSourceItems(
             Func<Guid, BaseItem> getItem,

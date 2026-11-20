@@ -2,14 +2,12 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
-using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Configuration;
@@ -27,8 +25,6 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
 {
     private readonly IMediaEncoder _mediaEncoder;
     private readonly IMediaSourceManager _mediaSources;
-    private readonly IMediaSegmentManager _mediaSegments;
-    private readonly IChannelManager _channels;
     private readonly IItemLookupService _lookup;
     private readonly ICollectionFolderResolver _collections;
 
@@ -47,8 +43,6 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
     /// <param name="mediaEncoder">Reads embedded metadata from the episode file.</param>
     /// <param name="mediaSources">Resolves the episode's media sources.</param>
-    /// <param name="mediaSegments">Provides segment support when building the media source.</param>
-    /// <param name="channels">Provides channel sources when building media sources.</param>
     /// <param name="lookup">The item identity lookup.</param>
     /// <param name="collections">The library membership resolver.</param>
     public EpisodeMetadataService(
@@ -64,16 +58,12 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
         IItemRepository itemRepository,
         IMediaEncoder mediaEncoder,
         IMediaSourceManager mediaSources,
-        IMediaSegmentManager mediaSegments,
-        IChannelManager channels,
         IItemLookupService lookup,
         ICollectionFolderResolver collections)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository)
     {
         _mediaEncoder = mediaEncoder;
         _mediaSources = mediaSources;
-        _mediaSegments = mediaSegments;
-        _channels = channels;
         _lookup = lookup;
         _collections = collections;
     }
@@ -201,7 +191,7 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
             cancellationToken.ThrowIfCancellationRequested();
             var request = new MediaInfoRequest
             {
-                MediaSource = episode.GetMediaSources(false, _mediaSources, _mediaSegments, _channels)[0],
+                MediaSource = _mediaSources.GetStaticMediaSources(episode, false)[0],
                 MediaType = DlnaProfileType.Video
             };
             var mediaInfo = await _mediaEncoder.GetMediaInfo(request, cancellationToken).ConfigureAwait(false);

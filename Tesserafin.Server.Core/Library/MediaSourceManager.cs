@@ -17,6 +17,7 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
@@ -65,6 +66,7 @@ namespace Tesserafin.Server.Core.Library
         private readonly IMediaStreamRepository _mediaStreamRepository;
         private readonly IMediaAttachmentRepository _mediaAttachmentRepository;
         private readonly IMediaSegmentManager _mediaSegmentManager;
+        private readonly MediaSourceReadContext _sourceReadContext;
         private readonly ConcurrentDictionary<string, ILiveStream> _openStreams = new ConcurrentDictionary<string, ILiveStream>(StringComparer.OrdinalIgnoreCase);
         private readonly AsyncNonKeyedLocker _liveStreamLocker = new(1);
         private readonly JsonSerializerOptions _jsonOptions = JsonDefaults.Options;
@@ -89,7 +91,10 @@ namespace Tesserafin.Server.Core.Library
             IDirectoryService directoryService,
             IMediaStreamRepository mediaStreamRepository,
             IMediaAttachmentRepository mediaAttachmentRepository,
-            IMediaSegmentManager mediaSegmentManager)
+            IMediaSegmentManager mediaSegmentManager,
+            ILinkedChildrenService linkedChildren,
+            Lazy<IChannelManager> channels,
+            ActiveRecordings recordings)
         {
             _writes = writes;
             _deletions = deletions;
@@ -109,6 +114,7 @@ namespace Tesserafin.Server.Core.Library
             _mediaStreamRepository = mediaStreamRepository;
             _mediaAttachmentRepository = mediaAttachmentRepository;
             _mediaSegmentManager = mediaSegmentManager;
+            _sourceReadContext = new MediaSourceReadContext(itemLookupService, linkedChildren, channels, recordings);
         }
 
         public void AddParts(IEnumerable<IMediaSourceProvider> providers)
@@ -367,11 +373,7 @@ namespace Tesserafin.Server.Core.Library
         {
             ArgumentNullException.ThrowIfNull(item);
 
-            var hasMediaSources = (IHasMediaSources)item;
-
-            // channelManager not injectable here: IChannelManager -> IDtoService -> IMediaSourceManager
-            // is an existing DI edge, so IMediaSourceManager -> IChannelManager would be circular.
-            var sources = hasMediaSources.GetMediaSources(enablePathSubstitution, this, _mediaSegmentManager, BaseItem.ChannelManager);
+            var sources = item.GetMediaSources(enablePathSubstitution, this, _mediaSegmentManager, _sourceReadContext);
 
             if (user is not null)
             {
@@ -420,7 +422,7 @@ namespace Tesserafin.Server.Core.Library
                 return sources;
             }
 
-            var versions = video.GetAllVersions();
+            var versions = video.GetCatalogueVersions(_sourceReadContext.Items, _sourceReadContext.Links);
             if (versions.Count < 2)
             {
                 return sources;

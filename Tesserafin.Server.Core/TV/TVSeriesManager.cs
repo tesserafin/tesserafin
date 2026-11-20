@@ -4,12 +4,10 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
 using Tesserafin.Data;
@@ -28,8 +26,6 @@ namespace Tesserafin.Server.Core.TV
         private readonly ILibraryManager _libraryManager;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly IMediaSourceManager _mediaSourceManager;
-        private readonly IMediaSegmentManager _mediaSegmentManager;
-        private readonly IChannelManager _channelManager;
         private readonly IItemSortService _itemSortService;
 
         public TVSeriesManager(
@@ -37,16 +33,12 @@ namespace Tesserafin.Server.Core.TV
             ILibraryManager libraryManager,
             IServerConfigurationManager configurationManager,
             IMediaSourceManager mediaSourceManager,
-            IMediaSegmentManager mediaSegmentManager,
-            IChannelManager channelManager,
             IItemSortService itemSortService)
         {
             _userDataManager = userDataManager;
             _libraryManager = libraryManager;
             _configurationManager = configurationManager;
             _mediaSourceManager = mediaSourceManager;
-            _mediaSegmentManager = mediaSegmentManager;
-            _channelManager = channelManager;
             _itemSortService = itemSortService;
         }
 
@@ -312,7 +304,7 @@ namespace Tesserafin.Server.Core.TV
 
             // Match by version name
             var playedVersionId = playedVersion.Id.ToString("N", CultureInfo.InvariantCulture);
-            var playedVersionName = lastWatchedVideo.GetMediaSources(false, _mediaSourceManager, _mediaSegmentManager, _channelManager)
+            var playedVersionName = _mediaSourceManager.GetStaticMediaSources(lastWatchedVideo, false)
                 .FirstOrDefault(source => string.Equals(source.Id, playedVersionId, StringComparison.OrdinalIgnoreCase))?.Name;
 
             if (string.IsNullOrEmpty(playedVersionName))
@@ -320,7 +312,7 @@ namespace Tesserafin.Server.Core.TV
                 return nextEpisode;
             }
 
-            var matchingSource = nextEpisode.GetMediaSources(false, _mediaSourceManager, _mediaSegmentManager, _channelManager)
+            var matchingSource = _mediaSourceManager.GetStaticMediaSources(nextEpisode, false)
                 .FirstOrDefault(source => string.Equals(source.Name, playedVersionName, StringComparison.OrdinalIgnoreCase));
 
             if (matchingSource is not null

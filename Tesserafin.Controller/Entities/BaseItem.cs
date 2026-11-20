@@ -1194,11 +1194,14 @@ namespace Tesserafin.Controller.Entities
             return string.IsNullOrEmpty(path) ? null : mediaSourceManager.GetPathProtocol(path);
         }
 
-        public virtual IReadOnlyList<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, IChannelManager channelManager)
+        public virtual IReadOnlyList<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, MediaSourceReadContext context)
         {
-            if (SourceType == SourceType.Channel)
+            var video = this as Video;
+            var activeRecording = video is not null && context.Recordings.GetActiveRecordingInfo(video.Path) is not null;
+            var isChannelItem = video is null ? SourceType == SourceType.Channel : !activeRecording && !ChannelId.IsEmpty();
+            if (isChannelItem)
             {
-                var sources = channelManager.GetStaticMediaSources(this, CancellationToken.None)
+                var sources = context.Channels.Value.GetStaticMediaSources(this, CancellationToken.None)
                            .ToList();
 
                 if (sources.Count > 0)
@@ -1207,13 +1210,17 @@ namespace Tesserafin.Controller.Entities
                 }
             }
 
-            var list = GetAllItemsForMediaSources()
+            var items = video is null ? GetAllItemsForMediaSources() : video.GetCatalogueMediaSourceItems(context.Items, context.Links);
+            var list = items
                 .Select(source => (source.Item, source.MediaSourceType, Protocol: source.Item.GetPathProtocol(mediaSourceManager)))
                 .ToList();
             var commonPrefix = GetCommonNamePrefix(list);
-            var result = list.Select(i => GetVersionInfo(enablePathSubstitution, i.Item, i.MediaSourceType, i.Protocol, mediaSourceManager, mediaSegmentManager, commonPrefix)).ToList();
+            bool? hasLocalAlternates = null;
+            bool HasLocalAlternates() => hasLocalAlternates ??= video is not null
+                && context.Links.GetLinkedChildrenIds(video.Id, (int)LinkedChildType.LocalAlternateVersion).Count > 0;
+            var result = list.Select(i => GetVersionInfo(enablePathSubstitution, i.Item, i.MediaSourceType, i.Protocol, mediaSourceManager, mediaSegmentManager, commonPrefix, HasLocalAlternates)).ToList();
 
-            if (IsActiveRecording())
+            if (activeRecording)
             {
                 foreach (var mediaSource in result)
                 {
@@ -1237,7 +1244,7 @@ namespace Tesserafin.Controller.Entities
             return Enumerable.Empty<(BaseItem, MediaSourceType)>();
         }
 
-        private MediaSourceInfo GetVersionInfo(bool enablePathSubstitution, BaseItem item, MediaSourceType type, MediaProtocol? protocol, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, string commonPrefix)
+        private MediaSourceInfo GetVersionInfo(bool enablePathSubstitution, BaseItem item, MediaSourceType type, MediaProtocol? protocol, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, string commonPrefix, Func<bool> hasLocalAlternates)
         {
             ArgumentNullException.ThrowIfNull(item);
 
@@ -1249,7 +1256,7 @@ namespace Tesserafin.Controller.Entities
                 Protocol = protocol ?? MediaProtocol.File,
                 MediaStreams = mediaSourceManager.GetMediaStreams(item.Id),
                 MediaAttachments = mediaSourceManager.GetMediaAttachments(item.Id),
-                Name = GetMediaSourceName(item, protocol, commonPrefix),
+                Name = GetMediaSourceName(item, protocol, hasLocalAlternates, commonPrefix),
                 Path = enablePathSubstitution ? GetMappedPath(item, itemPath, protocol) : itemPath,
                 RunTimeTicks = item.RunTimeTicks,
                 Container = item.Container,
@@ -1328,7 +1335,7 @@ namespace Tesserafin.Controller.Entities
             return info;
         }
 
-        internal string GetMediaSourceName(BaseItem item, MediaProtocol? protocol, string commonPrefix = null)
+        internal string GetMediaSourceName(BaseItem item, MediaProtocol? protocol, Func<bool> hasLocalAlternates, string commonPrefix = null)
         {
             var terms = new List<string>();
 
@@ -1355,7 +1362,7 @@ namespace Tesserafin.Controller.Entities
 
                 // Fall back to the containing folder name (the common layout for movie versions, and
                 // the path taken when no common prefix could be derived).
-                if (terms.Count == 0 && HasLocalAlternateVersions)
+                if (terms.Count == 0 && hasLocalAlternates())
                 {
                     var containingFolderName = System.IO.Path.GetFileName(ContainingFolderPath);
                     if (displayName.Length > containingFolderName.Length && displayName.StartsWith(containingFolderName, StringComparison.OrdinalIgnoreCase))
