@@ -7,6 +7,7 @@ using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 
 namespace Tesserafin.Server.Core.Library
@@ -23,6 +24,7 @@ namespace Tesserafin.Server.Core.Library
         private readonly IItemCacheStore _itemCacheStore;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly IItemChangePublisher _changes;
+        private readonly ActiveRecordings _recordings;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ItemStore"/> class.
@@ -31,12 +33,15 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="itemCacheStore">The item cache lifecycle port (register side).</param>
         /// <param name="configurationManager">The server configuration manager (id generation).</param>
         /// <param name="changes">Completed item change publication.</param>
+        /// <param name="recordings">The recordings in progress.</param>
         public ItemStore(
             IItemPersistenceService persistenceService,
             IItemCacheStore itemCacheStore,
             IServerConfigurationManager configurationManager,
-            IItemChangePublisher changes)
+            IItemChangePublisher changes,
+            ActiveRecordings recordings)
         {
+            _recordings = recordings;
             _persistenceService = persistenceService;
             _itemCacheStore = itemCacheStore;
             _configurationManager = configurationManager;
@@ -62,7 +67,7 @@ namespace Tesserafin.Server.Core.Library
                 folder.UserData = null;
             }
 
-            if (item.SourceType == SourceType.Library)
+            if (item.GetSourceType(_recordings) == SourceType.Library)
             {
                 _changes.Added(item, parent);
             }

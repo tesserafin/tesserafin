@@ -34,7 +34,7 @@ public sealed class ItemPersistenceConservationTests : IDisposable
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<TesserafinDbContext> _options;
     private readonly ILibraryManager _previousLibraryManager;
-    private readonly IRecordingsManager _previousRecordingsManager;
+
     private readonly Mock<ILibraryManager> _libraryManager = new();
     private readonly Dictionary<Guid, BaseItem> _items = [];
     private readonly ItemPersistenceService _service;
@@ -67,13 +67,11 @@ public sealed class ItemPersistenceConservationTests : IDisposable
         context.SaveChanges();
 
         _previousLibraryManager = BaseItem.LibraryManager;
-        _previousRecordingsManager = Video.RecordingsManager;
         _libraryManager.Setup(value => value.GetItemById(It.IsAny<Guid>()))
             .Returns((Guid id) => _items.GetValueOrDefault(id)!);
         _libraryManager.Setup(value => value.GetCollectionFolders(It.IsAny<BaseItem>()))
             .Returns(() => []);
         BaseItem.LibraryManager = _libraryManager.Object;
-        Video.RecordingsManager = new Mock<IRecordingsManager>().Object;
 
         var factory = new Mock<IDbContextFactory<TesserafinDbContext>>();
         factory.Setup(value => value.CreateDbContext()).Returns(CreateContext);
@@ -81,13 +79,12 @@ public sealed class ItemPersistenceConservationTests : IDisposable
             .Returns(() => Task.FromResult(CreateContext()));
         var appHost = new Mock<IServerApplicationHost>();
         appHost.Setup(value => value.ReverseVirtualPath(It.IsAny<string>())).Returns((string path) => path);
-        _service = new ItemPersistenceService(factory.Object, appHost.Object, NullLogger<ItemPersistenceService>.Instance);
+        _service = new ItemPersistenceService(factory.Object, appHost.Object, NullLogger<ItemPersistenceService>.Instance, new ActiveRecordings());
     }
 
     public void Dispose()
     {
         BaseItem.LibraryManager = _previousLibraryManager;
-        Video.RecordingsManager = _previousRecordingsManager;
         _connection.Dispose();
     }
 

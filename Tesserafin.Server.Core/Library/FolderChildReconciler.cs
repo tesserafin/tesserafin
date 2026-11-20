@@ -239,10 +239,10 @@ internal sealed class FolderChildReconciler(IItemLookupService lookup, IFileSyst
         // that share the same user data keys (eg. same episode replaced with a new file).
         if (actuallyRemoved.Count > 0)
         {
-            var removedKeys = actuallyRemoved.SelectMany(i => i.GetUserDataKeys()).ToHashSet();
+            var removedKeys = actuallyRemoved.SelectMany(i => i.GetUserDataKeys(deletionContext.Recordings)).ToHashSet();
             foreach (var child in validChildren)
             {
-                if (child.GetUserDataKeys().Any(removedKeys.Contains))
+                if (child.GetUserDataKeys(deletionContext.Recordings).Any(removedKeys.Contains))
                 {
                     await writes.ReattachUserDataAsync(child, cancellationToken).ConfigureAwait(false);
                 }

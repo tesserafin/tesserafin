@@ -368,7 +368,8 @@ public sealed class UserViewCatalogParityTests
                 persistenceServiceMock.Object,
                 itemLookupService,
                 ConfigMock.Object,
-                Mock.Of<IItemChangePublisher>());
+                Mock.Of<IItemChangePublisher>(),
+                new ActiveRecordings());
 
             var fileSystemMock = new Mock<IFileSystem>();
             fileSystemMock.Setup(f => f.GetValidFilename(It.IsAny<string>())).Returns<string>(s => s);

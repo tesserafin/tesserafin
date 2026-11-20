@@ -191,7 +191,7 @@ namespace Tesserafin.Server.Core.Dto
             BaseItem? owner = null,
             bool skipVisibilityCheck = false)
         {
-            var accessibleItems = skipVisibilityCheck || user is null ? items : items.Where(x => x.IsVisible(user)).ToList();
+            var accessibleItems = skipVisibilityCheck || user is null ? items : items.Where(x => x.IsVisible(user, false, _visibility)).ToList();
             var returnItems = new BaseItemDto[accessibleItems.Count];
             List<(BaseItem, BaseItemDto)>? programTuples = null;
             List<(BaseItemDto, LiveTvChannel)>? channelTuples = null;

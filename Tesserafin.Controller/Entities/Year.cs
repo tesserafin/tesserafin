@@ -9,6 +9,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Entities
@@ -38,9 +39,9 @@ namespace Tesserafin.Controller.Entities
             return false;
         }
 
-        public override List<string> GetUserDataKeys()
+        public override List<string> GetUserDataKeys(ActiveRecordings recordings = null)
         {
-            var list = base.GetUserDataKeys();
+            var list = base.GetUserDataKeys(recordings);
 
             list.Insert(0, "Year-" + Name);
             return list;

@@ -34,7 +34,7 @@ public abstract class UserDataLockingModeTests : IDisposable
 
     private readonly MigratedSqliteDatabase _database;
     private readonly ILibraryManager _previousLibraryManager;
-    private readonly IRecordingsManager _previousRecordingsManager;
+
     private readonly ItemPersistenceService _service;
     private readonly Guid _userId;
     private readonly Guid _otherUserId;
@@ -53,15 +53,13 @@ public abstract class UserDataLockingModeTests : IDisposable
         }
 
         _previousLibraryManager = BaseItem.LibraryManager;
-        _previousRecordingsManager = Video.RecordingsManager;
         var libraryManager = new Mock<ILibraryManager>();
         libraryManager.Setup(value => value.GetCollectionFolders(It.IsAny<BaseItem>())).Returns(() => []);
         BaseItem.LibraryManager = libraryManager.Object;
-        Video.RecordingsManager = Mock.Of<IRecordingsManager>();
 
         var appHost = new Mock<IServerApplicationHost>();
         appHost.Setup(value => value.ReverseVirtualPath(It.IsAny<string>())).Returns((string path) => path);
-        _service = new ItemPersistenceService(_database.Factory(), appHost.Object, NullLogger<ItemPersistenceService>.Instance);
+        _service = new ItemPersistenceService(_database.Factory(), appHost.Object, NullLogger<ItemPersistenceService>.Instance, new ActiveRecordings());
     }
 
     public void Dispose()
@@ -137,7 +135,6 @@ public abstract class UserDataLockingModeTests : IDisposable
         if (disposing)
         {
             BaseItem.LibraryManager = _previousLibraryManager;
-            Video.RecordingsManager = _previousRecordingsManager;
             _database.Dispose();
         }
     }

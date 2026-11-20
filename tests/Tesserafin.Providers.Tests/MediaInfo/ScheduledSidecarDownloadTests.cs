@@ -183,6 +183,5 @@ public sealed class ScheduledSidecarDownloadTests
 
     private sealed class CompleteMovie : Movie
     {
-        protected override bool IsActiveRecording() => false;
     }
 }

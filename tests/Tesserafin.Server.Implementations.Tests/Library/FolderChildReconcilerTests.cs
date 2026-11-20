@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
@@ -270,7 +271,7 @@ public sealed class FolderChildReconcilerTests
     {
         public override bool CanDelete(ItemDeletionContext deletion) => true;
 
-        public override List<string> GetUserDataKeys() => ["shared history key"];
+        public override List<string> GetUserDataKeys(ActiveRecordings? recordings = null) => ["shared history key"];
     }
 
     private sealed class DeletableVideo : Video

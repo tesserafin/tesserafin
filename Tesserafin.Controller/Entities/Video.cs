@@ -158,22 +158,6 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public bool IsStacked => AdditionalParts.Length > 0;
 
-        public static IRecordingsManager RecordingsManager { get; set; }
-
-        [JsonIgnore]
-        public override SourceType SourceType
-        {
-            get
-            {
-                if (IsActiveRecording())
-                {
-                    return SourceType.LiveTV;
-                }
-
-                return base.SourceType;
-            }
-        }
-
         /// <summary>Checks whether the media can be fully processed by a provider.</summary>
         /// <param name="recordings">The recordings in progress.</param>
         /// <returns>Whether this is neither an in-progress recording nor a channel livestream.</returns>
@@ -281,9 +265,9 @@ namespace Tesserafin.Controller.Entities
             return OriginalLanguage ?? GetOwner()?.GetInheritedOriginalLanguage();
         }
 
-        public override List<string> GetUserDataKeys()
+        public override List<string> GetUserDataKeys(ActiveRecordings recordings = null)
         {
-            var list = base.GetUserDataKeys();
+            var list = base.GetUserDataKeys(recordings);
 
             if (EnableDefaultVideoUserDataKeys)
             {
@@ -346,20 +330,16 @@ namespace Tesserafin.Controller.Entities
             return MediaPathProtocol.IsLocalFile(Path, fileSystem);
         }
 
-        protected override bool IsActiveRecording()
-        {
-            return RecordingsManager.GetActiveRecordingInfo(Path) is not null;
-        }
-
         internal override SourceType GetSourceType(IStandaloneVisibilityService scope)
-        {
-            if (scope is not IRecordingVisibilityService recordings)
-            {
-                return SourceType;
-            }
+            => scope is IRecordingVisibilityService recordings && recordings.IsActiveRecording(Path)
+                ? SourceType.LiveTV
+                : SourceType;
 
-            return recordings.IsActiveRecording(Path) ? SourceType.LiveTV : base.SourceType;
-        }
+        /// <inheritdoc />
+        public override UnratedItem GetBlockUnratedType(ActiveRecordings recordings)
+            => GetType() == typeof(Video) && GetSourceType(recordings) == SourceType.LiveTV
+                ? UnratedItem.Other
+                : GetBlockUnratedType();
 
         internal override bool GetBlockUnratedValue(User user, IStandaloneVisibilityService scope)
         {
@@ -375,7 +355,7 @@ namespace Tesserafin.Controller.Entities
 
         /// <inheritdoc />
         public override SourceType GetSourceType(ActiveRecordings recordings)
-            => recordings.GetActiveRecordingInfo(Path) is not null ? SourceType.LiveTV : base.SourceType;
+            => recordings.GetActiveRecordingInfo(Path) is not null ? SourceType.LiveTV : SourceType;
 
         public override bool CanDelete(ItemDeletionContext deletion)
         {

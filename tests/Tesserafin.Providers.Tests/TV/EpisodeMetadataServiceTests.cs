@@ -8,6 +8,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
@@ -209,7 +210,8 @@ public class EpisodeMetadataServiceTests
                 encoder ?? Mock.Of<IMediaEncoder>(),
                 sources ?? Mock.Of<IMediaSourceManager>(),
                 lookup ?? Mock.Of<IItemLookupService>(),
-                Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict))
+                Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict),
+                new ActiveRecordings())
         {
         }
 

@@ -3,8 +3,7 @@ using Xunit;
 namespace Tesserafin.Controller.Tests.Entities;
 
 /// <summary>
-/// <see cref="BaseItem"/>/<see cref="Video"/> statics (<c>BaseItem.LibraryManager</c>,
-/// <c>Video.RecordingsManager</c>, etc.) are shared mutable process-wide state. Any test class that
+/// <see cref="BaseItem"/> statics such as <c>BaseItem.LibraryManager</c> are shared mutable process-wide state. Any test class that
 /// sets one of them must join this collection so xUnit runs it sequentially with the others instead
 /// of in parallel - otherwise one test's static assignment can leak into another test running at the
 /// same time (observed as flaky failures in <see cref="BaseItemTests"/> once <see cref="FolderTests"/>

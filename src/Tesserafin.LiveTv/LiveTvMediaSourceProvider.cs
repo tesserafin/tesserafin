@@ -29,7 +29,7 @@ namespace Tesserafin.LiveTv
 
         private readonly ILogger<LiveTvMediaSourceProvider> _logger;
         private readonly IServerApplicationHost _appHost;
-        private readonly IRecordingsManager _recordingsManager;
+        private readonly ActiveRecordings _recordings;
         private readonly IMediaSourceManager _mediaSourceManager;
         private readonly IItemLookupService _itemLookupService;
         private readonly ILiveTvService[] _services;
@@ -37,14 +37,14 @@ namespace Tesserafin.LiveTv
         public LiveTvMediaSourceProvider(
             ILogger<LiveTvMediaSourceProvider> logger,
             IServerApplicationHost appHost,
-            IRecordingsManager recordingsManager,
+            ActiveRecordings recordings,
             IMediaSourceManager mediaSourceManager,
             IItemLookupService itemLookupService,
             IEnumerable<ILiveTvService> services)
         {
             _logger = logger;
             _appHost = appHost;
-            _recordingsManager = recordingsManager;
+            _recordings = recordings;
             _mediaSourceManager = mediaSourceManager;
             _itemLookupService = itemLookupService;
             _services = services.ToArray();
@@ -52,11 +52,11 @@ namespace Tesserafin.LiveTv
 
         public Task<IEnumerable<MediaSourceInfo>> GetMediaSources(BaseItem item, CancellationToken cancellationToken)
         {
-            if (item.SourceType == SourceType.LiveTV)
+            var isLiveTv = item.SourceType == SourceType.LiveTV;
+            if (isLiveTv || item is Video)
             {
-                var activeRecordingInfo = _recordingsManager.GetActiveRecordingInfo(item.Path);
-
-                if (string.IsNullOrEmpty(item.Path) || activeRecordingInfo is not null)
+                var activeRecordingInfo = _recordings.GetActiveRecordingInfo(item.Path);
+                if (activeRecordingInfo is not null || (isLiveTv && string.IsNullOrEmpty(item.Path)))
                 {
                     return GetMediaSourcesInternal(item, activeRecordingInfo, cancellationToken);
                 }

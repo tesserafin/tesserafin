@@ -163,9 +163,9 @@ namespace Tesserafin.Controller.LiveTv
         [JsonIgnore]
         public override bool SupportsAncestors => false;
 
-        public override List<string> GetUserDataKeys()
+        public override List<string> GetUserDataKeys(ActiveRecordings recordings = null)
         {
-            var list = base.GetUserDataKeys();
+            var list = base.GetUserDataKeys(recordings);
 
             if (!IsSeries)
             {

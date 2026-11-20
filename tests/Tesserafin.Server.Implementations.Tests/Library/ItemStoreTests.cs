@@ -6,8 +6,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
-using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Server.Core.Library;
@@ -48,7 +48,8 @@ public class ItemStoreTests
             _persistenceServiceMock.Object,
             _itemCacheStore,
             _configurationManagerMock.Object,
-            _changes);
+            _changes,
+            new ActiveRecordings());
     }
 
     // ---------------------------------------------------------------
@@ -206,12 +207,7 @@ public class ItemStoreTests
     [Fact]
     public void CreateItem_NonLibrarySourceTypeItem_DoesNotRaiseItemAdded()
     {
-        // A non-empty ChannelId makes BaseItem.SourceType return Channel rather than Library
-        // (BaseItem.cs:269-280) - mirrors the "too much noise" exclusion CreateItems applies for
-        // the live-tv guide. Audio (not a Video subclass) so SourceType resolves via the plain
-        // BaseItem getter instead of Video's IsActiveRecording() override, which needs statics this
-        // test does not set up.
-        var item = new Audio { Id = Guid.NewGuid(), Name = "Channel-sourced", ChannelId = Guid.NewGuid() };
+        var item = new Video { Id = Guid.NewGuid(), Name = "Channel-sourced", ChannelId = Guid.NewGuid() };
         Assert.Equal(SourceType.Channel, item.SourceType);
 
         var raised = false;
@@ -283,6 +279,7 @@ public class ItemStoreTests
         services.AddSingleton<IItemCacheStore>(_itemCacheStore);
         services.AddSingleton(_configurationManagerMock.Object);
         services.AddSingleton<IItemChangePublisher>(_changes);
+        services.AddSingleton<ActiveRecordings>();
         services.AddSingleton<IItemStore, ItemStore>();
 
         using var provider = services.BuildServiceProvider();
@@ -300,6 +297,7 @@ public class ItemStoreTests
         services.AddSingleton<IItemCacheStore>(_itemCacheStore);
         services.AddSingleton(_configurationManagerMock.Object);
         services.AddSingleton<IItemChangePublisher>(_changes);
+        services.AddSingleton<ActiveRecordings>();
         services.AddSingleton<IItemStore, ItemStore>();
 
         using var provider = services.BuildServiceProvider();

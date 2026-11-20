@@ -179,7 +179,6 @@ public sealed class SidecarStoragePolicyTests
 
     private sealed class CompleteMovie : Movie
     {
-        protected override bool IsActiveRecording() => false;
     }
 
     private sealed class Storage : IDisposable

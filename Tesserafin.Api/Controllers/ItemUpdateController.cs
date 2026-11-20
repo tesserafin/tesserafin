@@ -40,6 +40,7 @@ public class ItemUpdateController : BaseTesserafinApiController
     private readonly ILocalizationManager _localizationManager;
     private readonly IFileSystem _fileSystem;
     private readonly IServerConfigurationManager _serverConfigurationManager;
+    private readonly ActiveRecordings _recordings;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ItemUpdateController"/> class.
@@ -51,6 +52,7 @@ public class ItemUpdateController : BaseTesserafinApiController
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
+    /// <param name="recordings">The recordings in progress.</param>
     public ItemUpdateController(
         IItemPeopleCommands peopleCommands,
         IItemWriteCommands writes,
@@ -58,7 +60,8 @@ public class ItemUpdateController : BaseTesserafinApiController
         ILibraryManager libraryManager,
         IProviderManager providerManager,
         ILocalizationManager localizationManager,
-        IServerConfigurationManager serverConfigurationManager)
+        IServerConfigurationManager serverConfigurationManager,
+        ActiveRecordings recordings)
     {
         _peopleCommands = peopleCommands;
         _writes = writes;
@@ -67,6 +70,7 @@ public class ItemUpdateController : BaseTesserafinApiController
         _localizationManager = localizationManager;
         _fileSystem = fileSystem;
         _serverConfigurationManager = serverConfigurationManager;
+        _recordings = recordings;
     }
 
     /// <summary>
@@ -179,7 +183,7 @@ public class ItemUpdateController : BaseTesserafinApiController
             && item is not AggregateFolder
             && item is not LiveTvChannel
             && item is not IItemByName
-            && item.SourceType == SourceType.Library)
+            && item.GetSourceType(_recordings) == SourceType.Library)
         {
             var inheritedContentType = _libraryManager.GetInheritedContentType(item);
             var configuredContentType = _libraryManager.GetConfiguredContentType(item);

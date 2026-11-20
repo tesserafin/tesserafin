@@ -12,6 +12,7 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Session;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Entities;
@@ -38,6 +39,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     private readonly ILogger<LibraryChangedNotifier> _logger;
     private readonly IItemSortService _itemSortService;
     private readonly IStandaloneVisibilityService _visibility;
+    private readonly ActiveRecordings _recordings;
 
     private readonly Lock _libraryChangedSyncLock = new();
     private readonly List<Folder> _foldersAddedTo = new();
@@ -63,6 +65,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     /// <param name="refreshProgress">Progress of active recursive scans.</param>
     /// <param name="itemSortService">The <see cref="IItemSortService"/>.</param>
     /// <param name="visibility">The catalogue data used for item visibility checks.</param>
+    /// <param name="recordings">The recordings in progress.</param>
     public LibraryChangedNotifier(
         ICollectionFolderResolver collectionFolders,
         IUserRootFolderProvider roots,
@@ -74,7 +77,8 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         ILogger<LibraryChangedNotifier> logger,
         ILibraryRefreshProgress refreshProgress,
         IItemSortService itemSortService,
-        IStandaloneVisibilityService visibility)
+        IStandaloneVisibilityService visibility,
+        ActiveRecordings recordings)
     {
         _collectionFolders = collectionFolders;
         _roots = roots;
@@ -87,6 +91,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         _refreshProgress = refreshProgress;
         _itemSortService = itemSortService;
         _visibility = visibility;
+        _recordings = recordings;
     }
 
     /// <inheritdoc />
@@ -372,7 +377,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         };
     }
 
-    private static bool FilterItem(BaseItem item)
+    private bool FilterItem(BaseItem item)
     {
         if (!item.IsFolder && !item.HasPathProtocol)
         {
@@ -384,7 +389,7 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
             return false;
         }
 
-        return item.SourceType == SourceType.Library;
+        return item.GetSourceType(_recordings) == SourceType.Library;
     }
 
     private static IEnumerable<string> GetTopParentIds(List<BaseItem> items, List<Folder> allUserRootChildren)

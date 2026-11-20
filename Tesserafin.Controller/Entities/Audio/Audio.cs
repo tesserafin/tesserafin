@@ -9,6 +9,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json.Serialization;
 using Tesserafin.Controller.IO;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Dto;
@@ -99,9 +100,9 @@ namespace Tesserafin.Controller.Entities.Audio
                     + (IndexNumber is not null ? IndexNumber.Value.ToString("0000 - ", CultureInfo.InvariantCulture) : string.Empty) + Name;
         }
 
-        public override List<string> GetUserDataKeys()
+        public override List<string> GetUserDataKeys(ActiveRecordings recordings = null)
         {
-            var list = base.GetUserDataKeys();
+            var list = base.GetUserDataKeys(recordings);
 
             var songKey = IndexNumber.HasValue ? IndexNumber.Value.ToString("0000", CultureInfo.InvariantCulture) : string.Empty;
 

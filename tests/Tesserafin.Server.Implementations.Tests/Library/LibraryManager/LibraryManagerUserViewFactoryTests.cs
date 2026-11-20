@@ -10,6 +10,7 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Resolvers;
@@ -95,7 +96,8 @@ public class LibraryManagerUserViewFactoryTests
             _persistenceServiceMock.Object,
             _itemLookupService,
             _configurationManagerMock.Object,
-            Mock.Of<IItemChangePublisher>());
+            Mock.Of<IItemChangePublisher>(),
+            new ActiveRecordings());
         fixture.Register(() => _itemStore);
         fixture.Register<IItemStore>(() => _itemStore);
 
@@ -307,7 +309,8 @@ public class LibraryManagerUserViewFactoryTests
             persistenceMock.Object,
             cacheStore,
             _configurationManagerMock.Object,
-            Mock.Of<IItemChangePublisher>());
+            Mock.Of<IItemChangePublisher>(),
+            new ActiveRecordings());
 
         var lookupServiceMock = new Mock<IItemLookupService>();
         lookupServiceMock.Setup(l => l.GetItemById(It.IsAny<Guid>())).Returns((BaseItem?)null);

@@ -7,6 +7,7 @@ using Moq;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Session;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Events;
@@ -60,7 +61,8 @@ public sealed class LibraryRefreshNotificationTests
             NullLogger<LibraryChangedNotifier>.Instance,
             refreshProgress.Object,
             Mock.Of<IItemSortService>(),
-            Mock.Of<IStandaloneVisibilityService>(MockBehavior.Strict));
+            Mock.Of<IStandaloneVisibilityService>(MockBehavior.Strict),
+            new ActiveRecordings());
 
         var token = TestContext.Current.CancellationToken;
         await notifier.StartAsync(token);

@@ -11,6 +11,7 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Resolvers;
 using Tesserafin.Controller.Sorting;
@@ -110,7 +111,8 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
             fixture.Create<Mock<IItemPersistenceService>>().Object,
             _itemLookupService,
             _configurationManagerMock.Object,
-            Mock.Of<IItemChangePublisher>());
+            Mock.Of<IItemChangePublisher>(),
+            new ActiveRecordings());
         fixture.Register(() => _itemStore);
         fixture.Register<IItemStore>(() => _itemStore);
 

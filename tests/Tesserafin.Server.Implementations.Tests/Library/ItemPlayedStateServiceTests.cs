@@ -9,6 +9,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
@@ -64,7 +65,8 @@ public sealed class ItemPlayedStateServiceTests
             _links.Object,
             Mock.Of<IChannelManager>(),
             configurationManager.Object,
-            new FixedClock());
+            new FixedClock(),
+            new ActiveRecordings());
     }
 
     [Fact]

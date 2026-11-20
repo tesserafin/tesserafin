@@ -7,6 +7,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
@@ -27,6 +28,7 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     private readonly IMediaSourceManager _mediaSources;
     private readonly IItemLookupService _lookup;
     private readonly ICollectionFolderResolver _collections;
+    private readonly ActiveRecordings _recordings;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EpisodeMetadataService"/> class.
@@ -45,6 +47,7 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
     /// <param name="mediaSources">Resolves the episode's media sources.</param>
     /// <param name="lookup">The item identity lookup.</param>
     /// <param name="collections">The library membership resolver.</param>
+    /// <param name="recordings">The recordings in progress.</param>
     public EpisodeMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -59,20 +62,22 @@ public class EpisodeMetadataService : MetadataService<Episode, EpisodeInfo>
         IMediaEncoder mediaEncoder,
         IMediaSourceManager mediaSources,
         IItemLookupService lookup,
-        ICollectionFolderResolver collections)
+        ICollectionFolderResolver collections,
+        ActiveRecordings recordings)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository)
     {
         _mediaEncoder = mediaEncoder;
         _mediaSources = mediaSources;
         _lookup = lookup;
         _collections = collections;
+        _recordings = recordings;
     }
 
     /// <inheritdoc />
     protected override async ValueTask<bool> BeforeMetadataRefreshAsync(Episode item, LibraryOptions libraryOptions, bool replaceAllMetadata, CancellationToken cancellationToken)
     {
         var hasChanges = await base.BeforeMetadataRefreshAsync(item, libraryOptions, replaceAllMetadata, cancellationToken).ConfigureAwait(false);
-        if (item.IsLocked || item.SourceType is not (SourceType.Library or SourceType.LiveTV))
+        if (item.IsLocked || item.GetSourceType(_recordings) is not (SourceType.Library or SourceType.LiveTV))
         {
             return hasChanges;
         }

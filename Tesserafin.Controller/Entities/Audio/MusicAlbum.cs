@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data;
@@ -85,9 +86,9 @@ namespace Tesserafin.Controller.Entities.Audio
             return 1;
         }
 
-        public override List<string> GetUserDataKeys()
+        public override List<string> GetUserDataKeys(ActiveRecordings recordings = null)
         {
-            var list = base.GetUserDataKeys();
+            var list = base.GetUserDataKeys(recordings);
 
             var albumArtist = AlbumArtist;
             if (!string.IsNullOrEmpty(albumArtist))

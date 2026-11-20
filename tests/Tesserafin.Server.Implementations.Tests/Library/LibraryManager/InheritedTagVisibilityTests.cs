@@ -89,7 +89,6 @@ public sealed class InheritedTagVisibilityTests
         BaseItem.LibraryManager = manager;
         BaseItem.ConfigurationManager = configuration.Object;
         BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>(m => m.GetPathProtocol(It.IsAny<string>()) == MediaProtocol.File);
-        Video.RecordingsManager = Mock.Of<IRecordingsManager>();
     }
 
     [Fact]

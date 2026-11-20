@@ -70,18 +70,14 @@ public class ItemAccessServiceTests
     [Fact]
     public void GetVisibleItemById_VisibleItemNoTagRestrictions_ReturnsItem()
     {
-        // Audio (not Video) to avoid Video.SourceType touching the unset Video.RecordingsManager
-        // static via IsActiveRecording(). No Path set -> IsVisibleStandaloneInternal short-circuits
-        // to visible before touching collection folders / LibraryManager statics (topParent.Path is
-        // empty -> return true).
-        var audio = new Audio { Id = Guid.NewGuid(), Name = "Track" };
-        _itemRepositoryMock.Setup(r => r.RetrieveItem(audio.Id)).Returns(audio);
+        var video = new Video { Id = Guid.NewGuid(), Name = "Video" };
+        _itemRepositoryMock.Setup(r => r.RetrieveItem(video.Id)).Returns(video);
 
         var user = new User("test-user", "provider", "provider");
 
-        var result = _itemAccessService.GetVisibleItemById<Audio>(audio.Id, user);
+        var result = _itemAccessService.GetVisibleItemById<Video>(video.Id, user);
 
-        Assert.Same(audio, result);
+        Assert.Same(video, result);
     }
 
     [Fact]

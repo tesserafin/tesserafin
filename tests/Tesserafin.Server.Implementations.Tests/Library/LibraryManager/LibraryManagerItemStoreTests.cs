@@ -9,6 +9,7 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Resolvers;
 using Tesserafin.Controller.Sorting;
@@ -71,7 +72,8 @@ public class LibraryManagerItemStoreTests
             _persistenceServiceMock.Object,
             _itemLookupService,
             _configurationManagerMock.Object,
-            _changes);
+            _changes,
+            new ActiveRecordings());
         fixture.Register<IItemChangePublisher>(() => _changes);
         fixture.Register(() => _itemStore);
         fixture.Register<IItemStore>(() => _itemStore);
@@ -180,7 +182,8 @@ public class LibraryManagerItemStoreTests
             _persistenceServiceMock.Object,
             _itemLookupService,
             _configurationManagerMock.Object,
-            _changes);
+            _changes,
+            new ActiveRecordings());
         var count = 0;
         _changes.ItemAdded += (_, _) => count++;
 

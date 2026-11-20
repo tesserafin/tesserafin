@@ -41,9 +41,6 @@ public class DtoServiceTests
         var appHost = new Mock<IApplicationHost>();
         appHost.Setup(x => x.SystemId).Returns("test-server");
 
-        // Video.SourceType probes the active-recording manager; provide one so it doesn't NRE.
-        Video.RecordingsManager = new Mock<IRecordingsManager>().Object;
-
         _dtoService = new DtoService(
             NullLogger<DtoService>.Instance,
             Mock.Of<INamedItemCatalog>(),

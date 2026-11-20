@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
@@ -46,7 +47,8 @@ public sealed class ContentPackItemDeletionTests : IDisposable
         _service = new ItemPersistenceService(
             factory.Object,
             new Mock<IServerApplicationHost>().Object,
-            NullLogger<ItemPersistenceService>.Instance);
+            NullLogger<ItemPersistenceService>.Instance,
+            new ActiveRecordings());
     }
 
     public void Dispose()

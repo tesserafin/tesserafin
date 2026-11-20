@@ -166,11 +166,11 @@ namespace Tesserafin.Controller.Playlists
             return base.GetChildren(user, true, query);
         }
 
-        public static IReadOnlyList<BaseItem> GetPlaylistItems(IEnumerable<BaseItem> inputItems, User user, DtoOptions options, IItemQueryService itemQueryService)
+        public static IReadOnlyList<BaseItem> GetPlaylistItems(IEnumerable<BaseItem> inputItems, User user, DtoOptions options, IItemQueryService itemQueryService, IStandaloneVisibilityService visibility)
         {
             if (user is not null)
             {
-                inputItems = inputItems.Where(i => i.IsVisibleStandalone(user));
+                inputItems = inputItems.Where(i => i.IsVisibleStandalone(user, visibility));
             }
 
             var list = new List<BaseItem>();

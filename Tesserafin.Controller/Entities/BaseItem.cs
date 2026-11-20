@@ -266,6 +266,8 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public virtual string Path { get; set; }
 
+        /// <summary>Gets the item's catalogue source, independent of an in-progress recording.</summary>
+        /// <remarks>Use <see cref="GetSourceType(ActiveRecordings)"/> when current recording state matters.</remarks>
         [JsonIgnore]
         public virtual SourceType SourceType
         {
@@ -1180,11 +1182,6 @@ namespace Tesserafin.Controller.Entities
             return true;
         }
 
-        protected virtual bool IsActiveRecording()
-        {
-            return false;
-        }
-
         protected MediaProtocol? GetPathProtocol(IMediaSourceManager mediaSourceManager)
         {
             var path = Path;
@@ -1194,9 +1191,9 @@ namespace Tesserafin.Controller.Entities
         public virtual IReadOnlyList<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, MediaSourceReadContext context)
         {
             var video = this as Video;
-            var activeRecording = video is not null && context.Recordings.GetActiveRecordingInfo(video.Path) is not null;
-            var isChannelItem = video is null ? SourceType == SourceType.Channel : !activeRecording && !ChannelId.IsEmpty();
-            if (isChannelItem)
+            var sourceType = GetSourceType(context.Recordings);
+            var activeRecording = video is not null && sourceType == SourceType.LiveTV;
+            if (sourceType == SourceType.Channel)
             {
                 var sources = context.Channels.Value.GetStaticMediaSources(this, CancellationToken.None)
                            .ToList();
@@ -1683,11 +1680,14 @@ namespace Tesserafin.Controller.Entities
             return info.Exists && this.HasChanged(info.LastWriteTimeUtc);
         }
 
-        public virtual List<string> GetUserDataKeys()
+        /// <summary>Gets the keys used to store and match per-user playback history.</summary>
+        /// <param name="recordings">The recordings in progress, when runtime state is available.</param>
+        /// <returns>The keys, in preference order.</returns>
+        public virtual List<string> GetUserDataKeys(ActiveRecordings recordings = null)
         {
             var list = new List<string>();
 
-            if (SourceType == SourceType.Channel)
+            if ((recordings is null ? SourceType : GetSourceType(recordings)) == SourceType.Channel)
             {
                 if (!string.IsNullOrEmpty(ExternalId))
                 {
@@ -2073,6 +2073,11 @@ namespace Tesserafin.Controller.Entities
 
             return true;
         }
+
+        /// <summary>Gets the unrated category with current recording state.</summary>
+        /// <param name="recordings">The recordings in progress.</param>
+        /// <returns>The unrated category.</returns>
+        public virtual UnratedItem GetBlockUnratedType(ActiveRecordings recordings) => GetBlockUnratedType();
 
         public virtual UnratedItem GetBlockUnratedType()
         {

@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Data.Entities;
@@ -29,6 +30,7 @@ public class ItemPersistenceService : IItemPersistenceService
     private readonly IDbContextFactory<TesserafinDbContext> _dbProvider;
     private readonly IServerApplicationHost _appHost;
     private readonly ILogger<ItemPersistenceService> _logger;
+    private readonly ActiveRecordings _recordings;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ItemPersistenceService"/> class.
@@ -36,11 +38,14 @@ public class ItemPersistenceService : IItemPersistenceService
     /// <param name="dbProvider">The database context factory.</param>
     /// <param name="appHost">The application host.</param>
     /// <param name="logger">The logger.</param>
+    /// <param name="recordings">The recordings in progress.</param>
     public ItemPersistenceService(
         IDbContextFactory<TesserafinDbContext> dbProvider,
         IServerApplicationHost appHost,
-        ILogger<ItemPersistenceService> logger)
+        ILogger<ItemPersistenceService> logger,
+        ActiveRecordings recordings)
     {
+        _recordings = recordings;
         _dbProvider = dbProvider;
         _appHost = appHost;
         _logger = logger;
@@ -136,7 +141,7 @@ public class ItemPersistenceService : IItemPersistenceService
             var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
             await using (transaction.ConfigureAwait(false))
             {
-                var userKeys = item.GetUserDataKeys().ToArray();
+                var userKeys = item.GetUserDataKeys(_recordings).ToArray();
                 var retentionDate = (DateTime?)null;
                 var itemId = item.Id;
 
@@ -312,7 +317,7 @@ public class ItemPersistenceService : IItemPersistenceService
 
             var topParent = item.GetTopParent();
 
-            var userdataKey = item.GetUserDataKeys();
+            var userdataKey = item.GetUserDataKeys(_recordings);
             var inheritedTags = item.GetInheritedTags();
 
             tuples.Add((item, ancestorIds, topParent, userdataKey, inheritedTags));
@@ -326,7 +331,7 @@ public class ItemPersistenceService : IItemPersistenceService
 
         foreach (var item in tuples)
         {
-            var entity = BaseItemMapper.Map(item.Item, _appHost);
+            var entity = BaseItemMapper.Map(item.Item, _appHost, _recordings);
             entity.TopParentId = item.TopParent?.Id;
 
             if (!existingItems.Any(e => e == entity.Id))

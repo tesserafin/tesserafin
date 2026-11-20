@@ -204,8 +204,9 @@ public static class BaseItemMapper
     /// </summary>
     /// <param name="dto">The DTO.</param>
     /// <param name="appHost">The application host for path resolution.</param>
+    /// <param name="recordings">The recordings in progress, when available.</param>
     /// <returns>The database entity.</returns>
-    public static BaseItemEntity Map(BaseItemDto dto, IServerApplicationHost appHost)
+    public static BaseItemEntity Map(BaseItemDto dto, IServerApplicationHost appHost, ActiveRecordings? recordings = null)
     {
         var dtoType = dto.GetType();
         var entity = new BaseItemEntity()
@@ -359,7 +360,7 @@ public static class BaseItemMapper
             entity.StartDate = hasStartDate.StartDate;
         }
 
-        entity.UnratedType = dto.GetBlockUnratedType().ToString();
+        entity.UnratedType = (recordings is null ? dto.GetBlockUnratedType() : dto.GetBlockUnratedType(recordings)).ToString();
 
         // Fields that are present in the DB but are never actually used
         // dto.UserDataKey = entity.UserDataKey;

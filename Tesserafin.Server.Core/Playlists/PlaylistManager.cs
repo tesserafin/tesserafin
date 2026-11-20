@@ -217,7 +217,7 @@ namespace Tesserafin.Server.Core.Playlists
         {
             var items = itemIds.Select(_libraryManager.GetItemById).Where(i => i is not null);
 
-            return Playlist.GetPlaylistItems(items, user, options, _itemQueryService);
+            return Playlist.GetPlaylistItems(items, user, options, _itemQueryService, _visibility);
         }
 
         public Task AddItemToPlaylistAsync(Guid playlistId, IReadOnlyCollection<Guid> itemIds, int? position, Guid userId)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Moq;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
@@ -173,10 +174,6 @@ public class BaseItemTests
         libraryManager.Setup(x => x.GetItemById(alt2.Id)).Returns(alt2);
         libraryManager.Setup(x => x.GetItemById(primary.Id)).Returns(primary);
 
-        var recordingsManager = new Mock<IRecordingsManager>();
-        recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-        Video.RecordingsManager = recordingsManager.Object;
-
         BaseItem.MediaSourceManager = mediaSourceManager.Object;
         BaseItem.LibraryManager = libraryManager.Object;
 
@@ -263,6 +260,37 @@ public class BaseItemTests
         }
 
         Assert.Equal(expected, video.IsCompleteMedia(recordings));
+    }
+
+    [Fact]
+    public async Task VideoSourceType_RecordingStateDoesNotChangeCatalogueSource()
+    {
+        var video = new Video
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = Guid.NewGuid(),
+            ExternalId = "channel-item",
+            Path = "/recordings/active.ts"
+        };
+        var recordings = new ActiveRecordings();
+        using var cancellation = new CancellationTokenSource();
+        recordings["timer"] = new ActiveRecordingInfo
+        {
+            Path = video.Path,
+            Timer = new TimerInfo { Status = RecordingStatus.InProgress },
+            CancellationTokenSource = cancellation
+        };
+
+        Assert.Equal(SourceType.Channel, video.SourceType);
+        Assert.Equal(SourceType.LiveTV, video.GetSourceType(recordings));
+        Assert.Equal(UnratedItem.Other, video.GetBlockUnratedType(recordings));
+        Assert.Equal([video.Id.ToString()], video.GetUserDataKeys(recordings));
+
+        await cancellation.CancelAsync();
+
+        Assert.Equal(SourceType.Channel, video.GetSourceType(recordings));
+        Assert.Equal(UnratedItem.ChannelContent, video.GetBlockUnratedType(recordings));
+        Assert.Equal([video.ExternalId, video.Id.ToString()], video.GetUserDataKeys(recordings));
     }
 
     [Theory]

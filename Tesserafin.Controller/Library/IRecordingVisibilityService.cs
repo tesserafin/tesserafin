@@ -1,5 +1,3 @@
-using Tesserafin.Controller.Entities;
-
 namespace Tesserafin.Controller.Library
 {
     /// <summary>
@@ -7,10 +5,8 @@ namespace Tesserafin.Controller.Library
     /// <see cref="IStandaloneVisibilityService"/>.
     /// </summary>
     /// <remarks>
-    /// Extracted from <see cref="Video"/> (DEBT-SERVER-9): a video's source type asks the static
-    /// <c>Video.RecordingsManager</c>, which depends on <see cref="ILibraryManager"/>. Passed as the
-    /// <see cref="ITagVisibilityService"/> of its visibility check, it answers instead, while the rules stay the
-    /// entities' own. Implementations must not depend on <see cref="ILibraryManager"/>, directly or deferred.
+    /// The visibility check uses this service to distinguish an in-progress recording from a video's
+    /// catalogue source. Implementations must not depend on <see cref="ILibraryManager"/>, directly or deferred.
     /// </remarks>
     public interface IRecordingVisibilityService : IStandaloneVisibilityService
     {

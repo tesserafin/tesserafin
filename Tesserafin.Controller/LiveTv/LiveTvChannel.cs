@@ -90,9 +90,9 @@ namespace Tesserafin.Controller.LiveTv
         [JsonIgnore]
         public string EpisodeTitle { get; set; }
 
-        public override List<string> GetUserDataKeys()
+        public override List<string> GetUserDataKeys(ActiveRecordings recordings = null)
         {
-            var list = base.GetUserDataKeys();
+            var list = base.GetUserDataKeys(recordings);
 
             if (!ConfigurationManager.Configuration.DisableLiveTvChannelUserDataName)
             {

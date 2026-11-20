@@ -848,7 +848,6 @@ namespace Tesserafin.Server.Core
             Folder.UserViewManager = Resolve<IUserViewManager>();
             Folder.CollectionManager = Resolve<ICollectionManager>();
             UserView.TVSeriesManager = Resolve<ITVSeriesManager>();
-            Video.RecordingsManager = Resolve<IRecordingsManager>();
         }
 
         /// <summary>

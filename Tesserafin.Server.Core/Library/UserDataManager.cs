@@ -11,6 +11,7 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations;
@@ -30,6 +31,7 @@ namespace Tesserafin.Server.Core.Library
         private readonly IDbContextFactory<TesserafinDbContext> _repository;
         private readonly IItemCountService _itemCountService;
         private readonly IVideoVersionCatalog _versions;
+        private readonly ActiveRecordings _recordings;
         private readonly FastConcurrentLru<string, UserItemData> _cache;
 
         /// <summary>
@@ -39,12 +41,15 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="repository">Instance of the <see cref="IDbContextFactory{TesserafinDbContext}"/> interface.</param>
         /// <param name="itemCountService">Instance of the <see cref="IItemCountService"/> interface.</param>
         /// <param name="versions">The catalogue versions used to calculate resume data.</param>
+        /// <param name="recordings">The recordings in progress.</param>
         public UserDataManager(
             IServerConfigurationManager config,
             IDbContextFactory<TesserafinDbContext> repository,
             IItemCountService itemCountService,
-            IVideoVersionCatalog versions)
+            IVideoVersionCatalog versions,
+            ActiveRecordings recordings)
         {
+            _recordings = recordings;
             _config = config;
             _repository = repository;
             _itemCountService = itemCountService;
@@ -64,7 +69,7 @@ namespace Tesserafin.Server.Core.Library
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            var keys = item.GetUserDataKeys();
+            var keys = item.GetUserDataKeys(_recordings);
 
             using var dbContext = _repository.CreateDbContext();
             using var transaction = dbContext.Database.BeginTransaction();
@@ -209,7 +214,7 @@ namespace Tesserafin.Server.Core.Library
                     }
                     else
                     {
-                        var keys = item.GetUserDataKeys();
+                        var keys = item.GetUserDataKeys(_recordings);
                         itemsNeedingQuery.Add((item, keys));
                     }
                 }
@@ -367,7 +372,7 @@ namespace Tesserafin.Server.Core.Library
         {
             return item.UserData?.Where(e => e.UserId.Equals(user.Id)).Select(Map).FirstOrDefault() ?? new UserItemData()
             {
-                Key = item.GetUserDataKeys()[0],
+                Key = item.GetUserDataKeys(_recordings)[0],
             };
         }
 

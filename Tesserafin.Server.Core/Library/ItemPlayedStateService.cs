@@ -8,6 +8,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
@@ -36,6 +37,7 @@ namespace Tesserafin.Server.Core.Library
         private readonly IChannelManager _channelManager;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly TimeProvider _timeProvider;
+        private readonly ActiveRecordings _recordings;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ItemPlayedStateService"/> class.
@@ -48,6 +50,7 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="channelManager">Selects the items of a channel folder.</param>
         /// <param name="configurationManager">Whether specials are listed within seasons.</param>
         /// <param name="timeProvider">The clock for a mark without a date.</param>
+        /// <param name="recordings">The recordings in progress.</param>
         public ItemPlayedStateService(
             IUserDataManager userDataManager,
             IItemQueryService itemQueryService,
@@ -56,8 +59,10 @@ namespace Tesserafin.Server.Core.Library
             ILinkedChildrenService linkedChildrenService,
             IChannelManager channelManager,
             IServerConfigurationManager configurationManager,
-            TimeProvider timeProvider)
+            TimeProvider timeProvider,
+            ActiveRecordings recordings)
         {
+            _recordings = recordings;
             _userDataManager = userDataManager;
             _itemQueryService = itemQueryService;
             _itemAccessService = itemAccessService;
@@ -76,7 +81,7 @@ namespace Tesserafin.Server.Core.Library
 
             foreach (var target in SelectTargets(user, item, played: true))
             {
-                var data = _userDataManager.GetUserData(user, target) ?? new UserItemData { Key = target.GetUserDataKeys()[0] };
+                var data = _userDataManager.GetUserData(user, target) ?? new UserItemData { Key = target.GetUserDataKeys(_recordings)[0] };
                 PlayedStateTransitions.MarkPlayed(data, datePlayed, _timeProvider.GetUtcNow().UtcDateTime);
                 _userDataManager.SaveUserData(user, target, data, UserDataSaveReason.TogglePlayed, CancellationToken.None);
 

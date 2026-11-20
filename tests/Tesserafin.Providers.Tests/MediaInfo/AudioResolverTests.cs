@@ -8,7 +8,6 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
@@ -26,7 +25,6 @@ public class AudioResolverTests
     public AudioResolverTests()
     {
         // prep BaseItem and Video for calls made that expect managers
-        Video.RecordingsManager = Mock.Of<IRecordingsManager>();
 
         var applicationPaths = new Mock<IServerApplicationPaths>().Object;
         var serverConfig = new Mock<IServerConfigurationManager>();

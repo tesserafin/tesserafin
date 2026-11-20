@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json.Serialization;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
@@ -151,9 +152,9 @@ namespace Tesserafin.Controller.Entities.TV
             return OriginalLanguage ?? Series?.GetInheritedOriginalLanguage();
         }
 
-        public override List<string> GetUserDataKeys()
+        public override List<string> GetUserDataKeys(ActiveRecordings recordings = null)
         {
-            var list = base.GetUserDataKeys();
+            var list = base.GetUserDataKeys(recordings);
 
             var series = Series;
             if (series is not null && ParentIndexNumber.HasValue && IndexNumber.HasValue)
