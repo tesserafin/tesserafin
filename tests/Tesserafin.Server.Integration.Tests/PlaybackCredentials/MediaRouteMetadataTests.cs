@@ -64,6 +64,9 @@ public sealed class MediaRouteMetadataTests
             ["GET /Playback/Sessions/{id}/Hls/hls1/{playlistId}/{segmentId}.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             // Consolidation step 1: a Live TV session's live playlist and its segments, bound the same way.
             ["GET /Playback/Sessions/{id}/Hls/live.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
+            // Step 4: a session's progressive output, for a client that declares no HLS output.
+            ["GET /Playback/Sessions/{id}/Progressive.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
+            ["HEAD /Playback/Sessions/{id}/Progressive.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Playback/Sessions/{id}/Hls/hls/{playlistId}/{segmentId}.{segmentContainer}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Audio/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["HEAD /Audio/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),

@@ -191,6 +191,31 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
         => IsExecutableRemux(plan) || IsExecutableTranscode(plan) || IsExecutableAudioRemux(plan) || IsExecutableAudioTranscode(plan);
 
     /// <summary>
+    /// Determines whether a plan is one the session's progressive route executes from the plan alone:
+    /// a remux or a transcode the HLS route would execute, delivered instead as one HTTP stream - for
+    /// a client that declares no HLS output (decided 2026-11-20). A video goes out in MPEG-TS or
+    /// Matroska, an audio track in ADTS AAC or MPEG-TS; the streams and their targets are the HLS
+    /// route's own rules.
+    /// </summary>
+    /// <param name="plan">The execution plan.</param>
+    /// <returns><see langword="true"/> if the session's progressive route produces this plan.</returns>
+    public static bool IsExecutableProgressive(PlaybackExecutionPlan? plan)
+        => plan is { Protocol: StreamingProtocol.Http, Method: PlaybackMethod.Remux or PlaybackMethod.Transcode }
+            && (plan.VideoStreamIndex is null
+                ? plan.Container is "aac" or "ts"
+                : plan.Container is "ts" or "mkv")
+            && IsExecutableHlsOutput(plan with { Protocol = StreamingProtocol.Hls, Container = "ts" });
+
+    /// <summary>
+    /// Determines whether a plan is one of the session's own outputs it executes from the plan: its
+    /// HLS route or its progressive route.
+    /// </summary>
+    /// <param name="plan">The execution plan.</param>
+    /// <returns><see langword="true"/> if a session route produces this plan.</returns>
+    public static bool IsExecutableSessionOutput(PlaybackExecutionPlan? plan)
+        => IsExecutableHlsOutput(plan) || IsExecutableProgressive(plan);
+
+    /// <summary>
     /// Determines whether a plan is an audio remux this server executes from the plan alone: the
     /// engine chose <see cref="PlaybackMethod.Remux"/> for one audio stream and no video stream,
     /// delivered over HLS in fMP4 or MPEG-TS segments, the audio copied as it is. Nothing is
@@ -343,13 +368,15 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
                 return new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }
 
-            if (remux is null && (IsExecutableRemux(plan) || IsExecutableAudioRemux(plan)))
+            var progressive = IsExecutableProgressive(plan);
+            if (remux is null && (IsExecutableRemux(plan) || IsExecutableAudioRemux(plan) || (progressive && plan.Method == PlaybackMethod.Remux)))
             {
                 remux = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }
             else if (transcode is null
-                && ((IsExecutableTranscode(plan) && (!IsToneMappingToSdr(plan) || _canTonemap()))
-                    || IsExecutableAudioTranscode(plan)))
+                && (((IsExecutableTranscode(plan) || (progressive && plan.Method == PlaybackMethod.Transcode && plan.VideoStreamIndex is not null)) && (!IsToneMappingToSdr(plan) || _canTonemap()))
+                    || IsExecutableAudioTranscode(plan)
+                    || (progressive && plan.Method == PlaybackMethod.Transcode && plan.VideoStreamIndex is null)))
             {
                 transcode = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }

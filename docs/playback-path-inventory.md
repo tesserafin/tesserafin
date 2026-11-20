@@ -389,6 +389,22 @@ disabled (legacy planner reached). The existing chain's HLS contracts (`Playback
 (`LegacyPlaybackInfo`), their remaining caller; the kill-switch contract through a client with no
 HLS output (`TranscodeProgressiveHttp`), the one session the live wiring still plans.
 
+Progressive output (decided 2026-11-20): a client that declares no HLS output is served one HTTP
+stream from `GET/HEAD Playback/Sessions/{id}/Progressive.{container}`
+(`PlaybackSessionProgressiveController`, hidden from OpenAPI like the session HLS routes).
+`IsExecutableProgressive` is the HLS route's own rules (streams, H.264/AAC targets or copies) in
+MPEG-TS or Matroska for a video, ADTS AAC or MPEG-TS for an audio track. The request is built from
+the retained plan (`Container`, no segments); `PlaybackSessionExecution.IsThePlan` (now shared by
+both routes) checks the executor's state; `FileStreamResponseHelpers.GetTranscodedFile` keeps the
+legacy progressive job ownership. The one client input is the start position, clamped to the item:
+a progressive stream cannot be sought within, so a request naming a start stops the caller's job
+for the session and starts a new one. Proof: `ProgressiveEndToEndTests` (an MPEG-4 transcode to
+H.264/AAC in MPEG-TS with a seek that restarts FFmpeg at `-ss 00:00:06`, another user refused; a
+Matroska remux copying both streams), required by name; break controls: planner without the
+progressive output (legacy planner reached), seek without the restart (one FFmpeg command). The
+kill-switch contract now runs on a remote HTTP source (`StaticHttpFile`), the one session the live
+wiring still plans until step 5.
+
 ### Plan to delete `PlaybackInfo` and the legacy planner
 
 The Android client never calls `PlaybackInfo` (its start is `POST Playback/Sessions` only). What
@@ -401,8 +417,7 @@ reaches it), then the deletion is one coordinated change.
 2. HDR tone mapping to SDR: done (above), where the executor can tone-map. Hosted proof needs the
    project's FFmpeg on the runner (follow-up).
 3. Targets other than H.264/AAC: done (above).
-4. A client with no HLS output (decided): a session-owned progressive HTTP output for clients that
-   declare it, executing the same plan under the same access and stop rules as HLS.
+4. A client with no HLS output: done (above).
 5. Non-local sources (decided): read through a session-managed provider on the tuner model - it
    opens and closes the source and says whether seeking is possible; a source no provider handles
    is refused.
@@ -419,7 +434,7 @@ Remaining consumers by name. Nothing is deleted globally while one of them still
 
 | Legacy path | Still reached by |
 | --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | a session for a client with no HLS output, Live TV through `PlaybackInfo`, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
+| `PlaybackSessionPlanner` / `StreamBuilder` | a session of a non-local source, Live TV through `PlaybackInfo`, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
 | Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio the server does not serve from the session, Live TV, channel-plugin items; a library video the server does not serve from the session |

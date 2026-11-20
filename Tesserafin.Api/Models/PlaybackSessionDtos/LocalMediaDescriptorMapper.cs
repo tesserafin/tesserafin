@@ -24,7 +24,7 @@ public static class LocalMediaDescriptorMapper
     /// <param name="plan">The retained execution plan.</param>
     /// <returns><see langword="true"/> for a direct play, an executable remux or an executable transcode.</returns>
     public static bool CanMap(PlaybackExecutionPlan? plan)
-        => plan is { Method: PlaybackMethod.DirectPlay } || LocalMediaPlanner.IsExecutableHlsOutput(plan);
+        => plan is { Method: PlaybackMethod.DirectPlay } || LocalMediaPlanner.IsExecutableSessionOutput(plan);
 
     /// <summary>
     /// Maps an engine-decided local video session to its descriptor.
@@ -54,6 +54,20 @@ public static class LocalMediaDescriptorMapper
         var source = Uri.EscapeDataString(plan.SourceId);
         var binding = FormattableString.Invariant(
             $"itemId={item}&mediaSourceId={source}&playSessionId={Uri.EscapeDataString(playSessionId ?? string.Empty)}");
+
+        if (plan.Method != PlaybackMethod.DirectPlay && plan.Protocol == StreamingProtocol.Http)
+        {
+            // One HTTP stream in the plan's container, for a client that declares no HLS output.
+            var container = Uri.EscapeDataString(plan.Container);
+            return new PlaybackSessionStreamDescriptor(
+                FormattableString.Invariant($"/Playback/Sessions/{sessionId}/Progressive.{container}?{binding}"),
+                StreamingProtocol.Http,
+                engineVersion,
+                null,
+                SubtitleUrl(item, source, plan),
+                plan.Container,
+                MimeTypes.GetMimeType("." + plan.Container, null));
+        }
 
         if (plan.Method != PlaybackMethod.DirectPlay)
         {

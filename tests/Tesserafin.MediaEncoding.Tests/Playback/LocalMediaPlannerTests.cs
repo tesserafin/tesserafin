@@ -519,6 +519,69 @@ public sealed class LocalMediaPlannerTests
         Assert.False(LocalMediaPlanner.IsExecutableRemux(burn with { Method = PlaybackMethod.Remux }));
     }
 
+    [Theory]
+    [InlineData("mpeg4", "avi", PlaybackMethod.Transcode)]
+    [InlineData("h264", "mkv", PlaybackMethod.Remux)]
+    public void A_client_with_no_hls_output_is_served_by_an_owned_progressive_output(string videoCodec, string container, PlaybackMethod expected)
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var progressiveOnly = Browser(hlsOutput: false) with
+        {
+            Decode = Browser(hlsOutput: false).Decode with { SupportsHls = false },
+            OutputProfiles = [new PlaybackOutputProfile(MediaKind.Video, StreamingProtocol.Http, "ts", ["h264"], ["aac"], null, null, null)],
+        };
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(progressiveOnly, _declared));
+        Assert.NotNull(planner.PlanVideo(Options(Source("film", videoCodec, 1, 2, container))));
+        var executed = store.TakeCaptured()?.ExecutionPlan;
+
+        Assert.NotNull(executed);
+        Assert.Equal(expected, executed.Method);
+        Assert.Equal(StreamingProtocol.Http, executed.Protocol);
+        Assert.Equal("ts", executed.Container);
+        Assert.True(LocalMediaPlanner.IsExecutableProgressive(executed));
+        Assert.False(LocalMediaPlanner.IsExecutableHlsOutput(executed));
+    }
+
+    [Fact]
+    public void A_progressive_output_follows_the_hls_rules_in_its_own_containers()
+    {
+        var plan = new PlaybackExecutionPlan(
+            PlaybackMethod.Transcode,
+            SourceId: "film",
+            Container: "ts",
+            Protocol: StreamingProtocol.Http,
+            VideoStreamIndex: 0,
+            VideoCodec: "h264",
+            VideoBitrate: null,
+            Resolution: null,
+            VideoRange: null,
+            AudioStreamIndex: 1,
+            AudioCodec: "aac",
+            AudioBitrate: null,
+            AudioChannels: null,
+            SubtitleStreamIndex: null,
+            SubtitleFormat: null,
+            SubtitleDelivery: null,
+            TotalBitrate: null,
+            Transforms: [TransformKind.RemuxContainer, TransformKind.TranscodeVideo, TransformKind.CopyAudio]);
+
+        Assert.True(LocalMediaPlanner.IsExecutableProgressive(plan));
+        Assert.True(LocalMediaPlanner.IsExecutableProgressive(plan with { Container = "mkv" }));
+        Assert.False(LocalMediaPlanner.IsExecutableProgressive(plan with { Container = "mp4" }));
+        Assert.False(LocalMediaPlanner.IsExecutableProgressive(plan with { Protocol = StreamingProtocol.Hls }));
+        Assert.False(LocalMediaPlanner.IsExecutableProgressive(plan with { VideoCodec = "hevc" }));
+        Assert.True(LocalMediaPlanner.IsExecutableProgressive(plan with
+        {
+            Container = "aac",
+            VideoStreamIndex = null,
+            VideoCodec = null,
+            Transforms = [TransformKind.RemuxContainer, TransformKind.TranscodeAudio],
+        }));
+        Assert.False(LocalMediaPlanner.IsExecutableProgressive(plan with { Method = PlaybackMethod.DirectPlay }));
+    }
+
     [Fact]
     public void Only_an_hls_copy_of_one_audio_stream_is_an_executable_audio_remux()
     {

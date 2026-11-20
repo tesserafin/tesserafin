@@ -42,6 +42,8 @@ public class MediaBoundaryStructuralTests
         // Consolidation step 1: the live playlist and segments of a Live TV session.
         ("DynamicHlsController", "GetPlaybackSessionLiveHlsPlaylist", PlaybackCapabilityScope.Media),
         ("HlsSegmentController", "GetPlaybackSessionLiveSegment", PlaybackCapabilityScope.Media),
+        // Step 4: the progressive output of a session, for a client that declares no HLS output.
+        ("PlaybackSessionProgressiveController", "GetPlaybackSessionProgressive", PlaybackCapabilityScope.Media),
         ("AudioController", "GetAudioStream", PlaybackCapabilityScope.Media),
         ("AudioController", "GetAudioStreamByContainer", PlaybackCapabilityScope.Media),
         ("UniversalAudioController", "GetUniversalAudioStream", PlaybackCapabilityScope.Media),

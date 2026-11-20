@@ -57,8 +57,8 @@ public static class EnginePlanEncodingRequest
     }
 
     /// <summary>
-    /// Renders the encoding request of an executable HLS plan
-    /// (<see cref="LocalMediaPlanner.IsExecutableHlsOutput"/>).
+    /// Renders the encoding request of an executable HLS or progressive plan
+    /// (<see cref="LocalMediaPlanner.IsExecutableSessionOutput"/>).
     /// </summary>
     /// <param name="plan">The retained execution plan.</param>
     /// <param name="itemId">The item the session plays.</param>
@@ -80,10 +80,12 @@ public static class EnginePlanEncodingRequest
         string? transcodeReasons)
     {
         ArgumentNullException.ThrowIfNull(plan);
-        if (!LocalMediaPlanner.IsExecutableHlsOutput(plan))
+        if (!LocalMediaPlanner.IsExecutableSessionOutput(plan))
         {
             throw new ArgumentException("Only an executable remux or transcode plan has an encoding request.", nameof(plan));
         }
+
+        var progressive = plan.Protocol == StreamingProtocol.Http;
 
         var copiesVideo = CopiesVideo(plan);
         var copiesAudio = CopiesAudio(plan);
@@ -94,8 +96,10 @@ public static class EnginePlanEncodingRequest
         request.MediaSourceId = plan.SourceId;
         request.PlaySessionId = playSessionId;
         request.DeviceId = deviceId;
-        request.SegmentContainer = plan.Container;
-        request.MinSegments = 1;
+        // One HTTP stream in the plan's container, or HLS segments of it.
+        request.Container = progressive ? plan.Container : null;
+        request.SegmentContainer = progressive ? null : plan.Container;
+        request.MinSegments = progressive ? null : 1;
         request.VideoCodec = plan.VideoCodec;
         // An audio-only request takes its output codec as it is: the executor weighs a stream copy
         // for video requests only. A copied audio stream is therefore named "copy" here.

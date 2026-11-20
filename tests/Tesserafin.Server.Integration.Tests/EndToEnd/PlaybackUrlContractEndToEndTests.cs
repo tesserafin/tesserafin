@@ -272,12 +272,13 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     [Fact]
     public async Task KillSwitch_ForcesLegacyOnNextRequest_UrlStillServable()
     {
-        // Since consolidation step 1 a local video the session journey executes has no legacy
-        // fallback for the kill switch to restore (docs/playback-path-inventory.md §4 to §7). The kill
-        // switch still governs every plan that journey does not execute: here, a client with no HLS
-        // output (progressive HTTP), until step 4 of the plan moves it onto the session.
-        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 kill switch fixture {Guid.NewGuid()}");
-        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeProgressiveHttp();
+        // Since consolidation step 1 a local item the session journey executes has no legacy fallback
+        // for the kill switch to restore (docs/playback-path-inventory.md §4 to §7). The kill switch
+        // still governs every plan that journey does not execute: here, a source that is not a local
+        // file (a remote HTTP url), until step 5 of the plan reads it through a session provider.
+        await using var remote = StaticHttpFile.Start(_fixturePath);
+        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 kill switch fixture {Guid.NewGuid()}", configure: movie => movie.Path = remote.Url);
+        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHls();
 
         // V2 mode (not merely Canary): every session is v2-authoritative, no cohort-hash dependency -
         // the simplest way to get a REAL "before" state where v2 actually served this session, so the
