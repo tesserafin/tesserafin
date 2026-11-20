@@ -62,6 +62,9 @@ public sealed class MediaRouteMetadataTests
             // Consolidation step 1: a remux session's HLS routes, bound the same way.
             ["GET /Playback/Sessions/{id}/Hls/main.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Playback/Sessions/{id}/Hls/hls1/{playlistId}/{segmentId}.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
+            // Consolidation step 1: a Live TV session's live playlist and its segments, bound the same way.
+            ["GET /Playback/Sessions/{id}/Hls/live.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
+            ["GET /Playback/Sessions/{id}/Hls/hls/{playlistId}/{segmentId}.{segmentContainer}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Audio/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["HEAD /Audio/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Audio/{itemId}/stream.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
@@ -175,8 +178,9 @@ public sealed class MediaRouteMetadataTests
         // Enumerated by controller type, not by path substring: a keyword filter over route
         // templates finds thirteen and silently drops Videos/ActiveEncodings, which is an endpoint
         // of these controllers just as much as the segment routes are. Sixteen since the two
-        // HLS routes of a remux session (Playback/Sessions/{id}/Hls/...) joined DynamicHlsController.
-        Assert.Equal(16, hidden.Length);
+        // HLS routes of a remux session (Playback/Sessions/{id}/Hls/...) joined DynamicHlsController;
+        // eighteen since a Live TV session's live playlist and segment route joined them.
+        Assert.Equal(18, hidden.Length);
 
         var anonymous = hidden
             .Where(endpoint => endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Count == 0

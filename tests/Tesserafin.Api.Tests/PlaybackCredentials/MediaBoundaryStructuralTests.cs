@@ -39,6 +39,9 @@ public class MediaBoundaryStructuralTests
         // Consolidation step 1: the HLS routes of a session the engine alone decided to remux.
         ("DynamicHlsController", "GetPlaybackSessionHlsPlaylist", PlaybackCapabilityScope.Media),
         ("DynamicHlsController", "GetPlaybackSessionHlsSegment", PlaybackCapabilityScope.Media),
+        // Consolidation step 1: the live playlist and segments of a Live TV session.
+        ("DynamicHlsController", "GetPlaybackSessionLiveHlsPlaylist", PlaybackCapabilityScope.Media),
+        ("HlsSegmentController", "GetPlaybackSessionLiveSegment", PlaybackCapabilityScope.Media),
         ("AudioController", "GetAudioStream", PlaybackCapabilityScope.Media),
         ("AudioController", "GetAudioStreamByContainer", PlaybackCapabilityScope.Media),
         ("UniversalAudioController", "GetUniversalAudioStream", PlaybackCapabilityScope.Media),
