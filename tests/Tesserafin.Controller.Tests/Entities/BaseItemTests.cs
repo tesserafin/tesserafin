@@ -46,13 +46,9 @@ public class BaseItemTests
             Path = altPath,
         };
 
-        var mediaSourceManager = new Mock<IMediaSourceManager>();
-        mediaSourceManager.Setup(x => x.GetPathProtocol(It.IsAny<string>()))
-                .Returns((string x) => MediaProtocol.File);
         var libraryManager = new Mock<ILibraryManager>();
         libraryManager.Setup(x => x.GetLocalAlternateVersionIds(It.IsAny<Video>()))
                 .Returns([Guid.Empty]);
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
         BaseItem.LibraryManager = libraryManager.Object;
 
         Assert.Equal(name, video.GetMediaSourceName(video));
@@ -114,14 +110,10 @@ public class BaseItemTests
             Path = altPath,
         };
 
-        var mediaSourceManager = new Mock<IMediaSourceManager>();
-        mediaSourceManager.Setup(x => x.GetPathProtocol(It.IsAny<string>()))
-                .Returns((string x) => MediaProtocol.File);
         var libraryManager = new Mock<ILibraryManager>();
         // No local alternate versions: these are linked (separate items), so the folder fallback is unavailable.
         libraryManager.Setup(x => x.GetLocalAlternateVersionIds(It.IsAny<Video>()))
                 .Returns(Array.Empty<Guid>());
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
         BaseItem.LibraryManager = libraryManager.Object;
 
         Assert.Equal(expectedPrimary, video.GetMediaSourceName(video, commonPrefix));
@@ -131,7 +123,7 @@ public class BaseItemTests
     [Fact]
     public void GetAlternateVersion_ReturnsMatchingLocalVersion()
     {
-        var (primary, alt1, alt2) = SetupVersionGroup();
+        var (primary, alt1, alt2, _) = SetupVersionGroup();
 
         Assert.Same(alt1, primary.GetAlternateVersion(alt1.Id));
         Assert.Same(alt2, primary.GetAlternateVersion(alt2.Id));
@@ -142,7 +134,7 @@ public class BaseItemTests
     [Fact]
     public void GetAllVersions_FromAnyVersion_ReturnsEveryVersionOnce()
     {
-        var (primary, alt1, alt2) = SetupVersionGroup();
+        var (primary, alt1, alt2, _) = SetupVersionGroup();
 
         foreach (var source in new[] { primary, alt1, alt2 })
         {
@@ -155,7 +147,7 @@ public class BaseItemTests
         }
     }
 
-    private static (Video Primary, Video Alt1, Video Alt2) SetupVersionGroup()
+    private static (Video Primary, Video Alt1, Video Alt2, IMediaSourceManager MediaSources) SetupVersionGroup()
     {
         var primary = new Video { Id = Guid.NewGuid(), Path = "/Movies/Movie/Movie.mkv" };
         var alt1 = new Video { Id = Guid.NewGuid(), Path = "/Movies/Movie/Movie - 1080p.mkv", PrimaryVersionId = primary.Id };
@@ -182,29 +174,28 @@ public class BaseItemTests
         var recordingsManager = new Mock<IRecordingsManager>();
         recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
 
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
         BaseItem.LibraryManager = libraryManager.Object;
 
-        return (primary, alt1, alt2);
+        return (primary, alt1, alt2, mediaSourceManager.Object);
     }
 
     [Fact]
     public void GetMediaSources_DefaultsToTheQueriedVersionsOwnSource()
     {
-        var (primary, alt1, _) = SetupVersionGroup();
+        var (primary, alt1, _, mediaSources) = SetupVersionGroup();
 
         // Resuming the 1080p alternate must default to the 1080p source, not the higher-resolution
         // 2160p primary that the width ordering would otherwise place first.
-        Assert.Equal(alt1.Id.ToString("N"), alt1.GetMediaSources(false, BaseItem.MediaSourceManager, Mock.Of<IMediaSegmentManager>(), Mock.Of<IChannelManager>())[0].Id);
+        Assert.Equal(alt1.Id.ToString("N"), alt1.GetMediaSources(false, mediaSources, Mock.Of<IMediaSegmentManager>(), Mock.Of<IChannelManager>())[0].Id);
 
         // Opening the primary still defaults to the primary's own (here highest-resolution) source.
-        Assert.Equal(primary.Id.ToString("N"), primary.GetMediaSources(false, BaseItem.MediaSourceManager, Mock.Of<IMediaSegmentManager>(), Mock.Of<IChannelManager>())[0].Id);
+        Assert.Equal(primary.Id.ToString("N"), primary.GetMediaSources(false, mediaSources, Mock.Of<IMediaSegmentManager>(), Mock.Of<IChannelManager>())[0].Id);
     }
 
     [Fact]
     public void GetAllItemsForMediaSources_FromAnyVersion_HasNoDuplicates()
     {
-        var (primary, alt1, alt2) = SetupVersionGroup();
+        var (primary, alt1, alt2, _) = SetupVersionGroup();
 
         var method = typeof(Video).GetMethod("GetAllItemsForMediaSources", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
@@ -305,12 +296,6 @@ public class BaseItemTests
         libraryManager.Setup(x => x.GetLinkedAlternateVersions(It.IsAny<Video>())).Returns(Array.Empty<Video>());
         libraryManager.Setup(x => x.GetLocalAlternateVersionIds(It.IsAny<Video>())).Returns(Array.Empty<Guid>());
         BaseItem.LibraryManager = libraryManager.Object;
-
-        // BaseItem.PathProtocol (touched via GetCommonNamePrefix -> IsFileProtocol, on the fallback
-        // path exercised here) reads the static BaseItem.MediaSourceManager rather than the
-        // mediaSourceManager instance passed into GetMediaSources below — so it must be set here too,
-        // for the same static-leak reason as Video.RecordingsManager above.
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
 
         // Video.SourceType (touched via BaseItem.GetMediaSources' own-version fallback) calls
         // Video.IsActiveRecording(), which reads the static Video.RecordingsManager. That static is

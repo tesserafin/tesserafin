@@ -30,6 +30,7 @@ public class ChapterManager : IChapterManager
     private readonly IFileSystem _fileSystem;
     private readonly ILogger<ChapterManager> _logger;
     private readonly IMediaEncoder _encoder;
+    private readonly IMediaSourceManager _mediaSourceManager;
     private readonly IChapterRepository _chapterRepository;
     private readonly ILibraryManager _libraryManager;
     private readonly IPathManager _pathManager;
@@ -45,6 +46,7 @@ public class ChapterManager : IChapterManager
     /// <param name="logger">The <see cref="ILogger{ChapterManager}"/>.</param>
     /// <param name="fileSystem">The <see cref="IFileSystem"/>.</param>
     /// <param name="encoder">The <see cref="IMediaEncoder"/>.</param>
+    /// <param name="mediaSourceManager">The <see cref="IMediaSourceManager"/>.</param>
     /// <param name="chapterRepository">The <see cref="IChapterRepository"/>.</param>
     /// <param name="libraryManager">The <see cref="ILibraryManager"/>.</param>
     /// <param name="pathManager">The <see cref="IPathManager"/>.</param>
@@ -52,6 +54,7 @@ public class ChapterManager : IChapterManager
         ILogger<ChapterManager> logger,
         IFileSystem fileSystem,
         IMediaEncoder encoder,
+        IMediaSourceManager mediaSourceManager,
         IChapterRepository chapterRepository,
         ILibraryManager libraryManager,
         IPathManager pathManager)
@@ -59,6 +62,7 @@ public class ChapterManager : IChapterManager
         _logger = logger;
         _fileSystem = fileSystem;
         _encoder = encoder;
+        _mediaSourceManager = mediaSourceManager;
         _chapterRepository = chapterRepository;
         _libraryManager = libraryManager;
         _pathManager = pathManager;
@@ -179,7 +183,7 @@ public class ChapterManager : IChapterManager
                         };
 
                         _logger.LogInformation("Extracting chapter image for {Name} at {Path}", video.Name, inputPath);
-                        var tempFile = await _encoder.ExtractVideoImage(inputPath, container, mediaSource, video.GetDefaultVideoStream(), video.Video3DFormat, time, cancellationToken).ConfigureAwait(false);
+                        var tempFile = await _encoder.ExtractVideoImage(inputPath, container, mediaSource, video.GetDefaultVideoStream(_mediaSourceManager), video.Video3DFormat, time, cancellationToken).ConfigureAwait(false);
                         File.Copy(tempFile, path, true);
 
                         try

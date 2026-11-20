@@ -54,7 +54,6 @@ namespace Tesserafin.Server.Core.Library
         private readonly IUserManager _userManager;
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemAccessService _itemAccessService;
-        private readonly IFileSystem _fileSystem;
         private readonly ILogger<MediaSourceManager> _logger;
         private readonly IUserDataManager _userDataManager;
         private readonly IMediaEncoder _mediaEncoder;
@@ -82,7 +81,6 @@ namespace Tesserafin.Server.Core.Library
             IItemLookupService itemLookupService,
             IItemAccessService itemAccessService,
             ILogger<MediaSourceManager> logger,
-            IFileSystem fileSystem,
             IUserDataManager userDataManager,
             IMediaEncoder mediaEncoder,
             IDirectoryService directoryService,
@@ -100,7 +98,6 @@ namespace Tesserafin.Server.Core.Library
             _itemLookupService = itemLookupService;
             _itemAccessService = itemAccessService;
             _logger = logger;
-            _fileSystem = fileSystem;
             _userDataManager = userDataManager;
             _mediaEncoder = mediaEncoder;
             _localizationManager = localizationManager;
@@ -255,46 +252,9 @@ namespace Tesserafin.Server.Core.Library
             return SortMediaSources(list, preferredId).ToArray();
         }
 
-        /// <inheritdoc />>
+        /// <inheritdoc />
         public MediaProtocol GetPathProtocol(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                return MediaProtocol.File;
-            }
-
-            if (path.StartsWith("Rtsp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Rtsp;
-            }
-
-            if (path.StartsWith("Rtmp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Rtmp;
-            }
-
-            if (path.StartsWith("Http", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Http;
-            }
-
-            if (path.StartsWith("rtp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Rtp;
-            }
-
-            if (path.StartsWith("ftp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Ftp;
-            }
-
-            if (path.StartsWith("udp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Udp;
-            }
-
-            return _fileSystem.IsPathFile(path) ? MediaProtocol.File : MediaProtocol.Http;
-        }
+            => MediaPath.GetProtocol(path);
 
         public bool SupportsDirectStream(string path, MediaProtocol protocol)
         {

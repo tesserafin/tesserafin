@@ -652,14 +652,14 @@ namespace Tesserafin.Controller.Entities
             return base.GetDeletePaths();
         }
 
-        public virtual MediaStream GetDefaultVideoStream()
+        public virtual MediaStream GetDefaultVideoStream(IMediaSourceManager mediaSourceManager)
         {
             if (!DefaultVideoStreamIndex.HasValue)
             {
                 return null;
             }
 
-            return MediaSourceManager.GetMediaStreams(new MediaStreamQuery
+            return mediaSourceManager.GetMediaStreams(new MediaStreamQuery
             {
                 ItemId = Id,
                 Index = DefaultVideoStreamIndex.Value

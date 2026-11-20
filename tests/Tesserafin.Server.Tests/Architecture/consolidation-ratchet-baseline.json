@@ -7,7 +7,6 @@
     "BaseItem.ConfigurationManager",
     "BaseItem.FileSystem",
     "BaseItem.LibraryManager",
-    "BaseItem.MediaSourceManager",
     "BaseItem.ProviderManager",
     "BaseItem.UserDataManager"
   ],

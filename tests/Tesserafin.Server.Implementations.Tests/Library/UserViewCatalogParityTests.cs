@@ -347,7 +347,6 @@ public sealed class UserViewCatalogParityTests
             // pre-existing behavior, reproduced verbatim by UserViewFactory (see its type-level
             // remarks and LibraryManagerUserViewFactoryTests' identical setup for the same overload).
             Tesserafin.Controller.Entities.BaseItem.LibraryManager = Mock.Of<ILibraryManager>();
-            Tesserafin.Controller.Entities.BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
 
             var localizationMock = new Mock<ILocalizationManager>();
             localizationMock.Setup(l => l.GetLocalizedString("Movies")).Returns("Movies");

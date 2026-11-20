@@ -113,7 +113,6 @@ public sealed class EpisodeEmbeddedInfoProbeTests
         libraryManager.Setup(l => l.GetLibraryOptions(It.IsAny<BaseItem>())).Returns(_enabled);
         var configuration = new Mock<IServerConfigurationManager>();
         configuration.Setup(c => c.Configuration).Returns(new ServerConfiguration());
-        BaseItem.MediaSourceManager = _sources.Object;
         var previousLibraryManager = BaseItem.LibraryManager;
         BaseItem.LibraryManager = libraryManager.Object;
         var naming = new Mock<IItemNamingService>();

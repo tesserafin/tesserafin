@@ -76,12 +76,6 @@ public class MediaInfoResolverTests
     [Fact]
     public void GetExternalFiles_BadProtocol_ReturnsNoSubtitles()
     {
-        // need a media source manager capable of returning something other than file protocol
-        var mediaSourceManager = new Mock<IMediaSourceManager>();
-        mediaSourceManager.Setup(m => m.GetPathProtocol(It.IsRegex("http.*")))
-            .Returns(MediaProtocol.Http);
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
-
         var video = new Movie
         {
             Path = "https://url.com/My.Video.mkv"
@@ -95,8 +89,6 @@ public class MediaInfoResolverTests
     [InlineData(true)]
     public void GetExternalFiles_MissingDirectory_DirectoryNotQueried(bool metadataDirectory)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         string containingFolderPath, metadataPath;
 
         if (metadataDirectory)
@@ -140,8 +132,6 @@ public class MediaInfoResolverTests
     [InlineData("[LTDB] Who Framed Roger Rabbit (1998) - [Bluray-1080p].mkv", "[LTDB] Who Framed Roger Rabbit (1998) - [Bluray-1080p].en.srt", "eng")]
     public void GetExternalFiles_NameMatching_MatchesAndParsesToken(string movie, string file, string? language, bool metadataDirectory = false)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         var video = new Movie
         {
             Path = VideoDirectoryPath + "/" + movie
@@ -165,8 +155,6 @@ public class MediaInfoResolverTests
     [InlineData("Some.Other.Video.srt")]
     public void GetExternalFiles_NameMatching_RejectsNonMatches(string file)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         var video = new Movie
         {
             Path = VideoDirectoryPath + "/My.Video.mkv"
@@ -183,12 +171,6 @@ public class MediaInfoResolverTests
     [InlineData(VideoDirectoryPath)] // valid but no files found for this test
     public async Task GetExternalStreams_BadPaths_ReturnsNoSubtitles(string path)
     {
-        // need a media source manager capable of returning something other than file protocol
-        var mediaSourceManager = new Mock<IMediaSourceManager>();
-        mediaSourceManager.Setup(m => m.GetPathProtocol(It.IsRegex("http.*")))
-            .Returns(MediaProtocol.Http);
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
-
         var video = new Movie
         {
             Path = path
@@ -276,8 +258,6 @@ public class MediaInfoResolverTests
     [MemberData(nameof(GetExternalStreams_MergeMetadata_HandlesOverridesCorrectly_Data))]
     public async Task GetExternalStreams_MergeMetadata_HandlesOverridesCorrectly(string file, MediaStream[] inputStreams, MediaStream[] expectedStreams)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         var video = new Movie
         {
             Path = VideoDirectoryPath + "/My.Video.mkv"
@@ -326,8 +306,6 @@ public class MediaInfoResolverTests
     [InlineData(2, 2)]
     public async Task GetExternalStreams_StreamIndex_HandlesFilesAndContainers(int fileCount, int streamCount)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         var video = new Movie
         {
             Path = VideoDirectoryPath + "/My.Video.mkv"

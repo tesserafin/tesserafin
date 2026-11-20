@@ -40,10 +40,6 @@ public class ItemNamingServiceTests
     [Fact]
     public void FillMissingEpisodeNumbersFromPath_PopulatesSeasonAndEpisodeNumbers()
     {
-        var mediaSourceManager = new Mock<IMediaSourceManager>();
-        mediaSourceManager.Setup(x => x.GetPathProtocol(It.IsAny<string>())).Returns(MediaProtocol.File);
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
-
         var service = CreateService();
         var episode = new Episode
         {

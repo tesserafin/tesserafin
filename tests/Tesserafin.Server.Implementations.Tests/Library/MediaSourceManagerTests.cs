@@ -59,7 +59,10 @@ namespace Tesserafin.Server.Implementations.Tests.Library
         [InlineData("https://example.com/stream.m3u8", MediaProtocol.Http)]
         [InlineData("rtsp://media.example.com:554/twister/audiotrack", MediaProtocol.Rtsp)]
         public void GetPathProtocol_ValidArg_Correct(string path, MediaProtocol expected)
-            => Assert.Equal(expected, _mediaSourceManager.GetPathProtocol(path));
+        {
+            Assert.Equal(expected, _mediaSourceManager.GetPathProtocol(path));
+            Assert.Equal(expected, new Video { Path = path }.PathProtocol);
+        }
 
         [Theory]
         [InlineData(5, "eng", "eng", false, true)]
@@ -275,7 +278,6 @@ namespace Tesserafin.Server.Implementations.Tests.Library
             var recordingsManager = new Mock<IRecordingsManager>();
             recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
 
-            BaseItem.MediaSourceManager = mediaSourceManager.Object;
             BaseItem.LibraryManager = libraryManager.Object;
 
             return (primary, alt1, alt2);

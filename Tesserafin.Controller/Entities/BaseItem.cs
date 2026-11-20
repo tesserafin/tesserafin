@@ -347,7 +347,7 @@ namespace Tesserafin.Controller.Entities
                     return null;
                 }
 
-                return MediaSourceManager.GetPathProtocol(path);
+                return MediaPath.GetProtocol(path);
             }
         }
 
@@ -482,8 +482,6 @@ namespace Tesserafin.Controller.Entities
         public IItemReadServices ReadServices { get; set; }
 
         public static IUserDataManager UserDataManager { get; set; }
-
-        public static IMediaSourceManager MediaSourceManager { get; set; }
 
         /// <summary>
         /// Gets or sets the name of the forced sort.

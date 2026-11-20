@@ -106,7 +106,6 @@ public sealed class StandaloneVisibilityTests
         _repository = repository;
         _readServices = new Tesserafin.Server.Implementations.Item.ItemReadServices(repository.Object, _activeRecordings);
         BaseItem.ConfigurationManager = configuration.Object;
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>(m => m.GetPathProtocol(It.IsAny<string>()) == MediaProtocol.File);
         // The static answers from the same recordings as the service (Record).
 
         var fileSystem = new Mock<Tesserafin.Model.IO.IFileSystem>();

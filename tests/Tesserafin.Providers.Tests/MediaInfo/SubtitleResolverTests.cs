@@ -65,8 +65,6 @@ public class SubtitleResolverTests
     [InlineData("My.Video.mp3", true, false)]
     public async Task GetExternalStreams_MixedFilenames_PicksSubtitles(string file, bool metadataDirectory, bool matches)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         var video = new Movie
         {
             Path = MediaInfoResolverTests.VideoDirectoryPath + "/My.Video.mkv"

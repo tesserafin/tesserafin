@@ -377,7 +377,6 @@ namespace Tesserafin.Providers.Tests.Manager
             // Set path and media source manager so images will be downloaded (EnableImageStub will return false)
             var item = GetItemWithImages(imageType, initialImageCount, false);
             item.Path = "non-empty path";
-            BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
 
             // seek 2 so it won't short-circuit out of downloading when populated
             var libraryOptions = GetLibraryOptions(item, imageType, 2);

@@ -56,7 +56,6 @@ public class FindExtrasTests
 
         // This is pretty terrible but unavoidable
         BaseItem.FileSystem ??= fixture.Create<IFileSystem>();
-        BaseItem.MediaSourceManager ??= fixture.Create<IMediaSourceManager>();
     }
 
     [Fact]

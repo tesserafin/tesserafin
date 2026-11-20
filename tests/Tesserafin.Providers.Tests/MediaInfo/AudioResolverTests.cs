@@ -65,8 +65,6 @@ public class AudioResolverTests
     [InlineData("My.Video.mp3", true, true)]
     public async Task GetExternalStreams_MixedFilenames_PicksAudio(string file, bool metadataDirectory, bool matches)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         var video = new Movie
         {
             Path = MediaInfoResolverTests.VideoDirectoryPath + "/My.Video.mkv"

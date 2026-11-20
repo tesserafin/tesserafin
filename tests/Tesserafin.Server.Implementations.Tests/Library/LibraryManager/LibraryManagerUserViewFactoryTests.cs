@@ -241,7 +241,6 @@ public class LibraryManagerUserViewFactoryTests
     {
         Tesserafin.Controller.Entities.BaseItem.ConfigurationManager = _configurationManagerMock.Object;
         Tesserafin.Controller.Entities.BaseItem.LibraryManager = _libraryManager;
-        Tesserafin.Controller.Entities.BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
 
         var view = _libraryManager.GetNamedView("Movies", CollectionType.movies, "SortName");
 
