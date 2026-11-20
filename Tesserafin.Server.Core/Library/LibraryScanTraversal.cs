@@ -37,12 +37,12 @@ internal sealed class LibraryScanTraversal(
         cancellationToken.ThrowIfCancellationRequested();
         var root = roots.GetRootFolder();
         root.Children = null;
-        await root.RefreshMetadata(_deletions, _writes, cancellationToken).ConfigureAwait(false);
+        await root.RefreshMetadata(_deletions, _writes, _validation.Providers, cancellationToken).ConfigureAwait(false);
         await root.ValidateChildren(_validation, new Progress<double>(), new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         var userRoot = userRoots.GetUserRootFolder();
         userRoot.Children = null;
-        await userRoot.RefreshMetadata(_deletions, _writes, cancellationToken).ConfigureAwait(false);
+        await userRoot.RefreshMetadata(_deletions, _writes, _validation.Providers, cancellationToken).ConfigureAwait(false);
         await userRoot.ValidateChildren(_validation, new Progress<double>(), new MetadataRefreshOptions(new DirectoryService(fileSystem)), recursive: false, allowRemoveRoot: removeRoot, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         var deleted = new List<Guid>();
@@ -55,7 +55,7 @@ internal sealed class LibraryScanTraversal(
             }
             else
             {
-                await child.RefreshMetadata(_deletions, _writes, cancellationToken).ConfigureAwait(false);
+                await child.RefreshMetadata(_deletions, _writes, _validation.Providers, cancellationToken).ConfigureAwait(false);
             }
         }
 

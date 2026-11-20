@@ -6,8 +6,7 @@
   "entityStaticServices": [
     "BaseItem.ConfigurationManager",
     "BaseItem.FileSystem",
-    "BaseItem.LibraryManager",
-    "BaseItem.ProviderManager"
+    "BaseItem.LibraryManager"
   ],
   "forbiddenDependencies": [],
   "streamBuilderFiles": [

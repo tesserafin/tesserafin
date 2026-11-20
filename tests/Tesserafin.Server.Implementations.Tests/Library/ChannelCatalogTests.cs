@@ -63,7 +63,7 @@ public sealed class ChannelCatalogTests
     // ---------------------------------------------------------------
     // Lookup-only behavior: a channel plugin with no matching materialized item is silently
     // omitted (see ChannelCatalog's type-level remarks - materialization stays ChannelManager's
-    // job, since it reaches into the SCC via BaseItem.ProviderManager).
+    // job, since it reaches into the SCC via its provider manager).
     // ---------------------------------------------------------------
 
     [Fact]

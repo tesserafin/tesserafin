@@ -36,6 +36,7 @@ public class GuideManager : IGuideManager
     private readonly IItemWriteCommands _writes;
     private readonly IItemImageService _images;
     private readonly IItemDeletionCommands _deletions;
+    private readonly Lazy<IProviderManager> _providers;
     private readonly ILogger<GuideManager> _logger;
     private readonly IConfigurationManager _config;
     private readonly IFileSystem _fileSystem;
@@ -58,6 +59,7 @@ public class GuideManager : IGuideManager
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="images">Explicit image preparation and commit lifecycle.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="providers">The provider manager for metadata refreshes.</param>
     /// <param name="logger">The <see cref="ILogger{TCategoryName}"/>.</param>
     /// <param name="config">The <see cref="IConfigurationManager"/>.</param>
     /// <param name="fileSystem">The <see cref="IFileSystem"/>.</param>
@@ -73,6 +75,7 @@ public class GuideManager : IGuideManager
         IItemWriteCommands writes,
         IItemImageService images,
         IItemDeletionCommands deletions,
+        Lazy<IProviderManager> providers,
         ILogger<GuideManager> logger,
         IConfigurationManager config,
         IFileSystem fileSystem,
@@ -89,6 +92,7 @@ public class GuideManager : IGuideManager
         _writes = writes;
         _images = images;
         _deletions = deletions;
+        _providers = providers;
         _logger = logger;
         _config = config;
         _fileSystem = fileSystem;
@@ -328,6 +332,7 @@ public class GuideManager : IGuideManager
                 await currentChannel.RefreshMetadata(
                     _deletions,
                     _writes,
+                    _providers.Value,
                     new MetadataRefreshOptions(new DirectoryService(_fileSystem))
                     {
                         ForceSave = true

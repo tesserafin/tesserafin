@@ -48,6 +48,7 @@ namespace Tesserafin.Server.Core.Library
 
         private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
+        private readonly Lazy<IProviderManager> _providerManager;
 
         private readonly IServerApplicationHost _appHost;
         private readonly IItemRepository _itemRepo;
@@ -73,6 +74,7 @@ namespace Tesserafin.Server.Core.Library
         public MediaSourceManager(
             IItemWriteCommands writes,
             IItemDeletionCommands deletions,
+            Lazy<IProviderManager> providers,
             IServerApplicationHost appHost,
             IItemRepository itemRepo,
             IApplicationPaths applicationPaths,
@@ -91,6 +93,7 @@ namespace Tesserafin.Server.Core.Library
         {
             _writes = writes;
             _deletions = deletions;
+            _providerManager = providers;
             _channelManager = channelManager;
             _appHost = appHost;
             _itemRepo = itemRepo;
@@ -202,6 +205,7 @@ namespace Tesserafin.Server.Core.Library
                 await item.RefreshMetadata(
                     _deletions,
                     _writes,
+                    _providerManager.Value,
                     new MetadataRefreshOptions(_directoryService)
                     {
                         EnableRemoteContentProbe = true,

@@ -26,6 +26,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IProviderManager _providers;
     private readonly ILibraryManager _libraryManager;
     private readonly ILibraryScanCoordinator _scans;
     private readonly ILocalizationManager _localization;
@@ -39,6 +40,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="providers">The provider manager for metadata refreshes.</param>
     /// <param name="scans">Library scan scheduling and state.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="localization">Instance of the <see cref="ILocalizationManager"/> interface.</param>
@@ -49,6 +51,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     public PeopleValidationTask(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
+        IProviderManager providers,
         ILibraryManager libraryManager,
         ILibraryScanCoordinator scans,
         ILocalizationManager localization,
@@ -59,6 +62,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
     {
         _writes = writes;
         _deletions = deletions;
+        _providers = providers;
         _libraryManager = libraryManager;
         _scans = scans;
         _localization = localization;
@@ -259,7 +263,7 @@ public class PeopleValidationTask : IScheduledTask, IConfigurableScheduledTask
                 MetadataRefreshMode = hasOverview ? MetadataRefreshMode.ValidationOnly : MetadataRefreshMode.Default
             };
 
-            await item.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
+            await item.RefreshMetadata(_deletions, _writes, _providers, options, cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (OperationCanceledException)

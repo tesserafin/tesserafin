@@ -282,7 +282,7 @@ namespace Tesserafin.Controller.Entities.TV
             return allEpisodes.DistinctBy(i => i.Id).Reverse();
         }
 
-        public async Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
+        public async Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IProviderManager providers, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
             Children = null; // invalidate cached children.
             // Refresh bottom up, seasons and episodes first, then the series
@@ -303,7 +303,7 @@ namespace Tesserafin.Controller.Entities.TV
 
                 if (refreshOptions.RefreshItem(item))
                 {
-                    await item.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(deletions, writes, providers, refreshOptions, cancellationToken).ConfigureAwait(false);
                 }
 
                 numComplete++;
@@ -334,7 +334,7 @@ namespace Tesserafin.Controller.Entities.TV
                 {
                     if (refreshOptions.RefreshItem(item))
                     {
-                        await item.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                        await item.RefreshMetadata(deletions, writes, providers, refreshOptions, cancellationToken).ConfigureAwait(false);
                     }
                 }
 
@@ -345,7 +345,7 @@ namespace Tesserafin.Controller.Entities.TV
             }
 
             refreshOptions = new MetadataRefreshOptions(refreshOptions);
-            await ProviderManager.RefreshSingleItem(this, refreshOptions, cancellationToken).ConfigureAwait(false);
+            await providers.RefreshSingleItem(this, refreshOptions, cancellationToken).ConfigureAwait(false);
         }
 
         public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, DtoOptions options, bool shouldIncludeMissingEpisodes)

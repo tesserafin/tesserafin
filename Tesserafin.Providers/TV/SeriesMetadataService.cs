@@ -425,7 +425,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         };
 
         series.AddChild(Writes, season);
-        await season.RefreshMetadata(_deletions, Writes, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken).ConfigureAwait(false);
+        await season.RefreshMetadata(_deletions, Writes, ProviderManager, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken).ConfigureAwait(false);
 
         return season;
     }

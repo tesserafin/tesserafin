@@ -754,7 +754,7 @@ namespace Tesserafin.Controller.Entities
 
                 if (container is not null)
                 {
-                    await RefreshAllMetadataForContainer(services.Deletions, services.Writes, services.Images, container, refreshOptions, innerProgress, cancellationToken).ConfigureAwait(false);
+                    await RefreshAllMetadataForContainer(services, container, refreshOptions, innerProgress, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
@@ -779,27 +779,27 @@ namespace Tesserafin.Controller.Entities
                 cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task RefreshAllMetadataForContainer(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IMetadataContainer container, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task RefreshAllMetadataForContainer(IFolderValidationServices services, IMetadataContainer container, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
             if (container is Series series)
             {
-                await series.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                await series.RefreshMetadata(services.Deletions, services.Writes, services.Providers, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
 
-            await container.RefreshAllMetadata(deletions, writes, images, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
+            await container.RefreshAllMetadata(services.Deletions, services.Writes, services.Providers, services.Images, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
         }
 
         private async Task RefreshChildMetadata(IFolderValidationServices services, BaseItem child, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
         {
             if (child is IMetadataContainer container)
             {
-                await RefreshAllMetadataForContainer(services.Deletions, services.Writes, services.Images, container, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
+                await RefreshAllMetadataForContainer(services, container, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
             }
             else
             {
                 if (refreshOptions.RefreshItem(child))
                 {
-                    await child.RefreshMetadata(services.Deletions, services.Writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                    await child.RefreshMetadata(services.Deletions, services.Writes, services.Providers, refreshOptions, cancellationToken).ConfigureAwait(false);
                 }
 
                 if (recursive && child is Folder folder)
@@ -1907,7 +1907,7 @@ namespace Tesserafin.Controller.Entities
             return resolved;
         }
 
-        protected override async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        protected override async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, IProviderManager providers, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
             var changesFound = false;
 
@@ -1919,7 +1919,7 @@ namespace Tesserafin.Controller.Entities
                 }
             }
 
-            var baseHasChanges = await base.RefreshedOwnedItems(deletions, writes, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
+            var baseHasChanges = await base.RefreshedOwnedItems(deletions, writes, providers, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
 
             return baseHasChanges || changesFound;
         }

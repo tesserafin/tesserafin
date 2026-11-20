@@ -24,6 +24,7 @@ namespace Tesserafin.Providers.MediaInfo
     {
         private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
+        private readonly IProviderManager _providers;
         private readonly ILibraryManager _libraryManager;
         private readonly IServerConfigurationManager _config;
         private readonly ISubtitleManager _subtitleManager;
@@ -35,6 +36,7 @@ namespace Tesserafin.Providers.MediaInfo
         public SubtitleScheduledTask(
             IItemWriteCommands writes,
             IItemDeletionCommands deletions,
+            IProviderManager providers,
             ILibraryManager libraryManager,
             IServerConfigurationManager config,
             ISubtitleManager subtitleManager,
@@ -45,6 +47,7 @@ namespace Tesserafin.Providers.MediaInfo
         {
             _writes = writes;
             _deletions = deletions;
+            _providers = providers;
             _libraryManager = libraryManager;
             _config = config;
             _subtitleManager = subtitleManager;
@@ -209,7 +212,7 @@ namespace Tesserafin.Providers.MediaInfo
             // Rescan
             if (downloadedLanguages.Count > 0)
             {
-                await video.RefreshMetadata(_deletions, _writes, cancellationToken).ConfigureAwait(false);
+                await video.RefreshMetadata(_deletions, _writes, _providers, cancellationToken).ConfigureAwait(false);
                 return false;
             }
 

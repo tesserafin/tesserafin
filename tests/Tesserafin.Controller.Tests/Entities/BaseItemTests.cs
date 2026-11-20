@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using Moq;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
@@ -10,6 +11,7 @@ using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaSegments;
+using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
@@ -21,6 +23,27 @@ namespace Tesserafin.Controller.Tests.Entities;
 [Collection(BaseItemStaticStateFixture.Name)]
 public class BaseItemTests
 {
+    [Fact]
+    public async Task RefreshMetadata_UsesSuppliedProviderManager()
+    {
+        var item = new Movie();
+        var options = new MetadataRefreshOptions(Mock.Of<IDirectoryService>());
+        var providers = new Mock<IProviderManager>(MockBehavior.Strict);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        providers.Setup(manager => manager.RefreshSingleItem(item, options, cancellationToken))
+            .ReturnsAsync(ItemUpdateType.MetadataImport);
+
+        var result = await item.RefreshMetadata(
+            Mock.Of<IItemDeletionCommands>(),
+            Mock.Of<IItemWriteCommands>(),
+            providers.Object,
+            options,
+            cancellationToken);
+
+        Assert.Equal(ItemUpdateType.MetadataImport, result);
+        providers.Verify(manager => manager.RefreshSingleItem(item, options, cancellationToken), Times.Once);
+    }
+
     [Theory]
     [InlineData("", "")]
     [InlineData("1", "0000000001")]

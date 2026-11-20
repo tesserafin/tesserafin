@@ -546,14 +546,13 @@ public class LibraryManagerItemLookupTests
         // The heavy machinery (root construction, metadata refresh, children validation) is
         // neutralized: stub root folders are supplied through their dedicated provider ports,
         // their ValidateChildrenInternal/Children members are overridden to no-ops, and the
-        // BaseItem statics used by the non-virtual RefreshMetadata path are pointed at mocks.
+        // metadata refresh uses a provider mock supplied through the validation port.
         // What remains under test is exactly the PR75 fix: the missing-directory cleanup loop in
         // ValidateTopLibraryFolders must invalidate the cache entry after deleting from the DB.
         SetLibraryManagerStatic(_libraryManager);
         SetConfigurationManagerStatic(_configurationManagerMock.Object);
         BaseItem.Logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<BaseItem>();
         BaseItem.FileSystem = Mock.Of<Tesserafin.Model.IO.IFileSystem>();
-        BaseItem.ProviderManager = new Mock<IProviderManager>().Object;
 
         var missing = new CollectionFolder
         {
@@ -574,7 +573,9 @@ public class LibraryManagerItemLookupTests
             .Returns(new StubUserRootFolder { StubChildren = [missing] });
 
         var roots = Mock.Of<ILibraryRootFolderProvider>(p => p.GetRootFolder() == new StubAggregateFolder());
-        var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(_writes, Mock.Of<IItemImageService>(), _deletions, Mock.Of<IFolderValidationServices>(), roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
+        var providers = Mock.Of<IProviderManager>();
+        var validation = Mock.Of<IFolderValidationServices>(services => services.Providers == providers);
+        var traversal = new Tesserafin.Server.Core.Library.LibraryScanTraversal(_writes, Mock.Of<IItemImageService>(), _deletions, validation, roots, _userRootFolderProviderMock.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), _persistenceServiceMock.Object, _itemLookupService, new Tesserafin.Server.Core.Library.DotIgnoreIgnoreRule());
         await traversal.RefreshTopFoldersAsync(TestContext.Current.CancellationToken, false);
 
         // Deleted from the database...

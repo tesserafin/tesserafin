@@ -30,6 +30,7 @@ public class LyricManager : ILyricManager
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly Lazy<IProviderManager> _providers;
     private readonly ILibraryItemOptions _libraryOptions;
     private readonly ILogger<LyricManager> _logger;
     private readonly IFileSystem _fileSystem;
@@ -44,6 +45,7 @@ public class LyricManager : ILyricManager
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="providers">The provider manager for metadata refreshes.</param>
     /// <param name="libraryOptions">The library options of an item.</param>
     /// <param name="logger">Instance of the <see cref="ILogger{LyricManager}"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
@@ -54,6 +56,7 @@ public class LyricManager : ILyricManager
     public LyricManager(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
+        Lazy<IProviderManager> providers,
         ILibraryItemOptions libraryOptions,
         ILogger<LyricManager> logger,
         IFileSystem fileSystem,
@@ -64,6 +67,7 @@ public class LyricManager : ILyricManager
     {
         _writes = writes;
         _deletions = deletions;
+        _providers = providers;
         _libraryOptions = libraryOptions;
         _logger = logger;
         _fileSystem = fileSystem;
@@ -264,7 +268,7 @@ public class LyricManager : ILyricManager
             }
         }
 
-        return audio.RefreshMetadata(_deletions, _writes, CancellationToken.None);
+        return audio.RefreshMetadata(_deletions, _writes, _providers.Value, CancellationToken.None);
     }
 
     /// <inheritdoc />

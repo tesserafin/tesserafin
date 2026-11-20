@@ -15,11 +15,12 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
+        /// <param name="providers">The provider manager executing this refresh.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="refreshOptions">The refresh options.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken);
+        Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IProviderManager providers, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken);
     }
 }

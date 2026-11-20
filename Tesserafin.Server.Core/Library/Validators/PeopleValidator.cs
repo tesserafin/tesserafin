@@ -18,6 +18,7 @@ public class PeopleValidator
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IProviderManager _providers;
 
     /// <summary>
     /// The _library manager.
@@ -37,14 +38,16 @@ public class PeopleValidator
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="providers">The provider manager for metadata refreshes.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="itemPeopleService">The item people service.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="fileSystem">The file system.</param>
-    public PeopleValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, ILibraryManager libraryManager, IItemPeopleService itemPeopleService, ILogger logger, IFileSystem fileSystem)
+    public PeopleValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, IProviderManager providers, ILibraryManager libraryManager, IItemPeopleService itemPeopleService, ILogger logger, IFileSystem fileSystem)
     {
         _writes = writes;
         _deletions = deletions;
+        _providers = providers;
         _libraryManager = libraryManager;
         _itemPeopleService = itemPeopleService;
         _logger = logger;
@@ -88,7 +91,7 @@ public class PeopleValidator
                     MetadataRefreshMode = MetadataRefreshMode.ValidationOnly
                 };
 
-                await item.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
+                await item.RefreshMetadata(_deletions, _writes, _providers, options, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
