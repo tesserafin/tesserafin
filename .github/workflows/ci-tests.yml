@@ -398,6 +398,8 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemoteSourceEndToEndTests.RemoteHttpFile_IsRemuxedFromItsUrlIntoTheSessionHlsOutput_NeverHandedToTheClient
           --require Tesserafin.Server.Integration.Tests.EndToEnd.RemoteSourceEndToEndTests.ASourceNoSessionProviderReads_IsRefusedExplicitly
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DiscSourceEndToEndTests.DvdFolder_IsConcatenatedAndTranscodedIntoTheSessionHlsOutput
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.ChannelItemEndToEndTests.ChannelItem_NamingARemoteFile_IsExecutedFromItsUrlIntoTheSessionHlsOutput
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.ChannelItemEndToEndTests.ChannelItem_WithASourceNoSessionProviderReads_IsRefusedExplicitly
           --require Tesserafin.Server.Integration.Tests.EndToEnd.LiveTvSessionEndToEndTests.LiveTvChannel_PlaysFromTheSessionLiveRoute_OnOneTunerStream_ClosedByTheStop
           --require Tesserafin.Server.Integration.Tests.EndToEnd.BurnInSubtitleEndToEndTests.BurnIn_EmbeddedAss_IsBurntIntoTheEncodedVideoOnTheSessionHlsRoute
           --require Tesserafin.Server.Integration.Tests.EndToEnd.BurnInSubtitleEndToEndTests.BurnIn_SrtSidecar_IsBurntIntoTheEncodedVideoOnTheSessionHlsRoute

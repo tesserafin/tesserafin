@@ -109,8 +109,10 @@ public sealed class PlaybackSessionDeliveryGuard
         // Access can be withdrawn after planning (library access, parental rating, disabled
         // account): the session's owner must still see the item on every request.
         var owner = _userManager.GetUserById(options.UserId);
-        if (owner is null || owner.HasPermission(PermissionKind.IsDisabled)
-            || _itemAccessService.GetVisibleItemById<BaseItem>(itemId, owner) is null)
+        var item = owner is null || owner.HasPermission(PermissionKind.IsDisabled)
+            ? null
+            : _itemAccessService.GetVisibleItemById<BaseItem>(itemId, owner);
+        if (item is null)
         {
             return PlaybackSessionDelivery.NotFound;
         }
@@ -124,9 +126,12 @@ public sealed class PlaybackSessionDeliveryGuard
         else
         {
             // An alternate version is its own item, with its own access rules: the version the plan
-            // selected must still be visible to the owner too, not only the film it belongs to.
-            if (!Guid.TryParse(plan.SourceId, out var sourceItemId)
-                || (!sourceItemId.Equals(itemId) && _itemAccessService.GetVisibleItemById<BaseItem>(sourceItemId, owner) is null))
+            // selected must still be visible to the owner too, not only the film it belongs to. A
+            // channel-plugin item's sources are named by its plugin, not items: the item itself was
+            // checked above.
+            if (item.ChannelId.Equals(Guid.Empty)
+                && (!Guid.TryParse(plan.SourceId, out var sourceItemId)
+                    || (!sourceItemId.Equals(itemId) && _itemAccessService.GetVisibleItemById<BaseItem>(sourceItemId, owner!) is null)))
             {
                 return PlaybackSessionDelivery.NotFound;
             }
