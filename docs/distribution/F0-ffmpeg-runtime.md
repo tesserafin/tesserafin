@@ -121,7 +121,7 @@ Jellyfin's builder happens to include.
 | Requirement | Provided by |
 | --- | --- |
 | H.264 software encode | x264 |
-| HEVC software encode | x265 |
+| HEVC software encode | x265, static multilib Main (8-bit) + Main10 (10-bit) |
 | AV1 software encode | SVT-AV1 |
 | AV1 decode | dav1d |
 | VP8/VP9 decode | libvpx |
@@ -141,6 +141,29 @@ Jellyfin's builder happens to include.
 | `scale_cuda`, `tonemap_cuda`, `overlay_cuda`, `transpose_cuda` | nv-codec-headers **+ `--enable-cuda-llvm`** — the kernels are `.cu` files gcc cannot compile, and `--enable-cuda` alone silently omits every one of these filters |
 | AMF | AMF headers |
 | `*_opencl` filters | OpenCL headers |
+
+### Software HEVC bit depth (linux, #342)
+
+`build-x265.sh` builds the pinned x265 3.6 twice: a namespaced Main10 library,
+then an 8-bit library with `LINKED_10BIT`. GNU ar combines the two static
+archives, retaining duplicate member names. FFmpeg links that single library;
+no new shared library, source component or Windows recipe is introduced.
+The 12-bit path is not added by this change.
+
+`verify-hevc-depth.sh` is run by the runtime gate before packaging and by
+`accept-runtime.sh` on every declared distribution, on each native architecture.
+It generates its own lossless FFV1 10-bit source, separately encodes Main and
+Main10, checks codec/profile/pixel format with the runtime's ffprobe, and fully
+decodes both outputs. The Main10 HLS/fMP4 case decodes a later independent
+fragment with its init segment and compares its first two frames with linear
+playback at that offset. A successful encode that silently drops to 8 bits
+must fail; `ffmpeg-controls.sh` exercises that mutation.
+
+These are runtime/packaging checks, not evidence that a browser or Tesserafin's
+server selected and played Main10. Real-server evidence belongs to the media
+bench. This Linux runtime change requires new measured accepted digests and a
+matching `F0_ACCEPTED_CI_TREE` before an image can adopt it; the revision shared
+with the unchanged Windows runtime remains `7.1.4-tesserafin.1`.
 
 ### Vulkan and libplacebo (linux, #342)
 
