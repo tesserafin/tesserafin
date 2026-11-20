@@ -83,17 +83,19 @@ public sealed class StandaloneVisibilityTests
 
         Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
 
+        // The service scores through the same stub as the static (Scores), held here so that the static can throw.
+        var localization = new Mock<ILocalizationManager>();
+        localization.Setup(l => l.GetRatingScore(It.IsAny<string>(), It.IsAny<string?>()))
+            .Returns((string rating, string? country) => _scores?.GetRatingScore(rating, country)!);
+        var visibility = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, localization.Object, configuration.Object, _activeRecordings);
+        fixture.Inject<IStandaloneVisibilityService>(visibility);
+        _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, visibility);
+
         var manager = _manager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 Array.Empty<IResolverIgnoreRule>(),
                 Array.Empty<IItemResolver>(),
                 fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
-
-        // The service scores through the same stub as the static (Scores), held here so that the static can throw.
-        var localization = new Mock<ILocalizationManager>();
-        localization.Setup(l => l.GetRatingScore(It.IsAny<string>(), It.IsAny<string?>()))
-            .Returns((string rating, string? country) => _scores?.GetRatingScore(rating, country)!);
-        _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, localization.Object, configuration.Object, _activeRecordings));
 
         var xml = new Mock<IXmlSerializer>();
         xml.Setup(x => x.DeserializeFromFile(typeof(LibraryOptions), It.IsAny<string>()))

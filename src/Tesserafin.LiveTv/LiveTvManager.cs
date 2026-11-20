@@ -46,6 +46,7 @@ namespace Tesserafin.LiveTv
         private readonly IChannelManager _channelManager;
         private readonly IRecordingsManager _recordingsManager;
         private readonly ActiveRecordings _recordings;
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly LiveTvDtoService _tvDtoService;
         private readonly ILiveTvService[] _services;
         private readonly IUserViewFactory _userViewFactory;
@@ -64,10 +65,12 @@ namespace Tesserafin.LiveTv
             LiveTvDtoService liveTvDtoService,
             IEnumerable<ILiveTvService> services,
             IUserViewFactory userViewFactory,
-            ActiveRecordings recordings)
+            ActiveRecordings recordings,
+            IStandaloneVisibilityService visibility)
         {
             _config = config;
             _recordings = recordings;
+            _visibility = visibility;
             _logger = logger;
             _userManager = userManager;
             _libraryManager = libraryManager;
@@ -1274,7 +1277,7 @@ namespace Tesserafin.LiveTv
                 .SelectMany(i => i.Locations)
                 .Distinct()
                 .Select(i => _itemPaths.FindByPath(i, true))
-                .Where(i => i is not null && i.IsVisibleStandalone(user))
+                .Where(i => i is not null && i.IsVisibleStandalone(user, _visibility))
                 .SelectMany(i => _libraryManager.GetCollectionFolders(i))
                 .DistinctBy(x => x.Id)
                 .OrderBy(i => i.SortName)

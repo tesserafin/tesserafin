@@ -34,6 +34,7 @@ public class PlaylistsController : BaseTesserafinApiController
 {
     private readonly IPlaylistManager _playlistManager;
     private readonly LinkedChildResolver _linkedChildren;
+    private readonly IStandaloneVisibilityService _visibility;
     private readonly IDtoService _dtoService;
     private readonly IUserManager _userManager;
 
@@ -44,16 +45,19 @@ public class PlaylistsController : BaseTesserafinApiController
     /// <param name="playlistManager">Instance of the <see cref="IPlaylistManager"/> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="linkedChildren">The resolver for saved playlist entries.</param>
+    /// <param name="visibility">The catalogue data used for playlist entry visibility.</param>
     public PlaylistsController(
         IDtoService dtoService,
         IPlaylistManager playlistManager,
         IUserManager userManager,
-        LinkedChildResolver linkedChildren)
+        LinkedChildResolver linkedChildren,
+        IStandaloneVisibilityService visibility)
     {
         _dtoService = dtoService;
         _playlistManager = playlistManager;
         _userManager = userManager;
         _linkedChildren = linkedChildren;
+        _visibility = visibility;
     }
 
     /// <summary>
@@ -180,7 +184,7 @@ public class PlaylistsController : BaseTesserafinApiController
         {
             Shares = playlist.Shares,
             OpenAccess = playlist.OpenAccess,
-            ItemIds = _linkedChildren.Resolve(playlist).Where(t => user is null || t.Item.IsVisibleStandalone(user)).Select(t => t.Item.Id).ToList()
+            ItemIds = _linkedChildren.Resolve(playlist).Where(t => user is null || t.Item.IsVisibleStandalone(user, _visibility)).Select(t => t.Item.Id).ToList()
         };
     }
 
@@ -540,7 +544,7 @@ public class PlaylistsController : BaseTesserafinApiController
         }
 
         var user = _userManager.GetUserById(callingUserId);
-        var items = _linkedChildren.Resolve(playlist).Where(i => i.Item.IsVisibleStandalone(user)).ToArray();
+        var items = _linkedChildren.Resolve(playlist).Where(i => i.Item.IsVisibleStandalone(user, _visibility)).ToArray();
         var count = items.Length;
         if (startIndex.HasValue)
         {

@@ -73,6 +73,7 @@ namespace Tesserafin.Server.Core.Library
         private readonly IItemPeopleService _itemPeopleService;
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemAccessService _itemAccessService;
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly IUserViewFactory _userViewFactory;
         private readonly IUserRootFolderProvider _userRootFolderProvider;
         private readonly ICollectionFolderResolver _collectionFolderResolver;
@@ -98,6 +99,7 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="mediaStreamLanguageService">The media stream language service.</param>
         /// <param name="itemLookupService">The item lookup service (read side of the item lookup cache; see PR75/PR76).</param>
         /// <param name="itemAccessService">The item access service (user visibility on top of the item lookup service; see PR77).</param>
+        /// <param name="visibility">The catalogue data used for item visibility checks.</param>
         /// <param name="userViewFactory">The user-view factory leaf (named/shadow view creation; see PR106b). <see cref="GetNamedView(User, string, CollectionType?, string)"/> and the other overloads delegate to it - a leaf dependency, not a cycle: <c>UserViewFactory</c> never references <see cref="ILibraryManager"/>.</param>
         /// <param name="userRootFolderProvider">The user root folder provider leaf (construction/cache of the per-server <see cref="UserRootFolder"/>; see PR107). <see cref="GetUserRootFolder"/> and this class's internal callers delegate to it - a leaf dependency, not a cycle: <c>UserRootFolderProvider</c> never references <see cref="ILibraryManager"/>. <see cref="LibraryManager"/> no longer implements <see cref="IUserRootFolderProvider"/> itself (it used to be aliased onto it via a DI factory cast - RFC <c>docs/rfc-di-query-user-views-v2.md</c> §0/§1's "piège n°1").</param>
         /// <param name="collectionFolderResolver">The library membership leaf (<see cref="GetCollectionFolders(BaseItem)"/> and its overload delegate to it; see DEBT-SERVER-2) - a leaf dependency, not a cycle: <c>CollectionFolderResolver</c> never references <see cref="ILibraryManager"/>.</param>
@@ -118,6 +120,7 @@ namespace Tesserafin.Server.Core.Library
             IMediaStreamLanguageService mediaStreamLanguageService,
             IItemLookupService itemLookupService,
             IItemAccessService itemAccessService,
+            IStandaloneVisibilityService visibility,
             IUserViewFactory userViewFactory,
             IUserRootFolderProvider userRootFolderProvider,
             ICollectionFolderResolver collectionFolderResolver,
@@ -138,6 +141,7 @@ namespace Tesserafin.Server.Core.Library
 
             _itemLookupService = itemLookupService;
             _itemAccessService = itemAccessService;
+            _visibility = visibility;
 
             _userViewFactory = userViewFactory;
             _userRootFolderProvider = userRootFolderProvider;
@@ -542,7 +546,7 @@ namespace Tesserafin.Server.Core.Library
                 Recursive = true,
                 DtoOptions = new DtoOptions(false) { EnableImages = false }
             })
-                .Where(i => !i.IsVisibleStandalone(user))
+                .Where(i => !i.IsVisibleStandalone(user, _visibility))
                 .Select(i => i.Id)
                 .ToArray();
 
