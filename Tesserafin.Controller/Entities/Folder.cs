@@ -1383,21 +1383,21 @@ namespace Tesserafin.Controller.Entities
         public IReadOnlyList<BaseItem> GetRecursiveChildren(Func<BaseItem, bool> filter, bool includeLinkedChildren)
             => ReadRecursiveChildren(filter, static folder => folder.Children, includeLinkedChildren ? static folder => folder.GetLinkedChildren() : null);
 
-        /// <summary>Reads the descendants and top-level saved links for a metadata refresh.</summary>
+        /// <summary>Reads the catalogue descendants and optionally the root folder's saved links.</summary>
         /// <param name="repository">The item repository.</param>
         /// <param name="lookup">The item identity lookup.</param>
-        /// <param name="links">The saved link resolver.</param>
+        /// <param name="links">The saved link resolver, or null to read only physical descendants.</param>
         /// <param name="filter">An optional filter for items returned by the traversal.</param>
         /// <returns>The distinct items in catalogue traversal order.</returns>
         public IReadOnlyList<BaseItem> GetRecursiveCatalogueChildren(
             IItemRepository repository,
             IItemLookupService lookup,
-            LinkedChildResolver links,
+            LinkedChildResolver links = null,
             Func<BaseItem, bool> filter = null)
             => ReadRecursiveChildren(
                 filter,
                 folder => folder.GetCatalogueChildren(repository, lookup),
-                links.GetItems);
+                links is null ? null : links.GetItems);
 
         private IReadOnlyList<BaseItem> ReadRecursiveChildren(
             Func<BaseItem, bool> filter,

@@ -27,9 +27,10 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
 {
     private readonly IItemWriteCommands _writes;
     private readonly AsyncNonKeyedLocker _slot = new(1);
-    private readonly ILibraryManager _library;
     private readonly IItemChangePublisher _changes;
     private readonly IItemLookupService _items;
+    private readonly IItemRepository _repository;
+    private readonly ILinkedChildrenService _linkedChildren;
     private readonly IItemPersistenceService _persistenceService;
     private readonly IItemCacheStore _itemCacheStore;
     private readonly IPathManager _pathManager;
@@ -43,9 +44,10 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
 
     public ItemDeletionCommands(
         IItemWriteCommands writes,
-        ILibraryManager library,
         IItemChangePublisher changes,
         IItemLookupService items,
+        IItemRepository repository,
+        ILinkedChildrenService linkedChildren,
         IItemPersistenceService persistenceService,
         IItemCacheStore itemCacheStore,
         IPathManager pathManager,
@@ -58,9 +60,10 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         ILogger<ItemDeletionCommands> logger)
     {
         _writes = writes;
-        _library = library;
         _changes = changes;
         _items = items;
+        _repository = repository;
+        _linkedChildren = linkedChildren;
         _persistenceService = persistenceService;
         _itemCacheStore = itemCacheStore;
         _pathManager = pathManager;
@@ -101,8 +104,8 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
                 return;
             }
 
-            var oldId = _library.GetNewItemId(path, typeof(Video));
-            var expectedId = _library.GetNewItemId(path, expectedType);
+            var oldId = ItemIdentity.Create(_configurationManager, path, typeof(Video));
+            var expectedId = ItemIdentity.Create(_configurationManager, path, expectedType);
             if (!oldId.Equals(expectedId) && _items.GetItemById(oldId) is Video obsolete)
             {
                 var parent = obsolete.GetOwner(_items) ?? obsolete.GetParent(_items);
@@ -221,7 +224,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         }
 
         var children = item.IsFolder
-            ? ((Folder)item).GetRecursiveChildren(false)
+            ? ((Folder)item).GetRecursiveCatalogueChildren(_repository, _items)
             : [];
 
         var metadataPaths = GetMetadataPaths(item, children).ToArray();
@@ -267,13 +270,16 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         // OwnerId check: items with OwnerId set are alternate versions or extras, not primaries
         if (item is Video video && !video.PrimaryVersionId.HasValue && video.OwnerId.Equals(Guid.Empty))
         {
-            var localAlternateIds = _library.GetLocalAlternateVersionIds(video).ToHashSet();
-            var allAlternateVersions = localAlternateIds
-                .Concat(_library.GetLinkedAlternateVersions(video).Select(v => v.Id))
-                .Distinct()
-                .Select(id => _items.GetItemById(id))
+            var localAlternatesInOrder = _linkedChildren.GetLinkedChildrenIds(video.Id, (int)LinkedChildType.LocalAlternateVersion);
+            var localAlternateIds = localAlternatesInOrder.ToHashSet();
+            var linkedAlternates = _linkedChildren.GetLinkedChildrenIds(video.Id, (int)LinkedChildType.LinkedAlternateVersion)
+                .Select(_items.GetItemById)
                 .OfType<Video>()
-                .ToList();
+                .OrderBy(alternate => alternate.SortName);
+            var allAlternateVersions = localAlternatesInOrder.Select(_items.GetItemById)
+                .OfType<Video>()
+                .Concat(linkedAlternates)
+                .DistinctBy(alternate => alternate.Id);
 
             // Partition alternates by whether their files still exist on disk
             var alternateVersions = new List<Video>();
@@ -482,7 +488,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
     {
         var list = new List<string>
         {
-            item.GetInternalMetadataPath()
+            item.GetInternalMetadataPath(_configurationManager.ApplicationPaths.InternalMetadataPath)
         };
 
         if (item is Video video)

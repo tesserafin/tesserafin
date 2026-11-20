@@ -16,6 +16,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
@@ -35,7 +36,7 @@ public sealed class ItemDeletionCommandsTests
         context.Changes.ItemRemoved += (_, _) => notifications++;
         var alternate = context.Video();
         alternate.SetPrimaryVersionId(item.Id);
-        context.Library.Setup(l => l.GetLocalAlternateVersionIds(item)).Returns([alternate.Id]);
+        context.Links.Setup(links => links.GetLinkedChildrenIds(item.Id, (int)LinkedChildType.LocalAlternateVersion)).Returns([alternate.Id]);
         context.Items.Setup(i => i.GetItemById(alternate.Id)).Returns(alternate);
         var parent = new Folder { Id = Guid.NewGuid() };
         item.ParentId = parent.Id;
@@ -102,6 +103,10 @@ public sealed class ItemDeletionCommandsTests
         var survivor = context.Video();
         var remaining = context.Video();
         var missing = context.Video();
+        var linked = context.Video();
+        survivor.ForcedSortName = "Z local";
+        remaining.ForcedSortName = "A local";
+        linked.ForcedSortName = "A linked";
         File.Delete(missing.Path);
         foreach (var alternate in new[] { survivor, remaining, missing })
         {
@@ -110,13 +115,19 @@ public sealed class ItemDeletionCommandsTests
             context.Items.Setup(i => i.GetItemById(alternate.Id)).Returns(alternate);
         }
 
+        linked.SetPrimaryVersionId(item.Id);
+        context.Items.Setup(i => i.GetItemById(linked.Id)).Returns(linked);
         item.LocalAlternateVersions = [survivor.Path, remaining.Path, missing.Path];
-        context.Library.Setup(l => l.GetLocalAlternateVersionIds(item)).Returns([survivor.Id, remaining.Id, missing.Id]);
+        item.LinkedAlternateVersions = [new LinkedChild { ItemId = linked.Id, Type = LinkedChildType.LinkedAlternateVersion }];
+        context.Links.Setup(links => links.GetLinkedChildrenIds(item.Id, (int)LinkedChildType.LocalAlternateVersion)).Returns([missing.Id, survivor.Id, remaining.Id]);
+        context.Links.Setup(links => links.GetLinkedChildrenIds(item.Id, (int)LinkedChildType.LinkedAlternateVersion)).Returns([linked.Id]);
         await context.Commands.DeleteAsync(item, new DeleteOptions { DeleteFileLocation = false }, null, TestContext.Current.CancellationToken);
         Assert.Null(survivor.PrimaryVersionId);
         Assert.Equal(Guid.Empty, survivor.OwnerId);
         Assert.Equal(survivor.Id, remaining.PrimaryVersionId);
         Assert.Equal(survivor.Id, remaining.OwnerId);
+        Assert.Equal(survivor.Id, linked.PrimaryVersionId);
+        Assert.Equal(Guid.Empty, linked.OwnerId);
         Assert.True(survivor.Saved);
         Assert.True(remaining.Saved);
         Assert.DoesNotContain(survivor.Path, survivor.LocalAlternateVersions);
@@ -125,6 +136,58 @@ public sealed class ItemDeletionCommandsTests
         context.Persistence.Verify(p => p.DeleteItem(It.Is<IReadOnlyList<Guid>>(ids => ids.Contains(missing.Id))), Times.Once);
         Assert.True(File.Exists(survivor.Path));
         Assert.True(File.Exists(remaining.Path));
+    }
+
+    [Fact]
+    public async Task PrimaryDeletion_WithLinkedVersionsOnly_PromotesBySortName()
+    {
+        using var context = new Context();
+        var primary = context.Video();
+        var firstInCatalogue = context.Video();
+        var firstByName = context.Video();
+        firstInCatalogue.ForcedSortName = "Z";
+        firstByName.ForcedSortName = "A";
+        firstInCatalogue.SetPrimaryVersionId(primary.Id);
+        firstByName.SetPrimaryVersionId(primary.Id);
+        context.Items.Setup(items => items.GetItemById(firstInCatalogue.Id)).Returns(firstInCatalogue);
+        context.Items.Setup(items => items.GetItemById(firstByName.Id)).Returns(firstByName);
+        context.Links.Setup(links => links.GetLinkedChildrenIds(primary.Id, (int)LinkedChildType.LinkedAlternateVersion))
+            .Returns([firstInCatalogue.Id, firstByName.Id]);
+
+        await context.Commands.DeleteAsync(primary, new DeleteOptions(), null, TestContext.Current.CancellationToken);
+
+        Assert.Null(firstByName.PrimaryVersionId);
+        Assert.Equal(firstByName.Id, firstInCatalogue.PrimaryVersionId);
+        Assert.Equal(Guid.Empty, firstInCatalogue.OwnerId);
+        context.Writes.Verify(writes => writes.RerouteLinkedChildReferencesAsync(primary.Id, firstByName.Id, CancellationToken.None), Times.Once);
+    }
+
+    [Fact]
+    public async Task FolderDeletion_RemovesCatalogueDescendantsAndPreservesExternalLinks()
+    {
+        using var context = new Context();
+        var root = new Folder { Id = Guid.NewGuid() };
+        var child = new Folder { Id = Guid.NewGuid(), ParentId = root.Id };
+        var descendant = context.Video();
+        descendant.ParentId = child.Id;
+        var linked = context.Video();
+        var metadataRoot = context.Configuration.Object.ApplicationPaths.InternalMetadataPath;
+        var descendantMetadata = Directory.CreateDirectory(descendant.GetInternalMetadataPath(metadataRoot)).FullName;
+        var linkedMetadata = Directory.CreateDirectory(linked.GetInternalMetadataPath(metadataRoot)).FullName;
+        root.LinkedChildren = [new LinkedChild { ItemId = linked.Id }];
+        context.Items.Setup(items => items.GetItemById(linked.Id)).Returns(linked);
+        context.Repository.Setup(repository => repository.GetItemList(It.Is<InternalItemsQuery>(query => query.ParentId.Equals(root.Id)))).Returns([child]);
+        context.Repository.Setup(repository => repository.GetItemList(It.Is<InternalItemsQuery>(query => query.ParentId.Equals(child.Id)))).Returns([descendant]);
+
+        await context.Commands.DeleteAsync(root, new DeleteOptions(), null, TestContext.Current.CancellationToken);
+
+        var deletedIds = new[] { root.Id, child.Id, descendant.Id };
+        context.Persistence.Verify(persistence => persistence.DeleteItem(It.Is<IReadOnlyList<Guid>>(ids => ids.SequenceEqual(deletedIds))), Times.Once);
+        Assert.Equal(deletedIds, context.Cache.Removed);
+        Assert.False(Directory.Exists(descendantMetadata));
+        Assert.True(File.Exists(linked.Path));
+        Assert.True(Directory.Exists(linkedMetadata));
+        context.Items.Verify(items => items.GetItemById(linked.Id), Times.Never);
     }
 
     [Fact]
@@ -171,9 +234,8 @@ public sealed class ItemDeletionCommandsTests
     {
         using var context = new Context();
         var obsolete = context.Video();
-        var correctedId = Guid.NewGuid();
-        context.Library.Setup(l => l.GetNewItemId(obsolete.Path, typeof(Video))).Returns(obsolete.Id);
-        context.Library.Setup(l => l.GetNewItemId(obsolete.Path, typeof(Tesserafin.Controller.Entities.Movies.Movie))).Returns(correctedId);
+        context.Configuration.Setup(c => c.ApplicationPaths.ProgramDataPath).Returns(Path.GetDirectoryName(obsolete.Path)!);
+        obsolete.Id = ItemIdentity.Create(context.Configuration.Object, obsolete.Path, typeof(Video));
         context.Items.Setup(l => l.GetItemById(obsolete.Id)).Returns(obsolete);
         await context.Commands.DeleteObsoleteAlternateAsync(obsolete.Path, typeof(Tesserafin.Controller.Entities.Movies.Movie), TestContext.Current.CancellationToken);
         Assert.True(File.Exists(obsolete.Path));
@@ -189,7 +251,7 @@ public sealed class ItemDeletionCommandsTests
         var file = context.Video().Path;
         var root = System.IO.Path.GetDirectoryName(file)!;
         var managedRoot = insideRoot ? root : root[..^1];
-        var item = new StubGenre { Id = Guid.NewGuid(), Name = "genre", Path = file };
+        var item = new Genre { Id = Guid.NewGuid(), Name = "genre", Path = file };
         context.Configuration.Setup(c => c.ApplicationPaths.GenrePath).Returns(managedRoot);
         context.Files.Setup(f => f.ContainsSubPath(managedRoot, file)).Returns(insideRoot);
         context.Files.Setup(f => f.GetFileSystemInfo(file)).Returns(new FileSystemMetadata { FullName = file });
@@ -251,6 +313,7 @@ public sealed class ItemDeletionCommandsTests
         Assert.DoesNotContain(typeof(IItemDeletionCommands), dependencies);
         Assert.DoesNotContain(typeof(Lazy<IExternalDataManager>), dependencies);
         Assert.DoesNotContain(typeof(Tesserafin.Controller.IO.IPathManager), dependencies);
+        Assert.DoesNotContain(typeof(ItemDeletionCommands).GetConstructors().Single().GetParameters(), p => p.ParameterType == typeof(ILibraryManager));
         Assert.DoesNotContain(typeof(BaseItem).GetProperties(), p => p.PropertyType == typeof(IItemDeletionCommands));
         Assert.DoesNotContain(typeof(BaseItem).GetFields(), f => f.FieldType == typeof(IItemDeletionCommands));
     }
@@ -264,7 +327,11 @@ public sealed class ItemDeletionCommandsTests
             var fixture = new Fixture().Customize(new AutoMoqCustomization());
             fixture.Register<IItemChangePublisher>(() => Changes);
             Configuration = fixture.Freeze<Mock<IServerConfigurationManager>>();
-            Library = fixture.Freeze<Mock<ILibraryManager>>();
+            Configuration.Setup(c => c.Configuration).Returns(new ServerConfiguration());
+            Configuration.Setup(c => c.ApplicationPaths.InternalMetadataPath).Returns(Path.Combine(_root, "metadata"));
+            Links = fixture.Freeze<Mock<ILinkedChildrenService>>();
+            Links.Setup(links => links.GetLinkedChildrenIds(It.IsAny<Guid>(), It.IsAny<int?>())).Returns([]);
+            Repository = fixture.Freeze<Mock<IItemRepository>>();
             Writes = fixture.Freeze<Mock<IItemWriteCommands>>();
             Writes.Setup(w => w.RerouteLinkedChildReferencesAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
             Items = fixture.Freeze<Mock<IItemLookupService>>();
@@ -287,7 +354,9 @@ public sealed class ItemDeletionCommandsTests
 
         public Mock<IServerConfigurationManager> Configuration { get; }
 
-        public Mock<ILibraryManager> Library { get; }
+        public Mock<ILinkedChildrenService> Links { get; }
+
+        public Mock<IItemRepository> Repository { get; }
 
         public Mock<IItemWriteCommands> Writes { get; }
 
@@ -308,7 +377,7 @@ public sealed class ItemDeletionCommandsTests
             var id = Guid.NewGuid();
             var path = System.IO.Path.Combine(_root, id + ".mp4");
             File.WriteAllBytes(path, [1, 3, 5, 7]);
-            return new StubVideo(System.IO.Path.Combine(_root, "metadata-" + id)) { Id = id, Name = "video", Path = path };
+            return new StubVideo { Id = id, Name = "video", Path = path };
         }
 
         public void Dispose()
@@ -339,27 +408,18 @@ public sealed class ItemDeletionCommandsTests
         }
     }
 
-    private sealed class StubGenre : Genre
-    {
-        public override string GetInternalMetadataPath() => Path + ".metadata";
-    }
-
     private sealed class StubEpisode : Episode
     {
         public override SourceType SourceType => SourceType.Library;
 
-        public override string GetInternalMetadataPath() => Path + ".metadata";
-
         public override IReadOnlyList<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, IChannelManager channelManager) => [];
     }
 
-    private sealed class StubVideo(string metadata) : Video
+    private sealed class StubVideo : Video
     {
         public override SourceType SourceType => ChannelId.Equals(Guid.Empty) ? SourceType.Library : SourceType.Channel;
 
         public bool Saved { get; private set; }
-
-        public override string GetInternalMetadataPath() => metadata;
 
         public override IEnumerable<FileSystemMetadata> GetDeletePaths(IFileSystem fileSystem) => [new FileSystemMetadata { FullName = Path }];
 
