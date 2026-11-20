@@ -8,9 +8,10 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Entities;
-using Tesserafin.Model.MediaInfo;
+using Tesserafin.Model.IO;
 using Tesserafin.Naming.Common;
 using Tesserafin.Naming.TV;
+using Tesserafin.Server.Core.IO;
 using NamingEpisodeInfo = Tesserafin.Naming.TV.EpisodeInfo;
 using NamingEpisodeResolver = Tesserafin.Naming.TV.EpisodeResolver;
 using VideoResolver = Tesserafin.Naming.Video.VideoResolver;
@@ -22,18 +23,18 @@ public class ItemNamingService : IItemNamingService
     private readonly NamingOptions _namingOptions;
     private readonly IItemLookupService _lookup;
     private readonly IItemRepository _repository;
-    private readonly Lazy<IMediaSourceManager> _mediaSources;
+    private readonly IFileSystem _fileSystem;
 
     public ItemNamingService(
         NamingOptions namingOptions,
         IItemLookupService lookup,
         IItemRepository repository,
-        Lazy<IMediaSourceManager> mediaSources)
+        IFileSystem fileSystem)
     {
         _namingOptions = namingOptions;
         _lookup = lookup;
         _repository = repository;
-        _mediaSources = mediaSources;
+        _fileSystem = fileSystem;
     }
 
     public int? GetSeasonNumberFromPath(string path, string? parentPath)
@@ -56,7 +57,7 @@ public class ItemNamingService : IItemNamingService
         var isFolder = episode.VideoType == VideoType.BluRay || episode.VideoType == VideoType.Dvd;
 
         NamingEpisodeInfo? episodeInfo = null;
-        if (!string.IsNullOrEmpty(episode.Path) && _mediaSources.Value.GetPathProtocol(episode.Path) == MediaProtocol.File)
+        if (MediaPathProtocol.IsLocalFile(episode.Path, _fileSystem))
         {
             episodeInfo = resolver.Resolve(episode.Path, isFolder, null, null, isAbsoluteNaming);
             // Resolve from parent folder if it's not the Season folder

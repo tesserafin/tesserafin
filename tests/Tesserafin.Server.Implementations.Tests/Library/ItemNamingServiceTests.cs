@@ -5,7 +5,7 @@ using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Model.Entities;
-using Tesserafin.Model.MediaInfo;
+using Tesserafin.Model.IO;
 using Tesserafin.Naming.Common;
 using Tesserafin.Server.Core.Library;
 using Xunit;
@@ -14,12 +14,12 @@ namespace Tesserafin.Server.Implementations.Tests.Library;
 
 public class ItemNamingServiceTests
 {
-    private static ItemNamingService CreateService(IItemLookupService? lookup = null, IMediaSourceManager? mediaSources = null)
+    private static ItemNamingService CreateService(IItemLookupService? lookup = null)
         => new(
             new NamingOptions(),
             lookup ?? Mock.Of<IItemLookupService>(MockBehavior.Strict),
             Mock.Of<IItemRepository>(MockBehavior.Strict),
-            new Lazy<IMediaSourceManager>(() => mediaSources ?? Mock.Of<IMediaSourceManager>(MockBehavior.Strict)));
+            Mock.Of<IFileSystem>(files => files.IsPathFile(It.IsAny<string>())));
 
     [Fact]
     public void ParseName_CleansNameAndYear()
@@ -45,9 +45,7 @@ public class ItemNamingServiceTests
     [Fact]
     public void FillMissingEpisodeNumbersFromPath_PopulatesSeasonAndEpisodeNumbers()
     {
-        var mediaSourceManager = new Mock<IMediaSourceManager>();
-        mediaSourceManager.Setup(x => x.GetPathProtocol(It.IsAny<string>())).Returns(MediaProtocol.File);
-        var service = CreateService(mediaSources: mediaSourceManager.Object);
+        var service = CreateService();
         var episode = new Episode
         {
             Id = Guid.NewGuid(),
@@ -77,12 +75,21 @@ public class ItemNamingServiceTests
         };
         var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
         lookup.Setup(l => l.GetItemById(folder.Id)).Returns(parentExists ? folder : null);
-        var mediaSources = new Mock<IMediaSourceManager>(MockBehavior.Strict);
-        mediaSources.Setup(s => s.GetPathProtocol(episode.Path)).Returns(MediaProtocol.File);
-        var service = CreateService(lookup.Object, mediaSources.Object);
+        var service = CreateService(lookup.Object);
 
         Assert.Equal(parentExists, service.FillMissingEpisodeNumbersFromPath(episode, false));
         Assert.Equal(parentExists ? 1 : null, episode.ParentIndexNumber);
         Assert.Equal(parentExists ? 1 : null, episode.IndexNumber);
+    }
+
+    [Fact]
+    public void FillMissingEpisodeNumbersFromPath_IgnoresRemotePaths()
+    {
+        var service = CreateService();
+        var episode = new Episode { Path = "https://example.invalid/Example.S01E02.mkv", VideoType = VideoType.VideoFile };
+
+        Assert.False(service.FillMissingEpisodeNumbersFromPath(episode, false));
+        Assert.Null(episode.ParentIndexNumber);
+        Assert.Null(episode.IndexNumber);
     }
 }

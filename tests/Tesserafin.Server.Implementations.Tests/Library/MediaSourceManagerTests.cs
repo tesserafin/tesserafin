@@ -53,13 +53,20 @@ namespace Tesserafin.Server.Implementations.Tests.Library
         }
 
         [Theory]
+        [InlineData(null, MediaProtocol.File)]
+        [InlineData("", MediaProtocol.File)]
         [InlineData(@"C:\mydir\myfile.ext", MediaProtocol.File)]
         [InlineData("/mydir/myfile.ext", MediaProtocol.File)]
         [InlineData("file:///mydir/myfile.ext", MediaProtocol.File)]
         [InlineData("http://example.com/stream.m3u8", MediaProtocol.Http)]
         [InlineData("https://example.com/stream.m3u8", MediaProtocol.Http)]
         [InlineData("rtsp://media.example.com:554/twister/audiotrack", MediaProtocol.Rtsp)]
-        public void GetPathProtocol_ValidArg_Correct(string path, MediaProtocol expected)
+        [InlineData("RTMP://example.invalid/live", MediaProtocol.Rtmp)]
+        [InlineData("rtp://example.invalid/live", MediaProtocol.Rtp)]
+        [InlineData("ftp://example.invalid/video", MediaProtocol.Ftp)]
+        [InlineData("udp://example.invalid/live", MediaProtocol.Udp)]
+        [InlineData("other://example.invalid/video", MediaProtocol.Http)]
+        public void GetPathProtocol_ValidArg_Correct(string? path, MediaProtocol expected)
             => Assert.Equal(expected, _mediaSourceManager.GetPathProtocol(path));
 
         [Theory]

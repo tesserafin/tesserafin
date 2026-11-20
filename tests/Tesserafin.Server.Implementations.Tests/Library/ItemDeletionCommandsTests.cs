@@ -14,7 +14,6 @@ using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
-using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
@@ -94,6 +93,21 @@ public sealed class ItemDeletionCommandsTests
         Assert.Equal(bulk ? 0 : 1, notifications);
         Assert.Equal(original, await File.ReadAllBytesAsync(item.Path, TestContext.Current.CancellationToken));
         context.Files.Verify(f => f.DeleteFile(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RemoteMediaDeletion_RemovesCatalogueEntryWithoutDeletingAFile()
+    {
+        using var context = new Context();
+        var item = new Video { Id = Guid.NewGuid(), Path = "RtSp://example.invalid/video", IsInMixedFolder = true };
+
+        await context.Commands.DeleteAsync(item, new DeleteOptions { DeleteFileLocation = true }, null, TestContext.Current.CancellationToken);
+
+        context.Files.Verify(f => f.IsPathFile(item.Path), Times.Never);
+        context.Files.Verify(f => f.GetFileSystemInfo(item.Path), Times.Never);
+        context.Files.Verify(f => f.DeleteFile(It.IsAny<string>()), Times.Never);
+        context.Persistence.Verify(p => p.DeleteItem(It.Is<IReadOnlyList<Guid>>(ids => ids.Contains(item.Id))), Times.Once);
+        Assert.Contains(item.Id, context.Cache.Removed);
     }
 
     [Fact]
@@ -375,7 +389,10 @@ public sealed class ItemDeletionCommandsTests
         Assert.DoesNotContain(typeof(IItemDeletionCommands), dependencies);
         Assert.DoesNotContain(typeof(Lazy<IExternalDataManager>), dependencies);
         Assert.DoesNotContain(typeof(Tesserafin.Controller.IO.IPathManager), dependencies);
-        Assert.DoesNotContain(typeof(ItemDeletionCommands).GetConstructors().Single().GetParameters(), p => p.ParameterType == typeof(ILibraryManager));
+        var deletionDependencies = typeof(ItemDeletionCommands).GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToArray();
+        Assert.DoesNotContain(typeof(ILibraryManager), deletionDependencies);
+        Assert.DoesNotContain(typeof(IMediaSourceManager), deletionDependencies);
+        Assert.DoesNotContain(typeof(Lazy<IMediaSourceManager>), deletionDependencies);
         Assert.DoesNotContain(typeof(BaseItem).GetProperties(), p => p.PropertyType == typeof(IItemDeletionCommands));
         Assert.DoesNotContain(typeof(BaseItem).GetFields(), f => f.FieldType == typeof(IItemDeletionCommands));
     }
@@ -400,6 +417,7 @@ public sealed class ItemDeletionCommandsTests
             Persistence = fixture.Freeze<Mock<IItemPersistenceService>>();
             fixture.Inject<IItemCacheStore>(Cache);
             Files = fixture.Freeze<Mock<IFileSystem>>();
+            Files.Setup(f => f.IsPathFile(It.IsAny<string>())).Returns(true);
             Files.Setup(f => f.FileExists(It.IsAny<string>())).Returns((string path) => File.Exists(path));
             Files.Setup(f => f.DirectoryExists(It.IsAny<string>())).Returns((string path) => Directory.Exists(path));
             Files.Setup(f => f.DeleteFile(It.IsAny<string>())).Callback((string path) => File.Delete(path));
@@ -409,7 +427,6 @@ public sealed class ItemDeletionCommandsTests
             Paths = fixture.Freeze<Mock<IPathManager>>();
             fixture.Inject(Recordings);
             fixture.Register(() => new Lazy<IChannelManager>(() => Channels.Object));
-            fixture.Register(() => new Lazy<IMediaSourceManager>(() => Mock.Of<IMediaSourceManager>()));
             fixture.Register(() => new Lazy<IExternalDataManager>(() => Mock.Of<IExternalDataManager>()));
             fixture.Inject<Microsoft.Extensions.Logging.ILogger<ItemDeletionCommands>>(Microsoft.Extensions.Logging.Abstractions.NullLogger<ItemDeletionCommands>.Instance);
             Commands = fixture.Create<ItemDeletionCommands>();

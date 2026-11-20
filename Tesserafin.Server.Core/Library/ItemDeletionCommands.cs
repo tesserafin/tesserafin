@@ -14,11 +14,10 @@ using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
-using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
-using Tesserafin.Model.MediaInfo;
+using Tesserafin.Server.Core.IO;
 
 namespace Tesserafin.Server.Core.Library;
 
@@ -37,7 +36,6 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
     private readonly IFileSystem _fileSystem;
     private readonly IServerConfigurationManager _configurationManager;
     private readonly Lazy<IExternalDataManager> _externalDataManagerFactory;
-    private readonly Lazy<IMediaSourceManager> _sources;
     private readonly Lazy<IChannelManager> _channels;
     private readonly ActiveRecordings _recordings;
     private readonly ILogger<ItemDeletionCommands> _logger;
@@ -54,7 +52,6 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         IFileSystem fileSystem,
         IServerConfigurationManager configurationManager,
         Lazy<IExternalDataManager> externalDataManagerFactory,
-        Lazy<IMediaSourceManager> sources,
         Lazy<IChannelManager> channels,
         ActiveRecordings recordings,
         ILogger<ItemDeletionCommands> logger)
@@ -70,7 +67,6 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         _fileSystem = fileSystem;
         _configurationManager = configurationManager;
         _externalDataManagerFactory = externalDataManagerFactory;
-        _sources = sources;
         _channels = channels;
         _recordings = recordings;
         _logger = logger;
@@ -440,7 +436,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
     }
 
     private bool IsFileProtocol(BaseItem item)
-        => !string.IsNullOrEmpty(item.Path) && _sources.Value.GetPathProtocol(item.Path) == MediaProtocol.File;
+        => MediaPathProtocol.IsLocalFile(item.Path, _fileSystem);
 
     private bool IsChannelItem(BaseItem item)
         => item is Video video

@@ -37,6 +37,7 @@ using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.MediaInfo;
+using Tesserafin.Server.Core.IO;
 
 namespace Tesserafin.Server.Core.Library
 {
@@ -255,46 +256,9 @@ namespace Tesserafin.Server.Core.Library
             return SortMediaSources(list, preferredId).ToArray();
         }
 
-        /// <inheritdoc />>
+        /// <inheritdoc />
         public MediaProtocol GetPathProtocol(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                return MediaProtocol.File;
-            }
-
-            if (path.StartsWith("Rtsp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Rtsp;
-            }
-
-            if (path.StartsWith("Rtmp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Rtmp;
-            }
-
-            if (path.StartsWith("Http", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Http;
-            }
-
-            if (path.StartsWith("rtp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Rtp;
-            }
-
-            if (path.StartsWith("ftp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Ftp;
-            }
-
-            if (path.StartsWith("udp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Udp;
-            }
-
-            return _fileSystem.IsPathFile(path) ? MediaProtocol.File : MediaProtocol.Http;
-        }
+            => MediaPathProtocol.GetProtocol(path, _fileSystem);
 
         public bool SupportsDirectStream(string path, MediaProtocol protocol)
         {
