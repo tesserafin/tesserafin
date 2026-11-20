@@ -130,7 +130,7 @@ namespace Tesserafin.Controller.LiveTv
             var info = new MediaSourceInfo
             {
                 Id = Id.ToString("N", CultureInfo.InvariantCulture),
-                Protocol = PathProtocol ?? MediaProtocol.File,
+                Protocol = GetPathProtocol(mediaSourceManager) ?? MediaProtocol.File,
                 MediaStreams = Array.Empty<MediaStream>(),
                 Name = Name,
                 Path = Path,

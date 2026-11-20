@@ -344,19 +344,7 @@ namespace Tesserafin.Controller.Entities
 
         [JsonIgnore]
         public MediaProtocol? PathProtocol
-        {
-            get
-            {
-                var path = Path;
-
-                if (string.IsNullOrEmpty(path))
-                {
-                    return null;
-                }
-
-                return MediaSourceManager.GetPathProtocol(path);
-            }
-        }
+            => GetPathProtocol(MediaSourceManager);
 
         [JsonIgnore]
         public bool IsFileProtocol => PathProtocol == MediaProtocol.File;
@@ -1200,6 +1188,12 @@ namespace Tesserafin.Controller.Entities
             return false;
         }
 
+        protected MediaProtocol? GetPathProtocol(IMediaSourceManager mediaSourceManager)
+        {
+            var path = Path;
+            return string.IsNullOrEmpty(path) ? null : mediaSourceManager.GetPathProtocol(path);
+        }
+
         public virtual IReadOnlyList<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, IChannelManager channelManager)
         {
             if (SourceType == SourceType.Channel)
@@ -1213,9 +1207,11 @@ namespace Tesserafin.Controller.Entities
                 }
             }
 
-            var list = GetAllItemsForMediaSources().ToList();
+            var list = GetAllItemsForMediaSources()
+                .Select(source => (source.Item, source.MediaSourceType, Protocol: source.Item.GetPathProtocol(mediaSourceManager)))
+                .ToList();
             var commonPrefix = GetCommonNamePrefix(list);
-            var result = list.Select(i => GetVersionInfo(enablePathSubstitution, i.Item, i.MediaSourceType, mediaSourceManager, mediaSegmentManager, commonPrefix)).ToList();
+            var result = list.Select(i => GetVersionInfo(enablePathSubstitution, i.Item, i.MediaSourceType, i.Protocol, mediaSourceManager, mediaSegmentManager, commonPrefix)).ToList();
 
             if (IsActiveRecording())
             {
@@ -1241,11 +1237,10 @@ namespace Tesserafin.Controller.Entities
             return Enumerable.Empty<(BaseItem, MediaSourceType)>();
         }
 
-        private MediaSourceInfo GetVersionInfo(bool enablePathSubstitution, BaseItem item, MediaSourceType type, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, string commonPrefix = null)
+        private MediaSourceInfo GetVersionInfo(bool enablePathSubstitution, BaseItem item, MediaSourceType type, MediaProtocol? protocol, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, string commonPrefix)
         {
             ArgumentNullException.ThrowIfNull(item);
 
-            var protocol = item.PathProtocol;
             var itemPath = item.Path;
 
             var info = new MediaSourceInfo
@@ -1254,7 +1249,7 @@ namespace Tesserafin.Controller.Entities
                 Protocol = protocol ?? MediaProtocol.File,
                 MediaStreams = mediaSourceManager.GetMediaStreams(item.Id),
                 MediaAttachments = mediaSourceManager.GetMediaAttachments(item.Id),
-                Name = GetMediaSourceName(item, commonPrefix),
+                Name = GetMediaSourceName(item, protocol, commonPrefix),
                 Path = enablePathSubstitution ? GetMappedPath(item, itemPath, protocol) : itemPath,
                 RunTimeTicks = item.RunTimeTicks,
                 Container = item.Container,
@@ -1333,12 +1328,12 @@ namespace Tesserafin.Controller.Entities
             return info;
         }
 
-        internal string GetMediaSourceName(BaseItem item, string commonPrefix = null)
+        internal string GetMediaSourceName(BaseItem item, MediaProtocol? protocol, string commonPrefix = null)
         {
             var terms = new List<string>();
 
             var path = item.Path;
-            if (item.IsFileProtocol && !string.IsNullOrEmpty(path))
+            if (protocol == MediaProtocol.File && !string.IsNullOrEmpty(path))
             {
                 var displayName = System.IO.Path.GetFileNameWithoutExtension(path);
 
@@ -1429,12 +1424,12 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <param name="items">The media source items.</param>
         /// <returns>The shared prefix, or null when no useful prefix exists.</returns>
-        private static string GetCommonNamePrefix(IReadOnlyList<(BaseItem Item, MediaSourceType MediaSourceType)> items)
+        private static string GetCommonNamePrefix(IReadOnlyList<(BaseItem Item, MediaSourceType MediaSourceType, MediaProtocol? Protocol)> items)
         {
             var fileNames = new List<string>();
-            foreach (var (item, _) in items)
+            foreach (var (item, _, protocol) in items)
             {
-                if (item.IsFileProtocol && !string.IsNullOrEmpty(item.Path))
+                if (protocol == MediaProtocol.File && !string.IsNullOrEmpty(item.Path))
                 {
                     fileNames.Add(System.IO.Path.GetFileNameWithoutExtension(item.Path));
                 }

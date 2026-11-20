@@ -6,6 +6,7 @@ using System.Threading;
 using Moq;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
@@ -46,17 +47,13 @@ public class BaseItemTests
             Path = altPath,
         };
 
-        var mediaSourceManager = new Mock<IMediaSourceManager>();
-        mediaSourceManager.Setup(x => x.GetPathProtocol(It.IsAny<string>()))
-                .Returns((string x) => MediaProtocol.File);
         var libraryManager = new Mock<ILibraryManager>();
         libraryManager.Setup(x => x.GetLocalAlternateVersionIds(It.IsAny<Video>()))
                 .Returns([Guid.Empty]);
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
         BaseItem.LibraryManager = libraryManager.Object;
 
-        Assert.Equal(name, video.GetMediaSourceName(video));
-        Assert.Equal(altName, video.GetMediaSourceName(videoAlt));
+        Assert.Equal(name, video.GetMediaSourceName(video, MediaProtocol.File));
+        Assert.Equal(altName, video.GetMediaSourceName(videoAlt, MediaProtocol.File));
     }
 
     [Theory]
@@ -114,18 +111,32 @@ public class BaseItemTests
             Path = altPath,
         };
 
-        var mediaSourceManager = new Mock<IMediaSourceManager>();
-        mediaSourceManager.Setup(x => x.GetPathProtocol(It.IsAny<string>()))
-                .Returns((string x) => MediaProtocol.File);
         var libraryManager = new Mock<ILibraryManager>();
         // No local alternate versions: these are linked (separate items), so the folder fallback is unavailable.
         libraryManager.Setup(x => x.GetLocalAlternateVersionIds(It.IsAny<Video>()))
                 .Returns(Array.Empty<Guid>());
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
         BaseItem.LibraryManager = libraryManager.Object;
 
-        Assert.Equal(expectedPrimary, video.GetMediaSourceName(video, commonPrefix));
-        Assert.Equal(expectedAlt, videoAlt.GetMediaSourceName(videoAlt, commonPrefix));
+        Assert.Equal(expectedPrimary, video.GetMediaSourceName(video, MediaProtocol.File, commonPrefix));
+        Assert.Equal(expectedAlt, videoAlt.GetMediaSourceName(videoAlt, MediaProtocol.File, commonPrefix));
+    }
+
+    [Fact]
+    public void GetMediaSources_UsesSuppliedPathClassificationForRemoteNames()
+    {
+        var audio = new Audio { Id = Guid.NewGuid(), Path = "https://example.invalid/audio.mp3", Name = "Remote audio" };
+        var sources = new Mock<IMediaSourceManager>();
+        sources.Setup(manager => manager.GetPathProtocol(audio.Path)).Returns(MediaProtocol.Http);
+        sources.Setup(manager => manager.GetMediaStreams(audio.Id)).Returns([]);
+        sources.Setup(manager => manager.GetMediaAttachments(audio.Id)).Returns([]);
+        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>(MockBehavior.Strict);
+
+        var source = Assert.Single(audio.GetMediaSources(false, sources.Object, Mock.Of<IMediaSegmentManager>(), Mock.Of<IChannelManager>()));
+
+        Assert.Equal(MediaProtocol.Http, source.Protocol);
+        Assert.Equal("Remote audio", source.Name);
+        Assert.Equal(audio.Path, source.Path);
+        sources.Verify(manager => manager.GetPathProtocol(audio.Path), Times.Once);
     }
 
     [Fact]
