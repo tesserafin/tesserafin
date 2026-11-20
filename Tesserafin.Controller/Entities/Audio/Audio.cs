@@ -8,9 +8,11 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json.Serialization;
+using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Dto;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Entities.Audio
 {
@@ -82,9 +84,9 @@ namespace Tesserafin.Controller.Entities.Audio
             return 1;
         }
 
-        public override bool CanDownload()
+        public override bool CanDownload(IFileSystem fileSystem)
         {
-            return IsFileProtocol;
+            return MediaPathProtocol.IsLocalFile(Path, fileSystem);
         }
 
         /// <summary>

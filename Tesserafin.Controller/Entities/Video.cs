@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
@@ -335,14 +336,14 @@ namespace Tesserafin.Controller.Entities
             return base.CreatePresentationUniqueKey();
         }
 
-        public override bool CanDownload()
+        public override bool CanDownload(IFileSystem fileSystem)
         {
             if (VideoType == VideoType.Dvd || VideoType == VideoType.BluRay)
             {
                 return false;
             }
 
-            return IsFileProtocol;
+            return MediaPathProtocol.IsLocalFile(Path, fileSystem);
         }
 
         protected override bool IsActiveRecording()

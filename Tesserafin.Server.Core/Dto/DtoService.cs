@@ -25,6 +25,7 @@ using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.IO;
 using Tesserafin.Model.Querying;
 using Book = Tesserafin.Controller.Entities.Book;
 using Episode = Tesserafin.Controller.Entities.TV.Episode;
@@ -134,6 +135,7 @@ namespace Tesserafin.Server.Core.Dto
         private readonly ItemDeletionContext _deletionContext;
         private readonly IStandaloneVisibilityService _visibility;
         private readonly IItemExtrasService _extras;
+        private readonly IFileSystem _fileSystem;
 
         public DtoService(
             ILogger<DtoService> logger,
@@ -154,7 +156,8 @@ namespace Tesserafin.Server.Core.Dto
             Lazy<IChannelManager> channels,
             ItemDeletionContext deletionContext,
             IStandaloneVisibilityService visibility,
-            IItemExtrasService extras)
+            IItemExtrasService extras,
+            IFileSystem fileSystem)
         {
             _logger = logger;
             _namedItems = namedItems;
@@ -175,6 +178,7 @@ namespace Tesserafin.Server.Core.Dto
             _deletionContext = deletionContext;
             _visibility = visibility;
             _extras = extras;
+            _fileSystem = fileSystem;
         }
 
         private ILiveTvManager LivetvManager => _livetvManagerFactory.Value;
@@ -417,8 +421,8 @@ namespace Tesserafin.Server.Core.Dto
             if (options.ContainsField(ItemFields.CanDownload))
             {
                 dto.CanDownload = user is null
-                    ? item.CanDownload()
-                    : item.CanDownload(user);
+                    ? item.CanDownload(_fileSystem)
+                    : item.CanDownload(user, _fileSystem);
             }
 
             if (options.ContainsField(ItemFields.Etag))

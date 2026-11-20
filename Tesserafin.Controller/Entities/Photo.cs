@@ -5,6 +5,7 @@
 using System.Text.Json.Serialization;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Drawing;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Entities
 {
@@ -61,7 +62,7 @@ namespace Tesserafin.Controller.Entities
 
         public int? IsoSpeedRating { get; set; }
 
-        public override bool CanDownload()
+        public override bool CanDownload(IFileSystem fileSystem)
         {
             return true;
         }

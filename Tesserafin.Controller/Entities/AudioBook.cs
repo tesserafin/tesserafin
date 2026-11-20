@@ -4,8 +4,10 @@
 
 using System;
 using System.Text.Json.Serialization;
+using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Entities
 {
@@ -52,9 +54,9 @@ namespace Tesserafin.Controller.Entities
             return SeriesId;
         }
 
-        public override bool CanDownload()
+        public override bool CanDownload(IFileSystem fileSystem)
         {
-            return IsFileProtocol;
+            return MediaPathProtocol.IsLocalFile(Path, fileSystem);
         }
 
         public override UnratedItem GetBlockUnratedType()

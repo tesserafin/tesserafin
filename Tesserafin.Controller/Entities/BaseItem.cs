@@ -892,7 +892,7 @@ namespace Tesserafin.Controller.Entities
 
         internal virtual SourceType GetSourceType(ActiveRecordings recordings) => SourceType;
 
-        public virtual bool CanDownload()
+        public virtual bool CanDownload(IFileSystem fileSystem)
         {
             return false;
         }
@@ -902,9 +902,9 @@ namespace Tesserafin.Controller.Entities
             return user.HasPermission(PermissionKind.EnableContentDownloading);
         }
 
-        public bool CanDownload(User user)
+        public bool CanDownload(User user, IFileSystem fileSystem)
         {
-            return CanDownload() && IsAuthorizedToDownload(user);
+            return CanDownload(fileSystem) && IsAuthorizedToDownload(user);
         }
 
         /// <inheritdoc />

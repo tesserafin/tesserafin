@@ -37,6 +37,7 @@ using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
+using Tesserafin.Model.IO;
 using Tesserafin.Model.Net;
 using Tesserafin.Model.Querying;
 
@@ -64,6 +65,7 @@ public class LibraryController : BaseTesserafinApiController
     private readonly ILogger<LibraryController> _logger;
     private readonly IServerConfigurationManager _serverConfigurationManager;
     private readonly IItemSortService _itemSortService;
+    private readonly IFileSystem _fileSystem;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LibraryController"/> class.
@@ -84,6 +86,7 @@ public class LibraryController : BaseTesserafinApiController
     /// <param name="logger">Instance of the <see cref="ILogger{LibraryController}"/> interface.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
+    /// <param name="fileSystem">File system for checking local paths.</param>
     public LibraryController(
         IItemDeletionCommands deletions,
         IItemExtrasService extras,
@@ -100,7 +103,8 @@ public class LibraryController : BaseTesserafinApiController
         ILibraryMonitor libraryMonitor,
         ILogger<LibraryController> logger,
         IServerConfigurationManager serverConfigurationManager,
-        IItemSortService itemSortService)
+        IItemSortService itemSortService,
+        IFileSystem fileSystem)
     {
         _deletions = deletions;
         _extras = extras;
@@ -118,6 +122,7 @@ public class LibraryController : BaseTesserafinApiController
         _logger = logger;
         _serverConfigurationManager = serverConfigurationManager;
         _itemSortService = itemSortService;
+        _fileSystem = fileSystem;
     }
 
     /// <summary>
@@ -141,7 +146,7 @@ public class LibraryController : BaseTesserafinApiController
         }
 
         var filePath = item.Path;
-        if (item.IsFileProtocol)
+        if (MediaPathProtocol.IsLocalFile(filePath, _fileSystem))
         {
             // PhysicalFile does not work well with symlinks at the moment.
             var resolved = FileSystemHelper.ResolveLinkTarget(filePath, returnFinalTarget: true);
@@ -712,14 +717,14 @@ public class LibraryController : BaseTesserafinApiController
 
         if (user is not null)
         {
-            if (!item.CanDownload(user))
+            if (!item.CanDownload(user, _fileSystem))
             {
                 throw new ArgumentException("Item does not support downloading");
             }
         }
         else
         {
-            if (!item.CanDownload())
+            if (!item.CanDownload(_fileSystem))
             {
                 throw new ArgumentException("Item does not support downloading");
             }
@@ -734,7 +739,7 @@ public class LibraryController : BaseTesserafinApiController
         var filename = Path.GetFileName(item.Path)?.Replace("\"", string.Empty, StringComparison.Ordinal);
 
         var filePath = item.Path;
-        if (item.IsFileProtocol)
+        if (MediaPathProtocol.IsLocalFile(filePath, _fileSystem))
         {
             // PhysicalFile does not work well with symlinks at the moment.
             var resolved = FileSystemHelper.ResolveLinkTarget(filePath, returnFinalTarget: true);

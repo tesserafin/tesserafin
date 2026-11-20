@@ -5,8 +5,10 @@
 using System;
 using System.Linq;
 using System.Text.Json.Serialization;
+using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Entities
 {
@@ -58,9 +60,9 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <inheritdoc />
-        public override bool CanDownload()
+        public override bool CanDownload(IFileSystem fileSystem)
         {
-            return IsFileProtocol;
+            return MediaPathProtocol.IsLocalFile(Path, fileSystem);
         }
 
         /// <inheritdoc />

@@ -220,6 +220,23 @@ public class BaseItemTests
     }
 
     [Theory]
+    [InlineData("/Movies/Film.mkv", VideoType.VideoFile, true, true)]
+    [InlineData("/Movies/Film.mkv", VideoType.VideoFile, false, false)]
+    [InlineData("https://example.invalid/film.mkv", VideoType.VideoFile, true, false)]
+    [InlineData("/Movies/Film", VideoType.Dvd, true, false)]
+    [InlineData("/Movies/Film", VideoType.BluRay, true, false)]
+    public void CanDownload_VideoRequiresAFileAndPermission(string path, VideoType type, bool permission, bool expected)
+    {
+        var video = new Video { Path = path, VideoType = type };
+        var files = new Mock<IFileSystem>(MockBehavior.Strict);
+        files.Setup(x => x.IsPathFile("/Movies/Film.mkv")).Returns(true);
+        var user = new User("u", "auth", "reset");
+        user.SetPermission(PermissionKind.EnableContentDownloading, permission);
+
+        Assert.Equal(expected, video.CanDownload(user, files.Object));
+    }
+
+    [Theory]
     [InlineData(false, false, false, true)]
     [InlineData(true, false, false, true)]
     [InlineData(true, true, false, false)]
