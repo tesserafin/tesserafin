@@ -254,13 +254,17 @@ namespace Tesserafin.Controller.Entities.TV
         /// <param name="repository">The item repository.</param>
         /// <param name="lookup">The lookup used to resolve the owning series.</param>
         /// <param name="itemSortService">The episode sort service.</param>
+        /// <param name="channels">The deferred channel manager for seasons supplied by a channel.</param>
+        /// <param name="displaySpecialsWithinSeasons">Whether to show specials within their aired seasons.</param>
         /// <returns>The season episodes in display order.</returns>
         public IReadOnlyList<BaseItem> GetCatalogueEpisodes(
             DtoOptions options,
             IItemRepository repository,
             IItemLookupService lookup,
-            IItemSortService itemSortService)
-            => GetSeries(lookup)?.GetCatalogueSeasonEpisodes(this, options, repository, itemSortService) ?? [];
+            IItemSortService itemSortService,
+            Lazy<IChannelManager> channels,
+            bool displaySpecialsWithinSeasons)
+            => GetSeries(lookup)?.GetCatalogueSeasonEpisodes(this, options, repository, lookup, itemSortService, channels, displaySpecialsWithinSeasons) ?? [];
 
         public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes)
         {

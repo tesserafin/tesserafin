@@ -418,30 +418,55 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
-            => ReadSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, itemSortService, static query => LibraryManager.GetItemList(query));
+            => ReadSeasonEpisodes(
+                parentSeason,
+                user,
+                options,
+                shouldIncludeMissingEpisodes,
+                ConfigurationManager.Configuration.DisplaySpecialsWithinSeasons,
+                itemSortService,
+                static query => LibraryManager.GetItemList(query),
+                static () => ChannelManager,
+                static episode => episode.Season);
 
-        internal List<BaseItem> GetCatalogueSeasonEpisodes(Season parentSeason, DtoOptions options, IItemRepository repository, IItemSortService itemSortService)
-            => ReadSeasonEpisodes(parentSeason, null, options, true, itemSortService, repository.GetItemList);
+        internal List<BaseItem> GetCatalogueSeasonEpisodes(
+            Season parentSeason,
+            DtoOptions options,
+            IItemRepository repository,
+            IItemLookupService lookup,
+            IItemSortService itemSortService,
+            Lazy<IChannelManager> channels,
+            bool displaySpecialsWithinSeasons)
+            => ReadSeasonEpisodes(
+                parentSeason,
+                null,
+                options,
+                true,
+                displaySpecialsWithinSeasons,
+                itemSortService,
+                repository.GetItemList,
+                () => channels.Value,
+                episode => episode.GetSeason(lookup, repository));
 
         private List<BaseItem> ReadSeasonEpisodes(
             Season parentSeason,
             User user,
             DtoOptions options,
             bool shouldIncludeMissingEpisodes,
+            bool displaySpecialsWithinSeasons,
             IItemSortService itemSortService,
-            Func<InternalItemsQuery, IReadOnlyList<BaseItem>> readItems)
+            Func<InternalItemsQuery, IReadOnlyList<BaseItem>> readItems,
+            Func<IChannelManager> getChannels,
+            Func<Episode, Season> getSeason)
         {
-            var queryFromSeries = ConfigurationManager.Configuration.DisplaySpecialsWithinSeasons;
-
-            // add optimization when this setting is not enabled
-            var seriesKey = queryFromSeries ?
+            var seriesKey = displaySpecialsWithinSeasons ?
                 GetUniqueSeriesKey(this) :
                 GetUniqueSeriesKey(parentSeason);
 
             var query = new InternalItemsQuery(user)
             {
-                AncestorWithPresentationUniqueKey = queryFromSeries ? null : seriesKey,
-                SeriesPresentationUniqueKey = queryFromSeries ? seriesKey : null,
+                AncestorWithPresentationUniqueKey = displaySpecialsWithinSeasons ? null : seriesKey,
+                SeriesPresentationUniqueKey = displaySpecialsWithinSeasons ? seriesKey : null,
                 IncludeItemTypes = new[] { BaseItemKind.Episode },
                 OrderBy = new[] { (ItemSortBy.SortName, SortOrder.Ascending) },
                 DtoOptions = options
@@ -459,7 +484,7 @@ namespace Tesserafin.Controller.Entities.TV
                 {
                     query.Parent = parentSeason;
                     query.ChannelIds = [ChannelId];
-                    allItems = [.. ChannelManager.GetChannelItemsInternal(query, new Progress<double>(), CancellationToken.None).GetAwaiter().GetResult().Items];
+                    allItems = [.. getChannels().GetChannelItemsInternal(query, new Progress<double>(), CancellationToken.None).GetAwaiter().GetResult().Items];
                 }
                 catch
                 {
@@ -472,7 +497,8 @@ namespace Tesserafin.Controller.Entities.TV
                 allItems = readItems(query);
             }
 
-            return GetSeasonEpisodes(parentSeason, user, allItems, options, shouldIncludeMissingEpisodes, itemSortService);
+            var episodes = FilterEpisodesBySeason(allItems, parentSeason, displaySpecialsWithinSeasons, getSeason);
+            return SortSeasonEpisodes(parentSeason, user, episodes, itemSortService);
         }
 
         public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, IEnumerable<BaseItem> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes)
@@ -488,7 +514,11 @@ namespace Tesserafin.Controller.Entities.TV
             }
 
             var episodes = FilterEpisodesBySeason(allSeriesEpisodes, parentSeason, ConfigurationManager.Configuration.DisplaySpecialsWithinSeasons);
+            return SortSeasonEpisodes(parentSeason, user, episodes, itemSortService);
+        }
 
+        private List<BaseItem> SortSeasonEpisodes(Season parentSeason, User user, IEnumerable<BaseItem> episodes, IItemSortService itemSortService)
+        {
             var sortBy = (parentSeason.IndexNumber ?? -1) == 0 ? ItemSortBy.SortName : ItemSortBy.AiredEpisodeOrder;
 
             // Partial threading (PR50/N): callers that can supply an IItemSortService use it
@@ -514,6 +544,9 @@ namespace Tesserafin.Controller.Entities.TV
         /// <param name="includeSpecials"><c>true</c> to include special, <c>false</c> to not.</param>
         /// <returns>The set of episodes.</returns>
         public static IEnumerable<BaseItem> FilterEpisodesBySeason(IEnumerable<BaseItem> episodes, Season parentSeason, bool includeSpecials)
+            => FilterEpisodesBySeason(episodes, parentSeason, includeSpecials, static episode => episode.Season);
+
+        private static IEnumerable<BaseItem> FilterEpisodesBySeason(IEnumerable<BaseItem> episodes, Season parentSeason, bool includeSpecials, Func<Episode, Season> getSeason)
         {
             var seasonNumber = parentSeason.IndexNumber;
             var seasonPresentationKey = GetUniqueSeriesKey(parentSeason);
@@ -532,10 +565,10 @@ namespace Tesserafin.Controller.Entities.TV
 
                 if (!currentSeasonNumber.HasValue && !seasonNumber.HasValue && parentSeason.LocationType == LocationType.Virtual)
                 {
-                    return episodeItem.Season is null or { LocationType: LocationType.Virtual };
+                    return getSeason(episodeItem) is null or { LocationType: LocationType.Virtual };
                 }
 
-                var season = episodeItem.Season;
+                var season = getSeason(episodeItem);
                 return season is not null && string.Equals(GetUniqueSeriesKey(season), seasonPresentationKey, StringComparison.OrdinalIgnoreCase);
             });
         }

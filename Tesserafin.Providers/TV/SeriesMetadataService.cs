@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
@@ -35,6 +36,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     private readonly IItemLookupService _lookup;
     private readonly LinkedChildResolver _links;
     private readonly ICollectionFolderResolver _collections;
+    private readonly Lazy<IChannelManager> _channels;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SeriesMetadataService"/> class.
@@ -56,6 +58,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// <param name="lookup">The item identity lookup.</param>
     /// <param name="links">The saved link resolver.</param>
     /// <param name="collections">The library membership resolver.</param>
+    /// <param name="channels">The deferred channel manager for channel seasons.</param>
     public SeriesMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -73,7 +76,8 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         IItemSortService itemSortService,
         IItemLookupService lookup,
         LinkedChildResolver links,
-        ICollectionFolderResolver collections)
+        ICollectionFolderResolver collections,
+        Lazy<IChannelManager> channels)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository)
     {
         _deletions = deletions;
@@ -83,6 +87,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         _lookup = lookup;
         _links = links;
         _collections = collections;
+        _channels = channels;
     }
 
     /// <inheritdoc />
@@ -242,7 +247,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             var seasonNumber = virtualSeason.IndexNumber;
             // If there's a physical season with the same number or no episodes in the season, delete it
             if ((seasonNumber.HasValue && physicalSeasonNumbers.Contains(seasonNumber.Value))
-                || virtualSeason.GetCatalogueEpisodes(new DtoOptions(true), ItemRepository, _lookup, _itemSortService).Count == 0)
+                || virtualSeason.GetCatalogueEpisodes(new DtoOptions(true), ItemRepository, _lookup, _itemSortService, _channels, ServerConfigurationManager.Configuration.DisplaySpecialsWithinSeasons).Count == 0)
             {
                 Logger.LogInformation("Removing virtual season {SeasonNumber} in series {SeriesName}", virtualSeason.IndexNumber, series.Name);
 

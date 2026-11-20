@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Moq;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
@@ -12,6 +14,7 @@ using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Configuration;
+using Tesserafin.Model.Querying;
 using Xunit;
 
 namespace Tesserafin.Controller.Tests.Entities.TV;
@@ -526,7 +529,6 @@ public class SeriesGetSeasonEpisodesTests
     [InlineData(false)]
     public void SeasonGetCatalogueEpisodes_ResolvesSeriesAndReadsConfiguredGroup(bool includeSpecials)
     {
-        SetDisplaySpecialsWithinSeasons(includeSpecials);
         BaseItem.LibraryManager = Mock.Of<ILibraryManager>(MockBehavior.Strict);
         var series = CreateSeries();
         var season = CreateSeason(1);
@@ -543,10 +545,46 @@ public class SeriesGetSeasonEpisodesTests
                 && q.AncestorWithPresentationUniqueKey == (includeSpecials ? null : "season-key"))))
             .Returns([episode, special]);
 
-        var result = season.GetCatalogueEpisodes(new DtoOptions(true), repository.Object, lookup.Object, new RecordingItemSortService());
+        var result = season.GetCatalogueEpisodes(
+            new DtoOptions(true),
+            repository.Object,
+            lookup.Object,
+            new RecordingItemSortService(),
+            new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")),
+            includeSpecials);
 
         BaseItem[] expected = includeSpecials ? [special, episode] : [episode];
         Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void SeasonGetCatalogueEpisodes_ChannelUsesInjectedChannelAndSeasonLookup()
+    {
+        var series = CreateSeries();
+        series.ChannelId = Guid.NewGuid();
+        var season = CreateSeason(1);
+        season.SeriesId = series.Id;
+        var episode = CreateEpisode("Linked episode", 2, 1);
+        episode.SeasonId = season.Id;
+        var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
+        lookup.Setup(x => x.GetItemById(series.Id)).Returns(series);
+        lookup.Setup(x => x.GetItemById(season.Id)).Returns(season);
+        var channels = new Mock<IChannelManager>(MockBehavior.Strict);
+        channels.Setup(x => x.GetChannelItemsInternal(
+                It.Is<InternalItemsQuery>(q => q.ParentId.Equals(season.Id) && q.ChannelIds.SequenceEqual(new[] { series.ChannelId })),
+                It.IsAny<IProgress<double>>(),
+                CancellationToken.None))
+            .ReturnsAsync(new QueryResult<BaseItem>([episode]));
+
+        var result = season.GetCatalogueEpisodes(
+            new DtoOptions(true),
+            Mock.Of<IItemRepository>(MockBehavior.Strict),
+            lookup.Object,
+            new RecordingItemSortService(),
+            new Lazy<IChannelManager>(() => channels.Object),
+            false);
+
+        Assert.Same(episode, Assert.Single(result));
     }
 
     /// <summary>

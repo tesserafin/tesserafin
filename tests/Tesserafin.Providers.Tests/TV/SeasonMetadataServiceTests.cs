@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
@@ -113,7 +114,8 @@ public sealed class SeasonMetadataServiceTests
             Mock.Of<IItemRepository>(),
             Mock.Of<IItemSortService>(),
             lookup ?? Mock.Of<IItemLookupService>(),
-            Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict))
+            Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict),
+            new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")))
     {
         public ItemUpdateType Prepare(Season season) => BeforeSaveInternal(season, false, ItemUpdateType.None);
 

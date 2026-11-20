@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
@@ -28,6 +29,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     private readonly IItemSortService _itemSortService;
     private readonly IItemLookupService _lookup;
     private readonly ICollectionFolderResolver _collections;
+    private readonly Lazy<IChannelManager> _channels;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SeasonMetadataService"/> class.
@@ -45,6 +47,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     /// <param name="lookup">The item identity lookup.</param>
     /// <param name="collections">The library membership resolver.</param>
+    /// <param name="channels">The deferred channel manager for channel seasons.</param>
     public SeasonMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -58,12 +61,14 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
         IItemRepository itemRepository,
         IItemSortService itemSortService,
         IItemLookupService lookup,
-        ICollectionFolderResolver collections)
+        ICollectionFolderResolver collections,
+        Lazy<IChannelManager> channels)
         : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository)
     {
         _itemSortService = itemSortService;
         _lookup = lookup;
         _collections = collections;
+        _channels = channels;
     }
 
     /// <inheritdoc />
@@ -127,7 +132,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 
     /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(Season item)
-        => item.GetCatalogueEpisodes(new DtoOptions(true), ItemRepository, _lookup, _itemSortService);
+        => item.GetCatalogueEpisodes(new DtoOptions(true), ItemRepository, _lookup, _itemSortService, _channels, ServerConfigurationManager.Configuration.DisplaySpecialsWithinSeasons);
 
     /// <inheritdoc />
     protected override ItemUpdateType UpdateMetadataFromChildren(Season item, IReadOnlyList<BaseItem> children, bool isFullRefresh, ItemUpdateType currentUpdateType)

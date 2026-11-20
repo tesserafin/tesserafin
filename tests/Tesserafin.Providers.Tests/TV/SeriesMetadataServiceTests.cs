@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
@@ -205,7 +206,8 @@ public sealed class SeriesMetadataServiceTests
             Mock.Of<IItemSortService>(),
             lookup,
             links,
-            collections ?? Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict))
+            collections ?? Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict),
+            new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")))
     {
         public ItemUpdateType Prepare(Series series) => BeforeSaveInternal(series, false, ItemUpdateType.None);
 
