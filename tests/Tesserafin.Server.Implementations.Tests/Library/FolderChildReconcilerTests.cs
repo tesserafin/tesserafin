@@ -221,7 +221,7 @@ public sealed class FolderChildReconcilerTests
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => context.Service.ReconcileAsync(context.Parent, [], [], context.Directory.Object, false, context.Writes.Object, context.Deletions.Object, context.Images.Object, cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => context.Service.ReconcileAsync(context.Parent, [], [], context.Directory.Object, false, context.DeletionContext, context.Writes.Object, context.Deletions.Object, context.Images.Object, cancellation.Token));
 
         context.Lookup.VerifyNoOtherCalls();
         context.Files.VerifyNoOtherCalls();
@@ -256,23 +256,25 @@ public sealed class FolderChildReconcilerTests
 
         public Mock<IItemImageUpdate> ImageUpdate { get; } = new();
 
+        public ItemDeletionContext DeletionContext => LibraryWriteFixture.CreateDeletionContext(Files.Object);
+
         public FolderChildReconciler Service { get; }
 
         public BaseItem Item(string name) => new Leaf() { Id = Guid.NewGuid(), Path = "/library/" + name + ".mkv" };
 
         public Task<FolderChildReconciliationResult> RunAsync(IReadOnlyList<BaseItem> current, IReadOnlyList<BaseItem> discovered)
-            => Service.ReconcileAsync(Parent, current, discovered, Directory.Object, false, Writes.Object, Deletions.Object, Images.Object, TestContext.Current.CancellationToken);
+            => Service.ReconcileAsync(Parent, current, discovered, Directory.Object, false, DeletionContext, Writes.Object, Deletions.Object, Images.Object, TestContext.Current.CancellationToken);
     }
 
     private sealed class Leaf : BaseItem
     {
-        public override bool CanDelete() => true;
+        public override bool CanDelete(ItemDeletionContext deletion) => true;
 
         public override List<string> GetUserDataKeys() => ["shared history key"];
     }
 
     private sealed class DeletableVideo : Video
     {
-        public override bool CanDelete() => true;
+        public override bool CanDelete(ItemDeletionContext deletion) => true;
     }
 }

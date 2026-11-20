@@ -197,14 +197,14 @@ namespace Tesserafin.Controller.Entities
 
         public static ICollectionManager CollectionManager { get; set; }
 
-        public override bool CanDelete()
+        public override bool CanDelete(ItemDeletionContext deletion)
         {
             if (IsRoot)
             {
                 return false;
             }
 
-            return base.CanDelete();
+            return base.CanDelete(deletion);
         }
 
         public override bool RequiresRefresh()
@@ -400,7 +400,7 @@ namespace Tesserafin.Controller.Entities
                 }
 
                 InvalidateCatalogueChildren(context.Lookup);
-                var reconciliation = await context.Writes.ReconcileFolderChildrenAsync(this, GetCatalogueChildren(context.Repository, context.Lookup).ToArray(), nonCachedChildren, directoryService, allowRemoveRoot, context.Deletions, context.Images, cancellationToken).ConfigureAwait(false);
+                var reconciliation = await context.Writes.ReconcileFolderChildrenAsync(this, GetCatalogueChildren(context.Repository, context.Lookup).ToArray(), nonCachedChildren, directoryService, allowRemoveRoot, context.DeletionContext, context.Deletions, context.Images, cancellationToken).ConfigureAwait(false);
                 if (reconciliation.Skipped)
                 {
                     return;

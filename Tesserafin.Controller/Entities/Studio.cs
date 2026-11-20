@@ -57,7 +57,7 @@ namespace Tesserafin.Controller.Entities
             return value;
         }
 
-        public override bool CanDelete()
+        public override bool CanDelete(ItemDeletionContext deletion)
         {
             return false;
         }

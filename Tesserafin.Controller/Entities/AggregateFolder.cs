@@ -56,7 +56,7 @@ namespace Tesserafin.Controller.Entities
 
         public string[] PhysicalLocationsList { get; set; }
 
-        public override bool CanDelete()
+        public override bool CanDelete(ItemDeletionContext deletion)
         {
             return false;
         }

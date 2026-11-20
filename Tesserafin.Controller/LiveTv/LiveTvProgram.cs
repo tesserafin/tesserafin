@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text.Json.Serialization;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
@@ -217,7 +218,7 @@ namespace Tesserafin.Controller.LiveTv
             return System.IO.Path.Combine(basePath, "livetv", Id.ToString("N", CultureInfo.InvariantCulture));
         }
 
-        public override bool CanDelete()
+        public override bool CanDelete(ItemDeletionContext deletion)
         {
             return false;
         }

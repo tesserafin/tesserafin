@@ -2,10 +2,10 @@ using System;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.MediaInfo;
 
-namespace Tesserafin.Server.Core.IO;
+namespace Tesserafin.Controller.IO;
 
 /// <summary>Classifies media paths independently of their playback sources.</summary>
-internal static class MediaPathProtocol
+public static class MediaPathProtocol
 {
     /// <summary>Checks whether a path can refer to a local media file.</summary>
     /// <param name="path">The media path.</param>

@@ -39,7 +39,6 @@ using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.MediaInfo;
-using Tesserafin.Server.Core.IO;
 
 namespace Tesserafin.Server.Core.Library
 {

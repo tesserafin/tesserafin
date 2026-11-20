@@ -382,14 +382,17 @@ namespace Tesserafin.Controller.Entities
             return user.GetPreferenceValues<UnratedItem>(PreferenceKind.BlockUnratedItems).Contains(type);
         }
 
-        public override bool CanDelete()
+        internal override SourceType GetSourceType(ActiveRecordings recordings)
+            => recordings.GetActiveRecordingInfo(Path) is not null ? SourceType.LiveTV : base.SourceType;
+
+        public override bool CanDelete(ItemDeletionContext deletion)
         {
-            if (IsActiveRecording())
+            if (deletion.Recordings.GetActiveRecordingInfo(Path) is not null)
             {
                 return false;
             }
 
-            return base.CanDelete();
+            return base.CanDelete(deletion);
         }
 
         public IEnumerable<Guid> GetAdditionalPartIds()

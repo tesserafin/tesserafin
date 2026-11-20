@@ -18,7 +18,7 @@ namespace Tesserafin.Server.Core.Library;
 /// <summary>Reconciles one completed discovery snapshot through explicit lifecycle commands.</summary>
 internal sealed class FolderChildReconciler(IItemLookupService lookup, IFileSystem files, ILogger<FolderChildReconciler> logger)
 {
-    public async Task<FolderChildReconciliationResult> ReconcileAsync(Folder parent, IReadOnlyList<BaseItem> currentSnapshot, IReadOnlyList<BaseItem> discovered, IDirectoryService directoryService, bool allowRemoveRoot, IItemWriteCommands writes, IItemDeletionCommands deletions, IItemImageService images, CancellationToken cancellationToken)
+    public async Task<FolderChildReconciliationResult> ReconcileAsync(Folder parent, IReadOnlyList<BaseItem> currentSnapshot, IReadOnlyList<BaseItem> discovered, IDirectoryService directoryService, bool allowRemoveRoot, ItemDeletionContext deletionContext, IItemWriteCommands writes, IItemDeletionCommands deletions, IItemImageService images, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!IsLibraryFolderAccessible(directoryService, parent, allowRemoveRoot))
@@ -132,7 +132,7 @@ internal sealed class FolderChildReconciler(IItemLookupService lookup, IFileSyst
         {
             foreach (var item in itemsRemoved)
             {
-                if (!item.CanDelete())
+                if (!item.CanDelete(deletionContext))
                 {
                     logger.LogDebug("Item marked as non-removable, skipping: {Path}", item.Path ?? item.Name);
                     continue;

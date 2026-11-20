@@ -11,11 +11,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller;
 using Tesserafin.Controller.BaseItemManager;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LibraryTaskScheduler;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Lyrics;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
@@ -626,6 +628,11 @@ namespace Tesserafin.Providers.Tests.Manager
             itemLookup ??= Mock.Of<IItemLookupService>();
             ProviderManager providerManager = null!;
             var scanContext = new LibraryScanContext(
+                new ItemDeletionContext(
+                    Mock.Of<IFileSystem>(),
+                    new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")),
+                    new ActiveRecordings(),
+                    Mock.Of<ICollectionFolderResolver>()),
                 deletions,
                 writes,
                 images,

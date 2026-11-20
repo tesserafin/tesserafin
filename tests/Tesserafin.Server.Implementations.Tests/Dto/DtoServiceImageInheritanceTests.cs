@@ -14,8 +14,10 @@ using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Trickplay;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.IO;
 using Tesserafin.Server.Core.Dto;
 using Tesserafin.Server.Core.Playlists;
+using Tesserafin.Server.Implementations.Tests.Library;
 using Xunit;
 
 namespace Tesserafin.Server.Implementations.Tests.Dto;
@@ -141,6 +143,7 @@ public class DtoServiceImageInheritanceTests
             chapterManager.Object,
             itemCountService.Object,
             Mock.Of<IVideoVersionCatalog>(),
-            new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")));
+            new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")),
+            LibraryWriteFixture.CreateDeletionContext(Mock.Of<IFileSystem>(MockBehavior.Strict)));
     }
 }

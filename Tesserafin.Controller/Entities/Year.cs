@@ -33,7 +33,7 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public override string ContainingFolderPath => Path;
 
-        public override bool CanDelete()
+        public override bool CanDelete(ItemDeletionContext deletion)
         {
             return false;
         }

@@ -73,7 +73,7 @@ namespace Tesserafin.Controller.Entities
             return LibraryManager.GetItemList(query);
         }
 
-        public override bool CanDelete()
+        public override bool CanDelete(ItemDeletionContext deletion)
         {
             return false;
         }

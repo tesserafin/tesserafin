@@ -119,7 +119,7 @@ namespace Tesserafin.Controller.Playlists
             return 1;
         }
 
-        public override bool IsAuthorizedToDelete(User user, List<Folder> allCollectionFolders)
+        public override bool IsAuthorizedToDelete(User user, ItemDeletionContext deletion, IReadOnlyList<Folder> allCollectionFolders)
         {
             return true;
         }
@@ -254,7 +254,7 @@ namespace Tesserafin.Controller.Playlists
             return shares.Any(s => s.UserId.Equals(userId));
         }
 
-        public override bool CanDelete(User user)
+        public override bool CanDelete(User user, ItemDeletionContext deletion)
         {
             return user.HasPermission(PermissionKind.IsAdministrator) || user.Id.Equals(OwnerUserId);
         }

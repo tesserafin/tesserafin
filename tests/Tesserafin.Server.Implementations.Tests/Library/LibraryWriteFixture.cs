@@ -1,7 +1,9 @@
+using System;
 using AutoFixture;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
@@ -17,6 +19,13 @@ namespace Tesserafin.Server.Implementations.Tests.Library;
 
 internal static class LibraryWriteFixture
 {
+    public static ItemDeletionContext CreateDeletionContext(IFileSystem files)
+        => new(
+            files,
+            new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")),
+            new ActiveRecordings(),
+            Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict));
+
     public static IItemWriteCommands Register(IFixture fixture)
     {
         var configuration = fixture.Create<IServerConfigurationManager>();

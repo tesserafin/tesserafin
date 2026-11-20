@@ -34,6 +34,7 @@ public sealed class FolderValidationTests
         refreshProgress.Setup(progress => progress.OnRefreshComplete(folder));
         var repository = Mock.Of<IItemRepository>(MockBehavior.Strict);
         var context = new LibraryScanContext(
+            LibraryWriteFixture.CreateDeletionContext(Mock.Of<IFileSystem>(MockBehavior.Strict)),
             Mock.Of<IItemDeletionCommands>(MockBehavior.Strict),
             Mock.Of<IItemWriteCommands>(MockBehavior.Strict),
             Mock.Of<IItemImageService>(MockBehavior.Strict),
@@ -80,6 +81,7 @@ public sealed class FolderValidationTests
             It.IsAny<IProgress<double>>(),
             It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var context = new LibraryScanContext(
+            LibraryWriteFixture.CreateDeletionContext(Mock.Of<IFileSystem>(MockBehavior.Strict)),
             Mock.Of<IItemDeletionCommands>(MockBehavior.Strict),
             Mock.Of<IItemWriteCommands>(MockBehavior.Strict),
             Mock.Of<IItemImageService>(MockBehavior.Strict),
@@ -126,8 +128,8 @@ public sealed class FolderValidationTests
     [Fact]
     public async Task RefreshSeries_ReadsCatalogueChildrenAndFollowsOnlyTheSeriesLinks()
     {
-        var episode = new Episode { Id = Guid.NewGuid() };
-        var linkedEpisode = new Episode { Id = episode.Id };
+        var episode = new Episode { Id = Guid.NewGuid(), AdditionalParts = ["second-part.mkv"] };
+        var linkedEpisode = new Episode { Id = episode.Id, AdditionalParts = episode.AdditionalParts };
         var linkedFolder = new Folder { Id = Guid.NewGuid() };
         var season = new Season { Id = Guid.NewGuid(), LinkedChildren = [new LinkedChild { ItemId = Guid.NewGuid() }] };
         var series = new Series
@@ -151,6 +153,7 @@ public sealed class FolderValidationTests
 
         var lookup = Mock.Of<IItemLookupService>(MockBehavior.Strict);
         var context = new LibraryScanContext(
+            LibraryWriteFixture.CreateDeletionContext(Mock.Of<IFileSystem>(MockBehavior.Strict)),
             Mock.Of<IItemDeletionCommands>(MockBehavior.Strict),
             Mock.Of<IItemWriteCommands>(MockBehavior.Strict),
             Mock.Of<IItemImageService>(MockBehavior.Strict),

@@ -12,9 +12,12 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
+using Tesserafin.Data;
 using Tesserafin.Data.Entities;
+using Tesserafin.Data.Enums;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.IO;
 using Tesserafin.Model.LiveTv;
 using Tesserafin.Model.MediaInfo;
 using Xunit;
@@ -218,6 +221,50 @@ public class BaseItemTests
             Assert.Contains(alt1.Id, ids);
             Assert.Contains(alt2.Id, ids);
         }
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    public void CanDelete_ChannelItem_RequiresChannelCapabilityAndUserPermission(bool channelAllows, bool userAllows, bool expected)
+    {
+        var item = new Book { ChannelId = Guid.NewGuid() };
+        var channels = new Mock<IChannelManager>(MockBehavior.Strict);
+        channels.Setup(x => x.CanDelete(item)).Returns(channelAllows);
+        var deletion = new ItemDeletionContext(
+            Mock.Of<IFileSystem>(MockBehavior.Strict),
+            new Lazy<IChannelManager>(() => channels.Object),
+            new ActiveRecordings(),
+            Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict));
+        var user = new User("u", "auth", "reset");
+        user.SetPermission(PermissionKind.EnableContentDeletion, false);
+        user.SetPreference(PreferenceKind.EnableContentDeletionFromFolders, [userAllows ? item.ChannelId : Guid.NewGuid()]);
+
+        Assert.Equal(expected, item.CanDelete(user, deletion));
+    }
+
+    [Fact]
+    public void CanDelete_ActiveRecording_IsDeniedBeforeReadingTheFileSystem()
+    {
+        var movie = new Movie { Path = "/Recordings/in-progress.ts" };
+        using var cancellation = new CancellationTokenSource();
+        var recordings = new ActiveRecordings
+        {
+            ["recording"] = new ActiveRecordingInfo
+            {
+                Path = movie.Path,
+                Timer = new TimerInfo { Status = RecordingStatus.InProgress },
+                CancellationTokenSource = cancellation
+            }
+        };
+        var deletion = new ItemDeletionContext(
+            Mock.Of<IFileSystem>(MockBehavior.Strict),
+            new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")),
+            recordings,
+            Mock.Of<ICollectionFolderResolver>(MockBehavior.Strict));
+
+        Assert.False(movie.CanDelete(deletion));
     }
 
     [Fact]

@@ -111,7 +111,7 @@ namespace Tesserafin.Controller.Entities.Movies
             return [];
         }
 
-        public override bool IsAuthorizedToDelete(User user, List<Folder> allCollectionFolders)
+        public override bool IsAuthorizedToDelete(User user, ItemDeletionContext deletion, IReadOnlyList<Folder> allCollectionFolders)
         {
             return user.HasPermission(PermissionKind.IsAdministrator) || user.HasPermission(PermissionKind.EnableCollectionManagement);
         }

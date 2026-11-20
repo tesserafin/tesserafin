@@ -131,6 +131,7 @@ namespace Tesserafin.Server.Core.Dto
         private readonly IItemCountService _itemCountService;
         private readonly IVideoVersionCatalog _versions;
         private readonly Lazy<IChannelManager> _channels;
+        private readonly ItemDeletionContext _deletionContext;
 
         public DtoService(
             ILogger<DtoService> logger,
@@ -148,7 +149,8 @@ namespace Tesserafin.Server.Core.Dto
             IChapterManager chapterManager,
             IItemCountService itemCountService,
             IVideoVersionCatalog versions,
-            Lazy<IChannelManager> channels)
+            Lazy<IChannelManager> channels,
+            ItemDeletionContext deletionContext)
         {
             _logger = logger;
             _namedItems = namedItems;
@@ -166,6 +168,7 @@ namespace Tesserafin.Server.Core.Dto
             _itemCountService = itemCountService;
             _versions = versions;
             _channels = channels;
+            _deletionContext = deletionContext;
         }
 
         private ILiveTvManager LivetvManager => _livetvManagerFactory.Value;
@@ -399,10 +402,10 @@ namespace Tesserafin.Server.Core.Dto
             if (options.ContainsField(ItemFields.CanDelete))
             {
                 dto.CanDelete = user is null
-                    ? item.CanDelete()
+                    ? item.CanDelete(_deletionContext)
                     : allCollectionFolders is not null
-                        ? item.CanDelete(user, allCollectionFolders)
-                        : item.CanDelete(user);
+                        ? item.CanDelete(user, _deletionContext, allCollectionFolders)
+                        : item.CanDelete(user, _deletionContext);
             }
 
             if (options.ContainsField(ItemFields.CanDownload))

@@ -18,7 +18,9 @@ using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
@@ -826,17 +828,17 @@ namespace Tesserafin.Controller.Entities
             return Id.ToString("N", CultureInfo.InvariantCulture);
         }
 
-        public virtual bool CanDelete()
+        public virtual bool CanDelete(ItemDeletionContext deletion)
         {
-            if (SourceType == SourceType.Channel)
+            if (GetSourceType(deletion.Recordings) == SourceType.Channel)
             {
-                return ChannelManager.CanDelete(this);
+                return deletion.Channels.Value.CanDelete(this);
             }
 
-            return IsFileProtocol;
+            return MediaPathProtocol.IsLocalFile(Path, deletion.FileSystem);
         }
 
-        public virtual bool IsAuthorizedToDelete(User user, List<Folder> allCollectionFolders)
+        public virtual bool IsAuthorizedToDelete(User user, ItemDeletionContext deletion, IReadOnlyList<Folder> allCollectionFolders)
         {
             if (user.HasPermission(PermissionKind.EnableContentDeletion))
             {
@@ -845,12 +847,14 @@ namespace Tesserafin.Controller.Entities
 
             var allowed = user.GetPreferenceValues<Guid>(PreferenceKind.EnableContentDeletionFromFolders);
 
-            if (SourceType == SourceType.Channel)
+            if (GetSourceType(deletion.Recordings) == SourceType.Channel)
             {
                 return allowed.Contains(ChannelId);
             }
 
-            var collectionFolders = LibraryManager.GetCollectionFolders(this, allCollectionFolders);
+            var collectionFolders = allCollectionFolders is null
+                ? deletion.Libraries.GetCollectionFolders(this)
+                : deletion.Libraries.GetCollectionFolders(this, allCollectionFolders);
 
             foreach (var folder in collectionFolders)
             {
@@ -883,17 +887,13 @@ namespace Tesserafin.Controller.Entities
             return ownerId.IsEmpty() ? null : lookup.GetItemById(ownerId);
         }
 
-        public bool CanDelete(User user, List<Folder> allCollectionFolders)
-        {
-            return CanDelete() && IsAuthorizedToDelete(user, allCollectionFolders);
-        }
+        public bool CanDelete(User user, ItemDeletionContext deletion, IReadOnlyList<Folder> allCollectionFolders)
+            => CanDelete(deletion) && IsAuthorizedToDelete(user, deletion, allCollectionFolders);
 
-        public virtual bool CanDelete(User user)
-        {
-            var allCollectionFolders = LibraryManager.GetUserRootFolder().Children.OfType<Folder>().ToList();
+        public virtual bool CanDelete(User user, ItemDeletionContext deletion)
+            => CanDelete(user, deletion, null);
 
-            return CanDelete(user, allCollectionFolders);
-        }
+        internal virtual SourceType GetSourceType(ActiveRecordings recordings) => SourceType;
 
         public virtual bool CanDownload()
         {

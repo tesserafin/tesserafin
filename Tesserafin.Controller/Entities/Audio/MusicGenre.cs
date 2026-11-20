@@ -58,7 +58,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return 1;
         }
 
-        public override bool CanDelete()
+        public override bool CanDelete(ItemDeletionContext deletion)
         {
             return false;
         }

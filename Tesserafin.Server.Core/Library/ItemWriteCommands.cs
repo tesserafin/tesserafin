@@ -175,8 +175,8 @@ internal sealed partial class ItemWriteCommands(
         => new() { ItemId = source.ItemId, Type = source.Type, Path = source.Path, LibraryItemId = source.LibraryItemId };
 #pragma warning restore CS0618
 
-    public Task<FolderChildReconciliationResult> ReconcileFolderChildrenAsync(Folder parent, IReadOnlyList<BaseItem> currentChildren, IReadOnlyList<BaseItem> discovered, IDirectoryService directoryService, bool allowRemoveRoot, IItemDeletionCommands deletions, IItemImageService images, CancellationToken cancellationToken)
-        => childReconciler.ReconcileAsync(parent, currentChildren, discovered, directoryService, allowRemoveRoot, this, deletions, images, cancellationToken);
+    public Task<FolderChildReconciliationResult> ReconcileFolderChildrenAsync(Folder parent, IReadOnlyList<BaseItem> currentChildren, IReadOnlyList<BaseItem> discovered, IDirectoryService directoryService, bool allowRemoveRoot, ItemDeletionContext deletionContext, IItemDeletionCommands deletions, IItemImageService images, CancellationToken cancellationToken)
+        => childReconciler.ReconcileAsync(parent, currentChildren, discovered, directoryService, allowRemoveRoot, deletionContext, this, deletions, images, cancellationToken);
 
     public T GetOrCreateNamedItem<T>(string name, CancellationToken cancellationToken)
         where T : BaseItem, new()

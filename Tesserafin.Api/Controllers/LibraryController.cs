@@ -49,6 +49,7 @@ namespace Tesserafin.Api.Controllers;
 public class LibraryController : BaseTesserafinApiController
 {
     private readonly IItemDeletionCommands _deletions;
+    private readonly ItemDeletionContext _deletionContext;
     private readonly IProviderManager _providerManager;
     private readonly ISimilarItemsManager _similarItemsManager;
     private readonly ILibraryManager _libraryManager;
@@ -67,6 +68,7 @@ public class LibraryController : BaseTesserafinApiController
     /// Initializes a new instance of the <see cref="LibraryController"/> class.
     /// </summary>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="deletionContext">Dependencies for checking item deletion eligibility.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="similarItemsManager">Instance of the <see cref="ISimilarItemsManager"/> interface.</param>
     /// <param name="scans">Library scan scheduling and state.</param>
@@ -82,6 +84,7 @@ public class LibraryController : BaseTesserafinApiController
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
     public LibraryController(
         IItemDeletionCommands deletions,
+        ItemDeletionContext deletionContext,
         IProviderManager providerManager,
         ISimilarItemsManager similarItemsManager,
         ILibraryManager libraryManager,
@@ -97,6 +100,7 @@ public class LibraryController : BaseTesserafinApiController
         IItemSortService itemSortService)
     {
         _deletions = deletions;
+        _deletionContext = deletionContext;
         _providerManager = providerManager;
         _similarItemsManager = similarItemsManager;
         _libraryManager = libraryManager;
@@ -402,7 +406,7 @@ public class LibraryController : BaseTesserafinApiController
             return NotFound();
         }
 
-        if (user is not null && !item.CanDelete(user))
+        if (user is not null && !item.CanDelete(user, _deletionContext))
         {
             return Unauthorized("Unauthorized access");
         }
@@ -448,7 +452,7 @@ public class LibraryController : BaseTesserafinApiController
                 return NotFound();
             }
 
-            if (user is not null && !item.CanDelete(user))
+            if (user is not null && !item.CanDelete(user, _deletionContext))
             {
                 return Unauthorized("Unauthorized access");
             }

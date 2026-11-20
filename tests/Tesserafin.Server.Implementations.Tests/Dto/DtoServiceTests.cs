@@ -14,7 +14,9 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Trickplay;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.IO;
 using Tesserafin.Server.Core.Dto;
+using Tesserafin.Server.Implementations.Tests.Library;
 using Xunit;
 
 namespace Tesserafin.Server.Implementations.Tests.Dto;
@@ -58,7 +60,8 @@ public class DtoServiceTests
             new Mock<IChapterManager>().Object,
             new Mock<IItemCountService>().Object,
             Mock.Of<IVideoVersionCatalog>(),
-            new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")));
+            new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")),
+            LibraryWriteFixture.CreateDeletionContext(Mock.Of<IFileSystem>(MockBehavior.Strict)));
 
         // Episode.Series / Episode.Season resolve through the static BaseItem.LibraryManager.
         BaseItem.LibraryManager = _libraryManagerMock.Object;

@@ -4,6 +4,7 @@ using System.Linq;
 using AutoFixture;
 using AutoFixture.AutoMoq;
 using Moq;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
@@ -16,6 +17,7 @@ using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Configuration;
+using Tesserafin.Model.IO;
 using Tesserafin.Model.MediaInfo;
 using Tesserafin.Model.Serialization;
 using Xunit;
@@ -24,8 +26,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library.LibraryManager;
 
 /// <summary>
 /// Characterisation of library membership resolution (<c>GetCollectionFolders</c>): which top-level
-/// libraries an item belongs to, and the visibility and deletion rules that read it through the
-/// static <see cref="BaseItem.LibraryManager"/>. Every expectation is hand-derived and was green on
+/// libraries an item belongs to, and the visibility and deletion rules based on membership. Every expectation is hand-derived and was green on
 /// the unmodified <c>LibraryManager</c>; membership is now asserted through both the
 /// <see cref="ILibraryManager"/> facade and <see cref="ICollectionFolderResolver"/> (DEBT-SERVER-2).
 /// </summary>
@@ -242,8 +243,16 @@ public sealed class CollectionFolderMembershipTests
         var shows = AddLibrary("Shows", "/media/shows");
         var movie = AddMovie(Add(new Folder { Path = "/media/movies" }), "/media/movies/n.mkv");
 
-        Assert.True(movie.CanDelete(UserWithFolders(PreferenceKind.EnableContentDeletionFromFolders, movies.Id), _libraries));
-        Assert.False(movie.CanDelete(UserWithFolders(PreferenceKind.EnableContentDeletionFromFolders, shows.Id), _libraries));
+        var files = new Mock<IFileSystem>(MockBehavior.Strict);
+        files.Setup(x => x.IsPathFile(movie.Path)).Returns(true);
+        var deletion = new ItemDeletionContext(
+            files.Object,
+            new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")),
+            new ActiveRecordings(),
+            _resolver);
+
+        Assert.True(movie.CanDelete(UserWithFolders(PreferenceKind.EnableContentDeletionFromFolders, movies.Id), deletion, _libraries));
+        Assert.False(movie.CanDelete(UserWithFolders(PreferenceKind.EnableContentDeletionFromFolders, shows.Id), deletion, _libraries));
     }
 
     private static User UserWithFolders(PreferenceKind kind, Guid folderId)

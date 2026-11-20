@@ -107,7 +107,7 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public override bool SupportsPeople => false;
 
-        public override bool CanDelete()
+        public override bool CanDelete(ItemDeletionContext deletion)
         {
             return false;
         }

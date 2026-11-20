@@ -599,6 +599,7 @@ public class LibraryManagerItemLookupTests
 
         var roots = Mock.Of<ILibraryRootFolderProvider>(p => p.GetRootFolder() == new StubAggregateFolder());
         var context = new LibraryScanContext(
+            LibraryWriteFixture.CreateDeletionContext(Mock.Of<Tesserafin.Model.IO.IFileSystem>()),
             _deletions,
             _writes,
             Mock.Of<IItemImageService>(),
