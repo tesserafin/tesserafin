@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Microsoft.Extensions.Logging;
-using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
@@ -26,7 +25,6 @@ namespace Tesserafin.Server.Core.Library;
 internal sealed class ItemResolutionService(
     IServerConfigurationManager configuration,
     IFileSystem files,
-    IServerApplicationHost appHost,
     ILibraryItemOptions options,
     IItemLookupService lookup,
     NamingOptions namingOptions,
@@ -34,7 +32,6 @@ internal sealed class ItemResolutionService(
 {
     private readonly IServerConfigurationManager _configurationManager = configuration;
     private readonly IFileSystem _fileSystem = files;
-    private readonly IServerApplicationHost _appHost = appHost;
     private readonly NamingOptions _namingOptions = namingOptions;
     private readonly ILogger<ItemResolutionService> _logger = logger;
 
@@ -216,7 +213,7 @@ internal sealed class ItemResolutionService(
 
             try
             {
-                files = FileData.GetFilteredFileSystemEntries(directoryService, args.Path, _fileSystem, _appHost, _logger, args, flattenFolderDepth: flattenFolderDepth, resolveShortcuts: isPhysicalRoot || isVf);
+                files = FileData.GetFilteredFileSystemEntries(directoryService, args.Path, _fileSystem, _configurationManager.ApplicationPaths, _logger, args, flattenFolderDepth: flattenFolderDepth, resolveShortcuts: isPhysicalRoot || isVf);
             }
             catch (Exception ex)
             {

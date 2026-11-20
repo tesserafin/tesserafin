@@ -18,7 +18,7 @@ namespace Tesserafin.Controller.IO
         /// <param name="directoryService">The directory service.</param>
         /// <param name="path">The path.</param>
         /// <param name="fileSystem">The file system.</param>
-        /// <param name="appHost">The application host.</param>
+        /// <param name="applicationPaths">The application paths.</param>
         /// <param name="logger">The logger.</param>
         /// <param name="args">The args.</param>
         /// <param name="flattenFolderDepth">The flatten folder depth.</param>
@@ -29,7 +29,7 @@ namespace Tesserafin.Controller.IO
             IDirectoryService directoryService,
             string path,
             IFileSystem fileSystem,
-            IServerApplicationHost appHost,
+            IServerApplicationPaths applicationPaths,
             ILogger logger,
             ItemResolveArgs args,
             int flattenFolderDepth = 0,
@@ -58,7 +58,7 @@ namespace Tesserafin.Controller.IO
                 {
                     try
                     {
-                        var newPath = appHost.ExpandVirtualPath(fileSystem.ResolveShortcut(fullName));
+                        var newPath = VirtualPaths.Expand(applicationPaths, fileSystem.ResolveShortcut(fullName));
 
                         if (string.IsNullOrEmpty(newPath))
                         {
@@ -82,7 +82,7 @@ namespace Tesserafin.Controller.IO
                 }
                 else if (flattenFolderDepth > 0 && isDirectory)
                 {
-                    foreach (var child in GetFilteredFileSystemEntries(directoryService, fullName, fileSystem, appHost, logger, args, flattenFolderDepth: flattenFolderDepth - 1, resolveShortcuts: resolveShortcuts))
+                    foreach (var child in GetFilteredFileSystemEntries(directoryService, fullName, fileSystem, applicationPaths, logger, args, flattenFolderDepth: flattenFolderDepth - 1, resolveShortcuts: resolveShortcuts))
                     {
                         dict[child.FullName] = child;
                     }

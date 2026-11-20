@@ -1,8 +1,6 @@
 {
   "entityStaticServiceAccessFiles": [
-    "Tesserafin.Controller/Entities/AggregateFolder.cs",
     "Tesserafin.Controller/Entities/BaseItemExtensions.cs",
-    "Tesserafin.Controller/Entities/Folder.cs",
     "Tesserafin.Server.Core/ApplicationHost.cs"
   ],
   "entityStaticServices": [
@@ -11,8 +9,7 @@
     "BaseItem.LibraryManager",
     "BaseItem.MediaSourceManager",
     "BaseItem.ProviderManager",
-    "BaseItem.UserDataManager",
-    "CollectionFolder.ApplicationHost"
+    "BaseItem.UserDataManager"
   ],
   "forbiddenDependencies": [],
   "streamBuilderFiles": [

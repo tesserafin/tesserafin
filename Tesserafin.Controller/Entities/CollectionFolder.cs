@@ -55,8 +55,6 @@ namespace Tesserafin.Controller.Entities
 
         public Guid[] PhysicalFolderIds { get; set; }
 
-        public static IServerApplicationHost ApplicationHost { get; set; }
-
         [JsonIgnore]
         public override bool SupportsPlayedStatus => false;
 
@@ -228,7 +226,7 @@ namespace Tesserafin.Controller.Entities
             {
                 var flattenFolderDepth = 0;
 
-                var files = FileData.GetFilteredFileSystemEntries(directoryService, args.Path, FileSystem, ApplicationHost, Logger, args, flattenFolderDepth: flattenFolderDepth, resolveShortcuts: true);
+                var files = FileData.GetFilteredFileSystemEntries(directoryService, args.Path, FileSystem, ConfigurationManager.ApplicationPaths, Logger, args, flattenFolderDepth: flattenFolderDepth, resolveShortcuts: true);
 
                 args.FileSystemChildren = files;
             }

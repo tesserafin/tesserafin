@@ -19,6 +19,7 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Persistence;
@@ -1941,7 +1942,7 @@ namespace Tesserafin.Controller.Entities
                         {
                             Logger.LogDebug("Found shortcut at {0}", i.FullName);
 
-                            var resolvedPath = CollectionFolder.ApplicationHost.ExpandVirtualPath(FileSystem.ResolveShortcut(i.FullName));
+                            var resolvedPath = VirtualPaths.Expand(ConfigurationManager.ApplicationPaths, FileSystem.ResolveShortcut(i.FullName));
 
                             if (!string.IsNullOrEmpty(resolvedPath))
                             {

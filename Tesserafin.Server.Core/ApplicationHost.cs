@@ -288,14 +288,7 @@ namespace Tesserafin.Server.Core
         public string RestoreBackupPath { get; set; }
 
         public string ExpandVirtualPath(string path)
-        {
-            if (path is null)
-            {
-                return null;
-            }
-
-            return VirtualPaths.Expand(ApplicationPaths, path);
-        }
+            => VirtualPaths.Expand(ApplicationPaths, path);
 
         public string ReverseVirtualPath(string path)
         {
@@ -835,7 +828,6 @@ namespace Tesserafin.Server.Core
             BaseItem.MediaSourceManager = Resolve<IMediaSourceManager>();
             BaseItem.ProviderManager = Resolve<IProviderManager>();
             BaseItem.UserDataManager = Resolve<IUserDataManager>();
-            CollectionFolder.ApplicationHost = this;
         }
 
         /// <summary>

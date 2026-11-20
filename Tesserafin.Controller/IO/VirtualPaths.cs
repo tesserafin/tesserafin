@@ -1,12 +1,12 @@
 using System;
-using Tesserafin.Controller;
+using System.Diagnostics.CodeAnalysis;
 
-namespace Tesserafin.Server.Core.Library
+namespace Tesserafin.Controller.IO
 {
     /// <summary>
     /// Maps data and internal-metadata paths to and from the virtual prefixes persisted in configuration files.
     /// </summary>
-    internal static class VirtualPaths
+    public static class VirtualPaths
     {
         /// <summary>
         /// Replaces the virtual prefixes with the real data and internal-metadata paths.
@@ -14,8 +14,9 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="paths">The application paths.</param>
         /// <param name="path">The stored path.</param>
         /// <returns>The real path.</returns>
-        public static string Expand(IServerApplicationPaths paths, string path)
-            => path.Replace(paths.VirtualDataPath, paths.DataPath, StringComparison.OrdinalIgnoreCase)
+        [return: NotNullIfNotNull(nameof(path))]
+        public static string? Expand(IServerApplicationPaths paths, string? path)
+            => path?.Replace(paths.VirtualDataPath, paths.DataPath, StringComparison.OrdinalIgnoreCase)
                 .Replace(paths.VirtualInternalMetadataPath, paths.InternalMetadataPath, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
