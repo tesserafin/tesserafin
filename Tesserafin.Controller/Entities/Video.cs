@@ -173,19 +173,16 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        [JsonIgnore]
-        public bool IsCompleteMedia
-        {
-            get
+        /// <summary>Checks whether the media can be fully processed by a provider.</summary>
+        /// <param name="recordings">The recordings in progress.</param>
+        /// <returns>Whether this is neither an in-progress recording nor a channel livestream.</returns>
+        public bool IsCompleteMedia(ActiveRecordings recordings)
+            => GetSourceType(recordings) switch
             {
-                if (SourceType == SourceType.Channel)
-                {
-                    return !Tags.Contains("livestream", StringComparison.OrdinalIgnoreCase);
-                }
-
-                return !IsActiveRecording();
-            }
-        }
+                SourceType.LiveTV => false,
+                SourceType.Channel => !Tags.Contains("livestream", StringComparison.OrdinalIgnoreCase),
+                _ => true
+            };
 
         [JsonIgnore]
         protected virtual bool EnableDefaultVideoUserDataKeys => true;
@@ -471,8 +468,6 @@ namespace Tesserafin.Controller.Entities
 
             return base.GetDeletePaths(fileSystem);
         }
-
-        public virtual MediaStream GetDefaultVideoStream() => GetDefaultVideoStream(MediaSourceManager);
 
         public MediaStream GetDefaultVideoStream(IMediaSourceManager mediaSourceManager)
         {

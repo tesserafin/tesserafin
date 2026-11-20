@@ -9,6 +9,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Model.Drawing;
@@ -31,7 +32,7 @@ namespace Tesserafin.Providers.Tests.MediaInfo
         public void GetSupportedImages_AnyBaseItem_ReturnsExpected(Type type, params ImageType[] expected)
         {
             BaseItem item = (BaseItem)Activator.CreateInstance(type)!;
-            var embeddedImageProvider = new EmbeddedImageProvider(Mock.Of<IMediaSourceManager>(), Mock.Of<IMediaEncoder>(), new NullLogger<EmbeddedImageProvider>());
+            var embeddedImageProvider = new EmbeddedImageProvider(Mock.Of<IMediaSourceManager>(), Mock.Of<IMediaEncoder>(), new NullLogger<EmbeddedImageProvider>(), new ActiveRecordings());
             var actual = embeddedImageProvider.GetSupportedImages(item);
             Assert.Equal(expected.OrderBy(i => i.ToString()), actual.OrderBy(i => i.ToString()));
         }
@@ -42,7 +43,7 @@ namespace Tesserafin.Providers.Tests.MediaInfo
             var input = new Movie();
 
             var mediaSourceManager = GetMediaSourceManager(input, new List<MediaAttachment>(), new List<MediaStream>());
-            var embeddedImageProvider = new EmbeddedImageProvider(mediaSourceManager, null, new NullLogger<EmbeddedImageProvider>());
+            var embeddedImageProvider = new EmbeddedImageProvider(mediaSourceManager, null, new NullLogger<EmbeddedImageProvider>(), new ActiveRecordings());
 
             var actual = await embeddedImageProvider.GetImage(input, ImageType.Primary, CancellationToken.None);
             Assert.NotNull(actual);
@@ -76,7 +77,7 @@ namespace Tesserafin.Providers.Tests.MediaInfo
             mediaEncoder.Setup(encoder => encoder.ExtractVideoImage(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<MediaSourceInfo>(), It.IsAny<MediaStream>(), It.IsAny<int>(), It.IsAny<ImageFormat>(), It.IsAny<CancellationToken>()))
                 .Returns<string, string, MediaSourceInfo, MediaStream, int, ImageFormat, CancellationToken>((_, _, _, _, index, ext, _) => Task.FromResult(pathPrefix + index + "." + ext));
             var mediaSourceManager = GetMediaSourceManager(input, attachments, new List<MediaStream>());
-            var embeddedImageProvider = new EmbeddedImageProvider(mediaSourceManager, mediaEncoder.Object, new NullLogger<EmbeddedImageProvider>());
+            var embeddedImageProvider = new EmbeddedImageProvider(mediaSourceManager, mediaEncoder.Object, new NullLogger<EmbeddedImageProvider>(), new ActiveRecordings());
 
             var actual = await embeddedImageProvider.GetImage(input, type, CancellationToken.None);
             Assert.NotNull(actual);
@@ -129,7 +130,7 @@ namespace Tesserafin.Providers.Tests.MediaInfo
                     return Task.FromResult(pathPrefix + index + "." + ext);
                 });
             var mediaSourceManager = GetMediaSourceManager(input, new List<MediaAttachment>(), streams);
-            var embeddedImageProvider = new EmbeddedImageProvider(mediaSourceManager, mediaEncoder.Object, new NullLogger<EmbeddedImageProvider>());
+            var embeddedImageProvider = new EmbeddedImageProvider(mediaSourceManager, mediaEncoder.Object, new NullLogger<EmbeddedImageProvider>(), new ActiveRecordings());
 
             var actual = await embeddedImageProvider.GetImage(input, type, CancellationToken.None);
             Assert.NotNull(actual);

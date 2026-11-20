@@ -13,6 +13,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
@@ -39,6 +40,7 @@ namespace Tesserafin.Providers.MediaInfo
         private readonly IChapterManager _chapterManager;
         private readonly IServerConfigurationManager _config;
         private readonly ISubtitleManager _subtitleManager;
+        private readonly ActiveRecordings _recordings;
         private readonly ILibraryItemOptions _itemOptions;
         private readonly IItemPeopleService _itemPeopleService;
         private readonly AudioResolver _audioResolver;
@@ -61,7 +63,8 @@ namespace Tesserafin.Providers.MediaInfo
             AudioResolver audioResolver,
             SubtitleResolver subtitleResolver,
             IMediaAttachmentRepository mediaAttachmentRepository,
-            IMediaStreamRepository mediaStreamRepository)
+            IMediaStreamRepository mediaStreamRepository,
+            ActiveRecordings recordings)
         {
             _peopleCommands = peopleCommands;
             _logger = logger;
@@ -72,6 +75,7 @@ namespace Tesserafin.Providers.MediaInfo
             _chapterManager = chapterManager;
             _config = config;
             _subtitleManager = subtitleManager;
+            _recordings = recordings;
             _itemOptions = itemOptions;
             _itemPeopleService = itemPeopleService;
             _audioResolver = audioResolver;
@@ -556,7 +560,8 @@ namespace Tesserafin.Providers.MediaInfo
             {
                 var downloadedLanguages = await new SubtitleDownloader(
                     _logger,
-                    _subtitleManager).DownloadSubtitles(
+                    _subtitleManager,
+                    _recordings).DownloadSubtitles(
                         video,
                         currentStreams.Concat(externalSubtitleStreams).ToList(),
                         libraryOptions,

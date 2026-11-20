@@ -220,6 +220,35 @@ public class BaseItemTests
     }
 
     [Theory]
+    [InlineData(false, false, false, true)]
+    [InlineData(true, false, false, true)]
+    [InlineData(true, true, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(true, false, true, false)]
+    public void IsCompleteMedia_UsesChannelTagsAndLiveRecordingSnapshot(bool channel, bool liveStream, bool recording, bool expected)
+    {
+        var video = new Video
+        {
+            ChannelId = channel ? Guid.NewGuid() : Guid.Empty,
+            Path = "/Library/video.ts",
+            Tags = liveStream ? ["liveSTREAM"] : []
+        };
+        var recordings = new ActiveRecordings();
+        using var cancellation = new CancellationTokenSource();
+        if (recording)
+        {
+            recordings["recording"] = new ActiveRecordingInfo
+            {
+                Path = video.Path,
+                Timer = new TimerInfo { Status = RecordingStatus.InProgress },
+                CancellationTokenSource = cancellation
+            };
+        }
+
+        Assert.Equal(expected, video.IsCompleteMedia(recordings));
+    }
+
+    [Theory]
     [InlineData(true, true, true)]
     [InlineData(false, true, false)]
     [InlineData(true, false, false)]

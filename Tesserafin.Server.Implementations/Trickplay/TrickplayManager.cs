@@ -17,6 +17,7 @@ using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Trickplay;
 using Tesserafin.Data.Entities;
@@ -42,6 +43,7 @@ public partial class TrickplayManager : ITrickplayManager
     private readonly IApplicationPaths _appPaths;
     private readonly IPathManager _pathManager;
     private readonly IMediaSourceManager _mediaSourceManager;
+    private readonly ActiveRecordings _recordings;
 
     private static readonly AsyncNonKeyedLocker _resourcePool = new(1);
     private static readonly string[] _trickplayImgExtensions = [".jpg"];
@@ -59,6 +61,7 @@ public partial class TrickplayManager : ITrickplayManager
     /// <param name="appPaths">The application paths.</param>
     /// <param name="pathManager">The path manager.</param>
     /// <param name="mediaSourceManager">The media source manager.</param>
+    /// <param name="recordings">The recordings in progress.</param>
     public TrickplayManager(
         ILogger<TrickplayManager> logger,
         IMediaEncoder mediaEncoder,
@@ -69,7 +72,8 @@ public partial class TrickplayManager : ITrickplayManager
         IDbContextFactory<TesserafinDbContext> dbProvider,
         IApplicationPaths appPaths,
         IPathManager pathManager,
-        IMediaSourceManager mediaSourceManager)
+        IMediaSourceManager mediaSourceManager,
+        ActiveRecordings recordings)
     {
         _logger = logger;
         _mediaEncoder = mediaEncoder;
@@ -81,6 +85,7 @@ public partial class TrickplayManager : ITrickplayManager
         _appPaths = appPaths;
         _pathManager = pathManager;
         _mediaSourceManager = mediaSourceManager;
+        _recordings = recordings;
     }
 
     /// <inheritdoc />
@@ -649,7 +654,7 @@ public partial class TrickplayManager : ITrickplayManager
             return false;
         }
 
-        if (!video.IsCompleteMedia)
+        if (!video.IsCompleteMedia(_recordings))
         {
             return false;
         }

@@ -9,6 +9,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Lyrics;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
@@ -89,7 +90,8 @@ public sealed class ScheduledSidecarDownloadTests
             NullLogger<SubtitleScheduledTask>.Instance,
             Mock.Of<ILocalizationManager>(),
             [Mock.Of<ISubtitleProvider>(p => p.Name == "Provider")],
-            mediaSources.Object);
+            mediaSources.Object,
+            new ActiveRecordings());
 
         await task.ExecuteAsync(Mock.Of<IProgress<double>>(), token);
 

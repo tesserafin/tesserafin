@@ -12,6 +12,7 @@ using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
 using Tesserafin.Model.Configuration;
@@ -23,11 +24,13 @@ namespace Tesserafin.Providers.MediaInfo
     {
         private readonly ILogger _logger;
         private readonly ISubtitleManager _subtitleManager;
+        private readonly ActiveRecordings _recordings;
 
-        public SubtitleDownloader(ILogger logger, ISubtitleManager subtitleManager)
+        public SubtitleDownloader(ILogger logger, ISubtitleManager subtitleManager, ActiveRecordings recordings)
         {
             _logger = logger;
             _subtitleManager = subtitleManager;
+            _recordings = recordings;
         }
 
         public async Task<List<string>> DownloadSubtitles(
@@ -58,7 +61,7 @@ namespace Tesserafin.Providers.MediaInfo
 
             foreach (var language in languages)
             {
-                if (video.VideoType != VideoType.VideoFile || !video.IsCompleteMedia)
+                if (video.VideoType != VideoType.VideoFile || !video.IsCompleteMedia(_recordings))
                 {
                     continue;
                 }

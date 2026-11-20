@@ -10,6 +10,7 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
@@ -68,7 +69,7 @@ public sealed class SidecarStoragePolicyTests
             .ReturnsAsync(new[] { new RemoteSubtitleInfo { Id = "match", ProviderName = "Preferred" } });
         preferred.Setup(p => p.GetSubtitles("match", token)).ReturnsAsync(Subtitle);
         var manager = CreateSubtitleManager(storage, itemOptions.Object, blocked.Object, preferred.Object);
-        var downloader = new SubtitleDownloader(NullLogger.Instance, manager);
+        var downloader = new SubtitleDownloader(NullLogger.Instance, manager, new ActiveRecordings());
 
         var downloaded = await downloader.DownloadSubtitles(video, [], settings, true, token);
 

@@ -14,6 +14,7 @@ using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Lyrics;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
@@ -47,6 +48,7 @@ namespace Tesserafin.Providers.MediaInfo
         private readonly SubtitleResolver _subtitleResolver;
         private readonly LyricResolver _lyricResolver;
         private readonly FFProbeVideoInfo _videoProber;
+        private readonly ActiveRecordings _recordings;
         private readonly AudioFileProber _audioProber;
         private readonly Task<ItemUpdateType> _cachedTask = Task.FromResult(ItemUpdateType.None);
 
@@ -69,6 +71,7 @@ namespace Tesserafin.Providers.MediaInfo
         /// <param name="lyricManager">Instance of the <see cref="ILyricManager"/> interface.</param>
         /// <param name="mediaAttachmentRepository">Instance of the <see cref="IMediaAttachmentRepository"/> interface.</param>
         /// <param name="mediaStreamRepository">Instance of the <see cref="IMediaStreamRepository"/> interface.</param>
+        /// <param name="recordings">The recordings in progress.</param>
         public ProbeProvider(
             IItemPeopleCommands peopleCommands,
             IMediaSourceManager mediaSourceManager,
@@ -85,9 +88,11 @@ namespace Tesserafin.Providers.MediaInfo
             NamingOptions namingOptions,
             ILyricManager lyricManager,
             IMediaAttachmentRepository mediaAttachmentRepository,
-            IMediaStreamRepository mediaStreamRepository)
+            IMediaStreamRepository mediaStreamRepository,
+            ActiveRecordings recordings)
         {
             _logger = loggerFactory.CreateLogger<ProbeProvider>();
+            _recordings = recordings;
             _audioResolver = new AudioResolver(loggerFactory.CreateLogger<AudioResolver>(), localization, mediaEncoder, fileSystem, namingOptions);
             _subtitleResolver = new SubtitleResolver(loggerFactory.CreateLogger<SubtitleResolver>(), localization, mediaEncoder, fileSystem, namingOptions);
             _lyricResolver = new LyricResolver(loggerFactory.CreateLogger<LyricResolver>(), localization, mediaEncoder, fileSystem, namingOptions);
@@ -107,7 +112,8 @@ namespace Tesserafin.Providers.MediaInfo
                 _audioResolver,
                 _subtitleResolver,
                 mediaAttachmentRepository,
-                mediaStreamRepository);
+                mediaStreamRepository,
+                recordings);
 
             _audioProber = new AudioFileProber(
                 peopleCommands,
@@ -237,7 +243,7 @@ namespace Tesserafin.Providers.MediaInfo
                 return _cachedTask;
             }
 
-            if (!item.IsCompleteMedia)
+            if (!item.IsCompleteMedia(_recordings))
             {
                 return _cachedTask;
             }

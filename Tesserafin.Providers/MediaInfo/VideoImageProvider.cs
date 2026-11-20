@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
@@ -25,6 +26,7 @@ namespace Tesserafin.Providers.MediaInfo
     {
         private readonly IMediaSourceManager _mediaSourceManager;
         private readonly IMediaEncoder _mediaEncoder;
+        private readonly ActiveRecordings _recordings;
         private readonly ILogger<VideoImageProvider> _logger;
 
         /// <summary>
@@ -33,11 +35,13 @@ namespace Tesserafin.Providers.MediaInfo
         /// <param name="mediaSourceManager">The media source manager for fetching item streams.</param>
         /// <param name="mediaEncoder">The media encoder for capturing images.</param>
         /// <param name="logger">The logger.</param>
-        public VideoImageProvider(IMediaSourceManager mediaSourceManager, IMediaEncoder mediaEncoder, ILogger<VideoImageProvider> logger)
+        /// <param name="recordings">The recordings in progress.</param>
+        public VideoImageProvider(IMediaSourceManager mediaSourceManager, IMediaEncoder mediaEncoder, ILogger<VideoImageProvider> logger, ActiveRecordings recordings)
         {
             _mediaSourceManager = mediaSourceManager;
             _mediaEncoder = mediaEncoder;
             _logger = logger;
+            _recordings = recordings;
         }
 
         /// <inheritdoc />
@@ -123,12 +127,12 @@ namespace Tesserafin.Providers.MediaInfo
                 return false;
             }
 
-            if (!item.IsFileProtocol)
+            if (string.IsNullOrEmpty(item.Path) || _mediaSourceManager.GetPathProtocol(item.Path) != MediaProtocol.File)
             {
                 return false;
             }
 
-            return item is Video video && !video.IsPlaceHolder && video.IsCompleteMedia;
+            return item is Video video && !video.IsPlaceHolder && video.IsCompleteMedia(_recordings);
         }
     }
 }

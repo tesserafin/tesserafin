@@ -45,6 +45,7 @@ namespace Tesserafin.LiveTv
         private readonly ILocalizationManager _localization;
         private readonly IChannelManager _channelManager;
         private readonly IRecordingsManager _recordingsManager;
+        private readonly ActiveRecordings _recordings;
         private readonly LiveTvDtoService _tvDtoService;
         private readonly ILiveTvService[] _services;
         private readonly IUserViewFactory _userViewFactory;
@@ -62,9 +63,11 @@ namespace Tesserafin.LiveTv
             IRecordingsManager recordingsManager,
             LiveTvDtoService liveTvDtoService,
             IEnumerable<ILiveTvService> services,
-            IUserViewFactory userViewFactory)
+            IUserViewFactory userViewFactory,
+            ActiveRecordings recordings)
         {
             _config = config;
+            _recordings = recordings;
             _logger = logger;
             _userManager = userManager;
             _libraryManager = libraryManager;
@@ -523,7 +526,7 @@ namespace Tesserafin.LiveTv
                 result.Items = result
                     .Items
                     .OfType<Video>()
-                    .Where(i => !i.IsCompleteMedia)
+                    .Where(i => !i.IsCompleteMedia(_recordings))
                     .ToArray();
 
                 result.TotalRecordCount = result.Items.Count;

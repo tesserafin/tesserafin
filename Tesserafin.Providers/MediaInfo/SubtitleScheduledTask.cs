@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
 using Tesserafin.Data.Enums;
@@ -30,6 +31,7 @@ namespace Tesserafin.Providers.MediaInfo
         private readonly ILibraryItemOptions _libraryOptions;
         private readonly IItemQueryService _itemQueries;
         private readonly ISubtitleManager _subtitleManager;
+        private readonly ActiveRecordings _recordings;
         private readonly ILogger<SubtitleScheduledTask> _logger;
         private readonly ILocalizationManager _localization;
         private readonly ISubtitleProvider[] _subtitleProviders;
@@ -47,7 +49,8 @@ namespace Tesserafin.Providers.MediaInfo
             ILogger<SubtitleScheduledTask> logger,
             ILocalizationManager localization,
             IEnumerable<ISubtitleProvider> subtitleProviders,
-            IMediaSourceManager mediaSourceManager)
+            IMediaSourceManager mediaSourceManager,
+            ActiveRecordings recordings)
         {
             _writes = writes;
             _deletions = deletions;
@@ -57,6 +60,7 @@ namespace Tesserafin.Providers.MediaInfo
             _libraryOptions = libraryOptions;
             _itemQueries = itemQueries;
             _subtitleManager = subtitleManager;
+            _recordings = recordings;
             _logger = logger;
             _localization = localization;
             _subtitleProviders = subtitleProviders
@@ -187,7 +191,8 @@ namespace Tesserafin.Providers.MediaInfo
 
             var downloadedLanguages = await new SubtitleDownloader(
                 _logger,
-                _subtitleManager).DownloadSubtitles(
+                _subtitleManager,
+                _recordings).DownloadSubtitles(
                     video,
                     mediaStreams,
                     libraryOptions,
