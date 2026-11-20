@@ -150,19 +150,12 @@ namespace Tesserafin.Controller.Entities
         public override bool SupportsAddingToPlaylist => true;
 
         [JsonIgnore]
-        public int MediaSourceCount
-        {
-            get
-            {
-                return GetMediaSourceCount();
-            }
-        }
+        protected int MediaSourceCount => CountMediaSources(
+            LibraryManager.GetItemById,
+            video => LibraryManager.GetLinkedAlternateVersions(video).Count() + LibraryManager.GetLocalAlternateVersionIds(video).Count() + 1);
 
         [JsonIgnore]
         public bool IsStacked => AdditionalParts.Length > 0;
-
-        [JsonIgnore]
-        public override bool HasLocalAlternateVersions => LibraryManager.GetLocalAlternateVersionIds(this).Any();
 
         public static IRecordingsManager RecordingsManager { get; set; }
 
@@ -252,31 +245,31 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public override MediaType MediaType => MediaType.Video;
 
-        private int GetMediaSourceCount(HashSet<Guid> callstack = null)
-        {
-            callstack ??= [];
-            if (PrimaryVersionId.HasValue)
-            {
-                var item = LibraryManager.GetItemById(PrimaryVersionId.Value);
-                if (item is Video video)
-                {
-                    if (callstack.Contains(video.Id))
-                    {
-                        // Count alternate versions using LibraryManager
-                        var linkedCount = LibraryManager.GetLinkedAlternateVersions(video).Count();
-                        var localCount = LibraryManager.GetLocalAlternateVersionIds(video).Count();
-                        return linkedCount + localCount + 1;
-                    }
+        /// <summary>Counts the requested video's primary, resolved linked videos and persisted local version links.</summary>
+        /// <param name="lookup">The item lookup.</param>
+        /// <param name="links">The persisted version links.</param>
+        /// <returns>The count represented by the version group.</returns>
+        public int GetCatalogueMediaSourceCount(IItemLookupService lookup, ILinkedChildrenService links)
+            => CountMediaSources(
+                lookup.GetItemById,
+                video => 1
+                    + links.GetLinkedChildrenIds(video.Id, (int)LinkedChildType.LinkedAlternateVersion).Count(id => lookup.GetItemById(id) is Video)
+                    + links.GetLinkedChildrenIds(video.Id, (int)LinkedChildType.LocalAlternateVersion).Count);
 
-                    callstack.Add(video.Id);
-                    return video.GetMediaSourceCount(callstack);
+        private int CountMediaSources(Func<Guid, BaseItem> getItem, Func<Video, int> countVersions)
+        {
+            HashSet<Guid> visited = [];
+            var version = this;
+            while (version.PrimaryVersionId is Guid primaryId && getItem(primaryId) is Video primary)
+            {
+                version = primary;
+                if (!visited.Add(version.Id))
+                {
+                    break;
                 }
             }
 
-            // Count alternate versions using LibraryManager
-            var linkedVersionCount = LibraryManager.GetLinkedAlternateVersions(this).Count();
-            var localVersionCount = LibraryManager.GetLocalAlternateVersionIds(this).Count();
-            return linkedVersionCount + localVersionCount + 1;
+            return countVersions(version);
         }
 
         /// <inheritdoc />
@@ -479,14 +472,16 @@ namespace Tesserafin.Controller.Entities
             return base.GetDeletePaths(fileSystem);
         }
 
-        public virtual MediaStream GetDefaultVideoStream()
+        public virtual MediaStream GetDefaultVideoStream() => GetDefaultVideoStream(MediaSourceManager);
+
+        public MediaStream GetDefaultVideoStream(IMediaSourceManager mediaSourceManager)
         {
             if (!DefaultVideoStreamIndex.HasValue)
             {
                 return null;
             }
 
-            return MediaSourceManager.GetMediaStreams(new MediaStreamQuery
+            return mediaSourceManager.GetMediaStreams(new MediaStreamQuery
             {
                 ItemId = Id,
                 Index = DefaultVideoStreamIndex.Value

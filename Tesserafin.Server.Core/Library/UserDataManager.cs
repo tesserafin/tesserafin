@@ -271,7 +271,7 @@ namespace Tesserafin.Server.Core.Library
 
             // Candidate primaries: a directly queried version (PrimaryVersionId set) keeps its own data.
             // Linked alternates are already known in memory; only the local-alternate existence check
-            // would otherwise hit the database (one query per item via Video.HasLocalAlternateVersions),
+            // would otherwise hit the database (one query per item to check for local versions),
             // so collect those ids and resolve them all in a single query below.
             List<Video>? candidates = null;
             List<Guid>? localProbeIds = null;

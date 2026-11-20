@@ -132,6 +132,7 @@ namespace Tesserafin.Server.Core.Dto
         private readonly IVideoVersionCatalog _versions;
         private readonly Lazy<IChannelManager> _channels;
         private readonly ItemDeletionContext _deletionContext;
+        private readonly IStandaloneVisibilityService _visibility;
 
         public DtoService(
             ILogger<DtoService> logger,
@@ -150,7 +151,8 @@ namespace Tesserafin.Server.Core.Dto
             IItemCountService itemCountService,
             IVideoVersionCatalog versions,
             Lazy<IChannelManager> channels,
-            ItemDeletionContext deletionContext)
+            ItemDeletionContext deletionContext,
+            IStandaloneVisibilityService visibility)
         {
             _logger = logger;
             _namedItems = namedItems;
@@ -169,6 +171,7 @@ namespace Tesserafin.Server.Core.Dto
             _versions = versions;
             _channels = channels;
             _deletionContext = deletionContext;
+            _visibility = visibility;
         }
 
         private ILiveTvManager LivetvManager => _livetvManagerFactory.Value;
@@ -1293,9 +1296,9 @@ namespace Tesserafin.Server.Core.Dto
                     // Match the per-user filtering of the media sources: versions the user cannot
                     // access are not selectable, so they must not count towards the badge either.
                     var mediaSourceCount = user is null
-                        || (!video.PrimaryVersionId.HasValue && video.LinkedAlternateVersions.Length == 0 && !video.HasLocalAlternateVersions)
-                            ? video.MediaSourceCount
-                            : _versions.GetVersions(video).Count(v => v.Id.Equals(video.Id) || v.IsVisibleStandalone(user));
+                        || (!video.PrimaryVersionId.HasValue && video.LinkedAlternateVersions.Length == 0 && !_versions.HasLocalVersions(video))
+                            ? _versions.GetMediaSourceCount(video)
+                            : _versions.GetVersions(video).Count(v => v.Id.Equals(video.Id) || v.IsVisibleStandalone(user, _visibility));
                     if (mediaSourceCount != 1)
                     {
                         dto.MediaSourceCount = mediaSourceCount;

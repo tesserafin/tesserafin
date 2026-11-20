@@ -656,9 +656,6 @@ namespace Tesserafin.Controller.Entities
         public int? ParentIndexNumber { get; set; }
 
         [JsonIgnore]
-        public virtual bool HasLocalAlternateVersions => false;
-
-        [JsonIgnore]
         public string OfficialRatingForComparison
         {
             get

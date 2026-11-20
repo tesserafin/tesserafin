@@ -41,6 +41,7 @@ namespace Tesserafin.Api.Controllers;
 public class VideosController : BaseTesserafinApiController
 {
     private readonly IItemWriteCommands _writes;
+    private readonly IVideoVersionCatalog _versions;
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
     private readonly IDtoService _dtoService;
@@ -58,6 +59,7 @@ public class VideosController : BaseTesserafinApiController
     /// Initializes a new instance of the <see cref="VideosController"/> class.
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
+    /// <param name="versions">The catalogue of alternate video versions.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
@@ -70,6 +72,7 @@ public class VideosController : BaseTesserafinApiController
     /// <param name="encodingHelper">Instance of <see cref="EncodingHelper"/>.</param>
     public VideosController(
         IItemWriteCommands writes,
+        IVideoVersionCatalog versions,
         ILibraryManager libraryManager,
         IUserManager userManager,
         IDtoService dtoService,
@@ -82,6 +85,7 @@ public class VideosController : BaseTesserafinApiController
         EncodingHelper encodingHelper)
     {
         _writes = writes;
+        _versions = versions;
         _libraryManager = libraryManager;
         _userManager = userManager;
         _dtoService = dtoService;
@@ -208,7 +212,7 @@ public class VideosController : BaseTesserafinApiController
             return BadRequest("Please supply at least two videos to merge.");
         }
 
-        var primaryVersion = items.FirstOrDefault(i => i.MediaSourceCount > 1 && !i.PrimaryVersionId.HasValue);
+        var primaryVersion = items.FirstOrDefault(i => !i.PrimaryVersionId.HasValue && _versions.GetMediaSourceCount(i) > 1);
         if (primaryVersion is null)
         {
             primaryVersion = items
@@ -221,7 +225,7 @@ public class VideosController : BaseTesserafinApiController
 
                     return 0;
                 })
-                .ThenByDescending(i => i.GetDefaultVideoStream()?.Width ?? 0)
+                .ThenByDescending(i => i.GetDefaultVideoStream(_mediaSourceManager)?.Width ?? 0)
                 .First();
         }
 
