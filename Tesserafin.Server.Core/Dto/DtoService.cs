@@ -121,7 +121,7 @@ namespace Tesserafin.Server.Core.Dto
 
         private readonly IImageProcessor _imageProcessor;
         private readonly IProviderManager _providerManager;
-        private readonly IRecordingsManager _recordingsManager;
+        private readonly ActiveRecordings _recordings;
 
         private readonly IApplicationHost _appHost;
         private readonly IMediaSourceManager _mediaSourceManager;
@@ -145,7 +145,7 @@ namespace Tesserafin.Server.Core.Dto
             IUserDataManager userDataRepository,
             IImageProcessor imageProcessor,
             IProviderManager providerManager,
-            IRecordingsManager recordingsManager,
+            ActiveRecordings recordings,
             IApplicationHost appHost,
             IMediaSourceManager mediaSourceManager,
             Lazy<ILiveTvManager> livetvManagerFactory,
@@ -166,7 +166,7 @@ namespace Tesserafin.Server.Core.Dto
             _userDataRepository = userDataRepository;
             _imageProcessor = imageProcessor;
             _providerManager = providerManager;
-            _recordingsManager = recordingsManager;
+            _recordings = recordings;
             _appHost = appHost;
             _mediaSourceManager = mediaSourceManager;
             _livetvManagerFactory = livetvManagerFactory;
@@ -353,9 +353,9 @@ namespace Tesserafin.Server.Core.Dto
                 ServerId = _appHost.SystemId
             };
 
-            if (item.SourceType == SourceType.Channel)
+            if (item.GetSourceType(_recordings) == SourceType.Channel)
             {
-                dto.SourceType = item.SourceType.ToString();
+                dto.SourceType = SourceType.Channel.ToString();
             }
 
             if (options.ContainsField(ItemFields.People))
@@ -430,7 +430,7 @@ namespace Tesserafin.Server.Core.Dto
                 dto.Etag = item.GetEtag(user);
             }
 
-            var activeRecording = _recordingsManager.GetActiveRecordingInfo(item.Path);
+            var activeRecording = _recordings.GetActiveRecordingInfo(item.Path);
             if (activeRecording is not null)
             {
                 dto.Type = BaseItemKind.Recording;
@@ -600,7 +600,7 @@ namespace Tesserafin.Server.Core.Dto
                     }
                 }
 
-                if (!dto.ChildCount.HasValue && item.SourceType == SourceType.Library)
+                if (!dto.ChildCount.HasValue && item.GetSourceType(_recordings) == SourceType.Library)
                 {
                     // For these types we can try to optimize and assume these values will be equal
                     if (item is MusicAlbum || item is Season || item is Playlist)
@@ -1126,7 +1126,7 @@ namespace Tesserafin.Server.Core.Dto
 
             if (options.ContainsField(ItemFields.EnableMediaSourceDisplay))
             {
-                dto.EnableMediaSourceDisplay = item.GetEnableMediaSourceDisplay(_channels);
+                dto.EnableMediaSourceDisplay = item.GetEnableMediaSourceDisplay(_channels, _recordings);
             }
 
             dto.PremiereDate = item.PremiereDate;
@@ -1339,7 +1339,7 @@ namespace Tesserafin.Server.Core.Dto
 
                     if (dto.MediaSources is not null && dto.MediaSources.Length > 0)
                     {
-                        if (item.SourceType == SourceType.Channel)
+                        if (item.GetSourceType(_recordings) == SourceType.Channel)
                         {
                             mediaStreams = dto.MediaSources[0].MediaStreams.ToArray();
                         }
@@ -1554,7 +1554,7 @@ namespace Tesserafin.Server.Core.Dto
 
             dto.ChannelId = item.ChannelId;
 
-            if (item.SourceType == SourceType.Channel)
+            if (item.GetSourceType(_recordings) == SourceType.Channel)
             {
                 var channel = _libraryManager.GetItemById(item.ChannelId);
                 if (channel is not null)

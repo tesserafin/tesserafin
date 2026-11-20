@@ -890,7 +890,10 @@ namespace Tesserafin.Controller.Entities
         public virtual bool CanDelete(User user, ItemDeletionContext deletion)
             => CanDelete(user, deletion, null);
 
-        internal virtual SourceType GetSourceType(ActiveRecordings recordings) => SourceType;
+        /// <summary>Gets the source type using the current recordings.</summary>
+        /// <param name="recordings">The recordings in progress.</param>
+        /// <returns>The item's source type.</returns>
+        public virtual SourceType GetSourceType(ActiveRecordings recordings) => SourceType;
 
         public virtual bool CanDownload(IFileSystem fileSystem)
         {
@@ -1165,10 +1168,11 @@ namespace Tesserafin.Controller.Entities
         /// <param name="channelManager">
         /// The channel manager, resolved only when <see cref="SourceType"/> is <see cref="SourceType.Channel"/>.
         /// </param>
+        /// <param name="recordings">The recordings in progress.</param>
         /// <returns><c>true</c> if media sources should be displayed; otherwise, <c>false</c>.</returns>
-        public bool GetEnableMediaSourceDisplay(Lazy<IChannelManager> channelManager)
+        public bool GetEnableMediaSourceDisplay(Lazy<IChannelManager> channelManager, ActiveRecordings recordings)
         {
-            if (SourceType == SourceType.Channel)
+            if (GetSourceType(recordings) == SourceType.Channel)
             {
                 return channelManager.Value.EnableMediaSourceDisplay(this);
             }

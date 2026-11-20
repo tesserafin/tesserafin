@@ -373,7 +373,8 @@ namespace Tesserafin.Controller.Entities
             return user.GetPreferenceValues<UnratedItem>(PreferenceKind.BlockUnratedItems).Contains(type);
         }
 
-        internal override SourceType GetSourceType(ActiveRecordings recordings)
+        /// <inheritdoc />
+        public override SourceType GetSourceType(ActiveRecordings recordings)
             => recordings.GetActiveRecordingInfo(Path) is not null ? SourceType.LiveTV : base.SourceType;
 
         public override bool CanDelete(ItemDeletionContext deletion)

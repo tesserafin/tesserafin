@@ -3,6 +3,7 @@ using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Configuration;
 
@@ -13,16 +14,19 @@ namespace Tesserafin.Controller.BaseItemManager
     {
         private readonly IServerConfigurationManager _serverConfigurationManager;
         private readonly Lazy<IChannelManager> _channels;
+        private readonly ActiveRecordings _recordings;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BaseItemManager"/> class.
         /// </summary>
         /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
         /// <param name="channels">The channel manager, resolved only for channel items.</param>
-        public BaseItemManager(IServerConfigurationManager serverConfigurationManager, Lazy<IChannelManager> channels)
+        /// <param name="recordings">The recordings in progress.</param>
+        public BaseItemManager(IServerConfigurationManager serverConfigurationManager, Lazy<IChannelManager> channels, ActiveRecordings recordings)
         {
             _serverConfigurationManager = serverConfigurationManager;
             _channels = channels;
+            _recordings = recordings;
         }
 
         /// <inheritdoc />
@@ -34,7 +38,7 @@ namespace Tesserafin.Controller.BaseItemManager
                 return true;
             }
 
-            if (baseItem.SourceType == SourceType.Channel)
+            if (baseItem.GetSourceType(_recordings) == SourceType.Channel)
             {
                 return !_channels.Value.EnableMediaSourceDisplay(baseItem);
             }
@@ -57,7 +61,7 @@ namespace Tesserafin.Controller.BaseItemManager
                 return true;
             }
 
-            if (baseItem.SourceType == SourceType.Channel)
+            if (baseItem.GetSourceType(_recordings) == SourceType.Channel)
             {
                 return !_channels.Value.EnableMediaSourceDisplay(baseItem);
             }

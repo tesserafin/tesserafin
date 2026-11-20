@@ -110,7 +110,6 @@ public class DtoServiceImageInheritanceTests
         var userDataManager = new Mock<IUserDataManager>();
         var imageProcessor = new Mock<IImageProcessor>();
         var providerManager = new Mock<IProviderManager>();
-        var recordingsManager = new Mock<IRecordingsManager>();
         var appHost = new Mock<IApplicationHost>();
         var mediaSourceManager = new Mock<IMediaSourceManager>();
         var liveTvManager = new Mock<ILiveTvManager>();
@@ -135,7 +134,7 @@ public class DtoServiceImageInheritanceTests
             userDataManager.Object,
             imageProcessor.Object,
             providerManager.Object,
-            recordingsManager.Object,
+            new ActiveRecordings(),
             appHost.Object,
             mediaSourceManager.Object,
             new Lazy<ILiveTvManager>(() => liveTvManager.Object),

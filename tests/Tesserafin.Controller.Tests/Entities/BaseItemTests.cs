@@ -315,16 +315,7 @@ public class BaseItemTests
         var movie = new Movie { Id = Guid.NewGuid() };
         var channelManager = new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access."));
 
-        // Video.SourceType (touched via BaseItem.GetEnableMediaSourceDisplay) calls
-        // Video.IsActiveRecording(), which reads the static Video.RecordingsManager. That static is
-        // only ever assigned in production at startup (see ApplicationHost), so it must be set
-        // explicitly here rather than relying on another test in this collection having left a value
-        // behind — see BaseItemStaticStateFixture for why leaking statics between tests is fragile.
-        var recordingsManager = new Mock<IRecordingsManager>();
-        recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-        Video.RecordingsManager = recordingsManager.Object;
-
-        Assert.True(movie.GetEnableMediaSourceDisplay(channelManager));
+        Assert.True(movie.GetEnableMediaSourceDisplay(channelManager, new ActiveRecordings()));
     }
 
     [Theory]
@@ -336,16 +327,7 @@ public class BaseItemTests
         var channelManager = new Mock<IChannelManager>();
         channelManager.Setup(x => x.EnableMediaSourceDisplay(channelItem)).Returns(channelManagerResult);
 
-        // Video.SourceType (touched via BaseItem.GetEnableMediaSourceDisplay) calls
-        // Video.IsActiveRecording(), which reads the static Video.RecordingsManager. That static is
-        // only ever assigned in production at startup (see ApplicationHost), so it must be set
-        // explicitly here rather than relying on another test in this collection having left a value
-        // behind — see BaseItemStaticStateFixture for why leaking statics between tests is fragile.
-        var recordingsManager = new Mock<IRecordingsManager>();
-        recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-        Video.RecordingsManager = recordingsManager.Object;
-
-        Assert.Equal(channelManagerResult, channelItem.GetEnableMediaSourceDisplay(new Lazy<IChannelManager>(() => channelManager.Object)));
+        Assert.Equal(channelManagerResult, channelItem.GetEnableMediaSourceDisplay(new Lazy<IChannelManager>(() => channelManager.Object), new ActiveRecordings()));
     }
 
     [Fact]

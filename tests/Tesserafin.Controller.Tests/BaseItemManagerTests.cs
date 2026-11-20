@@ -5,6 +5,8 @@ using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Model.Configuration;
 using Xunit;
 
@@ -17,12 +19,13 @@ namespace Tesserafin.Controller.Tests
         [InlineData(false)]
         public void ChannelItemFetchers_FollowMediaSourceDisplay(bool enableMediaSourceDisplay)
         {
-            var item = new Book { ChannelId = Guid.NewGuid() };
+            var item = new Movie { ChannelId = Guid.NewGuid() };
             var channels = new Mock<IChannelManager>(MockBehavior.Strict);
             channels.Setup(x => x.EnableMediaSourceDisplay(item)).Returns(enableMediaSourceDisplay);
             var baseItemManager = new Tesserafin.Controller.BaseItemManager.BaseItemManager(
                 Mock.Of<IServerConfigurationManager>(MockBehavior.Strict),
-                new Lazy<IChannelManager>(() => channels.Object));
+                new Lazy<IChannelManager>(() => channels.Object),
+                new ActiveRecordings());
 
             Assert.Equal(!enableMediaSourceDisplay, baseItemManager.IsMetadataFetcherEnabled(item, null, "Test"));
             Assert.Equal(!enableMediaSourceDisplay, baseItemManager.IsImageFetcherEnabled(item, null, "Test"));
@@ -57,7 +60,8 @@ namespace Tesserafin.Controller.Tests
 
             var baseItemManager = new Tesserafin.Controller.BaseItemManager.BaseItemManager(
                 serverConfigurationManager.Object,
-                new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")));
+                new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")),
+                new ActiveRecordings());
             var actual = baseItemManager.IsMetadataFetcherEnabled(item, libraryTypeOptions, fetcherName);
 
             Assert.Equal(expected, actual);
@@ -92,7 +96,8 @@ namespace Tesserafin.Controller.Tests
 
             var baseItemManager = new Tesserafin.Controller.BaseItemManager.BaseItemManager(
                 serverConfigurationManager.Object,
-                new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")));
+                new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")),
+                new ActiveRecordings());
             var actual = baseItemManager.IsImageFetcherEnabled(item, libraryTypeOptions, fetcherName);
 
             Assert.Equal(expected, actual);
