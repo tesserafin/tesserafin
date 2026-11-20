@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
@@ -34,6 +35,7 @@ public class LyricManager : ILyricManager
     private readonly ILibraryItemOptions _libraryOptions;
     private readonly ILogger<LyricManager> _logger;
     private readonly IFileSystem _fileSystem;
+    private readonly IServerApplicationPaths _applicationPaths;
     private readonly ILibraryMonitor _libraryMonitor;
     private readonly IMediaSourceManager _mediaSourceManager;
 
@@ -49,6 +51,7 @@ public class LyricManager : ILyricManager
     /// <param name="libraryOptions">The library options of an item.</param>
     /// <param name="logger">Instance of the <see cref="ILogger{LyricManager}"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
+    /// <param name="applicationPaths">The server application paths.</param>
     /// <param name="libraryMonitor">Instance of the <see cref="ILibraryMonitor"/> interface.</param>
     /// <param name="mediaSourceManager">Instance of the <see cref="IMediaSourceManager"/> interface.</param>
     /// <param name="lyricProviders">The list of <see cref="ILyricProvider"/>.</param>
@@ -60,6 +63,7 @@ public class LyricManager : ILyricManager
         ILibraryItemOptions libraryOptions,
         ILogger<LyricManager> logger,
         IFileSystem fileSystem,
+        IServerApplicationPaths applicationPaths,
         ILibraryMonitor libraryMonitor,
         IMediaSourceManager mediaSourceManager,
         IEnumerable<ILyricProvider> lyricProviders,
@@ -71,6 +75,7 @@ public class LyricManager : ILyricManager
         _libraryOptions = libraryOptions;
         _logger = logger;
         _fileSystem = fileSystem;
+        _applicationPaths = applicationPaths;
         _libraryMonitor = libraryMonitor;
         _mediaSourceManager = mediaSourceManager;
         _lyricProviders = lyricProviders
@@ -420,10 +425,11 @@ public class LyricManager : ILyricManager
                 }
             }
 
-            var internalPath = Path.GetFullPath(Path.Combine(audio.GetInternalMetadataPath(), saveFileName));
+            var metadataDirectory = audio.GetInternalMetadataPath(_applicationPaths.InternalMetadataPath);
+            var internalPath = Path.GetFullPath(Path.Combine(metadataDirectory, saveFileName));
 
             // TODO: Add some error to the user: return BadRequest("Could not save lyric, bad path.");
-            if (internalPath.StartsWith(audio.GetInternalMetadataPath(), StringComparison.Ordinal))
+            if (internalPath.StartsWith(metadataDirectory, StringComparison.Ordinal))
             {
                 savePaths.Add(internalPath);
             }

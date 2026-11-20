@@ -53,7 +53,7 @@ namespace Tesserafin.Providers.Manager
             ItemNamingService = itemNamingService;
             ExternalDataManager = externalDataManager;
             ItemRepository = itemRepository;
-            ImageProvider = new ItemImageProvider(Logger, ProviderManager, FileSystem);
+            ImageProvider = new ItemImageProvider(Logger, ProviderManager, FileSystem, ServerConfigurationManager.ApplicationPaths);
         }
 
         protected IItemWriteCommands Writes { get; }

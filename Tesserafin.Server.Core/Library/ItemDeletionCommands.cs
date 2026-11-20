@@ -482,7 +482,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
     {
         var list = new List<string>
         {
-            item.GetInternalMetadataPath()
+            item.GetInternalMetadataPath(_configurationManager.ApplicationPaths.InternalMetadataPath)
         };
 
         if (item is Video video)

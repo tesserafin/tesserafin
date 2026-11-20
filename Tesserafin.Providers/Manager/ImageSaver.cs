@@ -559,7 +559,7 @@ namespace Tesserafin.Providers.Manager
                     filename = folderName;
                 }
 
-                path = Path.Combine(item.GetInternalMetadataPath(), filename + extension);
+                path = Path.Combine(item.GetInternalMetadataPath(_config.ApplicationPaths.InternalMetadataPath), filename + extension);
             }
 
             return path;

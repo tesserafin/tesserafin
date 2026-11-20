@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
@@ -570,7 +571,7 @@ namespace Tesserafin.Providers.Tests.Manager
                     string.Format(CultureInfo.InvariantCulture, _testDataImagePath, 1)
                 });
 
-            return new ItemImageProvider(new NullLogger<ItemImageProvider>(), providerManager, mockFileSystem.Object);
+            return new ItemImageProvider(new NullLogger<ItemImageProvider>(), providerManager, mockFileSystem.Object, Mock.Of<IServerApplicationPaths>());
         }
 
         private static Video GetItemWithImages(ImageType type, int count, bool validPaths)
@@ -583,7 +584,7 @@ namespace Tesserafin.Providers.Tests.Manager
                 CallBase = true
             };
             item.Setup(m => m.IsSaveLocalMetadataEnabled()).Returns(false);
-            item.Setup(m => m.GetInternalMetadataPath()).Returns(string.Empty);
+            item.Setup(m => m.GetInternalMetadataPath(It.IsAny<string>())).Returns(string.Empty);
 
             var path = validPaths ? _testDataImagePath.Format : "invalid path {0}";
             for (int i = 0; i < count; i++)

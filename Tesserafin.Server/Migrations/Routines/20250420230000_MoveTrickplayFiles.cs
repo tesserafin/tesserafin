@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Trickplay;
@@ -23,6 +24,7 @@ public class MoveTrickplayFiles : IMigrationRoutine
 {
     private readonly ITrickplayManager _trickplayManager;
     private readonly IFileSystem _fileSystem;
+    private readonly IServerApplicationPaths _applicationPaths;
     private readonly ILibraryManager _libraryManager;
     private readonly IStartupLogger _logger;
 
@@ -31,16 +33,19 @@ public class MoveTrickplayFiles : IMigrationRoutine
     /// </summary>
     /// <param name="trickplayManager">Instance of the <see cref="ITrickplayManager"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
+    /// <param name="applicationPaths">The server application paths.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="logger">The logger.</param>
     public MoveTrickplayFiles(
         ITrickplayManager trickplayManager,
         IFileSystem fileSystem,
+        IServerApplicationPaths applicationPaths,
         ILibraryManager libraryManager,
         IStartupLogger<MoveTrickplayFiles> logger)
     {
         _trickplayManager = trickplayManager;
         _fileSystem = fileSystem;
+        _applicationPaths = applicationPaths;
         _libraryManager = libraryManager;
         _logger = logger;
     }
@@ -107,7 +112,7 @@ public class MoveTrickplayFiles : IMigrationRoutine
 
     private string GetOldTrickplayDirectory(BaseItem item, int? width = null)
     {
-        var path = Path.Combine(item.GetInternalMetadataPath(), "trickplay");
+        var path = Path.Combine(item.GetInternalMetadataPath(_applicationPaths.InternalMetadataPath), "trickplay");
 
         return width.HasValue ? Path.Combine(path, width.Value.ToString(CultureInfo.InvariantCulture)) : path;
     }
@@ -116,7 +121,7 @@ public class MoveTrickplayFiles : IMigrationRoutine
     {
         var path = saveWithMedia
             ? Path.Combine(item.ContainingFolderPath, Path.ChangeExtension(item.Path, ".trickplay"))
-            : Path.Combine(item.GetInternalMetadataPath(), "trickplay");
+            : Path.Combine(item.GetInternalMetadataPath(_applicationPaths.InternalMetadataPath), "trickplay");
 
         var subdirectory = string.Format(
             CultureInfo.InvariantCulture,

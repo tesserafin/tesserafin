@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.MediaEncoding;
@@ -37,6 +38,7 @@ namespace Tesserafin.Providers.MediaInfo
 
         private readonly ILogger _logger;
         private readonly IFileSystem _fileSystem;
+        private readonly IServerApplicationPaths _applicationPaths;
 
         /// <summary>
         /// The <see cref="NamingOptions"/> instance.
@@ -55,6 +57,7 @@ namespace Tesserafin.Providers.MediaInfo
         /// <param name="localizationManager">The localization manager.</param>
         /// <param name="mediaEncoder">The media encoder.</param>
         /// <param name="fileSystem">The file system.</param>
+        /// <param name="applicationPaths">The server application paths.</param>
         /// <param name="namingOptions">The <see cref="NamingOptions"/> object containing FileExtensions, MediaDefaultFlags, MediaForcedFlags and MediaFlagDelimiters.</param>
         /// <param name="type">The <see cref="DlnaProfileType"/> of the parsed file.</param>
         protected MediaInfoResolver(
@@ -62,12 +65,14 @@ namespace Tesserafin.Providers.MediaInfo
             ILocalizationManager localizationManager,
             IMediaEncoder mediaEncoder,
             IFileSystem fileSystem,
+            IServerApplicationPaths applicationPaths,
             NamingOptions namingOptions,
             DlnaProfileType type)
         {
             _logger = logger;
             _mediaEncoder = mediaEncoder;
             _fileSystem = fileSystem;
+            _applicationPaths = applicationPaths;
             _namingOptions = namingOptions;
             _type = type;
             _externalPathParser = new ExternalPathParser(namingOptions, localizationManager, _type);
@@ -220,7 +225,7 @@ namespace Tesserafin.Providers.MediaInfo
 
             var files = directoryService.GetFilePaths(folder, clearCache).ToList();
             files.Remove(video.Path);
-            var internalMetadataPath = video.GetInternalMetadataPath();
+            var internalMetadataPath = video.GetInternalMetadataPath(_applicationPaths.InternalMetadataPath);
             if (_fileSystem.DirectoryExists(internalMetadataPath))
             {
                 files.AddRange(directoryService.GetFilePaths(internalMetadataPath, clearCache));
@@ -272,7 +277,7 @@ namespace Tesserafin.Providers.MediaInfo
             string folder = audio.ContainingFolderPath;
             var files = directoryService.GetFilePaths(folder, clearCache).ToList();
             files.Remove(audio.Path);
-            var internalMetadataPath = audio.GetInternalMetadataPath();
+            var internalMetadataPath = audio.GetInternalMetadataPath(_applicationPaths.InternalMetadataPath);
             if (_fileSystem.DirectoryExists(internalMetadataPath))
             {
                 files.AddRange(directoryService.GetFilePaths(internalMetadataPath, clearCache));

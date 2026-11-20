@@ -2,7 +2,7 @@
 
 using System;
 using System.Collections.Generic;
-using Tesserafin.Common.Configuration;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
@@ -16,7 +16,7 @@ namespace Tesserafin.Server.Core.Images
     /// </summary>
     public class ArtistImageProvider : BaseDynamicImageProvider<MusicArtist>
     {
-        public ArtistImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IApplicationPaths applicationPaths, IImageProcessor imageProcessor)
+        public ArtistImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IServerApplicationPaths applicationPaths, IImageProcessor imageProcessor)
             : base(fileSystem, providerManager, applicationPaths, imageProcessor)
         {
         }

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Providers;
@@ -15,18 +16,22 @@ namespace Tesserafin.LocalMetadata.Images
     public class InternalMetadataFolderImageProvider : ILocalImageProvider, IHasOrder
     {
         private readonly IFileSystem _fileSystem;
+        private readonly IServerApplicationPaths _applicationPaths;
         private readonly ILogger<InternalMetadataFolderImageProvider> _logger;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="InternalMetadataFolderImageProvider"/> class.
         /// </summary>
         /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
+        /// <param name="applicationPaths">The server application paths.</param>
         /// <param name="logger">Instance of the <see cref="ILogger{InternalMetadataFolderImageProvider}"/> interface.</param>
         public InternalMetadataFolderImageProvider(
             IFileSystem fileSystem,
+            IServerApplicationPaths applicationPaths,
             ILogger<InternalMetadataFolderImageProvider> logger)
         {
             _fileSystem = fileSystem;
+            _applicationPaths = applicationPaths;
             _logger = logger;
         }
 
@@ -67,7 +72,7 @@ namespace Tesserafin.LocalMetadata.Images
         /// <inheritdoc />
         public IEnumerable<LocalImageInfo> GetImages(BaseItem item, IDirectoryService directoryService)
         {
-            var path = item.GetInternalMetadataPath();
+            var path = item.GetInternalMetadataPath(_applicationPaths.InternalMetadataPath);
 
             if (!Directory.Exists(path))
             {

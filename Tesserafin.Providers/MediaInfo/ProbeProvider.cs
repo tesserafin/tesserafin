@@ -88,9 +88,9 @@ namespace Tesserafin.Providers.MediaInfo
             IMediaStreamRepository mediaStreamRepository)
         {
             _logger = loggerFactory.CreateLogger<ProbeProvider>();
-            _audioResolver = new AudioResolver(loggerFactory.CreateLogger<AudioResolver>(), localization, mediaEncoder, fileSystem, namingOptions);
-            _subtitleResolver = new SubtitleResolver(loggerFactory.CreateLogger<SubtitleResolver>(), localization, mediaEncoder, fileSystem, namingOptions);
-            _lyricResolver = new LyricResolver(loggerFactory.CreateLogger<LyricResolver>(), localization, mediaEncoder, fileSystem, namingOptions);
+            _audioResolver = new AudioResolver(loggerFactory.CreateLogger<AudioResolver>(), localization, mediaEncoder, fileSystem, config.ApplicationPaths, namingOptions);
+            _subtitleResolver = new SubtitleResolver(loggerFactory.CreateLogger<SubtitleResolver>(), localization, mediaEncoder, fileSystem, config.ApplicationPaths, namingOptions);
+            _lyricResolver = new LyricResolver(loggerFactory.CreateLogger<LyricResolver>(), localization, mediaEncoder, fileSystem, config.ApplicationPaths, namingOptions);
 
             _videoProber = new FFProbeVideoInfo(
                 peopleCommands,

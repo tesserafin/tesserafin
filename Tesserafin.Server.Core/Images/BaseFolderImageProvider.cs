@@ -1,7 +1,7 @@
 #pragma warning disable CS1591
 
 using System.Collections.Generic;
-using Tesserafin.Common.Configuration;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
@@ -19,7 +19,7 @@ namespace Tesserafin.Server.Core.Images
     {
         private readonly ILibraryManager _libraryManager;
 
-        protected BaseFolderImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IApplicationPaths applicationPaths, IImageProcessor imageProcessor, ILibraryManager libraryManager)
+        protected BaseFolderImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IServerApplicationPaths applicationPaths, IImageProcessor imageProcessor, ILibraryManager libraryManager)
             : base(fileSystem, providerManager, applicationPaths, imageProcessor)
         {
             _libraryManager = libraryManager;

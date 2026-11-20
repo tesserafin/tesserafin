@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AutoFixture;
 using AutoFixture.AutoMoq;
 using Moq;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
@@ -224,6 +225,7 @@ public sealed class ItemDeletionCommandsTests
             var fixture = new Fixture().Customize(new AutoMoqCustomization());
             fixture.Register<IItemChangePublisher>(() => Changes);
             Configuration = fixture.Freeze<Mock<IServerConfigurationManager>>();
+            Configuration.SetupGet(c => c.ApplicationPaths).Returns(Mock.Of<IServerApplicationPaths>());
             Library = fixture.Freeze<Mock<ILibraryManager>>();
             Writes = fixture.Freeze<Mock<IItemWriteCommands>>();
             Writes.Setup(w => w.RerouteLinkedChildReferencesAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
@@ -301,7 +303,7 @@ public sealed class ItemDeletionCommandsTests
 
     private sealed class StubGenre : Genre
     {
-        public override string GetInternalMetadataPath() => Path + ".metadata";
+        public override string GetInternalMetadataPath(string basePath) => Path + ".metadata";
 
         public override IEnumerable<FileSystemMetadata> GetDeletePaths() => [new FileSystemMetadata { FullName = Path }];
     }
@@ -312,7 +314,7 @@ public sealed class ItemDeletionCommandsTests
 
         public bool Saved { get; private set; }
 
-        public override string GetInternalMetadataPath() => metadata;
+        public override string GetInternalMetadataPath(string basePath) => metadata;
 
         public override IEnumerable<FileSystemMetadata> GetDeletePaths() => [new FileSystemMetadata { FullName = Path }];
 

@@ -926,13 +926,6 @@ namespace Tesserafin.Controller.Entities
             return Name;
         }
 
-        public virtual string GetInternalMetadataPath()
-        {
-            var basePath = ConfigurationManager.ApplicationPaths.InternalMetadataPath;
-
-            return GetInternalMetadataPath(basePath);
-        }
-
         /// <summary>Builds the item's stable metadata path using an explicitly supplied root.</summary>
         /// <param name="basePath">The internal metadata root.</param>
         /// <returns>The item-owned metadata directory.</returns>

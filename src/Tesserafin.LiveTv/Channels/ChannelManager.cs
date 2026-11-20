@@ -348,7 +348,7 @@ namespace Tesserafin.LiveTv.Channels
 
         private MediaSourceInfo[] GetSavedMediaSources(BaseItem item)
         {
-            var path = Path.Combine(item.GetInternalMetadataPath(), "channelmediasourceinfos.json");
+            var path = Path.Combine(item.GetInternalMetadataPath(_config.ApplicationPaths.InternalMetadataPath), "channelmediasourceinfos.json");
 
             try
             {
@@ -364,7 +364,7 @@ namespace Tesserafin.LiveTv.Channels
 
         private async Task SaveMediaSources(BaseItem item, List<MediaSourceInfo> mediaSources)
         {
-            var path = Path.Combine(item.GetInternalMetadataPath(), "channelmediasourceinfos.json");
+            var path = Path.Combine(item.GetInternalMetadataPath(_config.ApplicationPaths.InternalMetadataPath), "channelmediasourceinfos.json");
 
             if (mediaSources is null || mediaSources.Count == 0)
             {

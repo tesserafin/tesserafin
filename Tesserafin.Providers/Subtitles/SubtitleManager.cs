@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
@@ -34,6 +35,7 @@ namespace Tesserafin.Providers.Subtitles
         private readonly ILibraryItemOptions _libraryOptions;
         private readonly ILogger<SubtitleManager> _logger;
         private readonly IFileSystem _fileSystem;
+        private readonly IServerApplicationPaths _applicationPaths;
         private readonly ILibraryMonitor _monitor;
         private readonly IMediaSourceManager _mediaSourceManager;
         private readonly ILocalizationManager _localization;
@@ -48,6 +50,7 @@ namespace Tesserafin.Providers.Subtitles
             ILibraryItemOptions libraryOptions,
             ILogger<SubtitleManager> logger,
             IFileSystem fileSystem,
+            IServerApplicationPaths applicationPaths,
             ILibraryMonitor monitor,
             IMediaSourceManager mediaSourceManager,
             ILocalizationManager localizationManager,
@@ -60,6 +63,7 @@ namespace Tesserafin.Providers.Subtitles
             _libraryOptions = libraryOptions;
             _logger = logger;
             _fileSystem = fileSystem;
+            _applicationPaths = applicationPaths;
             _monitor = monitor;
             _mediaSourceManager = mediaSourceManager;
             _localization = localizationManager;
@@ -242,7 +246,7 @@ namespace Tesserafin.Providers.Subtitles
                 }
                 else
                 {
-                    var internalPath = Path.GetFullPath(Path.Combine(video.GetInternalMetadataPath(), saveFileName));
+                    var internalPath = Path.GetFullPath(Path.Combine(video.GetInternalMetadataPath(_applicationPaths.InternalMetadataPath), saveFileName));
                     savePaths.Add(internalPath);
                 }
 
@@ -265,7 +269,7 @@ namespace Tesserafin.Providers.Subtitles
                 try
                 {
                     var containingFolder = video.ContainingFolderPath + Path.DirectorySeparatorChar;
-                    var metadataFolder = video.GetInternalMetadataPath() + Path.DirectorySeparatorChar;
+                    var metadataFolder = video.GetInternalMetadataPath(_applicationPaths.InternalMetadataPath) + Path.DirectorySeparatorChar;
                     if (path.StartsWith(containingFolder, StringComparison.Ordinal)
                             || path.StartsWith(metadataFolder, StringComparison.Ordinal))
                     {
