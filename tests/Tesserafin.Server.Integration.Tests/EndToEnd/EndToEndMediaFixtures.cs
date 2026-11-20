@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -251,6 +252,58 @@ public static class EndToEndMediaFixtures
         }
 
         return path;
+    }
+
+    /// <summary>
+    /// Synthesizes an HDR10 film: HEVC Main10 tagged BT.2020 / SMPTE ST 2084 (PQ), with AAC, in
+    /// Matroska - the source a client that only shows SDR must be served tone-mapped.
+    /// </summary>
+    /// <param name="directory">The directory to write the fixture into.</param>
+    /// <param name="durationSeconds">The duration of the fixture, in seconds.</param>
+    /// <returns>The full path to the synthesized file.</returns>
+    public static async Task<string> CreateHdr10FilmAsync(string directory, int durationSeconds)
+    {
+        var path = Path.Combine(directory, "hdr10.mkv");
+        var duration = durationSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        await RunFfmpegAsync(
+        [
+            "-hide_banner", "-y",
+            "-f", "lavfi", "-i", $"testsrc2=size=320x180:rate=25:duration={duration}",
+            "-f", "lavfi", "-i", $"sine=frequency=440:duration={duration}",
+            "-c:v", "libx265", "-preset", "ultrafast", "-pix_fmt", "yuv420p10le",
+            "-x265-params", "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc:log-level=error",
+            "-color_primaries", "bt2020", "-color_trc", "smpte2084", "-colorspace", "bt2020nc",
+            "-c:a", "aac", "-shortest",
+            "-f", "matroska", path,
+        ]).ConfigureAwait(false);
+
+        if (!File.Exists(path) || new FileInfo(path).Length == 0)
+        {
+            throw new InvalidOperationException($"ffmpeg did not produce a non-empty fixture at {path}.");
+        }
+
+        return path;
+    }
+
+    /// <summary>
+    /// Reads, with the REAL ffprobe, the pixel format and transfer characteristic of a file's first
+    /// video stream: what a tone mapping actually produced, not what a command line asked for.
+    /// </summary>
+    /// <param name="path">The file to probe.</param>
+    /// <returns>The pixel format and the colour transfer (empty when untagged).</returns>
+    public static async Task<(string PixelFormat, string ColorTransfer)> ProbeVideoColourAsync(string path)
+    {
+        var (exitCode, stdout, stderr) = await RunAsync(
+            FfprobePath,
+            ["-hide_banner", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=pix_fmt,color_transfer", "-of", "default=noprint_wrappers=1", path]).ConfigureAwait(false);
+        if (exitCode != 0)
+        {
+            throw new InvalidOperationException($"ffprobe exited {exitCode} probing '{path}'.\nstderr tail: {Tail(stderr)}");
+        }
+
+        string Read(string key) => stdout.Split('\n', StringSplitOptions.TrimEntries)
+            .FirstOrDefault(line => line.StartsWith(key + "=", StringComparison.Ordinal))?[(key.Length + 1)..] ?? string.Empty;
+        return (Read("pix_fmt"), Read("color_transfer"));
     }
 
     /// <summary>

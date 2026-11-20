@@ -362,6 +362,78 @@ public sealed class LocalMediaPlannerTests
         Assert.True(LocalMediaPlanner.IsExecutableTranscode(executed));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void An_hdr_source_for_an_sdr_client_is_tone_mapped_by_an_owned_transcode_only_where_the_executor_can(bool canTonemap)
+    {
+        var existing = new PlaybackPlan(PlayMethod.Transcode, 0);
+        var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
+        inner.Setup(p => p.PlanVideo(It.IsAny<MediaOptions>())).Returns(existing);
+        var store = new InMemoryV2PlanStore();
+        var planner = new LocalMediaPlanner(inner.Object, new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance, canTonemap: () => canTonemap);
+        var film = Source("film", "hevc", 1, 2, "mkv");
+        film.MediaStreams = [new MediaStream { Index = 0, Type = MediaStreamType.Video, Codec = "hevc", BitDepth = 10, ColorTransfer = "smpte2084", ColorPrimaries = "bt2020", ColorSpace = "bt2020nc" },
+            .. film.MediaStreams.Where(stream => stream.Type != MediaStreamType.Video)];
+        var sdrClient = Browser(hlsOutput: true) with
+        {
+            Decode = Browser(hlsOutput: true).Decode with
+            {
+                DirectPlayProfiles = [new DecodeProfile(MediaKind.Video, ["mp4"], ["h264", "hevc"], ["aac"])],
+                VideoCodecs = [new VideoCodecCapability("h264", [], null, null, ["SDR"], null, null), new VideoCodecCapability("hevc", [], null, null, ["SDR"], null, null)],
+            },
+        };
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(sdrClient, _declared));
+        var plan = planner.PlanVideo(Options(film));
+        var executed = store.TakeCaptured()?.ExecutionPlan;
+
+        if (canTonemap)
+        {
+            Assert.Equal(PlayMethod.Transcode, plan?.PlayMethod);
+            Assert.NotNull(executed);
+            Assert.True(LocalMediaPlanner.IsToneMappingToSdr(executed));
+            Assert.Equal("h264", executed.VideoCodec);
+            Assert.True(LocalMediaPlanner.IsExecutableTranscode(executed));
+        }
+        else
+        {
+            Assert.Same(existing, plan);
+            Assert.Null(executed);
+        }
+    }
+
+    [Fact]
+    public void Only_a_tone_mapping_to_sdr_of_an_encoded_video_is_executable()
+    {
+        var tonemap = new PlaybackExecutionPlan(
+            PlaybackMethod.Transcode,
+            SourceId: "film",
+            Container: "mp4",
+            Protocol: StreamingProtocol.Hls,
+            VideoStreamIndex: 0,
+            VideoCodec: "h264",
+            VideoBitrate: null,
+            Resolution: null,
+            VideoRange: "SDR",
+            AudioStreamIndex: 1,
+            AudioCodec: "aac",
+            AudioBitrate: null,
+            AudioChannels: null,
+            SubtitleStreamIndex: null,
+            SubtitleFormat: null,
+            SubtitleDelivery: null,
+            TotalBitrate: null,
+            Transforms: [TransformKind.RemuxContainer, TransformKind.TranscodeVideo, TransformKind.Tonemap, TransformKind.CopyAudio]);
+
+        Assert.True(LocalMediaPlanner.IsExecutableTranscode(tonemap));
+        Assert.False(LocalMediaPlanner.IsExecutableTranscode(tonemap with { VideoRange = "HDR10" }));
+        Assert.False(LocalMediaPlanner.IsExecutableTranscode(tonemap with { VideoRange = null }));
+        Assert.False(LocalMediaPlanner.IsExecutableTranscode(tonemap with { Transforms = [TransformKind.RemuxContainer, TransformKind.TranscodeVideo, TransformKind.CopyAudio] }));
+        Assert.True(LocalMediaPlanner.IsExecutableTranscode(tonemap with { VideoRange = null, Transforms = [TransformKind.RemuxContainer, TransformKind.TranscodeVideo, TransformKind.CopyAudio] }));
+    }
+
     [Fact]
     public void A_burn_in_is_executable_only_with_the_video_encoded_to_h264()
     {

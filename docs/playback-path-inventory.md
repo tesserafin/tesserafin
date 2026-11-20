@@ -365,6 +365,18 @@ required by name. Bitmap subtitles (PGS, DVB) take the same path but have no syn
 FFmpeg has no PGS encoder. Break controls: planner refusing the burn (legacy planner reached),
 request without the subtitle (no `subtitles` filter).
 
+HDR tone mapping: a transcode that tone-maps an HDR source to SDR (`Tonemap`, `VideoRange =
+"SDR"`) is executed on the session's HLS route, the executor applying `tonemapx` (or hardware tone
+mapping) to the H.264 encode. It is owned only where the executor can tone-map: the planner is given
+`canTonemap` (the `tonemapx` filter, or hardware tone mapping enabled); elsewhere the plan stays on
+the existing chain until the deletion, which will refuse it. A plan that keeps HDR10 out of Dolby
+Vision is not owned: the executor tone-maps every HDR source it encodes all the way to SDR. Proof:
+`ToneMappingEndToEndTests` (an HDR10 HEVC Main10 fixture for an SDR-only client; `tonemapx` in the
+command, the output 8-bit H.264 without the PQ transfer), run on the project's FFmpeg build through
+`TESSERAFIN_TONEMAP_FFMPEG` and skipped on a distribution FFmpeg, which has no `tonemapx` (the hosted
+runner's). Break control: planner without the capability (legacy planner reached). Android declares
+`SDR` only, so every HDR film reaches this path there: checked on a phone.
+
 ### Plan to delete `PlaybackInfo` and the legacy planner
 
 The Android client never calls `PlaybackInfo` (its start is `POST Playback/Sessions` only). What
@@ -374,8 +386,8 @@ like the slices above (legacy-free host, real FFmpeg, real browser; a phone chec
 reaches it), then the deletion is one coordinated change.
 
 1. Burnt-in subtitles: done for text and bitmap streams (above); Android reaches it: phone check.
-2. HDR tone mapping: execute a plan whose `VideoRange` asks for SDR output (tonemap filter,
-   software and the host's VAAPI), with an HDR10 fixture. Android reaches it: phone check.
+2. HDR tone mapping to SDR: done (above), where the executor can tone-map. Hosted proof needs the
+   project's FFmpeg on the runner (follow-up).
 3. Targets other than H.264/AAC (decided 2026-11-20): a transcode to HEVC, AV1, MP3 or Opus is
    re-planned to H.264/AAC when the client declares those, and refused explicitly otherwise; a
    direct play or a remux of these codecs stays allowed when the client's profile accepts them.

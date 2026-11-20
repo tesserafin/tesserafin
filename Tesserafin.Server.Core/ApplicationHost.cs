@@ -727,7 +727,12 @@ namespace Tesserafin.Server.Core
                     provider.GetRequiredService<IV2PlanStore>()),
                 provider.GetRequiredService<IPlaybackEngine>(),
                 provider.GetRequiredService<IV2PlanStore>(),
-                provider.GetRequiredService<ILogger<LocalMediaPlanner>>()));
+                provider.GetRequiredService<ILogger<LocalMediaPlanner>>(),
+                null,
+                // A tone-mapping plan is the session's only where the executor can tone-map: the
+                // software tonemapx filter, or hardware tone mapping the operator enabled.
+                () => provider.GetRequiredService<IMediaEncoder>().SupportsFilter("tonemapx")
+                    || provider.GetRequiredService<IServerConfigurationManager>().GetEncodingOptions() is { EnableTonemapping: true, HardwareAccelerationType: not Tesserafin.Model.Entities.HardwareAccelerationType.none }));
 
             serviceCollection.AddSingleton<PlaybackSessionLiveStreams>();
 

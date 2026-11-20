@@ -431,6 +431,13 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
 #pragma warning disable CA1034 // Nested types should not be visible
     public sealed class LegacyFreeFactory : E2eApplicationFactory
     {
+        /// <summary>
+        /// Gets the FFmpeg the server runs: <c>TESSERAFIN_TONEMAP_FFMPEG</c> when set (the project's
+        /// FFmpeg build, which tone-maps), otherwise the default one.
+        /// </summary>
+        protected override string ServerFfmpegPath
+            => Environment.GetEnvironmentVariable("TESSERAFIN_TONEMAP_FFMPEG") is { Length: > 0 } path ? path : FfmpegPath;
+
         /// <inheritdoc/>
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -441,7 +448,8 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
                     new LegacyChainReached(),
                     provider.GetRequiredService<IPlaybackEngine>(),
                     provider.GetRequiredService<IV2PlanStore>(),
-                    provider.GetRequiredService<ILogger<LocalMediaPlanner>>()));
+                    provider.GetRequiredService<ILogger<LocalMediaPlanner>>(),
+                    canTonemap: () => provider.GetRequiredService<IMediaEncoder>().SupportsFilter("tonemapx")));
                 services.AddSingleton<IPlaybackLiveStreamResolver, LegacyChainReached>();
             });
         }

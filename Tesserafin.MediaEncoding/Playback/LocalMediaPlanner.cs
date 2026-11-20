@@ -47,6 +47,7 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
     private readonly IPlaybackEngine _engine;
     private readonly IV2PlanStore _v2PlanStore;
     private readonly ILogger<LocalMediaPlanner> _logger;
+    private readonly Func<bool> _canTonemap;
     private readonly TimeProvider _timeProvider;
 
     /// <summary>
@@ -57,13 +58,19 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
     /// <param name="v2PlanStore">The store the decided plan is published into.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="timeProvider">The clock stamping the published record; the system clock when null.</param>
+    /// <param name="canTonemap">
+    /// Whether this server's executor tone-maps HDR to SDR (the <c>tonemapx</c> filter, or hardware
+    /// tone mapping enabled): a tone-mapping plan is owned only then. Never, when null.
+    /// </param>
     public LocalMediaPlanner(
         IPlaybackSessionPlanner inner,
         IPlaybackEngine engine,
         IV2PlanStore v2PlanStore,
         ILogger<LocalMediaPlanner> logger,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        Func<bool>? canTonemap = null)
     {
+        _canTonemap = canTonemap ?? (static () => false);
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(v2PlanStore);
@@ -207,14 +214,15 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
     /// Determines whether a plan is a transcode this server executes from the plan alone: the
     /// engine chose <see cref="PlaybackMethod.Transcode"/>, delivered over HLS in fMP4 or MPEG-TS
     /// segments; each stream is either copied or re-encoded, video to H.264 and audio to AAC
-    /// (optionally down-mixed); the output stays in the source's video range. A subtitle is either
-    /// delivered beside the stream or burnt into the encoded video. Tone mapping is not this
-    /// definition: it is decided, but not executed from here.
+    /// (optionally down-mixed); the output stays in the source's video range, or an HDR source is
+    /// tone-mapped to SDR (owned only on a server whose executor can). A subtitle is either
+    /// delivered beside the stream or burnt into the encoded video.
     /// </summary>
     /// <param name="plan">The execution plan.</param>
     /// <returns><see langword="true"/> if the plan is an executable SDR transcode.</returns>
     public static bool IsExecutableTranscode(PlaybackExecutionPlan? plan)
-        => plan is { Method: PlaybackMethod.Transcode, Protocol: StreamingProtocol.Hls, VideoStreamIndex: not null, VideoRange: null }
+        => plan is { Method: PlaybackMethod.Transcode, Protocol: StreamingProtocol.Hls, VideoStreamIndex: not null }
+            && IsExecutableVideoRange(plan)
             && !string.IsNullOrEmpty(plan.VideoCodec)
             && (plan.AudioStreamIndex is null || !string.IsNullOrEmpty(plan.AudioCodec))
             && (string.Equals(plan.Container, "mp4", StringComparison.OrdinalIgnoreCase) || string.Equals(plan.Container, "ts", StringComparison.OrdinalIgnoreCase))
@@ -226,8 +234,31 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             && plan.Transforms.All(transform => transform is TransformKind.RemuxContainer
                 or TransformKind.TranscodeVideo or TransformKind.CopyVideo
                 or TransformKind.TranscodeAudio or TransformKind.CopyAudio or TransformKind.Downmix
-                or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle or TransformKind.BurnInSubtitle)
+                or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle or TransformKind.BurnInSubtitle
+                or TransformKind.Tonemap)
             && IsExecutableSubtitle(plan);
+
+    /// <summary>
+    /// Determines whether a plan tone-maps an HDR source to SDR: the one tone mapping the executor
+    /// performs from a plan, on the video it encodes.
+    /// </summary>
+    /// <param name="plan">The execution plan.</param>
+    /// <returns><see langword="true"/> if the plan tone-maps to SDR.</returns>
+    public static bool IsToneMappingToSdr(PlaybackExecutionPlan? plan)
+        => plan is not null
+            && plan.Transforms.Contains(TransformKind.Tonemap)
+            && plan.Transforms.Contains(TransformKind.TranscodeVideo)
+            && string.Equals(plan.VideoRange, "SDR", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The output stays in the source's video range, or the plan tone-maps to SDR. A plan that keeps
+    /// HDR10 out of Dolby Vision is decided but not executed from here: the executor tone-maps every
+    /// HDR source it encodes all the way to SDR.
+    /// </summary>
+    private static bool IsExecutableVideoRange(PlaybackExecutionPlan plan)
+        => plan.Transforms.Contains(TransformKind.Tonemap)
+            ? IsToneMappingToSdr(plan)
+            : plan.VideoRange is null;
 
     /// <summary>
     /// A transcode's subtitle is executable from the plan when it is delivered beside the stream,
@@ -305,7 +336,9 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             {
                 remux = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }
-            else if (transcode is null && (IsExecutableTranscode(plan) || IsExecutableAudioTranscode(plan)))
+            else if (transcode is null
+                && ((IsExecutableTranscode(plan) && (!IsToneMappingToSdr(plan) || _canTonemap()))
+                    || IsExecutableAudioTranscode(plan)))
             {
                 transcode = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }
