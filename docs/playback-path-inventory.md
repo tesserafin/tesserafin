@@ -350,6 +350,37 @@ refused; the stop closes the tuner stream), required by name. Break controls: pl
 live source (legacy planner reached), request without `LiveStreamId` (422), removal without release
 (tuner stream never closed).
 
+Audiobooks: an `AudioBook` is an `Audio`, already decided and served by the session journey;
+the Web client now offers it to that journey too (`AudioBook_StartAndSeek_…`, required by name). No
+local audio item of the Web client reaches `/Audio/{id}/universal` any more.
+
+### Plan to delete `PlaybackInfo` and the legacy planner
+
+The Android client never calls `PlaybackInfo` (its start is `POST Playback/Sessions` only). What
+still reaches the legacy chain is the Web client for the decisions below, DLNA, and, inside a
+session, the same decisions on any client. Each step moves one row under the session and is proved
+like the slices above (legacy-free host, real FFmpeg, real browser; a phone check where Android
+reaches it), then the deletion is one coordinated change.
+
+1. Burnt-in subtitles: execute a plan that burns a text (ASS/SRT) or bitmap (PGS/DVB) subtitle
+   from the session's HLS route (the executor gets the subtitle stream from the plan; the encoding
+   request carries it). Android reaches it: phone check.
+2. HDR tone mapping: execute a plan whose `VideoRange` asks for SDR output (tonemap filter,
+   software and the host's VAAPI), with an HDR10 fixture. Android reaches it: phone check.
+3. Targets other than H.264/AAC: either encode them from the plan (HEVC/AV1 behind the existing
+   `AllowHevcEncoding`/`AllowAv1Encoding`, MP3/Opus audio) or refuse them in the planner, which
+   then re-plans to H.264/AAC. Decision needed.
+4. A client with no HLS output: a session-owned progressive (HTTP) transcode route, or a refusal.
+   Decision needed.
+5. Non-local sources (channel-plugin items, `.strm`, remote HTTP): read through the media source
+   manager's provider like a tuner stream, or refuse. Decision needed.
+6. DLNA: keep it on `StreamBuilder` as its own consumer, or move it onto sessions. Decision needed.
+7. Deletion, once the rows above are empty: `GET/POST Items/{id}/PlaybackInfo`, the inner planner
+   (`PlaybackSessionPlanner`/`StreamBuilder` for sessions), `PlaybackExecutionPlanAdapter.ToStreamInfo`,
+   `PlaybackSessionStreamDescriptorMapper`, `PlaybackLiveStreamResolver`, the client-option HLS and
+   progressive routes, `/Audio/{id}/universal`; Web `getPlaybackInfo`, `createStreamInfo`, the V2
+   URL overlay and `enableV2PlaybackPath`; the generated `MediaInfoApi` in the mobile transport.
+
 Remaining consumers by name. Nothing is deleted globally while one of them still needs it:
 
 | Legacy path | Still reached by |
