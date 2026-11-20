@@ -6,12 +6,14 @@ using AutoFixture.AutoMoq;
 using Castle.Components.DictionaryAdapter;
 using Moq;
 using Tesserafin.Controller.Channels;
+using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
@@ -31,6 +33,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library
         private readonly Mock<IItemAccessService> _mockItemAccessService;
         private readonly Mock<IItemLookupService> _itemLookup;
         private readonly Mock<ILinkedChildrenService> _linkedChildren;
+        private readonly ServerConfiguration _configuration = new();
         private Video _item;
         private User _user;
 
@@ -41,6 +44,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library
             fixture.Inject(new Lazy<IItemMetadataDispatcher>(() => Mock.Of<IItemMetadataDispatcher>(MockBehavior.Strict)));
             fixture.Inject(new Lazy<IChannelManager>(() => throw new InvalidOperationException("Unexpected channel manager access.")));
             fixture.Inject(new ActiveRecordings());
+            fixture.Inject(Mock.Of<IServerConfigurationManager>(configuration => configuration.Configuration == _configuration));
             _itemLookup = fixture.Freeze<Mock<IItemLookupService>>();
             _linkedChildren = fixture.Freeze<Mock<ILinkedChildrenService>>();
             _linkedChildren.Setup(links => links.GetLinkedChildrenIds(It.IsAny<Guid>(), It.IsAny<int?>())).Returns([]);
@@ -167,6 +171,23 @@ namespace Tesserafin.Server.Implementations.Tests.Library
 
             _mediaSourceManager.SetDefaultAudioAndSubtitleStreamIndices(_item, mediaInfo, _user);
             Assert.Equal(expectedIndex, mediaInfo.DefaultAudioStreamIndex);
+        }
+
+        [Fact]
+        public void GetStaticMediaSources_UsesTheFirstConfiguredSubstitutionForLocalFilesOnly()
+        {
+            _configuration.PathSubstitutions =
+            [
+                new PathSubstitution { From = "/Movies", To = "/Shared" },
+                new PathSubstitution { From = "/Movies", To = "/Other" },
+                new PathSubstitution { From = "https://example.invalid", To = "/Remote" }
+            ];
+            var local = new Video { Id = Guid.NewGuid(), Path = "/Movies/test.mkv" };
+            var remote = new Video { Id = Guid.NewGuid(), Path = "https://example.invalid/test.mkv" };
+
+            Assert.Equal(local.Path, Assert.Single(_mediaSourceManager.GetStaticMediaSources(local, false)).Path);
+            Assert.Equal("/Shared/test.mkv", Assert.Single(_mediaSourceManager.GetStaticMediaSources(local, true)).Path);
+            Assert.Equal(remote.Path, Assert.Single(_mediaSourceManager.GetStaticMediaSources(remote, true)).Path);
         }
 
         [Fact]

@@ -10,8 +10,10 @@ namespace Tesserafin.Controller.Library;
 /// <param name="Links">The persisted version links.</param>
 /// <param name="Channels">The deferred channel manager, resolved for channel items.</param>
 /// <param name="Recordings">The current recordings.</param>
+/// <param name="MapFilePath">The configured network substitution for a file path.</param>
 public sealed record MediaSourceReadContext(
     IItemLookupService Items,
     ILinkedChildrenService Links,
     Lazy<IChannelManager> Channels,
-    ActiveRecordings Recordings);
+    ActiveRecordings Recordings,
+    Func<string, string> MapFilePath);

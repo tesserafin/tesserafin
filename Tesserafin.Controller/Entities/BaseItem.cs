@@ -1218,7 +1218,15 @@ namespace Tesserafin.Controller.Entities
             bool? hasLocalAlternates = null;
             bool HasLocalAlternates() => hasLocalAlternates ??= video is not null
                 && context.Links.GetLinkedChildrenIds(video.Id, (int)LinkedChildType.LocalAlternateVersion).Count > 0;
-            var result = list.Select(i => GetVersionInfo(enablePathSubstitution, i.Item, i.MediaSourceType, i.Protocol, mediaSourceManager, mediaSegmentManager, commonPrefix, HasLocalAlternates)).ToList();
+            var result = list.Select(source => GetVersionInfo(
+                source.Item,
+                source.MediaSourceType,
+                source.Protocol,
+                enablePathSubstitution && source.Protocol == MediaProtocol.File ? context.MapFilePath(source.Item.Path) : source.Item.Path,
+                mediaSourceManager,
+                mediaSegmentManager,
+                commonPrefix,
+                HasLocalAlternates)).ToList();
 
             if (activeRecording)
             {
@@ -1244,11 +1252,9 @@ namespace Tesserafin.Controller.Entities
             return Enumerable.Empty<(BaseItem, MediaSourceType)>();
         }
 
-        private MediaSourceInfo GetVersionInfo(bool enablePathSubstitution, BaseItem item, MediaSourceType type, MediaProtocol? protocol, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, string commonPrefix, Func<bool> hasLocalAlternates)
+        private MediaSourceInfo GetVersionInfo(BaseItem item, MediaSourceType type, MediaProtocol? protocol, string path, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, string commonPrefix, Func<bool> hasLocalAlternates)
         {
             ArgumentNullException.ThrowIfNull(item);
-
-            var itemPath = item.Path;
 
             var info = new MediaSourceInfo
             {
@@ -1257,7 +1263,7 @@ namespace Tesserafin.Controller.Entities
                 MediaStreams = mediaSourceManager.GetMediaStreams(item.Id),
                 MediaAttachments = mediaSourceManager.GetMediaAttachments(item.Id),
                 Name = GetMediaSourceName(item, protocol, hasLocalAlternates, commonPrefix),
-                Path = enablePathSubstitution ? GetMappedPath(item, itemPath, protocol) : itemPath,
+                Path = path,
                 RunTimeTicks = item.RunTimeTicks,
                 Container = item.Container,
                 Size = item.Size,
@@ -2561,16 +2567,6 @@ namespace Tesserafin.Controller.Entities
             }
 
             return hasChanges;
-        }
-
-        protected static string GetMappedPath(BaseItem item, string path, MediaProtocol? protocol)
-        {
-            if (protocol == MediaProtocol.File)
-            {
-                return LibraryManager.GetPathAfterNetworkSubstitution(path, item);
-            }
-
-            return path;
         }
 
         public virtual void FillUserDataDtoValues(

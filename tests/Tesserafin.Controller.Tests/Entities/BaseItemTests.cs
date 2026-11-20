@@ -320,7 +320,8 @@ public class BaseItemTests
             lookup ?? Mock.Of<IItemLookupService>(MockBehavior.Strict),
             links ?? Mock.Of<ILinkedChildrenService>(service => service.GetLinkedChildrenIds(It.IsAny<Guid>(), It.IsAny<int?>()) == Array.Empty<Guid>()),
             new Lazy<IChannelManager>(() => channels ?? throw new InvalidOperationException("Unexpected channel manager access.")),
-            new ActiveRecordings());
+            new ActiveRecordings(),
+            static path => path);
 
     [Fact]
     public void GetMediaSources_ActiveRecordingUsesTheCatalogueAndReturnsAPlaceholder()

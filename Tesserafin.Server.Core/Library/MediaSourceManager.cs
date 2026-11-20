@@ -18,6 +18,7 @@ using Tesserafin.Common.Configuration;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Channels;
+using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
@@ -94,7 +95,8 @@ namespace Tesserafin.Server.Core.Library
             IMediaSegmentManager mediaSegmentManager,
             ILinkedChildrenService linkedChildren,
             Lazy<IChannelManager> channels,
-            ActiveRecordings recordings)
+            ActiveRecordings recordings,
+            IServerConfigurationManager configuration)
         {
             _writes = writes;
             _deletions = deletions;
@@ -114,7 +116,12 @@ namespace Tesserafin.Server.Core.Library
             _mediaStreamRepository = mediaStreamRepository;
             _mediaAttachmentRepository = mediaAttachmentRepository;
             _mediaSegmentManager = mediaSegmentManager;
-            _sourceReadContext = new MediaSourceReadContext(itemLookupService, linkedChildren, channels, recordings);
+            _sourceReadContext = new MediaSourceReadContext(
+                itemLookupService,
+                linkedChildren,
+                channels,
+                recordings,
+                path => path.ApplyNetworkPathSubstitutions(configuration.Configuration.PathSubstitutions));
         }
 
         public void AddParts(IEnumerable<IMediaSourceProvider> providers)
