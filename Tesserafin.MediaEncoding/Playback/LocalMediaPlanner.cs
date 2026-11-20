@@ -114,6 +114,20 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             && !string.IsNullOrEmpty(source.Path);
 
     /// <summary>
+    /// Determines whether a media source is a remote file the server reads over HTTP (a remote url, a
+    /// <c>.strm</c> target): one the session's executor reads from its url, and can seek in because
+    /// its duration is known (decided 2026-11-20: non-local sources go through a provider that says
+    /// whether seeking is possible). It is never handed to the client as it is.
+    /// </summary>
+    /// <param name="source">The media source.</param>
+    /// <returns><see langword="true"/> if the source is a seekable remote HTTP file.</returns>
+    public static bool IsSeekableRemoteSource(MediaSourceInfo? source)
+        => source is { Protocol: MediaProtocol.Http, RequiresOpening: false, IsInfiniteStream: false, RunTimeTicks: > 0 }
+            && string.IsNullOrEmpty(source.LiveStreamId)
+            && Uri.TryCreate(source.Path, UriKind.Absolute, out var url)
+            && (url.Scheme == Uri.UriSchemeHttp || url.Scheme == Uri.UriSchemeHttps);
+
+    /// <summary>
     /// Determines whether a media source is the tuner stream this session opened: the source the
     /// media source manager returned for <paramref name="liveStreamId"/>.
     /// </summary>
@@ -154,7 +168,7 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             // A transcode to a codec this server does not encode from a session, for a client that
             // declares no H.264/AAC to re-plan to: refused, not handed to the existing chain.
             _logger.LogInformation(
-                "Playback for item {ItemId} refused: the only transcode the client allows encodes to a target other than H.264/AAC.",
+                "Playback for item {ItemId} refused: no session provider reads its source, or the only transcode the client allows encodes to a target other than H.264/AAC.",
                 options.ItemId);
             return null;
         }
@@ -335,15 +349,25 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             .Where(source => string.IsNullOrEmpty(options.MediaSourceId) || string.Equals(source.Id, options.MediaSourceId, StringComparison.Ordinal))
             .ToList();
         var live = !string.IsNullOrEmpty(request.LiveStreamId);
-        if (sources.Count == 0 || !sources.All(source => live ? IsSessionLiveSource(source, request.LiveStreamId) : IsLocalFileSource(source)))
+        if (sources.Count == 0)
         {
             return null;
         }
 
-        // An opened tuner stream has no end and is reachable by the server only (through its
-        // provider): it can be remuxed or transcoded into the session's live HLS output, never handed
-        // to the client as it is.
-        var constraints = live ? request.Constraints with { AllowDirectPlay = false } : request.Constraints;
+        if (!sources.All(source => live ? IsSessionLiveSource(source, request.LiveStreamId) : IsLocalFileSource(source) || IsSeekableRemoteSource(source)))
+        {
+            // A non-local source no session provider reads (another protocol, a remote stream with
+            // no known duration): refused, not handed to the existing chain (decided 2026-11-20). A
+            // local disc structure (DVD, Blu-ray, ISO) is not that: it stays with the existing chain.
+            refused = !live && sources.Any(source => source.Protocol != MediaProtocol.File);
+            return null;
+        }
+
+        // An opened tuner stream and a remote file are reachable by the server only (through its
+        // provider, or its url): they are remuxed or transcoded into a session output, never handed
+        // to the client as they are.
+        var serverOnly = live || sources.Any(IsSeekableRemoteSource);
+        var constraints = serverOnly ? request.Constraints with { AllowDirectPlay = false } : request.Constraints;
 
         var context = DlnaPlaybackAdapter.ToContext(options.ItemId, options.UserId, options.MediaSourceId, kind, PlaybackEngine.EngineVersion);
         // Resolved track indices belong to a source, not to the item. A later playable version
@@ -363,7 +387,7 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
                 continue;
             }
 
-            if (plan.Method == PlaybackMethod.DirectPlay && !live)
+            if (plan.Method == PlaybackMethod.DirectPlay && !serverOnly)
             {
                 return new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }

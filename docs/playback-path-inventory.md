@@ -405,6 +405,19 @@ progressive output (legacy planner reached), seek without the restart (one FFmpe
 kill-switch contract now runs on a remote HTTP source (`StaticHttpFile`), the one session the live
 wiring still plans until step 5.
 
+Non-local sources (decided 2026-11-20): a remote file over HTTP (a remote url, a `.strm` target)
+whose duration is known (`IsSeekableRemoteSource`) is executed by the session from its url - the
+executor reads it, the planner forbids a direct play (the url is never handed to the client), and it
+is remuxed or transcoded into a session output; the delivery guard accepts it in place of a local
+file. A non-local source no session provider reads (RTSP, RTMP, UDP, a remote stream with no known
+duration) is refused explicitly (422). A Live TV tuner stream is the opened-stream provider of the
+Live TV slice. Local disc structures (DVD, Blu-ray folders, ISO) are not non-local: they stay with the
+existing chain, as do channel-plugin items (no test channel plugin here; they are listed below).
+Proof: `RemoteSourceEndToEndTests` (a remote MP4 served over loopback HTTP, remuxed into the session's
+HLS output with FFmpeg reading the url; an RTSP source refused with 422), required by name; break
+control: remote provider removed (refused). The kill-switch contract moves to `PlaybackInfo`, the one
+caller the live wiring still serves, read from `IPlaybackLiveWiringDiagnosticsStore`.
+
 ### Plan to delete `PlaybackInfo` and the legacy planner
 
 The Android client never calls `PlaybackInfo` (its start is `POST Playback/Sessions` only). What
@@ -418,9 +431,8 @@ reaches it), then the deletion is one coordinated change.
    project's FFmpeg on the runner (follow-up).
 3. Targets other than H.264/AAC: done (above).
 4. A client with no HLS output: done (above).
-5. Non-local sources (decided): read through a session-managed provider on the tuner model - it
-   opens and closes the source and says whether seeking is possible; a source no provider handles
-   is refused.
+5. Non-local sources: done for remote HTTP files (above); channel-plugin items and local disc
+   structures remain with the existing chain.
 6. DLNA (decided): migrated onto sessions after step 4, through a DLNA adapter that turns the
    player's profile into capabilities and announces the play url; `StreamBuilder` goes with this
    last consumer.
@@ -434,7 +446,7 @@ Remaining consumers by name. Nothing is deleted globally while one of them still
 
 | Legacy path | Still reached by |
 | --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | a session of a non-local source, Live TV through `PlaybackInfo`, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
+| `PlaybackSessionPlanner` / `StreamBuilder` | a session of a channel-plugin item or a local disc structure (DVD, Blu-ray, ISO), Live TV through `PlaybackInfo`, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
 | Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio the server does not serve from the session, Live TV, channel-plugin items; a library video the server does not serve from the session |

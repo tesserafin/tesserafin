@@ -382,6 +382,8 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.EndToEnd.AudioHlsEndToEndTests.TranscodeAudio_ToATargetOtherThanAac_IsRefusedExplicitly
           --require Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveEndToEndTests.Progressive_TranscodeForAClientWithNoHlsOutput_StreamsTsFromTheSessionRoute
           --require Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveEndToEndTests.Progressive_RemuxForAClientWithNoHlsOutput_CopiesBothStreamsIntoTs
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.RemoteSourceEndToEndTests.RemoteHttpFile_IsRemuxedFromItsUrlIntoTheSessionHlsOutput_NeverHandedToTheClient
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.RemoteSourceEndToEndTests.ASourceNoSessionProviderReads_IsRefusedExplicitly
           --require Tesserafin.Server.Integration.Tests.EndToEnd.LiveTvSessionEndToEndTests.LiveTvChannel_PlaysFromTheSessionLiveRoute_OnOneTunerStream_ClosedByTheStop
           --require Tesserafin.Server.Integration.Tests.EndToEnd.BurnInSubtitleEndToEndTests.BurnIn_EmbeddedAss_IsBurntIntoTheEncodedVideoOnTheSessionHlsRoute
           --require Tesserafin.Server.Integration.Tests.EndToEnd.BurnInSubtitleEndToEndTests.BurnIn_SrtSidecar_IsBurntIntoTheEncodedVideoOnTheSessionHlsRoute

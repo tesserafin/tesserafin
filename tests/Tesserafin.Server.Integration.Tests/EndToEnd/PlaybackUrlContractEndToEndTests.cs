@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Api.Models.PlaybackSessionDtos;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Extensions.Json;
 using Tesserafin.MediaEncoding.Playback;
@@ -272,38 +273,45 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     [Fact]
     public async Task KillSwitch_ForcesLegacyOnNextRequest_UrlStillServable()
     {
-        // Since consolidation step 1 a local item the session journey executes has no legacy fallback
-        // for the kill switch to restore (docs/playback-path-inventory.md §4 to §7). The kill switch
-        // still governs every plan that journey does not execute: here, a source that is not a local
-        // file (a remote HTTP url), until step 5 of the plan reads it through a session provider.
-        await using var remote = StaticHttpFile.Start(_fixturePath);
-        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 kill switch fixture {Guid.NewGuid()}", configure: movie => movie.Path = remote.Url);
-        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHls();
+        // Since consolidation step 1 every source a session reads is executed by the session journey
+        // or refused: no session is planned by the existing chain for the kill switch to restore
+        // (docs/playback-path-inventory.md §7). The kill switch still governs that chain's remaining
+        // caller, PlaybackInfo, through the same live wiring.
+        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 kill switch fixture {Guid.NewGuid()}");
 
         // V2 mode (not merely Canary): every session is v2-authoritative, no cohort-hash dependency -
-        // the simplest way to get a REAL "before" state where v2 actually served this session, so the
+        // the simplest way to get a REAL "before" state where v2 actually served this request, so the
         // "after" transition below is a genuine transition and not just re-observing the default.
         _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.V2;
+        var beforeUrl = await LegacyPlaybackInfo.TranscodingUrlAsync(_client, itemId, _userId, EndToEndCapabilityPresets.TranscodeHls());
+        var before = LiveWiringOutcomeOf(beforeUrl);
+        Assert.True(before is { ServedByV2: true, FallbackReason: null }, $"Expected v2 to serve PlaybackInfo before the kill switch, got {before}.");
+        await AssertUrlServes200Async(beforeUrl, "Before kill switch");
 
-        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-kill-switch", cancellationToken: TestContext.Current.CancellationToken);
-
-        var beforeDescriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
-        await AssertUrlServes200Async(beforeDescriptor.Url, "Before kill switch");
-        Assert.True(
-            beforeDescriptor.FallbackReason is null && beforeDescriptor.ServedBy != PlaybackSessionResponse.LegacyDecisionVersion,
-            $"Expected the session to be genuinely v2-served before the kill switch - got ServedBy={beforeDescriptor.ServedBy}, FallbackReason={beforeDescriptor.FallbackReason}. " +
-            "The kill-switch transition below is only meaningful against a real v2-served 'before' state.");
-
-        // The kill switch itself: an operator flips PlaybackShadow.Mode back to Legacy/Shadow. Per
-        // PlaybackLiveStreamResolver's own remarks, this takes effect on the very next request - no
-        // restart, no session recreation.
+        // The kill switch itself: an operator flips PlaybackShadow.Mode back to Legacy. Per
+        // PlaybackLiveStreamResolver's own remarks, this takes effect on the very next request.
         _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
+        var afterUrl = await LegacyPlaybackInfo.TranscodingUrlAsync(_client, itemId, _userId, EndToEndCapabilityPresets.TranscodeHls());
+        var after = LiveWiringOutcomeOf(afterUrl);
+        Assert.Equal(PlaybackLiveFallbackReason.KillSwitch, after?.FallbackReason);
+        Assert.False(after?.ServedByV2);
+        await AssertUrlServes200Async(afterUrl, "After kill switch (legacy fallback)");
+    }
 
-        var afterDescriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
-        Assert.Equal(PlaybackLiveFallbackReason.KillSwitch, afterDescriptor.FallbackReason);
-        Assert.Equal(PlaybackSessionResponse.LegacyDecisionVersion, afterDescriptor.ServedBy);
-
-        await AssertUrlServes200Async(afterDescriptor.Url, "After kill switch (legacy fallback)");
+    /// <summary>
+    /// The live-wiring outcome recorded for the session PlaybackInfo created, found by the play
+    /// session its transcoding url names.
+    /// </summary>
+    private PlaybackLiveWiringOutcome? LiveWiringOutcomeOf(string transcodingUrl)
+    {
+        var query = transcodingUrl[(transcodingUrl.IndexOf('?', StringComparison.Ordinal) + 1)..];
+        var playSessionId = query.Split('&')
+            .Select(pair => pair.Split('=', 2))
+            .First(pair => string.Equals(pair[0], "PlaySessionId", StringComparison.OrdinalIgnoreCase))[1];
+        var session = Assert.Single(
+            _factory.Services.GetRequiredService<IPlaybackSessionManager>().GetAll(),
+            s => string.Equals(s.PlaySessionId, Uri.UnescapeDataString(playSessionId), StringComparison.Ordinal));
+        return _factory.Services.GetRequiredService<IPlaybackLiveWiringDiagnosticsStore>().TryGet(session.Id, out var outcome) ? outcome : null;
     }
 
     /// <summary>

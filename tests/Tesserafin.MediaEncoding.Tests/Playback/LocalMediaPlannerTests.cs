@@ -583,6 +583,49 @@ public sealed class LocalMediaPlannerTests
     }
 
     [Fact]
+    public void A_seekable_remote_file_is_executed_by_the_session_never_played_as_it_is()
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var remote = Source("film", "h264", 1, -1, "mp4");
+        remote.Path = "http://media.example/film.mp4";
+        remote.Protocol = MediaProtocol.Http;
+        remote.IsRemote = true;
+        remote.RunTimeTicks = TimeSpan.FromMinutes(90).Ticks;
+        remote.MediaStreams = [.. remote.MediaStreams.Where(stream => stream.Type != MediaStreamType.Subtitle)];
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(Browser(hlsOutput: true), _declared));
+        var plan = planner.PlanVideo(Options(remote));
+        var executed = store.TakeCaptured()?.ExecutionPlan;
+
+        // The browser plays H.264/AAC in MP4 as it is; a remote url is still not handed to it.
+        Assert.NotEqual(PlayMethod.DirectPlay, plan?.PlayMethod);
+        Assert.NotNull(executed);
+        Assert.True(LocalMediaPlanner.IsExecutableSessionOutput(executed));
+        Assert.True(LocalMediaPlanner.IsSeekableRemoteSource(remote));
+    }
+
+    [Theory]
+    [InlineData("http://media.example/live", MediaProtocol.Http, 0L)]
+    [InlineData("rtsp://camera.example/stream", MediaProtocol.Rtsp, 600_000_000L)]
+    public void A_non_local_source_no_session_provider_reads_is_refused(string path, MediaProtocol protocol, long runTimeTicks)
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var remote = Source("film", "h264", 1, -1, "ts");
+        remote.Path = path;
+        remote.Protocol = protocol;
+        remote.IsRemote = true;
+        remote.RunTimeTicks = runTimeTicks == 0 ? null : runTimeTicks;
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(Browser(hlsOutput: true), _declared));
+
+        Assert.Null(planner.PlanVideo(Options(remote)));
+        Assert.Null(store.TakeCaptured());
+        Assert.False(LocalMediaPlanner.IsSeekableRemoteSource(remote));
+    }
+
+    [Fact]
     public void Only_an_hls_copy_of_one_audio_stream_is_an_executable_audio_remux()
     {
         var remux = new PlaybackExecutionPlan(
