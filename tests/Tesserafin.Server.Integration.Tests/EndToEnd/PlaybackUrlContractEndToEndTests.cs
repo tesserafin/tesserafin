@@ -204,16 +204,11 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     public async Task Transcode_Hls_PostThenGetStream_ServesManifestAndSegment()
     {
         // A transcode the local video journey executes from the session never reaches this chain
-        // (TranscodeFilmEndToEndTests). This is the existing chain's contract - master playlist, then
-        // variant, then segment - for a target that journey does not execute (MP3 audio).
+        // (TranscodeFilmEndToEndTests), and one it does not execute is refused by the session. This is
+        // the existing chain's contract - master playlist, then variant, then segment - reached through
+        // its remaining caller, PlaybackInfo, for a target the session journey does not execute (MP3).
         var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 transcode fixture {Guid.NewGuid()}");
-        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHlsToAnUnexecutedTarget();
-
-        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-transcode-hls", cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal(PlaybackMethod.Transcode, session.Method);
-
-        var descriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
-        Assert.Equal(StreamingProtocol.Hls, descriptor.Protocol);
+        var descriptor = new { Url = await LegacyPlaybackInfo.TranscodingUrlAsync(_client, itemId, _userId, EndToEndCapabilityPresets.TranscodeHlsToAnUnexecutedTarget()) };
 
         var masterManifest = await GetTextAsync(descriptor.Url, "HLS master playlist");
         Assert.Contains("#EXTM3U", masterManifest, StringComparison.Ordinal);
@@ -279,9 +274,10 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     {
         // Since consolidation step 1 a local video the session journey executes has no legacy
         // fallback for the kill switch to restore (docs/playback-path-inventory.md §4 to §7). The kill
-        // switch still governs every plan that journey does not execute: here, an MP3 audio target.
+        // switch still governs every plan that journey does not execute: here, a client with no HLS
+        // output (progressive HTTP), until step 4 of the plan moves it onto the session.
         var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 kill switch fixture {Guid.NewGuid()}");
-        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHlsToAnUnexecutedTarget();
+        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeProgressiveHttp();
 
         // V2 mode (not merely Canary): every session is v2-authoritative, no cohort-hash dependency -
         // the simplest way to get a REAL "before" state where v2 actually served this session, so the

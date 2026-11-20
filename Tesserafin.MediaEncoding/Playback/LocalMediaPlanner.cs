@@ -148,7 +148,17 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             return null;
         }
 
-        var record = TryDecide(request, options, kind);
+        var record = TryDecide(request, options, kind, out var refused);
+        if (refused)
+        {
+            // A transcode to a codec this server does not encode from a session, for a client that
+            // declares no H.264/AAC to re-plan to: refused, not handed to the existing chain.
+            _logger.LogInformation(
+                "Playback for item {ItemId} refused: the only transcode the client allows encodes to a target other than H.264/AAC.",
+                options.ItemId);
+            return null;
+        }
+
         if (record is null)
         {
             return inner(options);
@@ -293,8 +303,9 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             && plan.Transforms.All(transform => transform is TransformKind.RemuxContainer or TransformKind.CopyVideo or TransformKind.CopyAudio or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle)
             && plan.SubtitleDelivery is null or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External;
 
-    private V2PlanRecord? TryDecide(LocalMediaRequest request, MediaOptions options, MediaKind kind)
+    private V2PlanRecord? TryDecide(LocalMediaRequest request, MediaOptions options, MediaKind kind, out bool refused)
     {
+        refused = false;
         var sources = options.MediaSources
             .Where(source => string.IsNullOrEmpty(options.MediaSourceId) || string.Equals(source.Id, options.MediaSourceId, StringComparison.Ordinal))
             .ToList();
@@ -342,6 +353,15 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             {
                 transcode = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }
+            else if (IsRefusedTranscodeTarget(plan))
+            {
+                refused = true;
+            }
+        }
+
+        if (remux is not null || transcode is not null)
+        {
+            refused = false;
         }
 
         return remux ?? transcode;
@@ -365,14 +385,41 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             OutputProfiles = declared.OutputProfiles
                 .Select(profile => profile with
                 {
-                    VideoCodecs = ExecutableFirst(profile.VideoCodecs, "h264"),
-                    AudioCodecs = ExecutableFirst(profile.AudioCodecs, "aac"),
+                    VideoCodecs = ExecutableFirst(profile.VideoCodecs, "h264", declared.Decode.VideoCodecs.Any(c => string.Equals(c.Codec, "h264", StringComparison.OrdinalIgnoreCase))),
+                    AudioCodecs = ExecutableFirst(profile.AudioCodecs, "aac", declared.Decode.AudioCodecs.Any(c => string.Equals(c.Codec, "aac", StringComparison.OrdinalIgnoreCase))),
                 })
                 .ToList(),
         };
 
-    private static string[] ExecutableFirst(System.Collections.Generic.IReadOnlyList<string> codecs, string executable)
-        => codecs.OrderBy(codec => string.Equals(codec, executable, StringComparison.OrdinalIgnoreCase) ? 0 : 1).ToArray();
+    /// <summary>
+    /// The executable target first in a profile's codec list. A profile that names codecs of this
+    /// kind but not the executable one gains it in front when the client declares it decodes it:
+    /// a transcode is then re-planned to H.264/AAC rather than to a codec this server does not
+    /// encode from a session (decided 2026-11-20). A profile with no codec of the kind (an audio
+    /// output's video list) is left as it is.
+    /// </summary>
+    private static string[] ExecutableFirst(System.Collections.Generic.IReadOnlyList<string> codecs, string executable, bool clientDecodesIt)
+    {
+        if (codecs.Any(codec => string.Equals(codec, executable, StringComparison.OrdinalIgnoreCase)))
+        {
+            return codecs.OrderBy(codec => string.Equals(codec, executable, StringComparison.OrdinalIgnoreCase) ? 0 : 1).ToArray();
+        }
+
+        return codecs.Count > 0 && clientDecodesIt ? [executable, .. codecs] : codecs.ToArray();
+    }
+
+    /// <summary>
+    /// Determines whether a plan is a transcode refused for its target: a stream it encodes is
+    /// encoded to another codec than H.264 (video) or AAC (audio). Such a plan is refused
+    /// explicitly rather than handed to the existing chain (decided 2026-11-20); a direct play or a
+    /// remux of those codecs is not a transcode and stays allowed.
+    /// </summary>
+    /// <param name="plan">The execution plan.</param>
+    /// <returns><see langword="true"/> if the plan encodes to an unexecuted target.</returns>
+    public static bool IsRefusedTranscodeTarget(PlaybackExecutionPlan? plan)
+        => plan is { Method: PlaybackMethod.Transcode }
+            && ((plan.Transforms.Contains(TransformKind.TranscodeVideo) && !string.Equals(plan.VideoCodec, "h264", StringComparison.OrdinalIgnoreCase))
+                || (plan.Transforms.Contains(TransformKind.TranscodeAudio) && !string.Equals(plan.AudioCodec, "aac", StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>
     /// The user's own audio and subtitle preferences, as <c>MediaSourceManager</c> already resolved

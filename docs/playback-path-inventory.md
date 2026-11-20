@@ -377,6 +377,18 @@ command, the output 8-bit H.264 without the PQ transfer), run on the project's F
 runner's). Break control: planner without the capability (legacy planner reached). Android declares
 `SDR` only, so every HDR film reaches this path there: checked on a phone.
 
+Transcode targets (decided 2026-11-20): an output profile that names codecs of a kind but not
+H.264 (video) or AAC (audio) gains it in front when the client declares it decodes it, so a
+transcode is re-planned to H.264/AAC. A transcode that still encodes to another codec (HEVC, AV1,
+MP3, Opus) is refused explicitly (422, `IsRefusedTranscodeTarget`), never handed to the existing
+chain; a direct play or a remux of those codecs stays allowed. Proof: planner tests (re-plan,
+refusal, HEVC remux allowed) and `AudioHlsEndToEndTests.TranscodeAudio_ToATargetOtherThanAac_…`
+(422 on the host where the legacy planner throws), required by name; break control: refusal
+disabled (legacy planner reached). The existing chain's HLS contracts (`PlaybackUrlContract…`
+`Transcode_Hls_…`, `HlsOutputIsolationEndToEndTests`) are now driven through `PlaybackInfo`
+(`LegacyPlaybackInfo`), their remaining caller; the kill-switch contract through a client with no
+HLS output (`TranscodeProgressiveHttp`), the one session the live wiring still plans.
+
 ### Plan to delete `PlaybackInfo` and the legacy planner
 
 The Android client never calls `PlaybackInfo` (its start is `POST Playback/Sessions` only). What
@@ -388,9 +400,7 @@ reaches it), then the deletion is one coordinated change.
 1. Burnt-in subtitles: done for text and bitmap streams (above); Android reaches it: phone check.
 2. HDR tone mapping to SDR: done (above), where the executor can tone-map. Hosted proof needs the
    project's FFmpeg on the runner (follow-up).
-3. Targets other than H.264/AAC (decided 2026-11-20): a transcode to HEVC, AV1, MP3 or Opus is
-   re-planned to H.264/AAC when the client declares those, and refused explicitly otherwise; a
-   direct play or a remux of these codecs stays allowed when the client's profile accepts them.
+3. Targets other than H.264/AAC: done (above).
 4. A client with no HLS output (decided): a session-owned progressive HTTP output for clients that
    declare it, executing the same plan under the same access and stop rules as HLS.
 5. Non-local sources (decided): read through a session-managed provider on the tuner model - it
@@ -409,7 +419,7 @@ Remaining consumers by name. Nothing is deleted globally while one of them still
 
 | Legacy path | Still reached by |
 | --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | audio for a client that declares no AAC-over-HLS output, Live TV through `PlaybackInfo`, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
+| `PlaybackSessionPlanner` / `StreamBuilder` | a session for a client with no HLS output, Live TV through `PlaybackInfo`, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
 | Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio the server does not serve from the session, Live TV, channel-plugin items; a library video the server does not serve from the session |

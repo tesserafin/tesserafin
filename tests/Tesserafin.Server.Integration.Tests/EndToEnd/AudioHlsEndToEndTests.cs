@@ -139,6 +139,25 @@ public sealed class AudioHlsEndToEndTests : IClassFixture<DirectPlayFilmEndToEnd
     }
 
     [Fact]
+    public async Task TranscodeAudio_ToATargetOtherThanAac_IsRefusedExplicitly()
+    {
+        var (client, userId) = await SignInAsync("audio-refused");
+        var itemId = await SeedTrackAsync(withCoverArt: false);
+
+        // A client whose only output is MP3 over HLS and that decodes no AAC: the only transcode is
+        // to MP3, which a session does not execute. Refused - on this host the legacy planner throws,
+        // so a hand-over would be a 500, not this 422.
+        var (direct, constraints) = EndToEndCapabilityPresets.AudioDirectPlay();
+        var mp3Only = direct with { OutputProfiles = [new PlaybackOutputProfile(MediaKind.Audio, StreamingProtocol.Hls, "ts", [], ["mp3"], null, null, null)] };
+        var request = new CreatePlaybackSessionRequest(itemId, userId, mp3Only, constraints, PlaySessionId: "audio-refused-ps");
+        using var response = await client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(response.StatusCode == HttpStatusCode.UnprocessableEntity, FormattableString.Invariant($"POST Playback/Sessions: {(int)response.StatusCode} {body}"));
+        Assert.DoesNotContain(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, "audio-refused-ps", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task TranscodeAudio_AnotherUser_CanNeitherReadNorStopNorTakeTheJob()
     {
         var (owner, ownerId) = await SignInAsync("audio-tc-owner");

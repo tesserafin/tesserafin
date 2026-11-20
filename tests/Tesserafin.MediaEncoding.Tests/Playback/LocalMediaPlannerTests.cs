@@ -244,12 +244,9 @@ public sealed class LocalMediaPlannerTests
     }
 
     [Fact]
-    public void An_audio_transcode_to_a_target_the_session_route_does_not_encode_is_left_to_the_existing_chain()
+    public void An_audio_transcode_to_a_target_other_than_aac_is_refused_not_handed_to_the_existing_chain()
     {
-        var existing = new PlaybackPlan(PlayMethod.Transcode, 0);
-        var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
-        inner.Setup(p => p.PlanAudio(It.IsAny<MediaOptions>())).Returns(existing);
-        var (planner, store) = Planner(inner.Object);
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
         var mp3Output = AudioPlayer(["mp3"]) with
         {
             OutputProfiles = [new PlaybackOutputProfile(MediaKind.Audio, StreamingProtocol.Hls, "ts", [], ["mp3"], null, null, null)],
@@ -259,8 +256,66 @@ public sealed class LocalMediaPlannerTests
         using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(mp3Output, _declared));
         var plan = planner.PlanAudio(Options(Track("track", "flac")));
 
-        Assert.Same(existing, plan);
+        Assert.Null(plan);
         Assert.Null(store.TakeCaptured());
+    }
+
+    [Fact]
+    public void A_video_transcode_is_re_planned_to_h264_when_the_client_decodes_it_and_refused_when_it_does_not()
+    {
+        var film = Source("film", "mpeg4", 1, 2, "avi");
+        var hevcOutput = Browser(hlsOutput: true) with
+        {
+            OutputProfiles = [new PlaybackOutputProfile(MediaKind.Video, StreamingProtocol.Hls, "mp4", ["hevc"], ["aac"], null, null, null)],
+        };
+
+        // Decodes H.264: re-planned to it, owned.
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        using (store.BeginCapture())
+        using (LocalMediaPlanner.BeginRequest(new LocalMediaRequest(hevcOutput, _declared)))
+        {
+            Assert.Equal(PlayMethod.Transcode, planner.PlanVideo(Options(film))?.PlayMethod);
+            Assert.Equal("h264", store.TakeCaptured()?.ExecutionPlan?.VideoCodec);
+        }
+
+        // Decodes HEVC only: the only transcode is to HEVC, which is refused.
+        var hevcOnly = hevcOutput with
+        {
+            Decode = hevcOutput.Decode with
+            {
+                DirectPlayProfiles = [new DecodeProfile(MediaKind.Video, ["mp4"], ["hevc"], ["aac"])],
+                VideoCodecs = [new VideoCodecCapability("hevc", [], null, null, [], null, null)],
+            },
+        };
+        var (refusing, refusingStore) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        using (refusingStore.BeginCapture())
+        using (LocalMediaPlanner.BeginRequest(new LocalMediaRequest(hevcOnly, _declared)))
+        {
+            Assert.Null(refusing.PlanVideo(Options(film)));
+            Assert.Null(refusingStore.TakeCaptured());
+        }
+    }
+
+    [Fact]
+    public void A_remux_of_a_codec_the_session_does_not_encode_stays_allowed()
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var hevcFilm = Source("film", "hevc", 1, 2, "mkv");
+        var hevcClient = Browser(hlsOutput: true) with
+        {
+            Decode = Browser(hlsOutput: true).Decode with
+            {
+                DirectPlayProfiles = [new DecodeProfile(MediaKind.Video, ["mp4"], ["hevc"], ["aac"])],
+                VideoCodecs = [new VideoCodecCapability("hevc", [], null, null, [], null, null)],
+            },
+            OutputProfiles = [new PlaybackOutputProfile(MediaKind.Video, StreamingProtocol.Hls, "mp4", ["hevc"], ["aac"], null, null, null)],
+        };
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(hevcClient, _declared));
+
+        Assert.Equal(PlayMethod.DirectStream, planner.PlanVideo(Options(hevcFilm))?.PlayMethod);
+        Assert.Equal(PlaybackMethod.Remux, store.TakeCaptured()?.ExecutionPlan?.Method);
     }
 
     [Fact]

@@ -260,9 +260,9 @@ public static class EndToEndCapabilityPresets
 
     /// <summary>
     /// <see cref="TranscodeHls"/> with MP3 as the only audio target of its HLS output. The engine's
-    /// answer is a transcode to MP3, which the local video journey does not execute from the session
-    /// (it encodes audio to AAC only, docs/playback-path-inventory.md §6), so a session with these
-    /// capabilities is planned by the existing chain and served from <c>/Videos/{id}/master.m3u8</c>:
+    /// answer is a transcode to MP3, which a session refuses (it encodes audio to AAC only and the
+    /// client declares no AAC to re-plan to); the existing chain still serves it to a
+    /// <c>PlaybackInfo</c> client from <c>/Videos/{id}/master.m3u8</c> (<see cref="LegacyPlaybackInfo"/>),
     /// the subject for that chain's own contracts while it still has consumers.
     /// </summary>
     /// <returns>HLS-transcode capabilities whose audio target the session journey does not execute.</returns>
@@ -276,6 +276,24 @@ public static class EndToEndCapabilityPresets
 
         // The audio must be re-encoded too, or the AAC source is copied and the target never matters.
         return (capabilities with { OutputProfiles = outputProfiles }, constraints with { AllowAudioStreamCopy = false });
+    }
+
+    /// <summary>
+    /// <see cref="TranscodeHls"/> with a progressive HTTP output instead of HLS (an MPEG-TS stream of
+    /// H.264 and AAC): a client that declares no HLS output. The session journey does not execute
+    /// that delivery yet (docs/playback-path-inventory.md §7, step 4), so a session with these
+    /// capabilities is planned by the existing chain, under the live wiring and its kill switch.
+    /// </summary>
+    /// <returns>Transcode capabilities whose only output is progressive HTTP.</returns>
+    public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) TranscodeProgressiveHttp()
+    {
+        var (capabilities, constraints) = TranscodeHls();
+        var outputProfiles = new List<PlaybackOutputProfile>
+        {
+            new(MediaKind.Video, StreamingProtocol.Http, "ts", [FixtureVideoCodec], [FixtureAudioCodec], null, null, null),
+        };
+
+        return (capabilities with { OutputProfiles = outputProfiles, Decode = capabilities.Decode with { SupportsHls = false } }, constraints);
     }
 
     /// <summary>

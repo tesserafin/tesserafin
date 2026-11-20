@@ -300,20 +300,11 @@ public sealed class HlsOutputIsolationEndToEndTests : IClassFixture<HlsIsolation
     /// </summary>
     private async Task<List<string>> PlayToSegmentsAsync(HttpClient client, Guid userId, string playSession)
     {
-        // The existing chain's HLS routes (/Videos/{id}/master.m3u8 ...) for a target the session
-        // journey does not execute; that journey's own isolation is TranscodeFilmEndToEndTests.
-        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHlsToAnUnexecutedTarget();
-        using var planned = await client.PostAsJsonAsync(
-            "Playback/Sessions",
-            new CreatePlaybackSessionRequest(_item, userId, capabilities, constraints, MediaSourceId: null, PlaySessionId: playSession),
-            JsonDefaults.Options,
-            TestContext.Current.CancellationToken);
-        var body = await planned.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        Assert.True(planned.IsSuccessStatusCode, $"POST Playback/Sessions: {(int)planned.StatusCode} {body}");
-        var session = JsonSerializer.Deserialize<PlaybackSessionResponse>(body, JsonDefaults.Options)!;
-        Assert.Equal(PlaybackMethod.Transcode, session.Method);
-
-        var descriptor = (await client.GetFromJsonAsync<PlaybackSessionStreamDescriptor>($"Playback/Sessions/{session.Id}/Stream", JsonDefaults.Options, TestContext.Current.CancellationToken))!;
+        // The existing chain's HLS routes (/Videos/{id}/master.m3u8 ...), reached through their
+        // remaining caller, PlaybackInfo: a session refuses a transcode it does not execute. The
+        // session journey's own isolation is TranscodeFilmEndToEndTests.
+        var url = await LegacyPlaybackInfo.TranscodingUrlAsync(client, _item, userId, EndToEndCapabilityPresets.TranscodeHlsToAnUnexecutedTarget(), playSession);
+        var descriptor = new { Url = url };
         var master = await GetAsync(client, descriptor.Url);
         Assert.Equal(HttpStatusCode.OK, master.Status);
         var variantUrl = Uris(Encoding.UTF8.GetString(master.Body), descriptor.Url)[0];
