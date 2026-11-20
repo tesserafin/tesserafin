@@ -164,6 +164,9 @@ namespace Tesserafin.Controller.Entities.Audio
             return info;
         }
 
+        public ArtistInfo GetLookupInfo((string Language, string CountryCode) locale)
+            => GetItemLookupInfo<ArtistInfo>(locale);
+
         public static string GetPath(string name, bool normalizeName)
             => GetPath(name, FileSystem, ConfigurationManager.ApplicationPaths.ArtistsPath, normalizeName);
 

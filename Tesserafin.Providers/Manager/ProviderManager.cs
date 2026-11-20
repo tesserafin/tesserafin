@@ -65,6 +65,7 @@ namespace Tesserafin.Providers.Manager
         private readonly ILibraryItemOptions _itemOptions;
         private readonly IItemRepository _itemRepository;
         private readonly IItemLookupService _itemLookup;
+        private readonly ILinkedChildrenService _artists;
         private readonly ILibraryScanCoordinator _scans;
         private readonly ISubtitleManager _subtitleManager;
         private readonly ILyricManager _lyricManager;
@@ -108,6 +109,7 @@ namespace Tesserafin.Providers.Manager
         /// <param name="itemOptions">Effective library options for provider selection.</param>
         /// <param name="itemRepository">Catalogue reads for album refresh.</param>
         /// <param name="itemLookup">Catalogue identity and hierarchy lookup.</param>
+        /// <param name="artists">Catalogue lookup for artists associated with albums.</param>
         /// <param name="baseItemManager">The BaseItem manager.</param>
         /// <param name="lyricManager">The lyric manager.</param>
         /// <param name="remoteImages">The image-only HTTP source.</param>
@@ -128,6 +130,7 @@ namespace Tesserafin.Providers.Manager
             ILibraryItemOptions itemOptions,
             IItemRepository itemRepository,
             IItemLookupService itemLookup,
+            ILinkedChildrenService artists,
             ILibraryScanCoordinator scans,
             IBaseItemManager baseItemManager,
             ILyricManager lyricManager,
@@ -148,6 +151,7 @@ namespace Tesserafin.Providers.Manager
             _itemOptions = itemOptions;
             _itemRepository = itemRepository;
             _itemLookup = itemLookup;
+            _artists = artists;
             _scans = scans;
             _subtitleManager = subtitleManager;
             _baseItemManager = baseItemManager;
@@ -984,7 +988,7 @@ namespace Tesserafin.Providers.Manager
                 .OfType<MusicAlbum>();
 
             var musicArtists = albums
-                .Select(i => i.MusicArtist)
+                .Select(album => album.GetMusicArtist(_itemLookup, _artists))
                 .Where(i => i is not null)
                 .Distinct();
 

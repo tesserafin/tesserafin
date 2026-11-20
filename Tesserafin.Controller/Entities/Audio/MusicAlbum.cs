@@ -72,6 +72,9 @@ namespace Tesserafin.Controller.Entities.Audio
         public MusicArtist GetMusicArtist()
             => FindMusicArtist(GetParents(), name => LibraryManager.GetArtists([name]));
 
+        public MusicArtist GetMusicArtist(IItemLookupService lookup, ILinkedChildrenService artists)
+            => FindMusicArtist(GetParents(lookup), name => artists.FindArtists([name]));
+
         protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user)
         {
             return Tracks;
@@ -130,7 +133,7 @@ namespace Tesserafin.Controller.Entities.Audio
             (string Language, string CountryCode) locale,
             Func<Audio, SongInfo> getTrackLookupInfo)
             => BuildLookupInfo(
-                FindMusicArtist(GetParents(lookup), name => artists.FindArtists([name])),
+                GetMusicArtist(lookup, artists),
                 GetCatalogueTracks(repository, lookup, links).Cast<Audio>().Select(getTrackLookupInfo),
                 locale);
 

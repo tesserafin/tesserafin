@@ -653,6 +653,7 @@ namespace Tesserafin.Providers.Tests.Manager
                 itemOptions,
                 repository,
                 itemLookup,
+                Mock.Of<ILinkedChildrenService>(),
                 Mock.Of<ILibraryScanCoordinator>(),
                 baseItemManager!,
                 Mock.Of<ILyricManager>(),
