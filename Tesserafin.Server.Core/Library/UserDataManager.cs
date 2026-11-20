@@ -29,6 +29,7 @@ namespace Tesserafin.Server.Core.Library
         private readonly IServerConfigurationManager _config;
         private readonly IDbContextFactory<TesserafinDbContext> _repository;
         private readonly IItemCountService _itemCountService;
+        private readonly IVideoVersionCatalog _versions;
         private readonly FastConcurrentLru<string, UserItemData> _cache;
 
         /// <summary>
@@ -37,14 +38,17 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="config">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
         /// <param name="repository">Instance of the <see cref="IDbContextFactory{TesserafinDbContext}"/> interface.</param>
         /// <param name="itemCountService">Instance of the <see cref="IItemCountService"/> interface.</param>
+        /// <param name="versions">The catalogue versions used to calculate resume data.</param>
         public UserDataManager(
             IServerConfigurationManager config,
             IDbContextFactory<TesserafinDbContext> repository,
-            IItemCountService itemCountService)
+            IItemCountService itemCountService,
+            IVideoVersionCatalog versions)
         {
             _config = config;
             _repository = repository;
             _itemCountService = itemCountService;
+            _versions = versions;
             _cache = new FastConcurrentLru<string, UserItemData>(Environment.ProcessorCount, _config.Configuration.CacheSize, StringComparer.OrdinalIgnoreCase);
         }
 
@@ -315,7 +319,7 @@ namespace Tesserafin.Server.Core.Library
                     continue;
                 }
 
-                var versions = video.GetAllVersions();
+                var versions = _versions.GetVersions(video);
                 if (versions.Count < 2)
                 {
                     continue;

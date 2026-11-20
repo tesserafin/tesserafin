@@ -131,29 +131,19 @@ public class BaseItemTests
     }
 
     [Fact]
-    public void GetAlternateVersion_ReturnsMatchingLocalVersion()
+    public void GetCatalogueVersions_FromAnyVersion_ReturnsEveryVersionOnce()
     {
         var (primary, alt1, alt2) = SetupVersionGroup();
-
-        Assert.Same(alt1, primary.GetAlternateVersion(alt1.Id));
-        Assert.Same(alt2, primary.GetAlternateVersion(alt2.Id));
-        Assert.Same(primary, primary.GetAlternateVersion(primary.Id));
-        Assert.Null(primary.GetAlternateVersion(Guid.NewGuid()));
-    }
-
-    [Fact]
-    public void GetAllVersions_FromAnyVersion_ReturnsEveryVersionOnce()
-    {
-        var (primary, alt1, alt2) = SetupVersionGroup();
+        var context = CreateVersionGroupReadContext(primary, alt1, alt2);
 
         foreach (var source in new[] { primary, alt1, alt2 })
         {
-            var versions = source.GetAllVersions();
+            var versions = source.GetCatalogueVersions(context.Items, context.Links);
 
             Assert.Equal(3, versions.Count);
-            Assert.Contains(versions, v => v.Id.Equals(primary.Id));
-            Assert.Contains(versions, v => v.Id.Equals(alt1.Id));
-            Assert.Contains(versions, v => v.Id.Equals(alt2.Id));
+            Assert.Contains(primary, versions);
+            Assert.Contains(alt1, versions);
+            Assert.Contains(alt2, versions);
         }
     }
 
@@ -196,10 +186,7 @@ public class BaseItemTests
     {
         var (primary, alt1, alt2) = SetupVersionGroup();
         var segmentManager = Mock.Of<IMediaSegmentManager>();
-        var links = new Mock<ILinkedChildrenService>();
-        links.Setup(x => x.GetLinkedChildrenIds(It.IsAny<Guid>(), It.IsAny<int?>())).Returns([]);
-        links.Setup(x => x.GetLinkedChildrenIds(primary.Id, (int)Tesserafin.Controller.Entities.LinkedChildType.LocalAlternateVersion)).Returns([alt1.Id, alt2.Id]);
-        var context = CreateReadContext(lookup: BaseItem.LibraryManager, links: links.Object);
+        var context = CreateVersionGroupReadContext(primary, alt1, alt2);
 
         // Resuming the 1080p alternate must default to the 1080p source, not the higher-resolution
         // 2160p primary that the width ordering would otherwise place first.
@@ -313,6 +300,20 @@ public class BaseItemTests
 
         Assert.Single(result);
         Assert.Equal(channelItem.Id.ToString("N"), result[0].Id);
+    }
+
+    private static MediaSourceReadContext CreateVersionGroupReadContext(Video primary, Video alt1, Video alt2)
+    {
+        var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
+        foreach (var video in new[] { primary, alt1, alt2 })
+        {
+            lookup.Setup(items => items.GetItemById(video.Id)).Returns(video);
+        }
+
+        var links = new Mock<ILinkedChildrenService>();
+        links.Setup(x => x.GetLinkedChildrenIds(It.IsAny<Guid>(), It.IsAny<int?>())).Returns([]);
+        links.Setup(x => x.GetLinkedChildrenIds(primary.Id, (int)Tesserafin.Controller.Entities.LinkedChildType.LocalAlternateVersion)).Returns([alt1.Id, alt2.Id]);
+        return CreateReadContext(lookup: lookup.Object, links: links.Object);
     }
 
     private static MediaSourceReadContext CreateReadContext(IChannelManager? channels = null, IItemLookupService? lookup = null, ILinkedChildrenService? links = null)

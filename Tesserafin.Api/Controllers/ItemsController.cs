@@ -48,6 +48,7 @@ public class ItemsController : BaseTesserafinApiController
     private readonly ISearchManager _searchManager;
     private readonly IItemQueryService _itemQueryService;
     private readonly IItemSortService _itemSortService;
+    private readonly IVideoVersionCatalog _versions;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ItemsController"/> class.
@@ -63,6 +64,7 @@ public class ItemsController : BaseTesserafinApiController
     /// <param name="searchManager">Instance of the <see cref="ISearchManager"/> interface.</param>
     /// <param name="itemQueryService">Instance of the <see cref="IItemQueryService"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
+    /// <param name="versions">The catalogue versions used to exclude videos already playing.</param>
     public ItemsController(
         IUserManager userManager,
         INamedItemCatalog namedItems,
@@ -74,7 +76,8 @@ public class ItemsController : BaseTesserafinApiController
         IUserDataManager userDataRepository,
         ISearchManager searchManager,
         IItemQueryService itemQueryService,
-        IItemSortService itemSortService)
+        IItemSortService itemSortService,
+        IVideoVersionCatalog versions)
     {
         _userManager = userManager;
         _namedItems = namedItems;
@@ -87,6 +90,7 @@ public class ItemsController : BaseTesserafinApiController
         _searchManager = searchManager;
         _itemQueryService = itemQueryService;
         _itemSortService = itemSortService;
+        _versions = versions;
     }
 
     /// <summary>
@@ -982,7 +986,7 @@ public class ItemsController : BaseTesserafinApiController
             excludeItemIds = _sessionManager.Sessions
                 .Where(s => s.UserId.Equals(requestUserId) && s.NowPlayingItem is not null)
                 .SelectMany(s => _libraryManager.GetItemById(s.NowPlayingItem.Id) is Video video
-                    ? video.GetAllVersions().Select(v => v.Id)
+                    ? _versions.GetVersions(video).Select(v => v.Id)
                     : [s.NowPlayingItem.Id])
                 .Distinct()
                 .ToArray();

@@ -68,6 +68,7 @@ namespace Tesserafin.Server.Core.Library
         private readonly IMediaAttachmentRepository _mediaAttachmentRepository;
         private readonly IMediaSegmentManager _mediaSegmentManager;
         private readonly MediaSourceReadContext _sourceReadContext;
+        private readonly IVideoVersionCatalog _versions;
         private readonly ConcurrentDictionary<string, ILiveStream> _openStreams = new ConcurrentDictionary<string, ILiveStream>(StringComparer.OrdinalIgnoreCase);
         private readonly AsyncNonKeyedLocker _liveStreamLocker = new(1);
         private readonly JsonSerializerOptions _jsonOptions = JsonDefaults.Options;
@@ -96,7 +97,8 @@ namespace Tesserafin.Server.Core.Library
             ILinkedChildrenService linkedChildren,
             Lazy<IChannelManager> channels,
             ActiveRecordings recordings,
-            IServerConfigurationManager configuration)
+            IServerConfigurationManager configuration,
+            IVideoVersionCatalog versions)
         {
             _writes = writes;
             _deletions = deletions;
@@ -122,6 +124,7 @@ namespace Tesserafin.Server.Core.Library
                 channels,
                 recordings,
                 path => path.ApplyNetworkPathSubstitutions(configuration.Configuration.PathSubstitutions));
+            _versions = versions;
         }
 
         public void AddParts(IEnumerable<IMediaSourceProvider> providers)
@@ -429,7 +432,7 @@ namespace Tesserafin.Server.Core.Library
                 return sources;
             }
 
-            var versions = video.GetCatalogueVersions(_sourceReadContext.Items, _sourceReadContext.Links);
+            var versions = _versions.GetVersions(video);
             if (versions.Count < 2)
             {
                 return sources;

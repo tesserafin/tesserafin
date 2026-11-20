@@ -27,19 +27,22 @@ namespace Tesserafin.Server.Core.TV
         private readonly IServerConfigurationManager _configurationManager;
         private readonly IMediaSourceManager _mediaSourceManager;
         private readonly IItemSortService _itemSortService;
+        private readonly IVideoVersionCatalog _versions;
 
         public TVSeriesManager(
             IUserDataManager userDataManager,
             ILibraryManager libraryManager,
             IServerConfigurationManager configurationManager,
             IMediaSourceManager mediaSourceManager,
-            IItemSortService itemSortService)
+            IItemSortService itemSortService,
+            IVideoVersionCatalog versions)
         {
             _userDataManager = userDataManager;
             _libraryManager = libraryManager;
             _configurationManager = configurationManager;
             _mediaSourceManager = mediaSourceManager;
             _itemSortService = itemSortService;
+            _versions = versions;
         }
 
         public QueryResult<BaseItem> GetNextUp(NextUpQuery query, DtoOptions options)
@@ -238,7 +241,7 @@ namespace Tesserafin.Server.Core.TV
             if (nextEpisode is not null && !includeResumable)
             {
                 // The resume progress may live on an alternate version
-                foreach (var version in nextEpisode.GetAllVersions())
+                foreach (var version in _versions.GetVersions(nextEpisode))
                 {
                     if (_userDataManager.GetUserData(user, version)?.PlaybackPositionTicks > 0)
                     {
@@ -273,7 +276,7 @@ namespace Tesserafin.Server.Core.TV
                 return (null, null);
             }
 
-            var versions = lastWatchedVideo.GetAllVersions();
+            var versions = _versions.GetVersions(lastWatchedVideo);
             var userDataByVersion = _userDataManager.GetUserDataBatch(versions, user);
 
             var playedVersion = VersionPlaybackSelector.SelectMostRecentlyPlayed(

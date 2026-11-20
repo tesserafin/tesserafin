@@ -129,6 +129,7 @@ namespace Tesserafin.Server.Core.Dto
         private readonly ITrickplayManager _trickplayManager;
         private readonly IChapterManager _chapterManager;
         private readonly IItemCountService _itemCountService;
+        private readonly IVideoVersionCatalog _versions;
 
         public DtoService(
             ILogger<DtoService> logger,
@@ -144,7 +145,8 @@ namespace Tesserafin.Server.Core.Dto
             Lazy<ILiveTvManager> livetvManagerFactory,
             ITrickplayManager trickplayManager,
             IChapterManager chapterManager,
-            IItemCountService itemCountService)
+            IItemCountService itemCountService,
+            IVideoVersionCatalog versions)
         {
             _logger = logger;
             _namedItems = namedItems;
@@ -160,6 +162,7 @@ namespace Tesserafin.Server.Core.Dto
             _trickplayManager = trickplayManager;
             _chapterManager = chapterManager;
             _itemCountService = itemCountService;
+            _versions = versions;
         }
 
         private ILiveTvManager LivetvManager => _livetvManagerFactory.Value;
@@ -1288,7 +1291,7 @@ namespace Tesserafin.Server.Core.Dto
                     var mediaSourceCount = user is null
                         || (!video.PrimaryVersionId.HasValue && video.LinkedAlternateVersions.Length == 0 && !video.HasLocalAlternateVersions)
                             ? video.MediaSourceCount
-                            : video.GetAllVersions().Count(v => v.Id.Equals(video.Id) || v.IsVisibleStandalone(user));
+                            : _versions.GetVersions(video).Count(v => v.Id.Equals(video.Id) || v.IsVisibleStandalone(user));
                     if (mediaSourceCount != 1)
                     {
                         dto.MediaSourceCount = mediaSourceCount;

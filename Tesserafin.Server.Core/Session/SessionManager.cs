@@ -66,6 +66,7 @@ namespace Tesserafin.Server.Core.Session
         private readonly CancellationTokenRegistration _shutdownCallback;
         private readonly IPlaybackCredentialService _credentialService;
         private readonly IItemPlayedStateService _playedStateService;
+        private readonly IVideoVersionCatalog _versions;
 
         private readonly ConcurrentDictionary<string, SessionInfo> _activeConnections
             = new(StringComparer.OrdinalIgnoreCase);
@@ -99,6 +100,7 @@ namespace Tesserafin.Server.Core.Session
         /// <param name="itemSortService">Instance of <see cref="IItemSortService"/> interface.</param>
         /// <param name="credentialService">Instance of the <see cref="IPlaybackCredentialService"/> interface.</param>
         /// <param name="playedStateService">Marks the other versions of a video played to completion.</param>
+        /// <param name="versions">The catalogue versions used to resolve reported media sources.</param>
         public SessionManager(
             ILogger<SessionManager> logger,
             IEventManager eventManager,
@@ -116,7 +118,8 @@ namespace Tesserafin.Server.Core.Session
             IItemQueryService itemQueryService,
             IItemSortService itemSortService,
             IPlaybackCredentialService credentialService,
-            IItemPlayedStateService playedStateService)
+            IItemPlayedStateService playedStateService,
+            IVideoVersionCatalog versions)
         {
             _logger = logger;
             _eventManager = eventManager;
@@ -135,6 +138,7 @@ namespace Tesserafin.Server.Core.Session
             _itemSortService = itemSortService;
             _credentialService = credentialService;
             _playedStateService = playedStateService;
+            _versions = versions;
 
             _deviceManager.DeviceOptionsUpdated += OnDeviceManagerDeviceOptionsUpdated;
         }
@@ -789,7 +793,7 @@ namespace Tesserafin.Server.Core.Session
                 && Guid.TryParse(mediaSourceId, out var mediaSourceItemId)
                 && !mediaSourceItemId.Equals(libraryVideo.Id))
             {
-                var versionItem = libraryVideo.GetAlternateVersion(mediaSourceItemId);
+                var versionItem = _versions.GetVersions(libraryVideo).FirstOrDefault(version => version.Id.Equals(mediaSourceItemId));
                 if (versionItem is not null)
                 {
                     return versionItem;

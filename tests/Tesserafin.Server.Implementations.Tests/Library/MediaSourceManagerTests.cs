@@ -48,6 +48,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library
             _itemLookup = fixture.Freeze<Mock<IItemLookupService>>();
             _linkedChildren = fixture.Freeze<Mock<ILinkedChildrenService>>();
             _linkedChildren.Setup(links => links.GetLinkedChildrenIds(It.IsAny<Guid>(), It.IsAny<int?>())).Returns([]);
+            fixture.Inject<IVideoVersionCatalog>(new VideoVersionCatalog(_itemLookup.Object, _linkedChildren.Object));
 
             _mockUserDataManager = fixture.Freeze<Mock<IUserDataManager>>();
             _mockUserDataManager.Setup(m => m.GetUserData(It.IsAny<User>(), It.IsAny<BaseItem>())).Returns(new UserItemData() { Key = "key" });
