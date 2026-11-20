@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -14,7 +15,6 @@ using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
-using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
@@ -38,8 +38,8 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
     private readonly IServerConfigurationManager _configurationManager;
     private readonly Lazy<IExternalDataManager> _externalDataManagerFactory;
     private readonly Lazy<IMediaSourceManager> _sources;
-    private readonly Lazy<IMediaSegmentManager> _segments;
     private readonly Lazy<IChannelManager> _channels;
+    private readonly ActiveRecordings _recordings;
     private readonly ILogger<ItemDeletionCommands> _logger;
 
     public ItemDeletionCommands(
@@ -55,8 +55,8 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         IServerConfigurationManager configurationManager,
         Lazy<IExternalDataManager> externalDataManagerFactory,
         Lazy<IMediaSourceManager> sources,
-        Lazy<IMediaSegmentManager> segments,
         Lazy<IChannelManager> channels,
+        ActiveRecordings recordings,
         ILogger<ItemDeletionCommands> logger)
     {
         _writes = writes;
@@ -71,8 +71,8 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         _configurationManager = configurationManager;
         _externalDataManagerFactory = externalDataManagerFactory;
         _sources = sources;
-        _segments = segments;
         _channels = channels;
+        _recordings = recordings;
         _logger = logger;
     }
 
@@ -186,22 +186,18 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         ArgumentNullException.ThrowIfNull(item);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var deleteSource = options.DeleteFileLocation && item.SourceType != SourceType.Channel;
-        if (item.SourceType == SourceType.Channel)
+        var isChannelItem = IsChannelItem(item);
+        var deleteSource = options.DeleteFileLocation && !isChannelItem;
+        if (isChannelItem && options.DeleteFromExternalProvider)
         {
-            if (options.DeleteFromExternalProvider)
+            try
             {
-                try
-                {
-                    await _channels.Value.DeleteItem(item).ConfigureAwait(false);
-                }
-                catch (ArgumentException)
-                {
-                    // channel no longer installed
-                }
+                await _channels.Value.DeleteItem(item).ConfigureAwait(false);
             }
-
-            deleteSource = false;
+            catch (ArgumentException)
+            {
+                // channel no longer installed
+            }
         }
 
         if (item is LiveTvProgram)
@@ -446,6 +442,11 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
     private bool IsFileProtocol(BaseItem item)
         => !string.IsNullOrEmpty(item.Path) && _sources.Value.GetPathProtocol(item.Path) == MediaProtocol.File;
 
+    private bool IsChannelItem(BaseItem item)
+        => item is Video video
+            ? !video.ChannelId.Equals(Guid.Empty) && _recordings.GetActiveRecordingInfo(video.Path) is null
+            : item.SourceType == SourceType.Channel;
+
     private bool IsInternalItem(BaseItem item)
     {
         if (!IsFileProtocol(item))
@@ -499,15 +500,15 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
             // Chapter Images
             list.Add(_pathManager.GetChapterImageFolderPath(video));
 
-            foreach (var mediaSource in item.GetMediaSources(false, _sources.Value, _segments.Value, _channels.Value))
+            foreach (var sourceId in GetMediaSourceIds(video))
             {
-                var subtitleFolder = _pathManager.GetSubtitleFolderPath(mediaSource.Id);
+                var subtitleFolder = _pathManager.GetSubtitleFolderPath(sourceId);
                 if (subtitleFolder is not null)
                 {
                     list.Add(subtitleFolder);
                 }
 
-                var attachmentFolder = _pathManager.GetAttachmentFolderPath(mediaSource.Id);
+                var attachmentFolder = _pathManager.GetAttachmentFolderPath(sourceId);
                 if (attachmentFolder is not null)
                 {
                     list.Add(attachmentFolder);
@@ -516,5 +517,20 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         }
 
         return list;
+    }
+
+    private IEnumerable<string> GetMediaSourceIds(Video video)
+    {
+        if (IsChannelItem(video))
+        {
+            var channelSources = _channels.Value.GetStaticMediaSources(video, CancellationToken.None).ToArray();
+            if (channelSources.Length > 0)
+            {
+                return channelSources.Select(source => source.Id);
+            }
+        }
+
+        return video.GetCatalogueMediaSourceIds(_items, _linkedChildren)
+            .Select(id => id.ToString("N", CultureInfo.InvariantCulture));
     }
 }

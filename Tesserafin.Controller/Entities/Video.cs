@@ -527,14 +527,36 @@ namespace Tesserafin.Controller.Entities
         }
 
         protected override IEnumerable<(BaseItem Item, MediaSourceType MediaSourceType)> GetAllItemsForMediaSources()
+            => ReadMediaSourceItems(
+                LibraryManager.GetItemById,
+                LibraryManager.GetLinkedAlternateVersions,
+                LibraryManager.GetLocalAlternateVersionIds);
+
+        /// <summary>Reads the item IDs represented by this video's catalogue sources.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <param name="links">The persisted version links.</param>
+        /// <returns>The distinct catalogue source IDs.</returns>
+        public IEnumerable<Guid> GetCatalogueMediaSourceIds(IItemLookupService lookup, ILinkedChildrenService links)
+            => ReadMediaSourceItems(
+                lookup.GetItemById,
+                video => links.GetLinkedChildrenIds(video.Id, (int)LinkedChildType.LinkedAlternateVersion)
+                    .Select(lookup.GetItemById)
+                    .OfType<Video>(),
+                video => links.GetLinkedChildrenIds(video.Id, (int)LinkedChildType.LocalAlternateVersion))
+                .Select(source => source.Item.Id);
+
+        private IEnumerable<(BaseItem Item, MediaSourceType MediaSourceType)> ReadMediaSourceItems(
+            Func<Guid, BaseItem> getItem,
+            Func<Video, IEnumerable<Video>> getLinkedVersions,
+            Func<Video, IEnumerable<Guid>> getLocalVersionIds)
         {
             var primary = PrimaryVersionId.HasValue
-                ? LibraryManager.GetItemById(PrimaryVersionId.Value) as Video
+                ? getItem(PrimaryVersionId.Value) as Video
                 : null;
 
             var primaryLinked = primary is null
                 ? []
-                : LibraryManager.GetLinkedAlternateVersions(primary).ToList();
+                : getLinkedVersions(primary).ToList();
 
             // Grouping marks user-merged (splittable) sources. The primary is only such a source when
             // this video is linked onto it; for local (file-based) alternates the primary is just
@@ -545,7 +567,7 @@ namespace Tesserafin.Controller.Entities
 
             // This video and its linked alternates, when this is itself an alternate, the primary and the primary's linked alternates.
             var grouped = new[] { ((BaseItem)this, MediaSourceType.Default) }
-                .Concat(LibraryManager.GetLinkedAlternateVersions(this).Select(i => ((BaseItem)i, MediaSourceType.Grouping)))
+                .Concat(getLinkedVersions(this).Select(i => ((BaseItem)i, MediaSourceType.Grouping)))
                 .Concat(primary is null
                     ? []
                     : primaryLinked.Select(i => ((BaseItem)i, MediaSourceType.Grouping)).Prepend(((BaseItem)primary, primaryType)))
@@ -555,8 +577,8 @@ namespace Tesserafin.Controller.Entities
             var localAlternates = grouped
                 .Select(i => i.Item1)
                 .OfType<Video>()
-                .SelectMany(LibraryManager.GetLocalAlternateVersionIds)
-                .Select(LibraryManager.GetItemById)
+                .SelectMany(getLocalVersionIds)
+                .Select(getItem)
                 .Where(i => i is not null)
                 .Select(i => (i, MediaSourceType.Default));
 

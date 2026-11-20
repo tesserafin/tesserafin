@@ -13,13 +13,14 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
-using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
+using Tesserafin.Model.LiveTv;
 using Tesserafin.Server.Core.Library;
 using Xunit;
 
@@ -191,6 +192,67 @@ public sealed class ItemDeletionCommandsTests
     }
 
     [Fact]
+    public async Task Deletion_CleansCatalogueSourceCachesForTheWholeVersionGroup()
+    {
+        using var context = new Context();
+        var primary = context.Video();
+        var linked = context.Video();
+        var local = context.Video();
+        var unrelated = context.Video();
+        linked.SetPrimaryVersionId(primary.Id);
+        context.Items.Setup(items => items.GetItemById(primary.Id)).Returns(primary);
+        context.Items.Setup(items => items.GetItemById(linked.Id)).Returns(linked);
+        context.Items.Setup(items => items.GetItemById(local.Id)).Returns(local);
+        context.Links.Setup(links => links.GetLinkedChildrenIds(primary.Id, (int)LinkedChildType.LinkedAlternateVersion)).Returns([linked.Id]);
+        context.Links.Setup(links => links.GetLinkedChildrenIds(primary.Id, (int)LinkedChildType.LocalAlternateVersion)).Returns([local.Id]);
+        var groupCaches = new[] { primary, linked, local }.SelectMany(item => context.CreateSourceCaches(item.Id)).ToArray();
+        var otherCaches = context.CreateSourceCaches(unrelated.Id);
+
+        await context.Commands.DeleteAsync(linked, new DeleteOptions(), null, TestContext.Current.CancellationToken);
+
+        Assert.All(groupCaches, path => Assert.False(Directory.Exists(path)));
+        Assert.All(otherCaches, path => Assert.True(Directory.Exists(path)));
+        Assert.True(File.Exists(primary.Path));
+        Assert.True(File.Exists(local.Path));
+        context.Channels.Verify(channels => channels.GetStaticMediaSources(It.IsAny<BaseItem>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task ChannelVideoDeletion_SelectsProviderOrCatalogueCaches(bool recording, bool providerHasSources)
+    {
+        using var context = new Context();
+        using var recordingCancellation = new CancellationTokenSource();
+        var item = context.Video();
+        item.ChannelId = Guid.NewGuid();
+        var providerSourceId = Guid.NewGuid();
+        var providerCaches = context.CreateSourceCaches(providerSourceId);
+        var catalogueCaches = context.CreateSourceCaches(item.Id);
+        context.Channels.Setup(channels => channels.GetStaticMediaSources(item, CancellationToken.None))
+            .Returns(providerHasSources ? [new MediaSourceInfo { Id = providerSourceId.ToString("N") }] : []);
+        if (recording)
+        {
+            context.Recordings["recording"] = new ActiveRecordingInfo
+            {
+                Path = item.Path,
+                Timer = new TimerInfo { Status = RecordingStatus.InProgress },
+                CancellationTokenSource = recordingCancellation
+            };
+        }
+
+        await context.Commands.DeleteAsync(item, new DeleteOptions { DeleteFileLocation = true }, null, TestContext.Current.CancellationToken);
+
+        var useProvider = !recording && providerHasSources;
+        Assert.All(providerCaches, path => Assert.Equal(!useProvider, Directory.Exists(path)));
+        Assert.All(catalogueCaches, path => Assert.Equal(useProvider, Directory.Exists(path)));
+        Assert.Equal(!recording, File.Exists(item.Path));
+        context.Channels.Verify(channels => channels.DeleteItem(item), recording ? Times.Never() : Times.Once());
+        context.Channels.Verify(channels => channels.GetStaticMediaSources(item, CancellationToken.None), recording ? Times.Never() : Times.Once());
+    }
+
+    [Fact]
     public async Task QueuedCancellation_DoesNoWork_AndCancellationAfterAdmissionFinishesReconciliationWithoutMutatingOptions()
     {
         using var context = new Context();
@@ -269,7 +331,7 @@ public sealed class ItemDeletionCommandsTests
         using var context = new Context();
         var cancellationToken = TestContext.Current.CancellationToken;
         var source = context.Video();
-        var episode = new StubEpisode
+        var episode = new Episode
         {
             Id = source.Id,
             Path = source.Path,
@@ -342,9 +404,12 @@ public sealed class ItemDeletionCommandsTests
             Files.Setup(f => f.DirectoryExists(It.IsAny<string>())).Returns((string path) => Directory.Exists(path));
             Files.Setup(f => f.DeleteFile(It.IsAny<string>())).Callback((string path) => File.Delete(path));
             Channels = fixture.Freeze<Mock<IChannelManager>>();
+            Channels.Setup(channels => channels.GetStaticMediaSources(It.IsAny<BaseItem>(), It.IsAny<CancellationToken>())).Returns([]);
+            Channels.Setup(channels => channels.DeleteItem(It.IsAny<BaseItem>())).Returns(Task.CompletedTask);
+            Paths = fixture.Freeze<Mock<IPathManager>>();
+            fixture.Inject(Recordings);
             fixture.Register(() => new Lazy<IChannelManager>(() => Channels.Object));
             fixture.Register(() => new Lazy<IMediaSourceManager>(() => Mock.Of<IMediaSourceManager>()));
-            fixture.Register(() => new Lazy<IMediaSegmentManager>(() => Mock.Of<IMediaSegmentManager>()));
             fixture.Register(() => new Lazy<IExternalDataManager>(() => Mock.Of<IExternalDataManager>()));
             fixture.Inject<Microsoft.Extensions.Logging.ILogger<ItemDeletionCommands>>(Microsoft.Extensions.Logging.Abstractions.NullLogger<ItemDeletionCommands>.Instance);
             Commands = fixture.Create<ItemDeletionCommands>();
@@ -370,6 +435,10 @@ public sealed class ItemDeletionCommandsTests
 
         public Mock<IChannelManager> Channels { get; }
 
+        public Mock<IPathManager> Paths { get; }
+
+        public ActiveRecordings Recordings { get; } = new();
+
         public ItemDeletionCommands Commands { get; }
 
         public StubVideo Video()
@@ -378,6 +447,16 @@ public sealed class ItemDeletionCommandsTests
             var path = System.IO.Path.Combine(_root, id + ".mp4");
             File.WriteAllBytes(path, [1, 3, 5, 7]);
             return new StubVideo { Id = id, Name = "video", Path = path };
+        }
+
+        public string[] CreateSourceCaches(Guid sourceId)
+        {
+            var id = sourceId.ToString("N");
+            var subtitles = Directory.CreateDirectory(Path.Combine(_root, "subtitles", id)).FullName;
+            var attachments = Directory.CreateDirectory(Path.Combine(_root, "attachments", id)).FullName;
+            Paths.Setup(paths => paths.GetSubtitleFolderPath(id)).Returns(subtitles);
+            Paths.Setup(paths => paths.GetAttachmentFolderPath(id)).Returns(attachments);
+            return [subtitles, attachments];
         }
 
         public void Dispose()
@@ -408,22 +487,11 @@ public sealed class ItemDeletionCommandsTests
         }
     }
 
-    private sealed class StubEpisode : Episode
-    {
-        public override SourceType SourceType => SourceType.Library;
-
-        public override IReadOnlyList<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, IChannelManager channelManager) => [];
-    }
-
     private sealed class StubVideo : Video
     {
-        public override SourceType SourceType => ChannelId.Equals(Guid.Empty) ? SourceType.Library : SourceType.Channel;
-
         public bool Saved { get; private set; }
 
         public override IEnumerable<FileSystemMetadata> GetDeletePaths(IFileSystem fileSystem) => [new FileSystemMetadata { FullName = Path }];
-
-        public override IReadOnlyList<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, IChannelManager channelManager) => [];
 
         public override Task UpdateToRepositoryAsync(IItemWriteCommands writes, ItemUpdateType updateReason, CancellationToken cancellationToken)
         {
