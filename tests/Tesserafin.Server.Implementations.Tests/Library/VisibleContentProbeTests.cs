@@ -377,12 +377,15 @@ public sealed class VisibleContentProbeTests
                 .Returns(new ParentalRatingScore(17, null));
 
             BackRepository(_staticRepository);
-            _entityReads = new Tesserafin.Server.Implementations.Item.ItemReadServices(_staticRepository.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings());
 
             var injectedRepository = new Mock<IItemRepository>();
             BackRepository(injectedRepository);
             var lookup = new Mock<IItemLookupService>();
             lookup.Setup(l => l.GetItemById(It.IsAny<Guid>())).Returns((Guid id) => Find(id));
+            _entityReads = new Tesserafin.Server.Implementations.Item.ItemReadServices(
+                _staticRepository.Object,
+                new Tesserafin.Controller.LiveTv.ActiveRecordings(),
+                new(() => new LinkedChildResolver(_staticRepository.Object, lookup.Object, Mock.Of<IItemPathLookupService>(), NullLogger<LinkedChildResolver>.Instance)));
             // The probe's scope sees the same world the legacy static path sees: no libraries, default options.
             var emptyRoot = new Folder { Children = [] };
             var rootProvider = Mock.Of<IUserRootFolderProvider>(p => p.GetUserRootFolder() == emptyRoot);

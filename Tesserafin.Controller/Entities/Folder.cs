@@ -1463,18 +1463,7 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <returns>IEnumerable{BaseItem}.</returns>
         public List<BaseItem> GetLinkedChildren()
-            => CreateLinkedChildResolver().Resolve(this).Select(entry => entry.Item).ToList();
-
-        protected static LinkedChildResolver CreateLinkedChildResolver(IStandaloneVisibilityService scope = null)
-        {
-            return new LinkedChildResolver(
-                scope is null ? query => LibraryManager.GetItemList(query) : null,
-                scope is null ? id => LibraryManager.GetItemById(id) : scope.GetItemById,
-                scope is null
-                    ? path => LibraryManager.GetItemList(ItemPathQuery.Create(path, null)).FirstOrDefault()
-                    : scope.FindByPath,
-                Logger);
-        }
+            => LinkedChildren.Length == 0 ? [] : RequireReadServices().LinkedChildren.GetItems(this).ToList();
 
         public List<BaseItem> GetLinkedChildren(User user, IStandaloneVisibilityService scope)
         {
@@ -1500,7 +1489,7 @@ namespace Tesserafin.Controller.Entities
                 .Select(i => i.Id)
                 .ToList();
 
-            var resolver = CreateLinkedChildResolver();
+            var resolver = RequireReadServices().LinkedChildren;
             foreach (var i in linkedChildren)
             {
                 var child = resolver.ResolveSingle(this, i);

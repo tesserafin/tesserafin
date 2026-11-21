@@ -59,15 +59,17 @@ public sealed partial class BaseItemRepository
     /// <param name="serverConfigurationManager">The server Configuration manager.</param>
     /// <param name="logger">System logger.</param>
     /// <param name="activeRecordings">The recordings in progress, for the catalogue reads attached to every loaded item.</param>
+    /// <param name="linkedChildren">The deferred resolver for links belonging to loaded items.</param>
     public BaseItemRepository(
         IDbContextFactory<TesserafinDbContext> dbProvider,
         IServerApplicationHost appHost,
         IItemTypeLookup itemTypeLookup,
         IServerConfigurationManager serverConfigurationManager,
         ILogger<BaseItemRepository> logger,
-        ActiveRecordings activeRecordings)
+        ActiveRecordings activeRecordings,
+        Lazy<LinkedChildResolver> linkedChildren)
     {
-        _readServices = new ItemReadServices(this, activeRecordings);
+        _readServices = new ItemReadServices(this, activeRecordings, linkedChildren);
         _dbProvider = dbProvider;
         _appHost = appHost;
         _itemTypeLookup = itemTypeLookup;

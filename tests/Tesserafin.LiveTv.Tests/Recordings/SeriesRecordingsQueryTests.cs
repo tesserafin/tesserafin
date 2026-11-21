@@ -52,7 +52,8 @@ public sealed class SeriesRecordingsQueryTests : IDisposable
             _types,
             configuration.Object,
             NullLogger<BaseItemRepository>.Instance,
-            new Tesserafin.Controller.LiveTv.ActiveRecordings());
+            new Tesserafin.Controller.LiveTv.ActiveRecordings(),
+            new());
     }
 
     public void Dispose() => _connection.Dispose();

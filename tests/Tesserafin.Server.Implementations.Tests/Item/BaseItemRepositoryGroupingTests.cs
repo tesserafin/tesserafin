@@ -56,7 +56,8 @@ public sealed class BaseItemRepositoryGroupingTests : IDisposable
             itemTypeLookup,
             serverConfigurationManager.Object,
             NullLogger<BaseItemRepository>.Instance,
-            new Tesserafin.Controller.LiveTv.ActiveRecordings());
+            new Tesserafin.Controller.LiveTv.ActiveRecordings(),
+            new());
     }
 
     public void Dispose()

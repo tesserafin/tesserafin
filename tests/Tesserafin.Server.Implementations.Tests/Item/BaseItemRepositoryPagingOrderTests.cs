@@ -67,7 +67,8 @@ public sealed class BaseItemRepositoryPagingOrderTests : IDisposable
             _types,
             serverConfigurationManager.Object,
             NullLogger<BaseItemRepository>.Instance,
-            new Tesserafin.Controller.LiveTv.ActiveRecordings());
+            new Tesserafin.Controller.LiveTv.ActiveRecordings(),
+            new());
 
         _user = new User("paging", "auth", "reset");
         using (var ctx = CreateDbContext())

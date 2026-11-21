@@ -26,7 +26,7 @@ public sealed class ItemReadServicesTests
             .Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.ParentId.Equals(folder.Id) && !q.GroupByPresentationUniqueKey)))
             .Returns([child]);
 
-        var children = new ItemReadServices(repository.Object, new ActiveRecordings()).GetChildren(folder);
+        var children = new ItemReadServices(repository.Object, new ActiveRecordings(), new()).GetChildren(folder);
 
         Assert.Same(child, Assert.Single(children));
     }
@@ -38,10 +38,10 @@ public sealed class ItemReadServicesTests
         var folderId = Guid.NewGuid();
         var repository = Mock.Of<IItemRepository>(r => r.GetIsPlayed(user, folderId, true) == true);
 
-        Assert.True(new ItemReadServices(repository, new ActiveRecordings()).IsPlayed(user, folderId));
+        Assert.True(new ItemReadServices(repository, new ActiveRecordings(), new()).IsPlayed(user, folderId));
     }
 
     [Fact]
     public void IsActiveRecording_NoRecordingInProgress_IsFalse()
-        => Assert.False(new ItemReadServices(Mock.Of<IItemRepository>(), new ActiveRecordings()).IsActiveRecording("/rec/a.ts"));
+        => Assert.False(new ItemReadServices(Mock.Of<IItemRepository>(), new ActiveRecordings(), new()).IsActiveRecording("/rec/a.ts"));
 }

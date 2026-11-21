@@ -104,7 +104,10 @@ public sealed class StandaloneVisibilityTests
 
         BaseItem.LibraryManager = manager;
         _repository = repository;
-        _readServices = new Tesserafin.Server.Implementations.Item.ItemReadServices(repository.Object, _activeRecordings);
+        _readServices = new Tesserafin.Server.Implementations.Item.ItemReadServices(
+            repository.Object,
+            _activeRecordings,
+            new(() => new LinkedChildResolver(repository.Object, lookup, Mock.Of<IItemPathLookupService>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<LinkedChildResolver>.Instance)));
         BaseItem.ConfigurationManager = configuration.Object;
     }
 

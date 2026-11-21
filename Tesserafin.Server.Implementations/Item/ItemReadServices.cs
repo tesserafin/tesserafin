@@ -14,8 +14,12 @@ namespace Tesserafin.Server.Implementations.Item;
 /// </summary>
 /// <param name="repository">The item repository.</param>
 /// <param name="recordings">The recordings in progress.</param>
-public sealed class ItemReadServices(IItemRepository repository, ActiveRecordings recordings) : IItemReadServices
+/// <param name="linkedChildren">The deferred saved-link resolver.</param>
+public sealed class ItemReadServices(IItemRepository repository, ActiveRecordings recordings, Lazy<LinkedChildResolver> linkedChildren) : IItemReadServices
 {
+    /// <inheritdoc />
+    public LinkedChildResolver LinkedChildren => linkedChildren.Value;
+
     /// <inheritdoc />
     public IReadOnlyList<BaseItem> GetChildren(Folder folder)
         => repository.GetItemList(new InternalItemsQuery

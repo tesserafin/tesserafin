@@ -116,6 +116,9 @@ public sealed class LinkedChildResolver
         return false;
     }
 
+    internal LinkedChildResolver ForScope(IStandaloneVisibilityService scope)
+        => new(null, scope.GetItemById, scope.FindByPath, _logger);
+
     internal BaseItem? ResolveSingle(Folder folder, LinkedChild link)
     {
         if (link.ItemId.HasValue)

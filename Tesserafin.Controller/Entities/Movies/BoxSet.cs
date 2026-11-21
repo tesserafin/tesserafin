@@ -305,7 +305,15 @@ namespace Tesserafin.Controller.Entities.Movies
         /// (DEBT-SERVER-7).
         /// </summary>
         private IReadOnlyList<BaseItem> GetLinkedChildren(IStandaloneVisibilityService scope)
-            => CreateLinkedChildResolver(scope).GetItems(this);
+        {
+            if (LinkedChildren.Length == 0)
+            {
+                return [];
+            }
+
+            var resolver = RequireReadServices().LinkedChildren;
+            return (scope is null ? resolver : resolver.ForScope(scope)).GetItems(this);
+        }
 
         private IEnumerable<BaseItem> FlattenItems(IEnumerable<BaseItem> items, List<Guid> expandedFolders, IStandaloneVisibilityService scope)
         {

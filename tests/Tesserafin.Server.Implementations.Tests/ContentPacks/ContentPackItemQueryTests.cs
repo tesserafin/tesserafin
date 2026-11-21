@@ -63,7 +63,8 @@ public sealed class ContentPackItemQueryTests : IDisposable
             _itemTypeLookup,
             serverConfigurationManager.Object,
             NullLogger<BaseItemRepository>.Instance,
-            new Tesserafin.Controller.LiveTv.ActiveRecordings());
+            new Tesserafin.Controller.LiveTv.ActiveRecordings(),
+            new());
     }
 
     public void Dispose()
