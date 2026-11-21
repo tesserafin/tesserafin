@@ -1,7 +1,5 @@
 #pragma warning disable CS1591
 
-using System.Collections.Generic;
-
 namespace Tesserafin.Controller.Entities
 {
     /// <summary>
@@ -9,7 +7,10 @@ namespace Tesserafin.Controller.Entities
     /// </summary>
     public interface IItemByName
     {
-        IReadOnlyList<BaseItem> GetTaggedItems(InternalItemsQuery query);
+        /// <summary>Applies the filters for items associated with this entry.</summary>
+        /// <param name="query">The query to filter.</param>
+        /// <returns>Whether this entry represents a valid filter.</returns>
+        bool TryApplyTaggedItemsFilter(InternalItemsQuery query);
     }
 
     public interface IHasDualAccess : IItemByName

@@ -66,7 +66,7 @@ namespace Tesserafin.Controller.Entities
             return false;
         }
 
-        public IReadOnlyList<BaseItem> GetTaggedItems(InternalItemsQuery query)
+        public bool TryApplyTaggedItemsFilter(InternalItemsQuery query)
         {
             query.GenreIds = new[] { Id };
             query.ExcludeItemTypes = new[]
@@ -77,7 +77,7 @@ namespace Tesserafin.Controller.Entities
                 BaseItemKind.MusicArtist
             };
 
-            return LibraryManager.GetItemList(query);
+            return true;
         }
 
         public static string GetPath(string name, IFileSystem fileSystem, string root, bool normalizeName = true)

@@ -60,16 +60,16 @@ namespace Tesserafin.Controller.Entities
             return true;
         }
 
-        public IReadOnlyList<BaseItem> GetTaggedItems(InternalItemsQuery query)
+        public bool TryApplyTaggedItemsFilter(InternalItemsQuery query)
         {
-            if (!int.TryParse(Name, NumberStyles.Integer, CultureInfo.InvariantCulture, out var year))
+            if (GetYearValue() is not int year)
             {
-                return new List<BaseItem>();
+                return false;
             }
 
             query.Years = new[] { year };
 
-            return LibraryManager.GetItemList(query);
+            return true;
         }
 
         public int? GetYearValue()

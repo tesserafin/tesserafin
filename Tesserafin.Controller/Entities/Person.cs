@@ -67,11 +67,11 @@ namespace Tesserafin.Controller.Entities
             return value;
         }
 
-        public IReadOnlyList<BaseItem> GetTaggedItems(InternalItemsQuery query)
+        public bool TryApplyTaggedItemsFilter(InternalItemsQuery query)
         {
             query.PersonIds = new[] { Id };
 
-            return LibraryManager.GetItemList(query);
+            return true;
         }
 
         public override bool CanDelete(IChannelManager channels)

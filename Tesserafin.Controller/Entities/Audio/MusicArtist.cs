@@ -76,7 +76,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return !IsAccessedByName;
         }
 
-        public IReadOnlyList<BaseItem> GetTaggedItems(InternalItemsQuery query)
+        public bool TryApplyTaggedItemsFilter(InternalItemsQuery query)
         {
             if (query.IncludeItemTypes.Length == 0)
             {
@@ -84,7 +84,7 @@ namespace Tesserafin.Controller.Entities.Audio
                 query.ArtistIds = new[] { Id };
             }
 
-            return LibraryManager.GetItemList(query);
+            return true;
         }
 
         public override int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)

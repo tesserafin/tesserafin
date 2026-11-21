@@ -182,6 +182,25 @@ public sealed class ItemByNamePathContractTests : IDisposable
         Assert.Throws<ArgumentException>(() => MusicArtist.GetPath(persistedLeaf, _fileSystem, _paths.ArtistsPath, normalizeName: false));
     }
 
+    [Theory]
+    [InlineData("2024", 2024)]
+    [InlineData("unknown", null)]
+    public void YearFilter_RejectsInvalidYears(string name, int? expected)
+    {
+        var year = new Year { Name = name };
+        var query = new InternalItemsQuery { Years = [] };
+
+        Assert.Equal(expected.HasValue, year.TryApplyTaggedItemsFilter(query));
+        if (expected is int value)
+        {
+            Assert.Equal(value, Assert.Single(query.Years));
+        }
+        else
+        {
+            Assert.Empty(query.Years);
+        }
+    }
+
     public void Dispose()
     {
         _tmp.Delete(true);

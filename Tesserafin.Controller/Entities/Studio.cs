@@ -68,11 +68,11 @@ namespace Tesserafin.Controller.Entities
             return true;
         }
 
-        public IReadOnlyList<BaseItem> GetTaggedItems(InternalItemsQuery query)
+        public bool TryApplyTaggedItemsFilter(InternalItemsQuery query)
         {
             query.StudioIds = new[] { Id };
 
-            return LibraryManager.GetItemList(query);
+            return true;
         }
 
         public static string GetPath(string name, IFileSystem fileSystem, string root, bool normalizeName = true)
