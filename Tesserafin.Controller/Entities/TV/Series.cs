@@ -148,7 +148,7 @@ namespace Tesserafin.Controller.Entities.TV
         {
             var seriesKey = GetUniqueSeriesKey(this);
 
-            var result = LibraryManager.GetCount(new InternalItemsQuery(user)
+            var result = listing.Queries.GetCount(new InternalItemsQuery(user)
             {
                 AncestorWithPresentationUniqueKey = null,
                 SeriesPresentationUniqueKey = seriesKey,
@@ -192,10 +192,10 @@ namespace Tesserafin.Controller.Entities.TV
 
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query)
         {
-            return GetSeasons(user, new DtoOptions(true));
+            return GetSeasons(user, new DtoOptions(true), query.RequireListing());
         }
 
-        public IReadOnlyList<BaseItem> GetSeasons(User user, DtoOptions options)
+        public IReadOnlyList<BaseItem> GetSeasons(User user, DtoOptions options, IItemListingServices listing)
         {
             var query = new InternalItemsQuery(user)
             {
@@ -204,7 +204,7 @@ namespace Tesserafin.Controller.Entities.TV
 
             SetSeasonQueryOptions(query, user);
 
-            return LibraryManager.GetItemList(query);
+            return listing.Queries.GetItemList(query);
         }
 
         private void SetSeasonQueryOptions(InternalItemsQuery query, User user)
@@ -258,21 +258,16 @@ namespace Tesserafin.Controller.Entities.TV
                 }
 
                 query.IsVirtualItem = false;
-                return LibraryManager.GetItemsResult(query);
+                return query.RequireListing().Queries.GetItems(query);
             }
 
             SetSeasonQueryOptions(query, user);
 
-            return LibraryManager.GetItemsResult(query);
-        }
-
-        public IEnumerable<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes)
-        {
-            return GetEpisodes(user, options, shouldIncludeMissingEpisodes, null);
+            return query.RequireListing().Queries.GetItems(query);
         }
 
         public IEnumerable<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
-            => ReadEpisodes(user, options, shouldIncludeMissingEpisodes, listing, static query => LibraryManager.GetItemList(query));
+            => ReadEpisodes(user, options, shouldIncludeMissingEpisodes, listing, query => listing.Queries.GetItemList(query));
 
         /// <summary>Reads grouped episodes, including missing entries, for a background metadata refresh.</summary>
         /// <param name="options">The item data to load.</param>
@@ -386,13 +381,8 @@ namespace Tesserafin.Controller.Entities.TV
             await services.Providers.RefreshSingleItem(this, refreshOptions, cancellationToken).ConfigureAwait(false);
         }
 
-        public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, DtoOptions options, bool shouldIncludeMissingEpisodes)
-        {
-            return GetSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, null);
-        }
-
         public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
-            => ReadSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, listing, static query => LibraryManager.GetItemList(query));
+            => ReadSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, listing, query => listing.Queries.GetItemList(query));
 
         internal List<BaseItem> GetCatalogueSeasonEpisodes(Season parentSeason, DtoOptions options, IItemRepository repository, IItemListingServices listing)
             => ReadSeasonEpisodes(parentSeason, null, options, true, listing, repository.GetItemList);
@@ -471,9 +461,9 @@ namespace Tesserafin.Controller.Entities.TV
             // contract has no service to give) keep falling back to the obsolete static facade.
             // The pragma below therefore survives this tranche on purpose -- see
             // docs/major-rewrite-plan-v13.md § PR49/N and § PR50/N.
-            if (listing is not null)
+            if (listing?.Sort is { } sorter)
             {
-                return listing.Sort.Sort(episodes, user, new[] { sortBy }, SortOrder.Ascending).ToList();
+                return sorter.Sort(episodes, user, new[] { sortBy }, SortOrder.Ascending).ToList();
             }
 
 #pragma warning disable CS0618 // static LibraryManager.Sort facade left in place pending Folder.GetChildren/Series.GetEpisodes cascade, see docs/major-rewrite-plan-v13.md § PR49/N

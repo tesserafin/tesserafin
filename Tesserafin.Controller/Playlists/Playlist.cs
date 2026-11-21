@@ -176,7 +176,7 @@ namespace Tesserafin.Controller.Playlists
         {
             if (item is MusicGenre musicGenre)
             {
-                return LibraryManager.GetItemList(new InternalItemsQuery(user)
+                return itemQueryService.GetItemList(new InternalItemsQuery(user)
                 {
                     Recursive = true,
                     IncludeItemTypes = [BaseItemKind.Audio],
@@ -188,7 +188,7 @@ namespace Tesserafin.Controller.Playlists
 
             if (item is MusicArtist musicArtist)
             {
-                return LibraryManager.GetItemList(new InternalItemsQuery(user)
+                return itemQueryService.GetItemList(new InternalItemsQuery(user)
                 {
                     Recursive = true,
                     IncludeItemTypes = [BaseItemKind.Audio],

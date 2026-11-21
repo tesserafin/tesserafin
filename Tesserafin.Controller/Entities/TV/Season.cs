@@ -190,7 +190,7 @@ namespace Tesserafin.Controller.Entities.TV
 
             var user = query.User;
 
-            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true), user, query, LibraryManager);
+            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true, query.Listing), user, query, LibraryManager);
 
             return PostFilterAndSort(items, query, collectionManager);
         }
@@ -230,19 +230,7 @@ namespace Tesserafin.Controller.Entities.TV
         /// <param name="user">The user.</param>
         /// <param name="options">The options to use.</param>
         /// <param name="shouldIncludeMissingEpisodes">If missing episodes should be included.</param>
-        /// <returns>Set of episodes.</returns>
-        public List<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes)
-        {
-            return GetEpisodes(user, options, shouldIncludeMissingEpisodes, null);
-        }
-
-        /// <summary>
-        /// Gets the episodes.
-        /// </summary>
-        /// <param name="user">The user.</param>
-        /// <param name="options">The options to use.</param>
-        /// <param name="shouldIncludeMissingEpisodes">If missing episodes should be included.</param>
-        /// <param name="listing">Listing services (sort, channels); the sort falls back to the obsolete static <c>LibraryManager.Sort</c> facade when <c>null</c> (see docs/major-rewrite-plan-v13.md § PR50/N).</param>
+        /// <param name="listing">The listing services for this request.</param>
         /// <returns>Set of episodes.</returns>
         public List<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
@@ -261,11 +249,6 @@ namespace Tesserafin.Controller.Entities.TV
             IItemLookupService lookup,
             IItemListingServices listing)
             => GetSeries(lookup)?.GetCatalogueSeasonEpisodes(this, options, repository, listing) ?? [];
-
-        public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes)
-        {
-            return GetEpisodes(series, user, options, shouldIncludeMissingEpisodes, null);
-        }
 
         public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
@@ -287,17 +270,9 @@ namespace Tesserafin.Controller.Entities.TV
             return series.GetSeasonEpisodes(this, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, listing);
         }
 
-        public List<BaseItem> GetEpisodes()
-        {
-            // No IItemSortService to give here (no DI-resolved caller reaches this no-arg
-            // overload): falls back to the obsolete static LibraryManager.Sort facade via
-            // Series.GetSeasonEpisodes, same as Season.GetChildren below. See PR50/N.
-            return GetEpisodes(Series, null, null, new DtoOptions(true), true);
-        }
-
         public override List<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query)
         {
-            return GetEpisodes(user, new DtoOptions(true), true);
+            return GetEpisodes(user, new DtoOptions(true), true, query.Listing);
         }
 
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query, IItemSortService itemSortService)

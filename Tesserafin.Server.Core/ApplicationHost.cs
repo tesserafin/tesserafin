@@ -665,7 +665,7 @@ namespace Tesserafin.Server.Core
 
             serviceCollection.AddSingleton<IUserViewManager, UserViewManager>();
             serviceCollection.AddSingleton<IItemQueryService, ItemQueryService>();
-            serviceCollection.AddTransient(provider => new Lazy<IItemQueryService>(provider.GetRequiredService<IItemQueryService>));
+            serviceCollection.AddSingleton<IItemCatalogueQuery, ItemCatalogueQuery>();
             serviceCollection.AddSingleton<IItemExtrasService, ItemExtrasService>();
             serviceCollection.TryAddSingleton(TimeProvider.System);
             serviceCollection.AddSingleton<IItemPlayedStateService, ItemPlayedStateService>();

@@ -27,13 +27,15 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="tvSeries">The TV series manager, deferred.</param>
         /// <param name="userData">The user data manager.</param>
         /// <param name="sort">The item sort service.</param>
+        /// <param name="queries">The catalogue queries for listings.</param>
         public ItemListingServices(
             Lazy<IChannelManager> channels,
             Lazy<ICollectionManager> collections,
             Lazy<IUserViewManager> userViews,
             Lazy<ITVSeriesManager> tvSeries,
             IUserDataManager userData,
-            IItemSortService sort)
+            IItemSortService sort,
+            IItemCatalogueQuery queries)
         {
             _channels = channels;
             _collections = collections;
@@ -41,6 +43,7 @@ namespace Tesserafin.Server.Core.Library
             _tvSeries = tvSeries;
             UserData = userData;
             Sort = sort;
+            Queries = queries;
         }
 
         /// <inheritdoc />
@@ -60,5 +63,8 @@ namespace Tesserafin.Server.Core.Library
 
         /// <inheritdoc />
         public IItemSortService Sort { get; }
+
+        /// <inheritdoc />
+        public IItemCatalogueQuery Queries { get; }
     }
 }

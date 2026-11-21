@@ -143,15 +143,16 @@ public class FolderGetChildrenCharacterizationTests
         var season = new Season { Id = Guid.NewGuid(), Name = "Season 1", IndexNumber = 1, SeriesId = series.Id };
         var episode = new Episode { Id = Guid.NewGuid(), Name = "Episode", ParentIndexNumber = 1, IndexNumber = 1 };
 
+        var queries = new Mock<IItemQueryService>();
         var libraryManager = new Mock<ILibraryManager>();
         season.ReadServices = Mock.Of<IItemReadServices>(reads => reads.GetItemById(series.Id) == series);
-        libraryManager.Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(new List<BaseItem> { episode });
+        queries.Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(new List<BaseItem> { episode });
         libraryManager
             .Setup(x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), user, It.IsAny<IEnumerable<ItemSortBy>>(), SortOrder.Ascending))
             .Returns((IEnumerable<BaseItem> items, User _, IEnumerable<ItemSortBy> _, SortOrder _) => items);
         SetStatics(libraryManager.Object);
 
-        var result = season.GetChildren(user, true, PermissiveVisibility.Query(user));
+        var result = season.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope, Listing = Mock.Of<IItemListingServices>(l => l.Queries == queries.Object) });
 
         Assert.Equal(new BaseItem[] { episode }, result);
     }
@@ -169,11 +170,12 @@ public class FolderGetChildrenCharacterizationTests
         };
         var season = new Season { Id = Guid.NewGuid(), Name = "Season 1", IndexNumber = 1 };
 
+        var queries = new Mock<IItemQueryService>();
         var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(new List<BaseItem> { season });
+        queries.Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(new List<BaseItem> { season });
         SetStatics(libraryManager.Object);
 
-        var result = series.GetChildren(user, true, PermissiveVisibility.Query(user));
+        var result = series.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = PermissiveVisibility.Scope, Listing = Mock.Of<IItemListingServices>(l => l.Queries == queries.Object) });
 
         Assert.Equal(new BaseItem[] { season }, result);
     }
@@ -276,14 +278,18 @@ public class FolderGetChildrenCharacterizationTests
         var season = new Season { Id = Guid.NewGuid(), Name = "Season 1", IndexNumber = 1, SeriesId = series.Id };
         var episode = new Episode { Id = Guid.NewGuid(), Name = "Episode", ParentIndexNumber = 1, IndexNumber = 1 };
 
+        var queries = new Mock<IItemQueryService>();
         var libraryManager = new Mock<ILibraryManager>();
         season.ReadServices = Mock.Of<IItemReadServices>(reads => reads.GetItemById(series.Id) == series);
-        libraryManager.Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(new List<BaseItem> { episode });
+        queries.Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(new List<BaseItem> { episode });
         SetStatics(libraryManager.Object);
         var sortService = new RecordingItemSortService();
 
-        var query = PermissiveVisibility.Query(user);
-        query.Listing = Mock.Of<IItemListingServices>(l => l.Sort == sortService);
+        var query = new InternalItemsQuery(user)
+        {
+            Visibility = PermissiveVisibility.Scope,
+            Listing = Mock.Of<IItemListingServices>(l => l.Sort == sortService && l.Queries == queries.Object)
+        };
         var result = season.GetChildren(user, true, query, sortService);
 
         Assert.Equal(new BaseItem[] { episode }, result);
@@ -397,6 +403,23 @@ public class FolderGetChildrenCharacterizationTests
         reads.Setup(x => x.GetItemById(last.Id)).Returns(replaced);
         Assert.Equal(new BaseItem[] { cachedFirst, replaced }, root.Children);
 
+        reads.Verify(x => x.GetChildren(root), Times.Once);
+    }
+
+    [Fact]
+    public void AggregateFolderChildren_RehydrateCachedIdentitiesThroughTheAttachedCatalogue()
+    {
+        var saved = new Folder { Id = Guid.NewGuid() };
+        var cached = new Folder { Id = saved.Id };
+        var root = new AggregateFolder();
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(x => x.GetChildren(root)).Returns([saved]);
+        reads.Setup(x => x.GetItemById(saved.Id)).Returns(cached);
+        root.ReadServices = reads.Object;
+
+        Assert.Same(saved, Assert.Single(root.Children));
+        root.Children = null;
+        Assert.Same(cached, Assert.Single(root.Children!));
         reads.Verify(x => x.GetChildren(root), Times.Once);
     }
 

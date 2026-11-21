@@ -36,7 +36,8 @@ public class ItemQueryServiceTests
         out Mock<IItemQueryScopeService> scopeService,
         ILibraryManager? libraryManager = null,
         IServerConfigurationManager? configurationManager = null,
-        IItemSortService? itemSortService = null)
+        IItemSortService? itemSortService = null,
+        IItemAccessService? access = null)
     {
         channelManager = new Mock<IChannelManager>();
         collectionManager = new Mock<ICollectionManager>();
@@ -51,7 +52,17 @@ public class ItemQueryServiceTests
 
         BaseItem.LibraryManager = libraryManager;
 
-        return new ItemQueryService(channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object, configurationManager, itemSortService ?? new PassthroughItemSortService(), itemLookupService.Object, itemRepository.Object, scopeService.Object, PermissiveVisibility.Scope, Listing);
+        var catalogue = new ItemCatalogueQuery(itemLookupService.Object, itemRepository.Object, scopeService.Object, access ?? Mock.Of<IItemAccessService>(), Mock.Of<IItemCountService>());
+        return new ItemQueryService(
+            channelManager.Object,
+            collectionManager.Object,
+            userViewManager.Object,
+            tvSeriesManager.Object,
+            configurationManager,
+            itemSortService ?? new PassthroughItemSortService(),
+            PermissiveVisibility.Scope,
+            Listing,
+            catalogue);
     }
 
     [Fact]
@@ -258,17 +269,17 @@ public class ItemQueryServiceTests
     public void GetItems_RecursiveQuery_FallsBackInsteadOfRawQueryItems()
     {
         var sentinel = new Movie { Id = Guid.NewGuid() };
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
-            .Setup(x => x.GetItemsResult(It.IsAny<InternalItemsQuery>()))
+        var queries = new Mock<IItemQueryService>();
+        queries
+            .Setup(x => x.GetItems(It.IsAny<InternalItemsQuery>()))
             .Returns(new QueryResult<BaseItem>(0, 1, new BaseItem[] { sentinel }));
-        var service = CreateService(out var channelManager, out var collectionManager, out var userViewManager, out var tvSeriesManager, out _, out _, out _, libraryManager: libraryManager.Object);
+        var service = CreateService(out var channelManager, out var collectionManager, out var userViewManager, out var tvSeriesManager, out _, out _, out _);
 
         var folder = new Folder { Id = Guid.NewGuid() };
         // Present in Children so a wrongly-taken fast path would return this instead of the sentinel below.
         folder.Children = new BaseItem[] { new Movie { Id = Guid.NewGuid() } };
 
-        var result = service.GetItems(folder, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, Recursive = true });
+        var result = service.GetItems(folder, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, Listing = Mock.Of<IItemListingServices>(l => l.Queries == queries.Object), Recursive = true });
 
         Assert.Single(result.Items);
         Assert.Equal(sentinel, result.Items[0]);
@@ -278,16 +289,16 @@ public class ItemQueryServiceTests
     public void GetItems_ItemIdsQuery_FallsBackInsteadOfRawQueryItems()
     {
         var sentinel = new Movie { Id = Guid.NewGuid() };
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
-            .Setup(x => x.GetItemsResult(It.IsAny<InternalItemsQuery>()))
+        var queries = new Mock<IItemQueryService>();
+        queries
+            .Setup(x => x.GetItems(It.IsAny<InternalItemsQuery>()))
             .Returns(new QueryResult<BaseItem>(0, 1, new BaseItem[] { sentinel }));
-        var service = CreateService(out var channelManager, out var collectionManager, out var userViewManager, out var tvSeriesManager, out _, out _, out _, libraryManager: libraryManager.Object);
+        var service = CreateService(out var channelManager, out var collectionManager, out var userViewManager, out var tvSeriesManager, out _, out _, out _);
 
         var folder = new Folder { Id = Guid.NewGuid() };
         folder.Children = new BaseItem[] { new Movie { Id = Guid.NewGuid() } };
 
-        var result = service.GetItems(folder, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, ItemIds = new[] { sentinel.Id } });
+        var result = service.GetItems(folder, new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, Listing = Mock.Of<IItemListingServices>(l => l.Queries == queries.Object), ItemIds = new[] { sentinel.Id } });
 
         Assert.Single(result.Items);
         Assert.Equal(sentinel, result.Items[0]);
@@ -323,9 +334,8 @@ public class ItemQueryServiceTests
         var userView = new UserView { Id = Guid.NewGuid(), DisplayParentId = displayParent.Id };
         var channelItem = new Movie { Id = Guid.NewGuid() };
 
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(x => x.GetItemById(displayParent.Id)).Returns(displayParent);
-        var service = CreateService(out var channelManager, out var collectionManager, out var userViewManager, out var tvSeriesManager, out _, out _, out _, libraryManager: libraryManager.Object);
+        userView.ReadServices = Mock.Of<IItemReadServices>(r => r.GetItemById(displayParent.Id) == displayParent);
+        var service = CreateService(out var channelManager, out var collectionManager, out var userViewManager, out var tvSeriesManager, out _, out _, out _);
 
         channelManager
             .Setup(x => x.GetChannelItemsInternal(It.IsAny<InternalItemsQuery>(), It.IsAny<IProgress<double>>(), It.IsAny<System.Threading.CancellationToken>()))
@@ -456,7 +466,7 @@ public class ItemQueryServiceTests
         var service = CreateService(out _, out _, out _, out _, out var itemLookupService, out var itemRepository, out var scopeService);
 
         var user = new User("test-user", "provider", "provider");
-        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, User = user };
+        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, User = user, IncludeItemTypes = [BaseItemKind.Movie] };
         var expected = new BaseItem[] { new Movie { Id = Guid.NewGuid() } };
 
         itemRepository.Setup(x => x.GetItemList(query)).Returns(expected);
@@ -466,6 +476,25 @@ public class ItemQueryServiceTests
         scopeService.Verify(x => x.AddUserToQuery(query, user, true), Times.Once);
         itemLookupService.Verify(x => x.GetItemById(It.IsAny<Guid>()), Times.Never);
         Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void GetItems_ExcludesRefusedCollectionsBeforeComputingThePage()
+    {
+        var user = new User("test-user", "provider", "provider");
+        var refused = new BoxSet { Id = Guid.NewGuid() };
+        var allowed = new BoxSet { Id = Guid.NewGuid() };
+        var access = Mock.Of<IItemAccessService>(a => a.IsVisibleStandalone(allowed, user));
+        var service = CreateService(out _, out _, out _, out _, out _, out var repository, out _, access: access);
+        var query = new InternalItemsQuery(user) { IncludeItemTypes = [BaseItemKind.BoxSet], EnableTotalRecordCount = true };
+        repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.User == null))).Returns([refused, allowed]);
+        repository.Setup(r => r.GetItems(It.Is<InternalItemsQuery>(q => q.ExcludeItemIds.Contains(refused.Id) && !q.ExcludeItemIds.Contains(allowed.Id))))
+            .Returns(new QueryResult<BaseItem>(0, 1, [allowed]));
+
+        var page = service.GetItems(query);
+
+        Assert.Equal(allowed, Assert.Single(page.Items));
+        Assert.Equal(1, page.TotalRecordCount);
     }
 
     [Fact]
@@ -528,7 +557,7 @@ public class ItemQueryServiceTests
         var service = CreateService(out _, out _, out _, out _, out _, out var itemRepository, out var scopeService);
 
         var user = new User("test-user", "provider", "provider");
-        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, User = user, EnableTotalRecordCount = true };
+        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, User = user, EnableTotalRecordCount = true, IncludeItemTypes = [BaseItemKind.Movie] };
         var expected = new QueryResult<BaseItem>(0, 0, Array.Empty<BaseItem>());
 
         itemRepository.Setup(x => x.GetItems(query)).Returns(expected);
