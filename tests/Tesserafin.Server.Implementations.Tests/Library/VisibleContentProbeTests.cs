@@ -385,7 +385,7 @@ public sealed class VisibleContentProbeTests
                 _staticRepository.Object,
                 new Tesserafin.Controller.LiveTv.ActiveRecordings(),
                 new(() => new LinkedChildResolver(_staticRepository.Object, lookup.Object, Mock.Of<IItemPathLookupService>(), NullLogger<LinkedChildResolver>.Instance)),
-                _config.Object.ApplicationPaths);
+                _config.Object);
             // The probe's scope sees the same world the legacy static path sees: no libraries, default options.
             var emptyRoot = new Folder { Children = [] };
             var rootProvider = Mock.Of<IUserRootFolderProvider>(p => p.GetUserRootFolder() == emptyRoot);

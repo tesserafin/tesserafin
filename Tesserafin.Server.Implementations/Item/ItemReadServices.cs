@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Tesserafin.Controller;
+using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
@@ -17,19 +17,22 @@ namespace Tesserafin.Server.Implementations.Item;
 /// <param name="repository">The item repository.</param>
 /// <param name="recordings">The recordings in progress.</param>
 /// <param name="linkedChildren">The deferred saved-link resolver.</param>
-/// <param name="applicationPaths">The configured storage paths.</param>
+/// <param name="configuration">The server settings and storage paths.</param>
 public sealed class ItemReadServices(
     IItemRepository repository,
     ActiveRecordings recordings,
     Lazy<LinkedChildResolver> linkedChildren,
-    IServerApplicationPaths applicationPaths) : IItemReadServices
+    IServerConfigurationManager configuration) : IItemReadServices
 {
     /// <inheritdoc />
     public LinkedChildResolver LinkedChildren => linkedChildren.Value;
 
     /// <inheritdoc />
+    public bool DisplaySpecialsWithinSeasons => configuration.Configuration.DisplaySpecialsWithinSeasons;
+
+    /// <inheritdoc />
     public bool IsManagedLibraryPath(string path)
-        => FilePath.ContainsSubPath(applicationPaths.DataPath, path);
+        => FilePath.ContainsSubPath(configuration.ApplicationPaths.DataPath, path);
 
     /// <inheritdoc />
     public IReadOnlyList<BaseItem> GetChildren(Folder folder)

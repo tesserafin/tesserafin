@@ -114,7 +114,7 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
             _itemStore,
             _itemLookupService,
             NullLogger<Tesserafin.Server.Core.Library.UserRootFolderProvider>.Instance,
-            new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings(), new(), Mock.Of<Tesserafin.Controller.IServerApplicationPaths>()));
+            new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings(), new(), Mock.Of<Tesserafin.Controller.Configuration.IServerConfigurationManager>()));
         fixture.Register(() => _provider);
         fixture.Register<IUserRootFolderProvider>(() => _provider);
 
@@ -159,7 +159,7 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
     {
         var resolved = _libraryManager.ResolvePath(_fileSystem.GetDirectoryInfo(_userRootPath)) as Folder;
         Assert.NotNull(resolved);
-        resolved!.ReadServices = new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings(), new(), Mock.Of<Tesserafin.Controller.IServerApplicationPaths>());
+        resolved!.ReadServices = new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings(), new(), Mock.Of<Tesserafin.Controller.Configuration.IServerConfigurationManager>());
         return resolved.DeepCopy<Folder, UserRootFolder>();
     }
 

@@ -69,7 +69,7 @@ public sealed partial class BaseItemRepository
         ActiveRecordings activeRecordings,
         Lazy<LinkedChildResolver> linkedChildren)
     {
-        _readServices = new ItemReadServices(this, activeRecordings, linkedChildren, serverConfigurationManager.ApplicationPaths);
+        _readServices = new ItemReadServices(this, activeRecordings, linkedChildren, serverConfigurationManager);
         _dbProvider = dbProvider;
         _appHost = appHost;
         _itemTypeLookup = itemTypeLookup;
