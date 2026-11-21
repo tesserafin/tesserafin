@@ -71,6 +71,8 @@ public sealed class InheritedTagVisibilityTests
         fixture.Register(() => rootProvider);
 
         var resolver = new Tesserafin.Server.Core.Library.CollectionFolderResolver(lookup, rootProvider);
+        reads.Setup(r => r.GetCollectionFolders(It.IsAny<BaseItem>(), null))
+            .Returns((BaseItem item, IEnumerable<Folder>? _) => resolver.GetCollectionFolders(item));
         fixture.Register<ICollectionFolderResolver>(() => resolver);
 
         fixture.Inject<IItemQueryScopeService>(new Tesserafin.Server.Core.Library.ItemQueryScopeService(

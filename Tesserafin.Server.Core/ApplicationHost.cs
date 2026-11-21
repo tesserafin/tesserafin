@@ -527,6 +527,9 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemQueryHelpers>(sp => sp.GetRequiredService<BaseItemRepository>());
             serviceCollection.AddSingleton<IItemPersistenceService, ItemPersistenceService>();
             serviceCollection.AddSingleton<IItemReadServices, ItemReadServices>();
+            serviceCollection.AddTransient(provider => new Lazy<IItemRepository>(provider.GetRequiredService<IItemRepository>));
+            serviceCollection.AddTransient(provider => new Lazy<ICollectionFolderResolver>(provider.GetRequiredService<ICollectionFolderResolver>));
+            serviceCollection.AddTransient(provider => new Lazy<ILibraryItemOptions>(provider.GetRequiredService<ILibraryItemOptions>));
             serviceCollection.AddSingleton<INextUpService, NextUpService>();
             serviceCollection.AddSingleton<IItemCountService, ItemCountService>();
             serviceCollection.AddSingleton<ILinkedChildrenService, LinkedChildrenService>();

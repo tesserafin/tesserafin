@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Data.Entities;
+using Tesserafin.Model.Configuration;
 using LinkedChildType = Tesserafin.Controller.Entities.LinkedChildType;
 
 namespace Tesserafin.Controller.Library;
@@ -41,6 +43,22 @@ public interface IItemReadServices
     /// <param name="versionType">The local or linked alternate version type.</param>
     /// <returns>The linked version ids.</returns>
     IReadOnlyList<Guid> GetVideoVersionIds(Video video, LinkedChildType versionType);
+
+    /// <summary>Finds album artists by name.</summary>
+    /// <param name="artistNames">The names to resolve.</param>
+    /// <returns>The catalogue artists grouped by name.</returns>
+    IReadOnlyDictionary<string, MusicArtist[]> FindArtists(IReadOnlyList<string> artistNames);
+
+    /// <summary>Gets the libraries containing an item.</summary>
+    /// <param name="item">The item.</param>
+    /// <param name="candidates">A supplied set of libraries to check, or all libraries when absent.</param>
+    /// <returns>The containing libraries.</returns>
+    IReadOnlyList<Folder> GetCollectionFolders(BaseItem item, IEnumerable<Folder>? candidates = null);
+
+    /// <summary>Gets the effective settings for an item.</summary>
+    /// <param name="item">The item.</param>
+    /// <returns>The effective library settings.</returns>
+    LibraryOptions GetLibraryOptions(BaseItem item);
 
     /// <summary>Checks whether a path is inside the server-managed data directory.</summary>
     /// <param name="path">The catalogue item path.</param>

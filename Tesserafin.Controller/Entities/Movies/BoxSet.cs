@@ -281,7 +281,7 @@ namespace Tesserafin.Controller.Entities.Movies
             var expandedFolders = new List<Guid>();
 
             return FlattenItems(this, expandedFolders, scope)
-                .SelectMany(i => scope?.GetCollectionFolders(i) ?? LibraryManager.GetCollectionFolders(i))
+                .SelectMany(i => scope?.GetCollectionFolders(i) ?? i.ReadServices?.GetCollectionFolders(i) ?? [])
                 .Select(i => i.Id)
                 .Distinct()
                 .ToArray();

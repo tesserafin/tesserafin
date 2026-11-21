@@ -388,15 +388,13 @@ public class FolderGetChildrenCharacterizationTests
         var reads = new Mock<IItemReadServices>();
         reads.Setup(x => x.GetChildren(root)).Returns(new BaseItem[] { first, missing, last });
         root.ReadServices = reads.Object;
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(x => x.GetItemById(first.Id)).Returns(cachedFirst);
-        libraryManager.Setup(x => x.GetItemById(last.Id)).Returns(cachedLast);
-        SetStatics(libraryManager.Object);
+        reads.Setup(x => x.GetItemById(first.Id)).Returns(cachedFirst);
+        reads.Setup(x => x.GetItemById(last.Id)).Returns(cachedLast);
         Assert.Equal(new BaseItem[] { first, missing, last }, root.Children);
         Assert.Equal(new BaseItem[] { cachedFirst, cachedLast }, root.Children);
 
         var replaced = new CollectionFolder { Id = last.Id, Name = "Last" };
-        libraryManager.Setup(x => x.GetItemById(last.Id)).Returns(replaced);
+        reads.Setup(x => x.GetItemById(last.Id)).Returns(replaced);
         Assert.Equal(new BaseItem[] { cachedFirst, replaced }, root.Children);
 
         reads.Verify(x => x.GetChildren(root), Times.Once);

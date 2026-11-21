@@ -133,7 +133,7 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public virtual IEnumerable<BaseItem> Children
         {
-            get => GetCatalogueChildren(null, LibraryManager);
+            get => GetCatalogueChildren(null, null);
             set => _children = value;
         }
 

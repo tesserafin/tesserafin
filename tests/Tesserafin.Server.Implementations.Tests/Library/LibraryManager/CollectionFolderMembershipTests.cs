@@ -40,6 +40,7 @@ public sealed class CollectionFolderMembershipTests
     private readonly List<Folder> _libraries = [];
     private readonly ILibraryManager _libraryManager;
     private readonly ICollectionFolderResolver _resolver;
+    private readonly IItemReadServices _reads;
     private readonly IStandaloneVisibilityService _scope;
     private readonly Mock<IXmlSerializer> _xml = new();
 
@@ -67,6 +68,14 @@ public sealed class CollectionFolderMembershipTests
         fixture.Register<ILibraryOptionsStore>(() => store);
 
         var libraryOptions = new Tesserafin.Server.Core.Library.LibraryItemOptions(_resolver, lookup, rootProvider, configuration.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), store);
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(r => r.GetItemById(It.IsAny<Guid>())).Returns(lookup.GetItemById);
+        reads.Setup(r => r.GetLibraryOptions(It.IsAny<BaseItem>())).Returns(libraryOptions.GetLibraryOptions);
+        reads.Setup(r => r.GetCollectionFolders(It.IsAny<BaseItem>(), It.IsAny<IEnumerable<Folder>?>()))
+            .Returns((BaseItem item, IEnumerable<Folder>? candidates) => candidates is null
+                ? _resolver.GetCollectionFolders(item)
+                : _resolver.GetCollectionFolders(item, candidates));
+        _reads = reads.Object;
         _scope = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, _resolver, rootProvider, repository.Object, Mock.Of<Tesserafin.Model.Globalization.ILocalizationManager>(), configuration.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings(), libraryOptions, Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.TagVisibilityService>.Instance);
 
         Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
@@ -273,6 +282,7 @@ public sealed class CollectionFolderMembershipTests
             item.Id = Guid.NewGuid();
         }
 
+        item.ReadServices = _reads;
         _items[item.Id] = item;
         return item;
     }

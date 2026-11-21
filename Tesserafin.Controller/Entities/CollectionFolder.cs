@@ -73,8 +73,8 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public override IEnumerable<BaseItem> Children
         {
-            get => GetCatalogueChildren(null, LibraryManager);
-            set => InvalidateCatalogueChildren(LibraryManager);
+            get => GetCatalogueChildren(null, null);
+            set => InvalidateCatalogueChildren(null);
         }
 
         [JsonIgnore]
@@ -136,9 +136,9 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>Resolves the currently committed physical folder identities through a catalogue lookup.</summary>
-        /// <param name="lookup">The item lookup used for physical folder resolution.</param>
+        /// <param name="lookup">The explicit lookup, or null to use the attached catalogue.</param>
         /// <returns>The available folders in membership order.</returns>
         public IEnumerable<Folder> GetPhysicalFolders(IItemLookupService lookup)
-            => PhysicalFolderIds.Select(id => lookup.GetItemById(id)).OfType<Folder>();
+            => PhysicalFolderIds.Select(id => lookup is null ? GetRelatedItem(id) : lookup.GetItemById(id)).OfType<Folder>();
     }
 }
