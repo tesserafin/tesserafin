@@ -373,9 +373,9 @@ namespace Tesserafin.Controller.Entities.TV
             return id;
         }
 
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths);
 
             if (!IsLocked)
             {

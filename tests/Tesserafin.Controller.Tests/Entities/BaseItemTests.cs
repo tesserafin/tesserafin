@@ -45,7 +45,7 @@ public class BaseItemTests
         fileSystem.Setup(fs => fs.GetFileSystemInfo(item.Path))
             .Returns(new FileSystemMetadata { Exists = true, LastWriteTimeUtc = item.DateModified.AddMinutes(1) });
 
-        Assert.True(item.RequiresRefresh(fileSystem.Object));
+        Assert.True(item.RequiresRefresh(fileSystem.Object, Mock.Of<Tesserafin.Controller.IServerApplicationPaths>()));
     }
 
     [Fact]

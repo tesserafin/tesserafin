@@ -13,6 +13,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Entities.Movies
 {
@@ -86,9 +87,9 @@ namespace Tesserafin.Controller.Entities.Movies
         }
 
         /// <inheritdoc />
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths);
 
             if (!ProductionYear.HasValue)
             {

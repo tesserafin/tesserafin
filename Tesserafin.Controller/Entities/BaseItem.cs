@@ -1648,7 +1648,7 @@ namespace Tesserafin.Controller.Entities
             return PresentationUniqueKey ?? CreatePresentationUniqueKey();
         }
 
-        public virtual bool RequiresRefresh(IFileSystem fileSystem)
+        public virtual bool RequiresRefresh(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
             if (string.IsNullOrEmpty(Path) || DateModified == DateTime.MinValue)
             {
@@ -2557,8 +2557,10 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <param name="replaceAllMetadata">Whether to replace all metadata.</param>
         /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
+        /// <param name="fileSystem">The filesystem used to resolve item paths.</param>
+        /// <param name="applicationPaths">The configured storage paths.</param>
         /// <returns>true if the item has change, else false.</returns>
-        public virtual bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public virtual bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
             var hasChanges = false;
 

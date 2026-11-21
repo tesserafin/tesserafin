@@ -66,11 +66,6 @@ namespace Tesserafin.Controller.Entities.Audio
         public override IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
             => IsAccessedByName ? [] : base.GetCatalogueChildren(repository, lookup);
 
-        public static string GetPath(string name)
-        {
-            return GetPath(name, true);
-        }
-
         public override double GetDefaultPrimaryImageAspectRatio()
         {
             return 1;
@@ -165,9 +160,6 @@ namespace Tesserafin.Controller.Entities.Audio
             return info;
         }
 
-        public static string GetPath(string name, bool normalizeName)
-            => GetPath(name, FileSystem, ConfigurationManager.ApplicationPaths.ArtistsPath, normalizeName);
-
         public static string GetPath(string name, IFileSystem fileSystem, string root, bool normalizeName = true)
         {
             // Trim the period at the end because windows will have a hard time with that
@@ -178,16 +170,16 @@ namespace Tesserafin.Controller.Entities.Audio
             return SafeDirectoryLeafName.CombineWithRoot(root, validName, nameof(name));
         }
 
-        private string GetRebasedPath()
+        private string GetRebasedPath(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            return GetPath(System.IO.Path.GetFileName(Path), false);
+            return GetPath(System.IO.Path.GetFileName(Path), fileSystem, applicationPaths.ArtistsPath, normalizeName: false);
         }
 
-        public override bool RequiresRefresh(IFileSystem fileSystem)
+        public override bool RequiresRefresh(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
             if (IsAccessedByName)
             {
-                var newPath = GetRebasedPath();
+                var newPath = GetRebasedPath(fileSystem, applicationPaths);
                 if (!string.Equals(Path, newPath, StringComparison.Ordinal))
                 {
                     Logger.LogDebug("{0} path has changed from {1} to {2}", GetType().Name, Path, newPath);
@@ -195,7 +187,7 @@ namespace Tesserafin.Controller.Entities.Audio
                 }
             }
 
-            return base.RequiresRefresh(fileSystem);
+            return base.RequiresRefresh(fileSystem, applicationPaths);
         }
 
         /// <summary>
@@ -203,14 +195,16 @@ namespace Tesserafin.Controller.Entities.Audio
         /// </summary>
         /// <param name="replaceAllMetadata">Option to replace metadata.</param>
         /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
+        /// <param name="fileSystem">The filesystem used to resolve item paths.</param>
+        /// <param name="applicationPaths">The configured storage paths.</param>
         /// <returns>True if metadata changed.</returns>
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths);
 
             if (IsAccessedByName)
             {
-                var newPath = GetRebasedPath();
+                var newPath = GetRebasedPath(fileSystem, applicationPaths);
                 if (!string.Equals(Path, newPath, StringComparison.Ordinal))
                 {
                     Path = newPath;

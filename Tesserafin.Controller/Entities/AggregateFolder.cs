@@ -91,9 +91,9 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        public override bool RequiresRefresh(IFileSystem fileSystem)
+        public override bool RequiresRefresh(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            var changed = base.RequiresRefresh(fileSystem) || _requiresRefresh;
+            var changed = base.RequiresRefresh(fileSystem, applicationPaths) || _requiresRefresh;
 
             if (!changed)
             {
@@ -110,11 +110,11 @@ namespace Tesserafin.Controller.Entities
             return changed;
         }
 
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
             ClearCache();
 
-            var changed = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService) || _requiresRefresh;
+            var changed = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths) || _requiresRefresh;
             _requiresRefresh = false;
             return changed;
         }

@@ -20,6 +20,7 @@ using Tesserafin.Controller.TV;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
+using Tesserafin.Model.IO;
 using Tesserafin.Model.Querying;
 
 namespace Tesserafin.Controller.Entities.TV
@@ -400,11 +401,13 @@ namespace Tesserafin.Controller.Entities.TV
         /// <summary>Prepares the season name and infers a missing season number from its path.</summary>
         /// <param name="replaceAllMetadata">Whether to replace all metadata.</param>
         /// <param name="itemNamingService">The season path parser.</param>
+        /// <param name="fileSystem">The filesystem used to resolve item paths.</param>
+        /// <param name="applicationPaths">The configured storage paths.</param>
         /// <param name="lookup">The catalogue lookup for the season folder's parent.</param>
         /// <returns>Whether the preparation changed the season.</returns>
-        public bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IItemLookupService lookup)
+        public bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths, IItemLookupService lookup)
         {
-            var hasChanges = this.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = this.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths);
             if (IndexNumber.HasValue || string.IsNullOrEmpty(Path))
             {
                 return hasChanges;

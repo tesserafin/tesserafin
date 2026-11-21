@@ -84,14 +84,6 @@ namespace Tesserafin.Controller.Entities
             return true;
         }
 
-        public static string GetPath(string name)
-        {
-            return GetPath(name, true);
-        }
-
-        public static string GetPath(string name, bool normalizeName)
-            => GetPath(name, FileSystem, ConfigurationManager.ApplicationPaths.PeoplePath, normalizeName);
-
         public static string GetPath(string name, IFileSystem fileSystem, string peoplePath, bool normalizeName = true)
         {
             // Trim the period at the end because windows will have a hard time with that
@@ -120,21 +112,21 @@ namespace Tesserafin.Controller.Entities
             return SafeDirectoryLeafName.CombineWithRoot(path, validFilename, nameof(name));
         }
 
-        private string GetRebasedPath()
+        private string GetRebasedPath(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            return GetPath(System.IO.Path.GetFileName(Path), false);
+            return GetPath(System.IO.Path.GetFileName(Path), fileSystem, applicationPaths.PeoplePath, normalizeName: false);
         }
 
-        public override bool RequiresRefresh(IFileSystem fileSystem)
+        public override bool RequiresRefresh(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            var newPath = GetRebasedPath();
+            var newPath = GetRebasedPath(fileSystem, applicationPaths);
             if (!string.Equals(Path, newPath, StringComparison.Ordinal))
             {
                 Logger.LogDebug("{0} path has changed from {1} to {2}", GetType().Name, Path, newPath);
                 return true;
             }
 
-            return base.RequiresRefresh(fileSystem);
+            return base.RequiresRefresh(fileSystem, applicationPaths);
         }
 
         /// <summary>
@@ -142,12 +134,14 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <param name="replaceAllMetadata"><c>true</c> to replace all metadata, <c>false</c> to not.</param>
         /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
+        /// <param name="fileSystem">The filesystem used to resolve item paths.</param>
+        /// <param name="applicationPaths">The configured storage paths.</param>
         /// <returns><c>true</c> if changes were made, <c>false</c> if not.</returns>
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths);
 
-            var newPath = GetRebasedPath();
+            var newPath = GetRebasedPath(fileSystem, applicationPaths);
             if (!string.Equals(Path, newPath, StringComparison.Ordinal))
             {
                 Path = newPath;

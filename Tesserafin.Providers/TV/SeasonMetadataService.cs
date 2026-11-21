@@ -74,7 +74,7 @@ public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
 
     /// <inheritdoc />
     protected override bool BeforeMetadataRefresh(Season item, bool replaceAllMetadata)
-        => item.BeforeMetadataRefresh(replaceAllMetadata, ItemNamingService, _lookup);
+        => item.BeforeMetadataRefresh(replaceAllMetadata, ItemNamingService, FileSystem, ServerConfigurationManager.ApplicationPaths, _lookup);
 
     /// <inheritdoc />
     protected override SeasonInfo GetLookupInfo(Season item, LibraryOptions libraryOptions)

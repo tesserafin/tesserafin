@@ -9,6 +9,7 @@ using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Entities
 {
@@ -37,9 +38,9 @@ namespace Tesserafin.Controller.Entities
             return info;
         }
 
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths);
 
             if (!ProductionYear.HasValue)
             {

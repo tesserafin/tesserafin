@@ -205,9 +205,9 @@ namespace Tesserafin.Controller.Entities
             return base.CanDelete(channels);
         }
 
-        public override bool RequiresRefresh(IFileSystem fileSystem)
+        public override bool RequiresRefresh(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            var baseResult = base.RequiresRefresh(fileSystem);
+            var baseResult = base.RequiresRefresh(fileSystem, applicationPaths);
 
             if (SupportsCumulativeRunTimeTicks && !RunTimeTicks.HasValue)
             {
