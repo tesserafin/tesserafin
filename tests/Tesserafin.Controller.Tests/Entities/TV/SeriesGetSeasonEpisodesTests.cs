@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Moq;
-using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
@@ -11,7 +10,6 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Model.Configuration;
 using Xunit;
 
 namespace Tesserafin.Controller.Tests.Entities.TV;
@@ -19,7 +17,7 @@ namespace Tesserafin.Controller.Tests.Entities.TV;
 /// <summary>
 /// Characterization tests for the <see cref="Series.GetSeasonEpisodes"/>/<see cref="Series.GetEpisodes"/>/
 /// <see cref="Season.GetEpisodes"/> chain (docs/major-rewrite-plan-v13.md § PR49/N, § PR50/N). These
-/// entities read <c>BaseItem.LibraryManager</c>/<c>BaseItem.ConfigurationManager</c> statics, so this
+/// entities still read the <c>BaseItem.LibraryManager</c> static, so this
 /// class joins <see cref="BaseItemStaticStateFixture"/> like <c>FolderTests</c>.
 ///
 /// This suite deliberately exercises the obsolete static <c>ILibraryManager.Sort</c> fallback
@@ -30,8 +28,16 @@ namespace Tesserafin.Controller.Tests.Entities.TV;
 [Collection(BaseItemStaticStateFixture.Name)]
 public class SeriesGetSeasonEpisodesTests
 {
-    private static Series CreateSeries(string presentationUniqueKey = "series-key")
-        => new Series { Id = Guid.NewGuid(), Name = "Test Series", PresentationUniqueKey = presentationUniqueKey };
+    private bool _displaySpecialsWithinSeasons;
+
+    private Series CreateSeries(string presentationUniqueKey = "series-key")
+        => new Series
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Series",
+            PresentationUniqueKey = presentationUniqueKey,
+            ReadServices = Mock.Of<IItemReadServices>(reads => reads.DisplaySpecialsWithinSeasons == _displaySpecialsWithinSeasons)
+        };
 
     private static Season CreateSeason(int? indexNumber, string presentationUniqueKey = "season-key")
         => new Season
@@ -67,11 +73,8 @@ public class SeriesGetSeasonEpisodesTests
             AirsBeforeEpisodeNumber = airsBeforeEpisodeNumber,
         };
 
-    private static void SetDisplaySpecialsWithinSeasons(bool value)
-    {
-        BaseItem.ConfigurationManager = Mock.Of<IServerConfigurationManager>(
-            x => x.Configuration == new ServerConfiguration { DisplaySpecialsWithinSeasons = value });
-    }
+    private void SetDisplaySpecialsWithinSeasons(bool value)
+        => _displaySpecialsWithinSeasons = value;
 
     // ---- Series.FilterEpisodesBySeason (public static, pure) --------------------------------
 

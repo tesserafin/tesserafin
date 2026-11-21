@@ -18,6 +18,9 @@ public interface IItemReadServices
     /// <summary>Gets the resolver for saved links in the catalogue.</summary>
     LinkedChildResolver LinkedChildren { get; }
 
+    /// <summary>Gets a value indicating whether specials should appear in their aired seasons.</summary>
+    bool DisplaySpecialsWithinSeasons { get; }
+
     /// <summary>Checks whether a path is inside the server-managed data directory.</summary>
     /// <param name="path">The catalogue item path.</param>
     /// <returns>Whether this item is managed by the server.</returns>

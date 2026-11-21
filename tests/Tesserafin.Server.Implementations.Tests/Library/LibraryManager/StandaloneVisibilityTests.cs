@@ -108,7 +108,7 @@ public sealed class StandaloneVisibilityTests
             repository.Object,
             _activeRecordings,
             new(() => new LinkedChildResolver(repository.Object, lookup, Mock.Of<IItemPathLookupService>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<LinkedChildResolver>.Instance)),
-            configuration.Object.ApplicationPaths);
+            configuration.Object);
         BaseItem.ConfigurationManager = configuration.Object;
     }
 

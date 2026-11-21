@@ -94,7 +94,7 @@ public sealed class UserRootFolderProviderTests : IDisposable
             _itemStoreMock.Object,
             _itemLookupServiceMock.Object,
             NullLogger<UserRootFolderProvider>.Instance,
-            new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings(), new(), Mock.Of<Tesserafin.Controller.IServerApplicationPaths>()));
+            new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings(), new(), Mock.Of<Tesserafin.Controller.Configuration.IServerConfigurationManager>()));
     }
 
     public void Dispose()

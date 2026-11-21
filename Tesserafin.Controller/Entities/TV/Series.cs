@@ -409,7 +409,7 @@ namespace Tesserafin.Controller.Entities.TV
             IItemListingServices listing,
             Func<InternalItemsQuery, IReadOnlyList<BaseItem>> readItems)
         {
-            var queryFromSeries = ConfigurationManager.Configuration.DisplaySpecialsWithinSeasons;
+            var queryFromSeries = RequireReadServices().DisplaySpecialsWithinSeasons;
 
             // add optimization when this setting is not enabled
             var seriesKey = queryFromSeries ?
@@ -466,7 +466,7 @@ namespace Tesserafin.Controller.Entities.TV
                 return GetSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, listing);
             }
 
-            var episodes = FilterEpisodesBySeason(allSeriesEpisodes, parentSeason, ConfigurationManager.Configuration.DisplaySpecialsWithinSeasons);
+            var episodes = FilterEpisodesBySeason(allSeriesEpisodes, parentSeason, RequireReadServices().DisplaySpecialsWithinSeasons);
 
             var sortBy = (parentSeason.IndexNumber ?? -1) == 0 ? ItemSortBy.SortName : ItemSortBy.AiredEpisodeOrder;
 
