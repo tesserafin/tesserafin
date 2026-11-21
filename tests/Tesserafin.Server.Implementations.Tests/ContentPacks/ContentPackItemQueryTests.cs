@@ -7,6 +7,7 @@ using Moq;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
@@ -64,7 +65,9 @@ public sealed class ContentPackItemQueryTests : IDisposable
             serverConfigurationManager.Object,
             NullLogger<BaseItemRepository>.Instance,
             new Tesserafin.Controller.LiveTv.ActiveRecordings(),
-            new());
+            new(),
+            new(),
+            new(() => Mock.Of<ILinkedChildrenService>()));
     }
 
     public void Dispose()

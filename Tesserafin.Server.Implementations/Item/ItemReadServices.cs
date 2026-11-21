@@ -11,6 +11,7 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.LiveTv;
+using LinkedChildType = Tesserafin.Controller.Entities.LinkedChildType;
 
 namespace Tesserafin.Server.Implementations.Item;
 
@@ -21,11 +22,15 @@ namespace Tesserafin.Server.Implementations.Item;
 /// <param name="recordings">The recordings in progress.</param>
 /// <param name="linkedChildren">The deferred saved-link resolver.</param>
 /// <param name="configuration">The server settings and storage paths.</param>
+/// <param name="lookup">The deferred cached identity lookup.</param>
+/// <param name="links">The persisted version links.</param>
 public sealed class ItemReadServices(
     IItemRepository repository,
     ActiveRecordings recordings,
     Lazy<LinkedChildResolver> linkedChildren,
-    IServerConfigurationManager configuration) : IItemReadServices
+    IServerConfigurationManager configuration,
+    Lazy<IItemLookupService> lookup,
+    Lazy<ILinkedChildrenService> links) : IItemReadServices
 {
     /// <inheritdoc />
     public LinkedChildResolver LinkedChildren => linkedChildren.Value;
@@ -42,6 +47,13 @@ public sealed class ItemReadServices(
     /// <inheritdoc />
     public string? LiveTvMoviePrefix => configuration.GetConfiguration<LiveTvOptions>("livetv").ListingProviders
         .FirstOrDefault(provider => !string.IsNullOrEmpty(provider.MoviePrefix))?.MoviePrefix;
+
+    /// <inheritdoc />
+    public BaseItem? GetItemById(Guid id) => lookup.Value.GetItemById(id);
+
+    /// <inheritdoc />
+    public IReadOnlyList<Guid> GetVideoVersionIds(Video video, LinkedChildType versionType)
+        => links.Value.GetLinkedChildrenIds(video.Id, (int)versionType);
 
     /// <inheritdoc />
     public bool IsManagedLibraryPath(string path)

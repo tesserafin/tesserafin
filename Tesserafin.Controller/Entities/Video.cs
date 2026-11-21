@@ -163,7 +163,7 @@ namespace Tesserafin.Controller.Entities
         public bool IsStacked => AdditionalParts.Length > 0;
 
         [JsonIgnore]
-        public override bool HasLocalAlternateVersions => LibraryManager.GetLocalAlternateVersionIds(this).Any();
+        public override bool HasLocalAlternateVersions => GetLocalVersionIds(this).Count > 0;
 
         [JsonIgnore]
         public override SourceType SourceType
@@ -251,32 +251,30 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public override MediaType MediaType => MediaType.Video;
 
-        private int GetMediaSourceCount(HashSet<Guid> callstack = null)
+        private int GetMediaSourceCount()
         {
-            callstack ??= [];
-            if (PrimaryVersionId.HasValue)
+            var version = this;
+            HashSet<Guid> visited = [];
+            while (version.PrimaryVersionId is Guid primaryId && ReadServices?.GetItemById(primaryId) is Video primary)
             {
-                var item = LibraryManager.GetItemById(PrimaryVersionId.Value);
-                if (item is Video video)
+                version = primary;
+                if (!visited.Add(version.Id))
                 {
-                    if (callstack.Contains(video.Id))
-                    {
-                        // Count alternate versions using LibraryManager
-                        var linkedCount = LibraryManager.GetLinkedAlternateVersions(video).Count();
-                        var localCount = LibraryManager.GetLocalAlternateVersionIds(video).Count();
-                        return linkedCount + localCount + 1;
-                    }
-
-                    callstack.Add(video.Id);
-                    return video.GetMediaSourceCount(callstack);
+                    break;
                 }
             }
 
-            // Count alternate versions using LibraryManager
-            var linkedVersionCount = LibraryManager.GetLinkedAlternateVersions(this).Count();
-            var localVersionCount = LibraryManager.GetLocalAlternateVersionIds(this).Count();
-            return linkedVersionCount + localVersionCount + 1;
+            return 1 + GetLinkedVersions(version).Count() + GetLocalVersionIds(version).Count;
         }
+
+        private IReadOnlyList<Guid> GetLocalVersionIds(Video video)
+            => ReadServices?.GetVideoVersionIds(video, LinkedChildType.LocalAlternateVersion) ?? [];
+
+        private IEnumerable<Video> GetLinkedVersions(Video video)
+            => (ReadServices?.GetVideoVersionIds(video, LinkedChildType.LinkedAlternateVersion) ?? [])
+                .Select(id => ReadServices?.GetItemById(id))
+                .OfType<Video>()
+                .OrderBy(version => version.SortName);
 
         /// <inheritdoc />
         public override string GetInheritedOriginalLanguage()
@@ -506,12 +504,12 @@ namespace Tesserafin.Controller.Entities
         protected override IEnumerable<(BaseItem Item, MediaSourceType MediaSourceType)> GetAllItemsForMediaSources()
         {
             var primary = PrimaryVersionId.HasValue
-                ? LibraryManager.GetItemById(PrimaryVersionId.Value) as Video
+                ? ReadServices?.GetItemById(PrimaryVersionId.Value) as Video
                 : null;
 
             var primaryLinked = primary is null
                 ? []
-                : LibraryManager.GetLinkedAlternateVersions(primary).ToList();
+                : GetLinkedVersions(primary).ToList();
 
             // Grouping marks user-merged (splittable) sources. The primary is only such a source when
             // this video is linked onto it; for local (file-based) alternates the primary is just
@@ -522,7 +520,7 @@ namespace Tesserafin.Controller.Entities
 
             // This video and its linked alternates, when this is itself an alternate, the primary and the primary's linked alternates.
             var grouped = new[] { ((BaseItem)this, MediaSourceType.Default) }
-                .Concat(LibraryManager.GetLinkedAlternateVersions(this).Select(i => ((BaseItem)i, MediaSourceType.Grouping)))
+                .Concat(GetLinkedVersions(this).Select(i => ((BaseItem)i, MediaSourceType.Grouping)))
                 .Concat(primary is null
                     ? []
                     : primaryLinked.Select(i => ((BaseItem)i, MediaSourceType.Grouping)).Prepend(((BaseItem)primary, primaryType)))
@@ -532,8 +530,8 @@ namespace Tesserafin.Controller.Entities
             var localAlternates = grouped
                 .Select(i => i.Item1)
                 .OfType<Video>()
-                .SelectMany(LibraryManager.GetLocalAlternateVersionIds)
-                .Select(LibraryManager.GetItemById)
+                .SelectMany(GetLocalVersionIds)
+                .Select(id => ReadServices?.GetItemById(id))
                 .Where(i => i is not null)
                 .Select(i => (i, MediaSourceType.Default));
 

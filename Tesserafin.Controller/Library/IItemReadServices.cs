@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Data.Entities;
+using LinkedChildType = Tesserafin.Controller.Entities.LinkedChildType;
 
 namespace Tesserafin.Controller.Library;
 
@@ -29,6 +30,17 @@ public interface IItemReadServices
 
     /// <summary>Gets the configured movie title prefix for the legacy guide provider.</summary>
     string? LiveTvMoviePrefix { get; }
+
+    /// <summary>Looks up a catalogue item by its identity.</summary>
+    /// <param name="id">The item id.</param>
+    /// <returns>The item when it exists.</returns>
+    BaseItem? GetItemById(Guid id);
+
+    /// <summary>Gets the saved links of the requested version type.</summary>
+    /// <param name="video">The video that owns the links.</param>
+    /// <param name="versionType">The local or linked alternate version type.</param>
+    /// <returns>The linked version ids.</returns>
+    IReadOnlyList<Guid> GetVideoVersionIds(Video video, LinkedChildType versionType);
 
     /// <summary>Checks whether a path is inside the server-managed data directory.</summary>
     /// <param name="path">The catalogue item path.</param>
