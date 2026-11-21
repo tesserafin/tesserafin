@@ -24,12 +24,8 @@ namespace Tesserafin.Controller.Entities.TV
     /// <summary>
     /// Class Episode.
     /// </summary>
-    public class Episode : Video, IHasTrailers, IHasLookupInfo<EpisodeInfo>, IHasSeries
+    public class Episode : Video, IHasLookupInfo<EpisodeInfo>, IHasSeries
     {
-        /// <inheritdoc />
-        [JsonIgnore]
-        public IReadOnlyList<BaseItem> LocalTrailers => GetExtras([Tesserafin.Model.Entities.ExtraType.Trailer]).ToArray();
-
         /// <summary>
         /// Gets or sets the season in which it aired.
         /// </summary>

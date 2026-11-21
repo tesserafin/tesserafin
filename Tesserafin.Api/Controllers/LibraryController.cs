@@ -56,6 +56,7 @@ public class LibraryController : BaseTesserafinApiController
     private readonly IProviderManager _providerManager;
     private readonly ISimilarItemsManager _similarItemsManager;
     private readonly ILibraryManager _libraryManager;
+    private readonly IItemExtrasService _extras;
     private readonly ILibraryScanCoordinator _scans;
     private readonly IUserManager _userManager;
     private readonly ICollectionManager _collectionManager;
@@ -75,6 +76,7 @@ public class LibraryController : BaseTesserafinApiController
     /// <param name="similarItemsManager">Instance of the <see cref="ISimilarItemsManager"/> interface.</param>
     /// <param name="scans">Library scan scheduling and state.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="extras">Reads items owned by the requested media.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="collectionManager">Instance of the <see cref="ICollectionManager"/> interface.</param>
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
@@ -92,6 +94,7 @@ public class LibraryController : BaseTesserafinApiController
         IProviderManager providerManager,
         ISimilarItemsManager similarItemsManager,
         ILibraryManager libraryManager,
+        IItemExtrasService extras,
         ILibraryScanCoordinator scans,
         IUserManager userManager,
         ICollectionManager collectionManager,
@@ -113,6 +116,7 @@ public class LibraryController : BaseTesserafinApiController
         _providerManager = providerManager;
         _similarItemsManager = similarItemsManager;
         _libraryManager = libraryManager;
+        _extras = extras;
         _scans = scans;
         _userManager = userManager;
         _collectionManager = collectionManager;
@@ -205,7 +209,7 @@ public class LibraryController : BaseTesserafinApiController
         while (true)
         {
             themeItems = _itemSortService.Sort(
-                item.GetExtras(user).Where(e => e.ExtraType == Tesserafin.Model.Entities.ExtraType.ThemeSong),
+                _extras.GetExtras(item, user, [Tesserafin.Model.Entities.ExtraType.ThemeSong]),
                 user,
                 orderBy).ToArray();
 
@@ -281,7 +285,7 @@ public class LibraryController : BaseTesserafinApiController
         while (true)
         {
             themeItems = _itemSortService.Sort(
-                item.GetExtras(user).Where(e => e.ExtraType == Tesserafin.Model.Entities.ExtraType.ThemeVideo),
+                _extras.GetExtras(item, user, [Tesserafin.Model.Entities.ExtraType.ThemeVideo]),
                 user,
                 orderBy).ToArray();
 

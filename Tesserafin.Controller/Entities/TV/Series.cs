@@ -30,7 +30,7 @@ namespace Tesserafin.Controller.Entities.TV
     /// <summary>
     /// Class Series.
     /// </summary>
-    public class Series : Folder, IHasTrailers, IHasDisplayOrder, IHasLookupInfo<SeriesInfo>, IMetadataContainer, ISupportsBoxSetGrouping
+    public class Series : Folder, IHasDisplayOrder, IHasLookupInfo<SeriesInfo>, IMetadataContainer, ISupportsBoxSetGrouping
     {
         public Series()
         {
@@ -55,10 +55,6 @@ namespace Tesserafin.Controller.Entities.TV
 
         [JsonIgnore]
         public override bool SupportsPeople => true;
-
-        /// <inheritdoc />
-        [JsonIgnore]
-        public IReadOnlyList<BaseItem> LocalTrailers => GetExtras([Tesserafin.Model.Entities.ExtraType.Trailer]).ToArray();
 
         /// <summary>
         /// Gets or sets the display order.

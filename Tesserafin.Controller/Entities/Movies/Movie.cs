@@ -3,8 +3,6 @@
 #pragma warning disable CS1591
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,19 +17,8 @@ namespace Tesserafin.Controller.Entities.Movies
     /// <summary>
     /// Class Movie.
     /// </summary>
-    public class Movie : Video, IHasSpecialFeatures, IHasTrailers, IHasLookupInfo<MovieInfo>, ISupportsBoxSetGrouping
+    public class Movie : Video, IHasLookupInfo<MovieInfo>, ISupportsBoxSetGrouping
     {
-        /// <inheritdoc />
-        [JsonIgnore]
-        public IReadOnlyList<Guid> SpecialFeatureIds => GetExtras()
-            .Where(extra => extra.ExtraType is not null && extra is Video)
-            .Select(extra => extra.Id)
-            .ToArray();
-
-        /// <inheritdoc />
-        [JsonIgnore]
-        public IReadOnlyList<BaseItem> LocalTrailers => GetExtras([Tesserafin.Model.Entities.ExtraType.Trailer]).ToArray();
-
         /// <summary>
         /// Gets or sets the name of the TMDb collection.
         /// </summary>
