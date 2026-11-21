@@ -18,6 +18,7 @@ using Tesserafin.Common.Configuration;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Channels;
+using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
@@ -69,6 +70,8 @@ namespace Tesserafin.Server.Core.Library
         private readonly AsyncNonKeyedLocker _liveStreamLocker = new(1);
         private readonly JsonSerializerOptions _jsonOptions = JsonDefaults.Options;
 
+        private readonly IServerConfigurationManager _configuration;
+
         private IMediaSourceProvider[] _providers;
 
         public MediaSourceManager(
@@ -89,12 +92,14 @@ namespace Tesserafin.Server.Core.Library
             IMediaStreamRepository mediaStreamRepository,
             IMediaAttachmentRepository mediaAttachmentRepository,
             IMediaSegmentManager mediaSegmentManager,
-            Lazy<IChannelManager> channelManager)
+            Lazy<IChannelManager> channelManager,
+            IServerConfigurationManager configuration)
         {
             _writes = writes;
             _deletions = deletions;
             _providerManager = providers;
             _channelManager = channelManager;
+            _configuration = configuration;
             _appHost = appHost;
             _itemRepo = itemRepo;
             _userManager = userManager;
@@ -259,6 +264,10 @@ namespace Tesserafin.Server.Core.Library
         /// <inheritdoc />
         public MediaProtocol GetPathProtocol(string path)
             => MediaPath.GetProtocol(path);
+
+        /// <inheritdoc />
+        public string MapFilePath(string path)
+            => path.ApplyNetworkPathSubstitutions(_configuration.Configuration.PathSubstitutions);
 
         public bool SupportsDirectStream(string path, MediaProtocol protocol)
         {
