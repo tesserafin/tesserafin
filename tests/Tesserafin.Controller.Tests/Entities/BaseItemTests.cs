@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
@@ -45,7 +46,12 @@ public class BaseItemTests
         fileSystem.Setup(fs => fs.GetFileSystemInfo(item.Path))
             .Returns(new FileSystemMetadata { Exists = true, LastWriteTimeUtc = item.DateModified.AddMinutes(1) });
 
-        Assert.True(item.RequiresRefresh(fileSystem.Object, Mock.Of<Tesserafin.Controller.IServerApplicationPaths>()));
+        var services = new MetadataRefreshServices(
+            fileSystem.Object,
+            Mock.Of<IServerApplicationPaths>(),
+            Mock.Of<IItemNamingService>(),
+            NullLogger.Instance);
+        Assert.True(item.RequiresRefresh(services));
     }
 
     [Fact]

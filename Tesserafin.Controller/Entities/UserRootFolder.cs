@@ -16,7 +16,6 @@ using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
 using Tesserafin.Data.Entities;
-using Tesserafin.Model.IO;
 using Tesserafin.Model.Library;
 using Tesserafin.Model.Querying;
 
@@ -148,10 +147,10 @@ namespace Tesserafin.Controller.Entities
             return list;
         }
 
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
             ClearCache();
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, services);
 
             if (string.Equals("default", Name, StringComparison.OrdinalIgnoreCase))
             {

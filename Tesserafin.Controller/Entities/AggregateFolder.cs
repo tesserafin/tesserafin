@@ -16,7 +16,6 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
-using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Entities
 {
@@ -85,17 +84,17 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        public override bool RequiresRefresh(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
+        public override bool RequiresRefresh(MetadataRefreshServices services)
         {
-            var changed = base.RequiresRefresh(fileSystem, applicationPaths) || _requiresRefresh;
+            var changed = base.RequiresRefresh(services) || _requiresRefresh;
 
             if (!changed)
             {
                 var locations = PhysicalLocations;
 
                 ClearCache();
-                var directory = fileSystem.GetDirectoryInfo(ContainingFolderPath);
-                var (_, newLocations) = FileData.ReadLibraryDirectory(directory, new DirectoryService(fileSystem), fileSystem, applicationPaths, Logger, physicalRoot: true);
+                var directory = services.FileSystem.GetDirectoryInfo(ContainingFolderPath);
+                var (_, newLocations) = FileData.ReadLibraryDirectory(directory, new DirectoryService(services.FileSystem), services.FileSystem, services.ApplicationPaths, services.Logger, physicalRoot: true);
                 _requiresRefresh = _requiresRefresh || !newLocations.SequenceEqual(locations);
 
                 if (!locations.SequenceEqual(newLocations))
@@ -107,11 +106,11 @@ namespace Tesserafin.Controller.Entities
             return changed;
         }
 
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
             ClearCache();
 
-            var changed = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths) || _requiresRefresh;
+            var changed = base.BeforeMetadataRefresh(replaceAllMetadata, services) || _requiresRefresh;
             _requiresRefresh = false;
             return changed;
         }

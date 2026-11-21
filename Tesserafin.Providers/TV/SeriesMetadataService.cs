@@ -94,7 +94,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 
             foreach (var season in seasons)
             {
-                var hasUpdate = refreshOptions is not null && season.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, ItemNamingService, FileSystem, ServerConfigurationManager.ApplicationPaths, _lookup);
+                var hasUpdate = refreshOptions is not null && season.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, RefreshServices, _lookup);
                 if (hasUpdate)
                 {
                     await season.UpdateToRepositoryAsync(Writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);

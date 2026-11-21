@@ -74,6 +74,9 @@ namespace Tesserafin.Providers.Manager
 
         protected IItemNamingService ItemNamingService { get; }
 
+        protected MetadataRefreshServices RefreshServices
+            => new(FileSystem, ServerConfigurationManager.ApplicationPaths, ItemNamingService, Logger);
+
         protected IExternalDataManager ExternalDataManager { get; }
 
         protected IItemRepository ItemRepository { get; }
@@ -122,7 +125,7 @@ namespace Tesserafin.Providers.Manager
             if (!requiresRefresh && refreshOptions.MetadataRefreshMode != MetadataRefreshMode.None)
             {
                 // TODO: If this returns true, should we instead just change metadata refresh mode to Full?
-                requiresRefresh = item.RequiresRefresh(FileSystem, ServerConfigurationManager.ApplicationPaths);
+                requiresRefresh = item.RequiresRefresh(RefreshServices);
 
                 if (requiresRefresh)
                 {
@@ -334,7 +337,7 @@ namespace Tesserafin.Providers.Manager
         /// <param name="replaceAllMetadata">Whether all metadata is being replaced.</param>
         /// <returns><c>true</c> when the item changed.</returns>
         protected virtual bool BeforeMetadataRefresh(TItemType item, bool replaceAllMetadata)
-            => item.BeforeMetadataRefresh(replaceAllMetadata, ItemNamingService, FileSystem, ServerConfigurationManager.ApplicationPaths);
+            => item.BeforeMetadataRefresh(replaceAllMetadata, RefreshServices);
 
         /// <summary>
         /// Normalises the original language to its two-letter code, then lets the item recompute what derives

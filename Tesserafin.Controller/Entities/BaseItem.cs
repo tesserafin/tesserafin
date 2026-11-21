@@ -1643,14 +1643,14 @@ namespace Tesserafin.Controller.Entities
             return PresentationUniqueKey ?? CreatePresentationUniqueKey();
         }
 
-        public virtual bool RequiresRefresh(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
+        public virtual bool RequiresRefresh(MetadataRefreshServices services)
         {
             if (string.IsNullOrEmpty(Path) || DateModified == DateTime.MinValue)
             {
                 return false;
             }
 
-            var info = fileSystem.GetFileSystemInfo(Path);
+            var info = services.FileSystem.GetFileSystemInfo(Path);
 
             return info.Exists && this.HasChanged(info.LastWriteTimeUtc);
         }
@@ -2551,11 +2551,9 @@ namespace Tesserafin.Controller.Entities
         /// This is called before any metadata refresh and returns true if changes were made.
         /// </summary>
         /// <param name="replaceAllMetadata">Whether to replace all metadata.</param>
-        /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
-        /// <param name="fileSystem">The filesystem used to resolve item paths.</param>
-        /// <param name="applicationPaths">The configured storage paths.</param>
+        /// <param name="services">The metadata refresh services.</param>
         /// <returns>true if the item has change, else false.</returns>
-        public virtual bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
+        public virtual bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
             var hasChanges = false;
 

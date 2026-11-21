@@ -175,36 +175,34 @@ namespace Tesserafin.Controller.Entities.Audio
             return GetPath(System.IO.Path.GetFileName(Path), fileSystem, applicationPaths.ArtistsPath, normalizeName: false);
         }
 
-        public override bool RequiresRefresh(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
+        public override bool RequiresRefresh(MetadataRefreshServices services)
         {
             if (IsAccessedByName)
             {
-                var newPath = GetRebasedPath(fileSystem, applicationPaths);
+                var newPath = GetRebasedPath(services.FileSystem, services.ApplicationPaths);
                 if (!string.Equals(Path, newPath, StringComparison.Ordinal))
                 {
-                    Logger.LogDebug("{0} path has changed from {1} to {2}", GetType().Name, Path, newPath);
+                    services.Logger.LogDebug("{0} path has changed from {1} to {2}", GetType().Name, Path, newPath);
                     return true;
                 }
             }
 
-            return base.RequiresRefresh(fileSystem, applicationPaths);
+            return base.RequiresRefresh(services);
         }
 
         /// <summary>
         /// This is called before any metadata refresh and returns true or false indicating if changes were made.
         /// </summary>
         /// <param name="replaceAllMetadata">Option to replace metadata.</param>
-        /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
-        /// <param name="fileSystem">The filesystem used to resolve item paths.</param>
-        /// <param name="applicationPaths">The configured storage paths.</param>
+        /// <param name="services">The metadata refresh services.</param>
         /// <returns>True if metadata changed.</returns>
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, services);
 
             if (IsAccessedByName)
             {
-                var newPath = GetRebasedPath(fileSystem, applicationPaths);
+                var newPath = GetRebasedPath(services.FileSystem, services.ApplicationPaths);
                 if (!string.Equals(Path, newPath, StringComparison.Ordinal))
                 {
                     Path = newPath;

@@ -22,7 +22,6 @@ using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
-using Tesserafin.Model.IO;
 using Tesserafin.Model.Querying;
 using MetadataProvider = Tesserafin.Model.Entities.MetadataProvider;
 
@@ -569,13 +568,13 @@ namespace Tesserafin.Controller.Entities.TV
         public SeriesInfo GetLookupInfo((string Language, string CountryCode) locale)
             => GetItemLookupInfo<SeriesInfo>(locale);
 
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, services);
 
             if (!ProductionYear.HasValue)
             {
-                var info = itemNamingService.ParseName(Name);
+                var info = services.ItemNamingService.ParseName(Name);
 
                 var yearInName = info.Year;
 

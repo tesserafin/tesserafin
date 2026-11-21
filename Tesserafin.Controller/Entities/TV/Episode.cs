@@ -373,9 +373,9 @@ namespace Tesserafin.Controller.Entities.TV
             return id;
         }
 
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, services);
 
             if (!IsLocked)
             {
@@ -383,14 +383,14 @@ namespace Tesserafin.Controller.Entities.TV
                 {
                     try
                     {
-                        if (itemNamingService.FillMissingEpisodeNumbersFromPath(this, replaceAllMetadata))
+                        if (services.ItemNamingService.FillMissingEpisodeNumbersFromPath(this, replaceAllMetadata))
                         {
                             hasChanges = true;
                         }
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError(ex, "Error in FillMissingEpisodeNumbersFromPath. Episode: {Episode}", Path ?? Name ?? Id.ToString());
+                        services.Logger.LogError(ex, "Error in FillMissingEpisodeNumbersFromPath. Episode: {Episode}", Path ?? Name ?? Id.ToString());
                     }
                 }
             }

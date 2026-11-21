@@ -10,7 +10,6 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Entities;
-using Tesserafin.Model.IO;
 using Tesserafin.Model.Providers;
 
 namespace Tesserafin.Controller.Entities
@@ -47,13 +46,13 @@ namespace Tesserafin.Controller.Entities
             return info;
         }
 
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService, fileSystem, applicationPaths);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, services);
 
             if (!ProductionYear.HasValue)
             {
-                var info = itemNamingService.ParseName(Name);
+                var info = services.ItemNamingService.ParseName(Name);
 
                 var yearInName = info.Year;
 
@@ -67,7 +66,7 @@ namespace Tesserafin.Controller.Entities
                     // Try to get the year from the folder name
                     if (!IsInMixedFolder)
                     {
-                        info = itemNamingService.ParseName(System.IO.Path.GetFileName(ContainingFolderPath));
+                        info = services.ItemNamingService.ParseName(System.IO.Path.GetFileName(ContainingFolderPath));
 
                         yearInName = info.Year;
 
