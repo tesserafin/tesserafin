@@ -436,14 +436,7 @@ namespace Tesserafin.Server.Core.IO
 
         /// <inheritdoc />
         public virtual bool ContainsSubPath(string parentPath, string path)
-        {
-            ArgumentException.ThrowIfNullOrEmpty(parentPath);
-            ArgumentException.ThrowIfNullOrEmpty(path);
-
-            return path.Contains(
-                Path.TrimEndingDirectorySeparator(parentPath) + Path.DirectorySeparatorChar,
-                _isEnvironmentCaseInsensitive ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
-        }
+            => FilePath.ContainsSubPath(parentPath, path);
 
         /// <inheritdoc />
         public virtual bool AreEqual(string path1, string path2)

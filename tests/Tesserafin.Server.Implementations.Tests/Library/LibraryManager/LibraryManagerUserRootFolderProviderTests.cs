@@ -89,11 +89,6 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
         _fileSystem = new ManagedFileSystem(NullLogger<ManagedFileSystem>.Instance, applicationPathsMock.Object, Array.Empty<IShortcutHandler>());
         fixture.Inject<IFileSystem>(_fileSystem);
 
-        // ItemResolveArgs.IsPhysicalRoot reads the static BaseItem.FileSystem (AreEqual against
-        // IServerApplicationPaths.RootFolderPath) - unrelated to DefaultUserViewsPath, but still
-        // needs a non-null static to avoid an NRE while resolving.
-        BaseItem.FileSystem = _fileSystem;
-
         // Same single-instance double-singleton wiring as LibraryManagerItemStoreTests (PR106a).
         _itemLookupService = new Tesserafin.Server.Core.Library.ItemLookupService(_itemRepositoryMock.Object, _configurationManagerMock.Object);
         fixture.Register(() => _itemLookupService);

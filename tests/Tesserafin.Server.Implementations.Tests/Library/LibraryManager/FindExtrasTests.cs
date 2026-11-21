@@ -56,7 +56,6 @@ public class FindExtrasTests
             new List<IItemResolver> { new AudioResolver(fixture.Create<NamingOptions>()) });
 
         // This is pretty terrible but unavoidable
-        BaseItem.FileSystem ??= fixture.Create<IFileSystem>();
     }
 
     [Fact]

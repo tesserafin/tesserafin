@@ -268,7 +268,6 @@ namespace Tesserafin.Providers.Tests.Manager
         public async Task RefreshImages_EmptyItemPopulatedProviderDynamic_AddsImages(ImageType imageType, int imageCount, bool responseHasPath, MediaProtocol protocol)
         {
             // Has to exist for querying DateModified time on file, results stored but not checked so not populating
-            BaseItem.FileSystem = Mock.Of<IFileSystem>();
 
             var item = new Video();
 
@@ -579,7 +578,6 @@ namespace Tesserafin.Providers.Tests.Manager
         private static Video GetItemWithImages(ImageType type, int count, bool validPaths)
         {
             // Has to exist for querying DateModified time on file, results stored but not checked so not populating
-            BaseItem.FileSystem ??= Mock.Of<IFileSystem>();
 
             var item = new Mock<Video>
             {

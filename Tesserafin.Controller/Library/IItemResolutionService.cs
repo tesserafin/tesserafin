@@ -35,6 +35,12 @@ public interface IItemResolutionService : IItemResolutionPolicy
 
     BaseItem? ResolvePath(FileSystemMetadata fileInfo, IDirectoryService directoryService, IItemResolver[]? resolvers, Folder? parent = null, CollectionType? collectionType = null, LibraryOptions? libraryOptions = null);
 
+    /// <summary>Reads the configured physical library root and expands its configured locations.</summary>
+    /// <param name="folder">The physical library root.</param>
+    /// <param name="directoryService">Directory access shared with the scan.</param>
+    /// <returns>The discovered entries and locations.</returns>
+    (FileSystemMetadata[]? Entries, string[] PhysicalLocations) DiscoverPhysicalRoot(AggregateFolder folder, IDirectoryService directoryService);
+
     /// <summary>Resolves a folder's filesystem entries with its current library options and collection type.</summary>
     /// <param name="parent">The folder whose children are being discovered.</param>
     /// <param name="files">Filesystem entries supplied by the folder.</param>

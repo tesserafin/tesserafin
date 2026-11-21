@@ -471,8 +471,6 @@ namespace Tesserafin.Controller.Entities
 
         public static IServerConfigurationManager ConfigurationManager { get; set; }
 
-        public static IFileSystem FileSystem { get; set; }
-
         /// <summary>
         /// Gets or sets the catalogue reads this item performs on itself (children, played state, active recording).
         /// The catalogue attaches them when it loads or saves the item.
@@ -1518,14 +1516,11 @@ namespace Tesserafin.Controller.Entities
         {
             var requiresSave = false;
 
-            if (SupportsOwnedItems)
+            if (IsFileProtocol && SupportsOwnedItems)
             {
                 try
                 {
-                    if (IsFileProtocol)
-                    {
-                        requiresSave = await RefreshOwnedItemsAsync(deletions, writes, providers, options, cancellationToken).ConfigureAwait(false);
-                    }
+                    requiresSave = await RefreshOwnedItemsAsync(deletions, writes, providers, options, cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {

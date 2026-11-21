@@ -20,6 +20,7 @@ using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Playlists
 {
@@ -100,7 +101,7 @@ namespace Tesserafin.Controller.Playlists
                     return false;
                 }
 
-                return FileSystem.ContainsSubPath(ConfigurationManager.ApplicationPaths.DataPath, path);
+                return FilePath.ContainsSubPath(ConfigurationManager.ApplicationPaths.DataPath, path);
             }
         }
 

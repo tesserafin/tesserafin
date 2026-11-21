@@ -59,4 +59,18 @@ public static class FilePath
             return filePath;
         }
     }
+
+    /// <summary>Checks whether a path contains the specified directory and a separator.</summary>
+    /// <param name="parentPath">The directory to look for.</param>
+    /// <param name="path">The path to check.</param>
+    /// <returns>Whether the directory occurs in the path.</returns>
+    public static bool ContainsSubPath(string parentPath, string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(parentPath);
+        ArgumentException.ThrowIfNullOrEmpty(path);
+
+        return path.Contains(
+            Path.TrimEndingDirectorySeparator(parentPath) + Path.DirectorySeparatorChar,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    }
 }

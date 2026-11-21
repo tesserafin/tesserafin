@@ -371,12 +371,6 @@ public sealed class VisibleContentProbeTests
             BaseItem.ConfigurationManager = _config.Object;
             BaseItem.Logger = NullLogger<BaseItem>.Instance;
 
-            var fileSystem = new Mock<IFileSystem>();
-            fileSystem
-                .Setup(f => f.ContainsSubPath(It.IsAny<string>(), It.IsAny<string>()))
-                .Returns((string parent, string path) => path.StartsWith(parent.TrimEnd('/') + "/", StringComparison.Ordinal));
-            BaseItem.FileSystem = fileSystem.Object;
-
             var localization = new Mock<ILocalizationManager>();
             localization
                 .Setup(l => l.GetRatingScore("R", It.IsAny<string?>()))

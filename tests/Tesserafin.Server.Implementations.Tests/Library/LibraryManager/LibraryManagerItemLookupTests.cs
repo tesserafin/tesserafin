@@ -572,7 +572,6 @@ public class LibraryManagerItemLookupTests
         SetLibraryManagerStatic(_libraryManager);
         SetConfigurationManagerStatic(_configurationManagerMock.Object);
         BaseItem.Logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<BaseItem>();
-        BaseItem.FileSystem = Mock.Of<Tesserafin.Model.IO.IFileSystem>();
 
         var missing = new CollectionFolder
         {

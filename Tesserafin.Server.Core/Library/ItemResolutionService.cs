@@ -374,6 +374,15 @@ internal sealed class ItemResolutionService(
     public bool IgnoreFile(FileSystemMetadata file, BaseItem? parent)
         => EntityResolutionIgnoreRules.Any(r => r.ShouldIgnore(file, parent));
 
+    public (FileSystemMetadata[]? Entries, string[] PhysicalLocations) DiscoverPhysicalRoot(AggregateFolder folder, IDirectoryService directoryService)
+        => FileData.ReadLibraryDirectory(
+            _fileSystem.GetDirectoryInfo(folder.ContainingFolderPath),
+            directoryService,
+            _fileSystem,
+            _configurationManager.ApplicationPaths,
+            _logger,
+            physicalRoot: true);
+
     public IEnumerable<BaseItem> ResolveFolderChildren(Folder parent, IReadOnlyList<FileSystemMetadata> files, IDirectoryService directoryService, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

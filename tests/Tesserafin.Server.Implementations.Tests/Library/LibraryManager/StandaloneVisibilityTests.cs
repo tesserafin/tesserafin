@@ -106,12 +106,6 @@ public sealed class StandaloneVisibilityTests
         _repository = repository;
         _readServices = new Tesserafin.Server.Implementations.Item.ItemReadServices(repository.Object, _activeRecordings);
         BaseItem.ConfigurationManager = configuration.Object;
-        // The static answers from the same recordings as the service (Record).
-
-        var fileSystem = new Mock<Tesserafin.Model.IO.IFileSystem>();
-        fileSystem.Setup(f => f.ContainsSubPath(It.IsAny<string>(), It.IsAny<string>()))
-            .Returns((string parent, string path) => path.StartsWith(parent + "/", StringComparison.Ordinal));
-        BaseItem.FileSystem = fileSystem.Object;
     }
 
     [Fact]

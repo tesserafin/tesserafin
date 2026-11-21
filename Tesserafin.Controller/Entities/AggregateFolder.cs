@@ -62,12 +62,6 @@ namespace Tesserafin.Controller.Entities
             return false;
         }
 
-        protected override FileSystemMetadata[] GetFileSystemChildren(IDirectoryService directoryService)
-        {
-            return ReadLibraryDirectory(directoryService, FileSystem, true).Entries
-                ?? throw new DirectoryNotFoundException($"Cannot read library directory {ContainingFolderPath}.");
-        }
-
         protected override IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
             lock (_childIdsLock)
@@ -99,7 +93,10 @@ namespace Tesserafin.Controller.Entities
             {
                 var locations = PhysicalLocations;
 
-                var newLocations = ReadLibraryDirectory(new DirectoryService(fileSystem), fileSystem, false).PhysicalLocations;
+                ClearCache();
+                var directory = fileSystem.GetDirectoryInfo(ContainingFolderPath);
+                var (_, newLocations) = FileData.ReadLibraryDirectory(directory, new DirectoryService(fileSystem), fileSystem, applicationPaths, Logger, physicalRoot: true);
+                _requiresRefresh = _requiresRefresh || !newLocations.SequenceEqual(locations);
 
                 if (!locations.SequenceEqual(newLocations))
                 {
@@ -119,24 +116,19 @@ namespace Tesserafin.Controller.Entities
             return changed;
         }
 
-        private (FileSystemMetadata[] Entries, string[] PhysicalLocations) ReadLibraryDirectory(IDirectoryService directoryService, IFileSystem fileSystem, bool setPhysicalLocations)
+        protected override IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             ClearCache();
 
-            var directory = fileSystem.GetDirectoryInfo(ContainingFolderPath);
-            var discovery = FileData.ReadLibraryDirectory(directory, directoryService, fileSystem, ConfigurationManager.ApplicationPaths, Logger, physicalRoot: true);
-            _requiresRefresh = _requiresRefresh || !discovery.PhysicalLocations.SequenceEqual(PhysicalLocations);
-            if (setPhysicalLocations)
-            {
-                PhysicalLocationsList = discovery.PhysicalLocations;
-            }
+            var (entries, locations) = resolution.DiscoverPhysicalRoot(this, directoryService);
+            _requiresRefresh = _requiresRefresh || !locations.SequenceEqual(PhysicalLocations);
+            PhysicalLocationsList = locations;
 
-            return discovery;
-        }
-
-        protected override IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
-        {
-            return base.GetNonCachedChildren(resolution, directoryService, cancellationToken).Concat(_virtualChildren);
+            return resolution.ResolveFolderChildren(
+                this,
+                entries ?? throw new DirectoryNotFoundException($"Cannot read library directory {ContainingFolderPath}."),
+                directoryService,
+                cancellationToken).Concat(_virtualChildren);
         }
 
         protected override async Task ValidateChildrenInternal(IFolderValidationServices services, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)

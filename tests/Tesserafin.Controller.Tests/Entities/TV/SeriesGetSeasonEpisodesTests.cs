@@ -41,7 +41,7 @@ public class SeriesGetSeasonEpisodesTests
             IndexNumber = indexNumber,
             PresentationUniqueKey = presentationUniqueKey,
             // Path deliberately left null: LocationType then resolves to Virtual without
-            // touching the BaseItem.FileSystem static (see PR50/N test notes below).
+            // requiring filesystem access (see PR50/N test notes below).
         };
 
     // ParentId/SeasonId are deliberately left unset (Guid.Empty) on every Episode created by this

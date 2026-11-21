@@ -18,6 +18,7 @@ using Tesserafin.Controller.TV;
 using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.IO;
 using Tesserafin.Model.Querying;
 
 namespace Tesserafin.Controller.Entities.Movies
@@ -66,7 +67,7 @@ namespace Tesserafin.Controller.Entities.Movies
                     return false;
                 }
 
-                return !FileSystem.ContainsSubPath(ConfigurationManager.ApplicationPaths.DataPath, Path);
+                return !FilePath.ContainsSubPath(ConfigurationManager.ApplicationPaths.DataPath, Path);
             }
         }
 
