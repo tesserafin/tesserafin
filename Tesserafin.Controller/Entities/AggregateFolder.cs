@@ -64,7 +64,7 @@ namespace Tesserafin.Controller.Entities
 
         protected override FileSystemMetadata[] GetFileSystemChildren(IDirectoryService directoryService)
         {
-            return ReadLibraryDirectory(directoryService, true).Entries
+            return ReadLibraryDirectory(directoryService, FileSystem, true).Entries
                 ?? throw new DirectoryNotFoundException($"Cannot read library directory {ContainingFolderPath}.");
         }
 
@@ -91,15 +91,15 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        public override bool RequiresRefresh()
+        public override bool RequiresRefresh(IFileSystem fileSystem)
         {
-            var changed = base.RequiresRefresh() || _requiresRefresh;
+            var changed = base.RequiresRefresh(fileSystem) || _requiresRefresh;
 
             if (!changed)
             {
                 var locations = PhysicalLocations;
 
-                var newLocations = ReadLibraryDirectory(new DirectoryService(FileSystem), false).PhysicalLocations;
+                var newLocations = ReadLibraryDirectory(new DirectoryService(fileSystem), fileSystem, false).PhysicalLocations;
 
                 if (!locations.SequenceEqual(newLocations))
                 {
@@ -119,12 +119,12 @@ namespace Tesserafin.Controller.Entities
             return changed;
         }
 
-        private (FileSystemMetadata[] Entries, string[] PhysicalLocations) ReadLibraryDirectory(IDirectoryService directoryService, bool setPhysicalLocations)
+        private (FileSystemMetadata[] Entries, string[] PhysicalLocations) ReadLibraryDirectory(IDirectoryService directoryService, IFileSystem fileSystem, bool setPhysicalLocations)
         {
             ClearCache();
 
-            var directory = FileSystem.GetDirectoryInfo(ContainingFolderPath);
-            var discovery = FileData.ReadLibraryDirectory(directory, directoryService, FileSystem, ConfigurationManager.ApplicationPaths, Logger, physicalRoot: true);
+            var directory = fileSystem.GetDirectoryInfo(ContainingFolderPath);
+            var discovery = FileData.ReadLibraryDirectory(directory, directoryService, fileSystem, ConfigurationManager.ApplicationPaths, Logger, physicalRoot: true);
             _requiresRefresh = _requiresRefresh || !discovery.PhysicalLocations.SequenceEqual(PhysicalLocations);
             if (setPhysicalLocations)
             {

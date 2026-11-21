@@ -1505,11 +1505,6 @@ namespace Tesserafin.Controller.Entities
             return prefix;
         }
 
-        public Task RefreshMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, CancellationToken cancellationToken)
-        {
-            return RefreshMetadata(deletions, writes, providers, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken);
-        }
-
         /// <summary>
         /// The base implementation to refresh metadata.
         /// </summary>
@@ -1653,14 +1648,14 @@ namespace Tesserafin.Controller.Entities
             return PresentationUniqueKey ?? CreatePresentationUniqueKey();
         }
 
-        public virtual bool RequiresRefresh()
+        public virtual bool RequiresRefresh(IFileSystem fileSystem)
         {
             if (string.IsNullOrEmpty(Path) || DateModified == DateTime.MinValue)
             {
                 return false;
             }
 
-            var info = FileSystem.GetFileSystemInfo(Path);
+            var info = fileSystem.GetFileSystemInfo(Path);
 
             return info.Exists && this.HasChanged(info.LastWriteTimeUtc);
         }

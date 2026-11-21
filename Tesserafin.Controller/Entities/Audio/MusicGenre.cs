@@ -100,7 +100,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return GetPath(System.IO.Path.GetFileName(Path), false);
         }
 
-        public override bool RequiresRefresh()
+        public override bool RequiresRefresh(IFileSystem fileSystem)
         {
             var newPath = GetRebasedPath();
             if (!string.Equals(Path, newPath, StringComparison.Ordinal))
@@ -109,7 +109,7 @@ namespace Tesserafin.Controller.Entities.Audio
                 return true;
             }
 
-            return base.RequiresRefresh();
+            return base.RequiresRefresh(fileSystem);
         }
 
         /// <summary>

@@ -15,6 +15,7 @@ using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.IO;
 using Tesserafin.Model.MediaInfo;
 using Xunit;
 
@@ -34,6 +35,17 @@ public class BaseItemTests
         var item = new Movie { Path = path!, ChannelId = isChannel ? Guid.NewGuid() : Guid.Empty };
 
         Assert.Equal(expected, item.LocationType);
+    }
+
+    [Fact]
+    public void RequiresRefresh_ReadsModificationTimeFromSuppliedFileSystem()
+    {
+        var item = new Movie { Path = "/media/film.mkv", DateModified = DateTime.UnixEpoch };
+        var fileSystem = new Mock<IFileSystem>(MockBehavior.Strict);
+        fileSystem.Setup(fs => fs.GetFileSystemInfo(item.Path))
+            .Returns(new FileSystemMetadata { Exists = true, LastWriteTimeUtc = item.DateModified.AddMinutes(1) });
+
+        Assert.True(item.RequiresRefresh(fileSystem.Object));
     }
 
     [Fact]

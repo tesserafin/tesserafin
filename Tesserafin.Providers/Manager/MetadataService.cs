@@ -122,11 +122,11 @@ namespace Tesserafin.Providers.Manager
             if (!requiresRefresh && refreshOptions.MetadataRefreshMode != MetadataRefreshMode.None)
             {
                 // TODO: If this returns true, should we instead just change metadata refresh mode to Full?
-                requiresRefresh = item.RequiresRefresh();
+                requiresRefresh = item.RequiresRefresh(FileSystem);
 
                 if (requiresRefresh)
                 {
-                    Logger.LogDebug("Refreshing {Type} {Item} because item.RequiresRefresh() returned true", typeof(TItemType).Name, item.Path ?? item.Name);
+                    Logger.LogDebug("Refreshing {Type} {Item} because its refresh check returned true", typeof(TItemType).Name, item.Path ?? item.Name);
                 }
             }
 
