@@ -28,6 +28,21 @@ public class BaseItemLookupServiceTests
         BaseItem.LibraryManager = new Mock<ILibraryManager>(MockBehavior.Strict).Object;
     }
 
+    [Fact]
+    public void AttachedCatalogueResolvesTheParentChainAndOwner()
+    {
+        var reads = new Mock<IItemReadServices>(MockBehavior.Strict);
+        var root = new Folder { Id = Guid.NewGuid(), ReadServices = reads.Object };
+        var parent = new Folder { Id = Guid.NewGuid(), ParentId = root.Id, ReadServices = reads.Object };
+        var item = new Movie { Id = Guid.NewGuid(), ParentId = parent.Id, OwnerId = root.Id, ReadServices = reads.Object };
+        reads.Setup(scope => scope.GetItemById(parent.Id)).Returns(parent);
+        reads.Setup(scope => scope.GetItemById(root.Id)).Returns(root);
+
+        Assert.Equal(new BaseItem[] { parent, root }, item.GetParents());
+        Assert.Same(parent, item.DisplayParent);
+        Assert.Same(root, item.GetOwner());
+    }
+
     // ---------------------------------------------------------------
     // GetParent(lookup)
     // ---------------------------------------------------------------

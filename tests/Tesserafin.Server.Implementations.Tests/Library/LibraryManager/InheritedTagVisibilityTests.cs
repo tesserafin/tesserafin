@@ -47,6 +47,7 @@ public sealed class InheritedTagVisibilityTests
     private readonly IItemAccessService _access;
     private readonly IStandaloneVisibilityService _tags;
     private readonly IItemLookupService _lookup;
+    private readonly IItemReadServices _reads;
 
     public InheritedTagVisibilityTests()
     {
@@ -59,6 +60,9 @@ public sealed class InheritedTagVisibilityTests
         repository.Setup(r => r.RetrieveItem(It.IsAny<Guid>())).Returns((Guid id) => _items.GetValueOrDefault(id)!);
 
         var lookup = new Tesserafin.Server.Core.Library.ItemLookupService(repository.Object, configuration.Object);
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(r => r.GetItemById(It.IsAny<Guid>())).Returns(lookup.GetItemById);
+        _reads = reads.Object;
         fixture.Register<IItemLookupService>(() => lookup);
         fixture.Register<Tesserafin.Server.Core.Library.IItemCacheStore>(() => lookup);
 
@@ -353,6 +357,7 @@ public sealed class InheritedTagVisibilityTests
             item.Id = Guid.NewGuid();
         }
 
+        item.ReadServices = _reads;
         _items[item.Id] = item;
         return item;
     }

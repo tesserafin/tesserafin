@@ -524,19 +524,7 @@ namespace Tesserafin.Controller.Entities
         public virtual Guid DisplayParentId => ParentId;
 
         [JsonIgnore]
-        public BaseItem DisplayParent
-        {
-            get
-            {
-                var id = DisplayParentId;
-                if (id.IsEmpty())
-                {
-                    return null;
-                }
-
-                return LibraryManager.GetItemById(id);
-            }
-        }
+        public BaseItem DisplayParent => GetRelatedItem(DisplayParentId);
 
         /// <summary>
         /// Gets or sets the date that the item first debuted. For movies this could be premiere date, episodes would be first aired.
@@ -826,6 +814,11 @@ namespace Tesserafin.Controller.Entities
             return Id.ToString("N", CultureInfo.InvariantCulture);
         }
 
+        /// <summary>Resolves a saved item reference through the attached catalogue.</summary>
+        /// <param name="id">The referenced item's id.</param>
+        /// <returns>The referenced item, if present.</returns>
+        protected BaseItem GetRelatedItem(Guid id) => id.IsEmpty() ? null : ReadServices?.GetItemById(id);
+
         /// <summary>
         /// Gets the attached catalogue reads.
         /// </summary>
@@ -871,15 +864,10 @@ namespace Tesserafin.Controller.Entities
             return false;
         }
 
-        public BaseItem GetOwner()
-        {
-            var ownerId = OwnerId;
-            return ownerId.IsEmpty() ? null : LibraryManager.GetItemById(ownerId);
-        }
+        public BaseItem GetOwner() => GetRelatedItem(OwnerId);
 
         /// <summary>
-        /// Gets the owner via the given lookup service, without touching the static
-        /// <see cref="LibraryManager"/>.
+        /// Gets the owner via the given lookup service.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <returns>BaseItem.</returns>
@@ -1033,20 +1021,10 @@ namespace Tesserafin.Controller.Entities
             return result;
         }
 
-        public BaseItem GetParent()
-        {
-            var parentId = ParentId;
-            if (parentId.IsEmpty())
-            {
-                return null;
-            }
-
-            return LibraryManager.GetItemById(parentId);
-        }
+        public BaseItem GetParent() => GetRelatedItem(ParentId);
 
         /// <summary>
-        /// Gets the parent via the given lookup service, without touching the static
-        /// <see cref="LibraryManager"/>.
+        /// Gets the parent via the given lookup service.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <returns>BaseItem.</returns>
@@ -1076,9 +1054,7 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>
-        /// Gets the parents via the given lookup service, without touching the static
-        /// <see cref="LibraryManager"/>. Each hop up the chain is resolved through
-        /// <paramref name="lookup"/>.
+        /// Gets the parents by resolving each hop through <paramref name="lookup"/>.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <returns>IEnumerable{BaseItem}.</returns>
@@ -1114,8 +1090,7 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>
-        /// Finds a parent of a given type via the given lookup service, without touching the
-        /// static <see cref="LibraryManager"/>.
+        /// Finds a parent of a given type via the given lookup service.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <typeparam name="T">Type of parent.</typeparam>

@@ -66,8 +66,9 @@ public sealed class ItemPersistenceConservationTests : IDisposable
         context.SaveChanges();
 
         _previousLibraryManager = BaseItem.LibraryManager;
-        _libraryManager.Setup(value => value.GetItemById(It.IsAny<Guid>()))
-            .Returns((Guid id) => _items.GetValueOrDefault(id)!);
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(value => value.GetItemById(It.IsAny<Guid>()))
+            .Returns((Guid id) => _items.GetValueOrDefault(id));
         _libraryManager.Setup(value => value.GetCollectionFolders(It.IsAny<BaseItem>()))
             .Returns(() => []);
         BaseItem.LibraryManager = _libraryManager.Object;
@@ -78,7 +79,7 @@ public sealed class ItemPersistenceConservationTests : IDisposable
             .Returns(() => Task.FromResult(CreateContext()));
         var appHost = new Mock<IServerApplicationHost>();
         appHost.Setup(value => value.ReverseVirtualPath(It.IsAny<string>())).Returns((string path) => path);
-        _service = new ItemPersistenceService(factory.Object, appHost.Object, NullLogger<ItemPersistenceService>.Instance, Mock.Of<Tesserafin.Controller.Library.IItemReadServices>());
+        _service = new ItemPersistenceService(factory.Object, appHost.Object, NullLogger<ItemPersistenceService>.Instance, reads.Object);
     }
 
     public void Dispose()

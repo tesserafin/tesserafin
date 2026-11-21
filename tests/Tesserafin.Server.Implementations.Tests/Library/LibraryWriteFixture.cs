@@ -42,7 +42,7 @@ internal static class LibraryWriteFixture
             fixture.Create<IStandaloneVisibilityService>()));
         var options = new LibraryItemOptions(fixture.Create<ICollectionFolderResolver>(), fixture.Create<IItemLookupService>(), fixture.Create<IUserRootFolderProvider>(), configuration, fixture.Create<IFileSystem>(), store);
         fixture.Inject<ILibraryItemOptions>(options);
-        var resolution = new ItemResolutionService(configuration, fixture.Create<IFileSystem>(), options, fixture.Create<IItemLookupService>(), fixture.Create<NamingOptions>(), NullLogger<ItemResolutionService>.Instance, NullLoggerFactory.Instance, fixture.Create<IDirectoryService>(), fixture.Create<DotIgnoreIgnoreRule>());
+        var resolution = new ItemResolutionService(configuration, fixture.Create<IFileSystem>(), options, fixture.Create<IItemLookupService>(), fixture.Create<NamingOptions>(), NullLogger<ItemResolutionService>.Instance, NullLoggerFactory.Instance, fixture.Create<IDirectoryService>(), fixture.Create<DotIgnoreIgnoreRule>(), fixture.Create<IItemReadServices>());
         fixture.Inject<IItemResolutionService>(resolution);
         var versions = new ItemVersionGraphPlanner(resolution, options, fixture.Create<IItemLookupService>(), fixture.Create<ILinkedChildrenService>());
         fixture.Inject(versions);
