@@ -462,11 +462,6 @@ namespace Tesserafin.Controller.Entities
         public Guid ParentId { get; set; }
 
         /// <summary>
-        /// Gets or sets the logger.
-        /// </summary>
-        public static ILibraryManager LibraryManager { get; set; }
-
-        /// <summary>
         /// Gets or sets the catalogue reads this item performs on itself (children, played state, active recording).
         /// The catalogue attaches them when it loads or saves the item.
         /// </summary>
@@ -708,8 +703,7 @@ namespace Tesserafin.Controller.Entities
 #pragma warning disable SA1201 // kept adjacent to IsTopParent for readability; it mirrors that property's logic
         /// <summary>
         /// Gets a value indicating whether this item is a top-level parent, resolving its parent
-        /// via the given lookup service instead of the static <see cref="LibraryManager"/>. Mirrors
-        /// the <see cref="IsTopParent"/> property but keeps the check off the static path.
+        /// via the supplied lookup service.
         /// </summary>
         /// <param name="lookup">The lookup service used to resolve the parent.</param>
         /// <returns><c>true</c> if this item is a top parent; otherwise, <c>false</c>.</returns>
@@ -813,6 +807,12 @@ namespace Tesserafin.Controller.Entities
         {
             return Id.ToString("N", CultureInfo.InvariantCulture);
         }
+
+        /// <summary>Gets listing services from the request or the attached catalogue.</summary>
+        /// <param name="query">The current request, when supplied.</param>
+        /// <returns>The listing services.</returns>
+        protected IItemListingReads GetListingServices(InternalItemsQuery query = null)
+            => query?.Listing ?? ReadServices?.Listing;
 
         /// <summary>Gets the libraries containing this item.</summary>
         /// <param name="candidates">The libraries to check, when supplied by the caller.</param>

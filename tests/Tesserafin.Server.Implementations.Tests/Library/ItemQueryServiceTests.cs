@@ -50,8 +50,6 @@ public class ItemQueryServiceTests
         libraryManager ??= new Mock<ILibraryManager>().Object;
         configurationManager ??= Mock.Of<IServerConfigurationManager>(x => x.Configuration == new ServerConfiguration());
 
-        BaseItem.LibraryManager = libraryManager;
-
         var catalogue = new ItemCatalogueQuery(itemLookupService.Object, itemRepository.Object, scopeService.Object, access ?? Mock.Of<IItemAccessService>(), Mock.Of<IItemCountService>());
         return new ItemQueryService(
             channelManager.Object,

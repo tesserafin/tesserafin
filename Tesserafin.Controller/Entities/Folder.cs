@@ -820,7 +820,7 @@ namespace Tesserafin.Controller.Entities
 
             if (user is null)
             {
-                return UserViewBuilder.Filter(Children, user, query, LibraryManager);
+                return UserViewBuilder.Filter(Children, user, query, GetListingServices(query));
             }
 
             // need to pass this param to the children.
@@ -839,18 +839,11 @@ namespace Tesserafin.Controller.Entities
                 getChildren(user, true, childQuery),
                 user,
                 query,
-                LibraryManager);
+                GetListingServices(query));
         }
 
         protected QueryResult<BaseItem> PostFilterAndSort(IEnumerable<BaseItem> items, InternalItemsQuery query, ICollectionManager collectionManager)
-        {
-            return PostFilterAndSortCore(items, query, collectionManager, filteredItems =>
-            {
-#pragma warning disable CS0618
-                return UserViewBuilder.SortAndPage(filteredItems, null, query, LibraryManager);
-#pragma warning restore CS0618
-            });
-        }
+            => PostFilterAndSort(items, query, collectionManager, GetListingServices(query)?.Sort);
 
         protected QueryResult<BaseItem> PostFilterAndSort(IEnumerable<BaseItem> items, InternalItemsQuery query, ICollectionManager collectionManager, IItemSortService itemSortService)
         {
@@ -1230,7 +1223,9 @@ namespace Tesserafin.Controller.Entities
             // the true root should return our users root folder children
             if (IsPhysicalRoot)
             {
-                return LibraryManager.GetUserRootFolder().GetChildren(user, includeLinkedChildren, out totalItemCount, new InternalItemsQuery(user) { Visibility = scope });
+                var listing = GetListingServices(query);
+                return listing.UserRoot.GetUserRootFolder()
+                    .GetChildren(user, includeLinkedChildren, out totalItemCount, new InternalItemsQuery(user) { Visibility = scope, Listing = query.Listing });
             }
 
             var result = new Dictionary<Guid, BaseItem>();
@@ -1304,7 +1299,7 @@ namespace Tesserafin.Controller.Entities
                 .Where(e => e.IsVisible(user, false, scope))
                 .ToArray();
 
-            var realChildren = UserViewBuilder.Filter(visibleChildren, query.User, query, LibraryManager)
+            var realChildren = UserViewBuilder.Filter(visibleChildren, query.User, query, GetListingServices(query))
                 .ToArray();
 
             var childCount = realChildren.Length;
@@ -1449,7 +1444,8 @@ namespace Tesserafin.Controller.Entities
                 return list;
             }
 
-            var allUserRootChildren = LibraryManager.GetUserRootFolder()
+            var reads = RequireReadServices();
+            var allUserRootChildren = reads.Listing.UserRoot.GetUserRootFolder()
                 .GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope })
                 .OfType<Folder>()
                 .ToList();
@@ -1458,7 +1454,7 @@ namespace Tesserafin.Controller.Entities
                 .Select(i => i.Id)
                 .ToList();
 
-            var resolver = RequireReadServices().LinkedChildren;
+            var resolver = reads.LinkedChildren;
             foreach (var i in linkedChildren)
             {
                 var child = resolver.ResolveSingle(this, i);
@@ -1483,7 +1479,7 @@ namespace Tesserafin.Controller.Entities
                     else
                     {
                         var itemCollectionFolderIds =
-                            LibraryManager.GetCollectionFolders(childOwner, allUserRootChildren).Select(f => f.Id);
+                            reads.GetCollectionFolders(childOwner, allUserRootChildren).Select(f => f.Id);
 
                         if (!itemCollectionFolderIds.Any(collectionFolderIds.Contains))
                         {

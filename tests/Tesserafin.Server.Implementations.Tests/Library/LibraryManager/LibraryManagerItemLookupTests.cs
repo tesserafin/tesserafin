@@ -118,7 +118,6 @@ public class LibraryManagerItemLookupTests
 
     private static void SetLibraryManagerStatic(ILibraryManager libraryManager)
     {
-        BaseItem.LibraryManager = libraryManager;
     }
 
     // ---------------------------------------------------------------

@@ -19,7 +19,6 @@ public sealed class BaseItemRatingTests
         var libraryManager = new Mock<ILibraryManager>();
         libraryManager.Setup(l => l.GetLibraryOptions(It.IsAny<BaseItem>())).Returns(new LibraryOptions());
         libraryManager.Setup(l => l.GetCollectionFolders(It.IsAny<BaseItem>())).Returns([]);
-        BaseItem.LibraryManager = libraryManager.Object;
     }
 
     [Fact]

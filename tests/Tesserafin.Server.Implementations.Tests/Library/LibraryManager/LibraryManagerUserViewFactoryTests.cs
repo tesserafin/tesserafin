@@ -239,8 +239,6 @@ public class LibraryManagerUserViewFactoryTests
     [Fact]
     public void GetNamedView_NameViewTypeSortNameOverload_NewView_PersistedAndRefreshed()
     {
-        Tesserafin.Controller.Entities.BaseItem.LibraryManager = _libraryManager;
-
         var view = _libraryManager.GetNamedView("Movies", CollectionType.movies, "SortName");
 
         Assert.Equal("Movies", view.Name);

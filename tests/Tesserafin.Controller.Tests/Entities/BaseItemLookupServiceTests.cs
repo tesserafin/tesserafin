@@ -13,21 +13,9 @@ namespace Tesserafin.Controller.Tests.Entities;
 /// <see cref="BaseItem.GetParent(IItemLookupService)"/>, <see cref="BaseItem.GetParents(IItemLookupService)"/>,
 /// <see cref="BaseItem.FindParent{T}(IItemLookupService)"/> and
 /// <see cref="BaseItem.GetOwner(IItemLookupService)"/> introduced in PR72.
-///
-/// The key property under test is that these overloads never touch the static
-/// <see cref="BaseItem.LibraryManager"/>: each test points that static at a strict mock with no
-/// setups, so any call into it throws <see cref="MockException"/> and fails the test.
 /// </summary>
-[Collection(BaseItemStaticStateFixture.Name)]
 public class BaseItemLookupServiceTests
 {
-    public BaseItemLookupServiceTests()
-    {
-        // Strict, no setups: any call the code under test makes to the static LibraryManager
-        // throws immediately, proving the service-aware overloads never fall back to it.
-        BaseItem.LibraryManager = new Mock<ILibraryManager>(MockBehavior.Strict).Object;
-    }
-
     [Fact]
     public void AttachedCatalogueResolvesTheParentChainAndOwner()
     {

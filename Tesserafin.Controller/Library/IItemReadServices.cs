@@ -18,6 +18,9 @@ namespace Tesserafin.Controller.Library;
 /// </remarks>
 public interface IItemReadServices
 {
+    /// <summary>Gets the services for catalogue listings.</summary>
+    IItemListingReads Listing { get; }
+
     /// <summary>Gets the resolver for saved links in the catalogue.</summary>
     LinkedChildResolver LinkedChildren { get; }
 

@@ -112,7 +112,7 @@ namespace Tesserafin.Controller.Entities
             }
 
             var scope = query.RequireVisibility();
-            return new UserViewBuilder(userViewManager, LibraryManager, scope.Logger, tvSeriesManager, channelManager, collectionManager, null, scope, query.Listing)
+            return new UserViewBuilder(userViewManager, query.Listing?.Queries, scope.Logger, tvSeriesManager, channelManager, collectionManager, null, scope, query.Listing, GetListingServices(query))
                 .GetUserItems(parent, this, CollectionType, query);
         }
 
@@ -131,7 +131,7 @@ namespace Tesserafin.Controller.Entities
             }
 
             var scope = query.RequireVisibility();
-            return new UserViewBuilder(userViewManager, LibraryManager, scope.Logger, tvSeriesManager, channelManager, collectionManager, itemSortService, scope, query.Listing)
+            return new UserViewBuilder(userViewManager, query.Listing?.Queries, scope.Logger, tvSeriesManager, channelManager, collectionManager, itemSortService, scope, query.Listing, GetListingServices(query))
                 .GetUserItems(parent, this, CollectionType, query);
         }
 

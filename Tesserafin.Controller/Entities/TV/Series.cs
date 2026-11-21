@@ -456,19 +456,8 @@ namespace Tesserafin.Controller.Entities.TV
 
             var sortBy = (parentSeason.IndexNumber ?? -1) == 0 ? ItemSortBy.SortName : ItemSortBy.AiredEpisodeOrder;
 
-            // Partial threading (PR50/N): callers that can supply an IItemSortService use it
-            // directly; callers that cannot (e.g. Season.GetChildren, the virtual GetChildren
-            // contract has no service to give) keep falling back to the obsolete static facade.
-            // The pragma below therefore survives this tranche on purpose -- see
-            // docs/major-rewrite-plan-v13.md § PR49/N and § PR50/N.
-            if (listing?.Sort is { } sorter)
-            {
-                return sorter.Sort(episodes, user, new[] { sortBy }, SortOrder.Ascending).ToList();
-            }
-
-#pragma warning disable CS0618 // static LibraryManager.Sort facade left in place pending Folder.GetChildren/Series.GetEpisodes cascade, see docs/major-rewrite-plan-v13.md § PR49/N
-            return LibraryManager.Sort(episodes, user, new[] { sortBy }, SortOrder.Ascending).ToList();
-#pragma warning restore CS0618
+            var sorter = (listing ?? GetListingServices()).Sort;
+            return sorter.Sort(episodes, user, new[] { sortBy }, SortOrder.Ascending).ToList();
         }
 
         /// <summary>

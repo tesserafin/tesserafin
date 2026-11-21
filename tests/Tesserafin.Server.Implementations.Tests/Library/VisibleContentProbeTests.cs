@@ -46,7 +46,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library;
 /// children). Both end in "is any eligible or linked child visible to this user".
 /// <see cref="VisibleContentProbe"/> must get there through its injected lookup and repository only:
 /// each run also asserts it never reads the static <see cref="BaseItem.ItemRepository"/>, and reaches
-/// the static <see cref="BaseItem.LibraryManager"/> only from inside <c>IsVisible</c> (tag inheritance
+/// the static <c>BaseItem.LibraryManager</c> only from inside <c>IsVisible</c> (tag inheritance
 /// and rating country of a real item - the visibility rule itself, unchanged).
 /// </remarks>
 [Collection(Tesserafin.Server.Implementations.Tests.Library.LibraryManager.LibraryManagerStaticStateFixture.Name)]
@@ -349,7 +349,7 @@ public sealed class VisibleContentProbeTests
 
     /// <summary>
     /// One self-contained library world: the process-wide entity statics
-    /// (<see cref="BaseItem.LibraryManager"/>, <see cref="BaseItem.ItemRepository"/>, ...) the historical
+    /// (<c>BaseItem.LibraryManager</c>, <see cref="BaseItem.ItemRepository"/>, ...) the historical
     /// probe reads are pointed at mocks backed by the same item and child tables.
     /// </summary>
     private sealed class World
@@ -388,7 +388,8 @@ public sealed class VisibleContentProbeTests
                 new(() => lookup.Object),
                 new(() => Mock.Of<ILinkedChildrenService>()),
                 new(() => Mock.Of<ICollectionFolderResolver>()),
-                new(() => Mock.Of<ILibraryItemOptions>()));
+                new(() => Mock.Of<ILibraryItemOptions>()),
+                new());
             // The probe's scope sees the same world the legacy static path sees: no libraries, default options.
             var emptyRoot = new Folder { Children = [] };
             var rootProvider = Mock.Of<IUserRootFolderProvider>(p => p.GetUserRootFolder() == emptyRoot);
@@ -412,7 +413,6 @@ public sealed class VisibleContentProbeTests
                 .Returns((InternalItemsQuery q) => q.ItemIds.Select(Find).OfType<BaseItem>().ToArray());
             _libraryManager.Setup(l => l.GetCollectionFolders(It.IsAny<BaseItem>())).Callback(RecordLibraryManagerCall).Returns([]);
             _libraryManager.Setup(l => l.GetLibraryOptions(It.IsAny<BaseItem>())).Callback(RecordLibraryManagerCall).Returns(new LibraryOptions());
-            BaseItem.LibraryManager = _libraryManager.Object;
         }
 
         public VisibleContentProbe Probe { get; }
@@ -502,7 +502,7 @@ public sealed class VisibleContentProbeTests
                 .Returns((User user, string name, Guid parentId, CollectionType? type, string sortName) =>
                     new UserView { Id = NamedViewId(user, (Folder)Find(parentId)!), Name = name, DisplayParentId = parentId, ViewType = type });
 
-            var sortService = new Tesserafin.Server.Core.Sorting.ItemSortService(Mock.Of<IUserManager>(), Mock.Of<IUserDataManager>());
+            var sortService = new Tesserafin.Server.Core.Sorting.ItemSortService(Mock.Of<IUserDataManager>());
             return new UserViewCatalog(
                 rootProvider.Object,
                 viewFactory.Object,
@@ -522,7 +522,7 @@ public sealed class VisibleContentProbeTests
                 Mock.Of<IUserViewManager>(),
                 Mock.Of<ITVSeriesManager>(),
                 _config.Object,
-                new Tesserafin.Server.Core.Sorting.ItemSortService(Mock.Of<IUserManager>(), Mock.Of<IUserDataManager>()),
+                new Tesserafin.Server.Core.Sorting.ItemSortService(Mock.Of<IUserDataManager>()),
                 Scope,
                 Mock.Of<IItemListingServices>(),
                 new ItemCatalogueQuery(
