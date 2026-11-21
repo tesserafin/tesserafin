@@ -21,6 +21,7 @@ using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.MediaInfo;
 using Xunit;
+using LinkedChildType = Tesserafin.Controller.Entities.LinkedChildType;
 
 namespace Tesserafin.Controller.Tests.Entities;
 
@@ -130,10 +131,9 @@ public class BaseItemTests
             Path = altPath,
         };
 
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(x => x.GetLocalAlternateVersionIds(It.IsAny<Video>()))
-                .Returns([Guid.Empty]);
-        BaseItem.LibraryManager = libraryManager.Object;
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(x => x.GetVideoVersionIds(video, LinkedChildType.LocalAlternateVersion)).Returns([Guid.Empty]);
+        video.ReadServices = reads.Object;
 
         Assert.Equal(name, video.GetMediaSourceName(video));
         Assert.Equal(altName, video.GetMediaSourceName(videoAlt));
@@ -194,12 +194,6 @@ public class BaseItemTests
             Path = altPath,
         };
 
-        var libraryManager = new Mock<ILibraryManager>();
-        // No local alternate versions: these are linked (separate items), so the folder fallback is unavailable.
-        libraryManager.Setup(x => x.GetLocalAlternateVersionIds(It.IsAny<Video>()))
-                .Returns(Array.Empty<Guid>());
-        BaseItem.LibraryManager = libraryManager.Object;
-
         Assert.Equal(expectedPrimary, video.GetMediaSourceName(video, commonPrefix));
         Assert.Equal(expectedAlt, videoAlt.GetMediaSourceName(videoAlt, commonPrefix));
     }
@@ -246,19 +240,14 @@ public class BaseItemTests
             .Returns((Guid id) => new List<MediaStream> { new MediaStream { Type = MediaStreamType.Video, Width = widths.GetValueOrDefault(id) } });
         mediaSourceManager.Setup(x => x.GetMediaAttachments(It.IsAny<Guid>())).Returns(new List<MediaAttachment>());
 
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(x => x.GetLinkedAlternateVersions(It.IsAny<Video>())).Returns(Array.Empty<Video>());
-        libraryManager.Setup(x => x.GetLocalAlternateVersionIds(primary)).Returns(new[] { alt1.Id, alt2.Id });
-        libraryManager.Setup(x => x.GetLocalAlternateVersionIds(alt1)).Returns(Array.Empty<Guid>());
-        libraryManager.Setup(x => x.GetLocalAlternateVersionIds(alt2)).Returns(Array.Empty<Guid>());
-        libraryManager.Setup(x => x.GetItemById(alt1.Id)).Returns(alt1);
-        libraryManager.Setup(x => x.GetItemById(alt2.Id)).Returns(alt2);
-        libraryManager.Setup(x => x.GetItemById(primary.Id)).Returns(primary);
-
-        var recordingsManager = new Mock<IRecordingsManager>();
-        recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-
-        BaseItem.LibraryManager = libraryManager.Object;
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(x => x.GetVideoVersionIds(primary, LinkedChildType.LocalAlternateVersion)).Returns([alt1.Id, alt2.Id]);
+        reads.Setup(x => x.GetItemById(primary.Id)).Returns(primary);
+        reads.Setup(x => x.GetItemById(alt1.Id)).Returns(alt1);
+        reads.Setup(x => x.GetItemById(alt2.Id)).Returns(alt2);
+        primary.ReadServices = reads.Object;
+        alt1.ReadServices = reads.Object;
+        alt2.ReadServices = reads.Object;
 
         return (primary, alt1, alt2, mediaSourceManager.Object);
     }
@@ -375,19 +364,6 @@ public class BaseItemTests
 
         var segmentManager = new Mock<IMediaSegmentManager>();
         segmentManager.Setup(x => x.IsTypeSupported(It.IsAny<BaseItem>())).Returns(false);
-
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(x => x.GetLinkedAlternateVersions(It.IsAny<Video>())).Returns(Array.Empty<Video>());
-        libraryManager.Setup(x => x.GetLocalAlternateVersionIds(It.IsAny<Video>())).Returns(Array.Empty<Guid>());
-        BaseItem.LibraryManager = libraryManager.Object;
-
-        // Video.SourceType (touched via BaseItem.GetMediaSources' own-version fallback) calls
-        // Video.IsActiveRecording(), which reads the static Video.RecordingsManager. That static is
-        // only ever assigned in production at startup (see ApplicationHost), so it must be set
-        // explicitly here rather than relying on another test in this collection having left a value
-        // behind — see BaseItemStaticStateFixture for why leaking statics between tests is fragile.
-        var recordingsManager = new Mock<IRecordingsManager>();
-        recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
 
         var result = channelItem.GetMediaSources(false, mediaSourceManager.Object, segmentManager.Object, channelManager.Object);
 

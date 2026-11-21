@@ -30,7 +30,7 @@ public sealed class ItemReadServicesTests
         var configuration = new Mock<IServerConfigurationManager>(MockBehavior.Strict);
         configuration.SetupGet(manager => manager.Configuration).Returns(settings);
         configuration.Setup(manager => manager.GetConfiguration("livetv")).Returns(liveTv);
-        var services = new ItemReadServices(Mock.Of<IItemRepository>(), new ActiveRecordings(), new(), configuration.Object);
+        var services = new ItemReadServices(Mock.Of<IItemRepository>(), new ActiveRecordings(), new(), configuration.Object, new(), new(() => Mock.Of<ILinkedChildrenService>()));
 
         Assert.False(services.IncludeLiveTvChannelNameInUserDataKeys);
         Assert.Equal("Movie:", services.LiveTvMoviePrefix);
@@ -49,7 +49,7 @@ public sealed class ItemReadServicesTests
             .Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.ParentId.Equals(folder.Id) && !q.GroupByPresentationUniqueKey)))
             .Returns([child]);
 
-        var children = new ItemReadServices(repository.Object, new ActiveRecordings(), new(), Mock.Of<IServerConfigurationManager>()).GetChildren(folder);
+        var children = new ItemReadServices(repository.Object, new ActiveRecordings(), new(), Mock.Of<IServerConfigurationManager>(), new(), new(() => Mock.Of<ILinkedChildrenService>())).GetChildren(folder);
 
         Assert.Same(child, Assert.Single(children));
     }
@@ -61,10 +61,10 @@ public sealed class ItemReadServicesTests
         var folderId = Guid.NewGuid();
         var repository = Mock.Of<IItemRepository>(r => r.GetIsPlayed(user, folderId, true) == true);
 
-        Assert.True(new ItemReadServices(repository, new ActiveRecordings(), new(), Mock.Of<IServerConfigurationManager>()).IsPlayed(user, folderId));
+        Assert.True(new ItemReadServices(repository, new ActiveRecordings(), new(), Mock.Of<IServerConfigurationManager>(), new(), new(() => Mock.Of<ILinkedChildrenService>())).IsPlayed(user, folderId));
     }
 
     [Fact]
     public void IsActiveRecording_NoRecordingInProgress_IsFalse()
-        => Assert.False(new ItemReadServices(Mock.Of<IItemRepository>(), new ActiveRecordings(), new(), Mock.Of<IServerConfigurationManager>()).IsActiveRecording("/rec/a.ts"));
+        => Assert.False(new ItemReadServices(Mock.Of<IItemRepository>(), new ActiveRecordings(), new(), Mock.Of<IServerConfigurationManager>(), new(), new(() => Mock.Of<ILinkedChildrenService>())).IsActiveRecording("/rec/a.ts"));
 }

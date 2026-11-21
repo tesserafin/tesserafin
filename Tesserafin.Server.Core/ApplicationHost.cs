@@ -577,6 +577,8 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemLookupService>(sp => sp.GetRequiredService<ItemLookupService>());
             serviceCollection.AddSingleton<IItemPathLookupService>(sp => sp.GetRequiredService<ItemLookupService>());
             serviceCollection.AddSingleton<LinkedChildResolver>();
+            serviceCollection.AddTransient(provider => new Lazy<IItemLookupService>(provider.GetRequiredService<IItemLookupService>));
+            serviceCollection.AddTransient(provider => new Lazy<ILinkedChildrenService>(provider.GetRequiredService<ILinkedChildrenService>));
             serviceCollection.AddTransient(provider => new Lazy<LinkedChildResolver>(provider.GetRequiredService<LinkedChildResolver>));
             serviceCollection.AddSingleton<IItemCacheStore>(sp => sp.GetRequiredService<ItemLookupService>());
             serviceCollection.AddSingleton<IItemAccessService, ItemAccessService>();

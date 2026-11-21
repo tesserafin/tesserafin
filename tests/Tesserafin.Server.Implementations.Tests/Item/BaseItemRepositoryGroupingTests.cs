@@ -7,6 +7,7 @@ using Moq;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations;
 using Tesserafin.Database.Implementations.Locking;
@@ -57,7 +58,9 @@ public sealed class BaseItemRepositoryGroupingTests : IDisposable
             serverConfigurationManager.Object,
             NullLogger<BaseItemRepository>.Instance,
             new Tesserafin.Controller.LiveTv.ActiveRecordings(),
-            new());
+            new(),
+            new(),
+            new(() => Mock.Of<ILinkedChildrenService>()));
     }
 
     public void Dispose()

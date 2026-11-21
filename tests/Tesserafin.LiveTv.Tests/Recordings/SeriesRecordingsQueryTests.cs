@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Data.Entities;
@@ -53,7 +54,9 @@ public sealed class SeriesRecordingsQueryTests : IDisposable
             configuration.Object,
             NullLogger<BaseItemRepository>.Instance,
             new Tesserafin.Controller.LiveTv.ActiveRecordings(),
-            new());
+            new(),
+            new(),
+            new(() => Mock.Of<ILinkedChildrenService>()));
     }
 
     public void Dispose() => _connection.Dispose();
