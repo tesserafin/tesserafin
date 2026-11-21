@@ -202,9 +202,8 @@ public class FolderTests
         var userView = new UserView { Id = Guid.NewGuid(), DisplayParentId = displayParent.Id };
         var channelItem = new Movie { Id = Guid.NewGuid() };
 
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(x => x.GetItemById(displayParent.Id)).Returns(displayParent);
-        BaseItem.LibraryManager = libraryManager.Object;
+        userView.ReadServices = Mock.Of<IItemReadServices>(reads => reads.GetItemById(displayParent.Id) == displayParent);
+        BaseItem.LibraryManager = Mock.Of<ILibraryManager>();
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
         channelManager

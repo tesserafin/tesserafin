@@ -104,11 +104,11 @@ namespace Tesserafin.Controller.Entities
 
             if (!DisplayParentId.IsEmpty())
             {
-                parent = LibraryManager.GetItemById(DisplayParentId) as Folder ?? parent;
+                parent = GetRelatedItem(DisplayParentId) as Folder ?? parent;
             }
             else if (!ParentId.IsEmpty())
             {
-                parent = LibraryManager.GetItemById(ParentId) as Folder ?? parent;
+                parent = GetParent() as Folder ?? parent;
             }
 
             var scope = query.RequireVisibility();
@@ -123,11 +123,11 @@ namespace Tesserafin.Controller.Entities
 
             if (!DisplayParentId.IsEmpty())
             {
-                parent = LibraryManager.GetItemById(DisplayParentId) as Folder ?? parent;
+                parent = GetRelatedItem(DisplayParentId) as Folder ?? parent;
             }
             else if (!ParentId.IsEmpty())
             {
-                parent = LibraryManager.GetItemById(ParentId) as Folder ?? parent;
+                parent = GetParent() as Folder ?? parent;
             }
 
             var scope = query.RequireVisibility();

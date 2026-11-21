@@ -108,7 +108,9 @@ public class FolderGetChildrenCharacterizationTests
         var userView = new UserView { Id = Guid.NewGuid(), DisplayParentId = parent.Id };
 
         var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(x => x.GetItemById(parent.Id)).Returns(parent);
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(x => x.GetItemById(parent.Id)).Returns(parent);
+        userView.ReadServices = reads.Object;
         SetStatics(libraryManager.Object);
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
@@ -142,7 +144,7 @@ public class FolderGetChildrenCharacterizationTests
         var episode = new Episode { Id = Guid.NewGuid(), Name = "Episode", ParentIndexNumber = 1, IndexNumber = 1 };
 
         var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(x => x.GetItemById(series.Id)).Returns(series);
+        season.ReadServices = Mock.Of<IItemReadServices>(reads => reads.GetItemById(series.Id) == series);
         libraryManager.Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(new List<BaseItem> { episode });
         libraryManager
             .Setup(x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), user, It.IsAny<IEnumerable<ItemSortBy>>(), SortOrder.Ascending))
@@ -275,7 +277,7 @@ public class FolderGetChildrenCharacterizationTests
         var episode = new Episode { Id = Guid.NewGuid(), Name = "Episode", ParentIndexNumber = 1, IndexNumber = 1 };
 
         var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(x => x.GetItemById(series.Id)).Returns(series);
+        season.ReadServices = Mock.Of<IItemReadServices>(reads => reads.GetItemById(series.Id) == series);
         libraryManager.Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(new List<BaseItem> { episode });
         SetStatics(libraryManager.Object);
         var sortService = new RecordingItemSortService();
@@ -300,7 +302,9 @@ public class FolderGetChildrenCharacterizationTests
         var userView = new UserView { Id = Guid.NewGuid(), DisplayParentId = parent.Id };
 
         var libraryManager = new Mock<ILibraryManager>(MockBehavior.Strict);
-        libraryManager.Setup(x => x.GetItemById(parent.Id)).Returns(parent);
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(x => x.GetItemById(parent.Id)).Returns(parent);
+        userView.ReadServices = reads.Object;
         SetStatics(libraryManager.Object);
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
@@ -319,7 +323,7 @@ public class FolderGetChildrenCharacterizationTests
 
         Assert.Equal(new BaseItem[] { child }, result);
         Assert.Single(sortService.Calls);
-        libraryManager.Verify(x => x.GetItemById(parent.Id), Times.Once);
+        reads.Verify(x => x.GetItemById(parent.Id), Times.Once);
         libraryManager.VerifyNoOtherCalls();
     }
 

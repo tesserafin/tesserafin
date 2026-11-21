@@ -82,7 +82,7 @@ namespace Tesserafin.Controller.Entities.TV
                     seriesId = FindSeriesId();
                 }
 
-                return seriesId.IsEmpty() ? null : (LibraryManager.GetItemById(seriesId) as Series);
+                return GetRelatedItem(seriesId) as Series;
             }
         }
 
@@ -97,7 +97,7 @@ namespace Tesserafin.Controller.Entities.TV
                     seasonId = FindSeasonId();
                 }
 
-                return seasonId.IsEmpty() ? null : (LibraryManager.GetItemById(seasonId) as Season);
+                return GetRelatedItem(seasonId) as Season;
             }
         }
 
@@ -280,12 +280,8 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         /// <summary>
-        /// Gets the Episode's <see cref="Series"/> via the given lookup service, without touching the
-        /// static <see cref="BaseItem.LibraryManager"/>. The parameterless <see cref="Series"/>
-        /// property remains as a compatibility wrapper over the static path; new callers that hold an
-        /// <see cref="IItemLookupService"/> should prefer this overload. Both the direct id resolution
-        /// and the empty-id parent fallback (<see cref="FindSeriesId(IItemLookupService)"/>) go through
-        /// <paramref name="lookup"/>, so this path is fully static-free.
+        /// Gets the owning series through the supplied lookup, falling back to the parent chain
+        /// when the series id is missing.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <returns>The series, or <c>null</c> if none can be resolved.</returns>
@@ -303,9 +299,7 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         /// <summary>
-        /// Finds the owning series id by walking the parent chain via the given lookup service,
-        /// without touching the static <see cref="BaseItem.LibraryManager"/>. Used by
-        /// <see cref="GetSeries(IItemLookupService)"/> as its empty-id fallback.
+        /// Finds the owning series id by walking the parent chain via the given lookup service.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <returns>The series id, or <see cref="Guid.Empty"/> if no series ancestor exists.</returns>

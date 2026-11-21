@@ -21,13 +21,11 @@ namespace Tesserafin.Server.Implementations.Tests.Dto;
 
 public class DtoServiceTests
 {
-    private readonly Mock<ILibraryManager> _libraryManagerMock;
     private readonly Mock<IItemPeopleService> _itemPeopleServiceMock;
     private readonly DtoService _dtoService;
 
     public DtoServiceTests()
     {
-        _libraryManagerMock = new Mock<ILibraryManager>();
         _itemPeopleServiceMock = new Mock<IItemPeopleService>();
 
         var imageProcessor = new Mock<IImageProcessor>();
@@ -44,7 +42,7 @@ public class DtoServiceTests
         _dtoService = new DtoService(
             NullLogger<DtoService>.Instance,
             Mock.Of<INamedItemCatalog>(),
-            _libraryManagerMock.Object,
+            Mock.Of<ILibraryManager>(),
             _itemPeopleServiceMock.Object,
             new Mock<IUserDataManager>().Object,
             imageProcessor.Object,
@@ -59,9 +57,6 @@ public class DtoServiceTests
             new Mock<IItemCountService>().Object,
             Mock.Of<IStandaloneVisibilityService>(),
             Mock.Of<IItemListingServices>());
-
-        // Episode.Series / Episode.Season resolve through the static BaseItem.LibraryManager.
-        BaseItem.LibraryManager = _libraryManagerMock.Object;
     }
 
     [Fact]
@@ -132,8 +127,10 @@ public class DtoServiceTests
         };
         episode.SetImage(new ItemImageInfo { Type = ImageType.Primary, Path = "http://test/episode.jpg" }, 0);
 
-        _libraryManagerMock.Setup(x => x.GetItemById(season.Id)).Returns(season);
-        _libraryManagerMock.Setup(x => x.GetItemById(series.Id)).Returns(series);
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(x => x.GetItemById(season.Id)).Returns(season);
+        reads.Setup(x => x.GetItemById(series.Id)).Returns(series);
+        episode.ReadServices = reads.Object;
 
         return (episode, season, series);
     }

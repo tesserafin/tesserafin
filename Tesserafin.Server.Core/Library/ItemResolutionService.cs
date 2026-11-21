@@ -34,7 +34,8 @@ internal sealed class ItemResolutionService(
     ILogger<ItemResolutionService> logger,
     ILoggerFactory loggerFactory,
     IDirectoryService directoryService,
-    DotIgnoreIgnoreRule dotIgnore) : IItemResolutionService
+    DotIgnoreIgnoreRule dotIgnore,
+    IItemReadServices reads) : IItemResolutionService
 {
     private readonly IServerConfigurationManager _configurationManager = configuration;
     private readonly IFileSystem _fileSystem = files;
@@ -194,6 +195,7 @@ internal sealed class ItemResolutionService(
 
         if (item is not null)
         {
+            item.ReadServices ??= reads;
             ResolverHelper.SetInitialItemValues(item, args, _fileSystem, this, _configurationManager.GetMetadataConfiguration().UseFileCreationTimeForDateAdded);
         }
 
@@ -409,6 +411,7 @@ internal sealed class ItemResolutionService(
                 items.RemoveAll(item =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    item.ReadServices ??= reads;
                     return !ResolverHelper.SetInitialItemValues(item, parent, this, directoryService, useFileCreationTime);
                 });
                 items.AddRange(ResolveFileList(result.ExtraFiles, directoryService, parent, collectionType, libraryOptions, cancellationToken));
