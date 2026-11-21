@@ -42,7 +42,6 @@ public sealed class SeriesMetadataServiceTests
             repository.Object,
             lookup,
             Mock.Of<IItemPathLookupService>(MockBehavior.Strict),
-            Mock.Of<IFileSystem>(MockBehavior.Strict),
             NullLogger<LinkedChildResolver>.Instance);
         var service = new TestSeriesMetadataService(repository.Object, lookup, resolver);
 
@@ -173,7 +172,6 @@ public sealed class SeriesMetadataServiceTests
             Mock.Of<IItemRepository>(MockBehavior.Strict),
             lookup,
             Mock.Of<IItemPathLookupService>(MockBehavior.Strict),
-            Mock.Of<IFileSystem>(MockBehavior.Strict),
             NullLogger<LinkedChildResolver>.Instance);
 
     private sealed class TestSeries : Series

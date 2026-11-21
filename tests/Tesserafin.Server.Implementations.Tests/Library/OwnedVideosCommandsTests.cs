@@ -257,7 +257,6 @@ public sealed class OwnedVideosCommandsTests
             Repository.Setup(r => r.RetrieveItem(It.IsAny<Guid>())).Returns((Guid id) => Persisted.GetValueOrDefault(id)!);
             Lookup = new ItemLookupService(Repository.Object, configuration.Object);
             Cache = Lookup;
-            Files.Setup(f => f.IsPathFile(It.IsAny<string>())).Returns(true);
             Files.Setup(f => f.FileExists(It.IsAny<string>())).Returns(true);
             Files.Setup(f => f.AreEqual(It.IsAny<string>(), It.IsAny<string>())).Returns((string a, string b) => string.Equals(a, b, StringComparison.Ordinal));
             Resolution.Setup(r => r.GetNewItemId(It.IsAny<string>(), It.IsAny<Type>())).Returns((string path, Type type) =>
@@ -284,7 +283,7 @@ public sealed class OwnedVideosCommandsTests
             Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>()))
                 .Callback((BaseItem item, MetadataRefreshOptions options, CancellationToken _) => Refreshed.Add(((Video)item, options))).ReturnsAsync(ItemUpdateType.None);
             BaseItem.LibraryManager = new Mock<ILibraryManager>(MockBehavior.Strict).Object;
-            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, itemOptions.Object, Lookup, Linked.Object), Persistence.Object, Cache, Lookup, Linked.Object, Mock.Of<IItemMetadataExporter>(), Files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(configuration.Object, Files.Object), Resolution.Object, Repository.Object, itemOptions.Object, new FolderChildReconciler(Lookup, Mock.Of<IFileSystem>(), NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
+            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, itemOptions.Object, Lookup, Linked.Object), Persistence.Object, Cache, Lookup, Linked.Object, Mock.Of<IItemMetadataExporter>(), Files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(configuration.Object, Files.Object), Resolution.Object, Repository.Object, itemOptions.Object, new FolderChildReconciler(Lookup, NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
         }
 
         public Movie Owner { get; } = new() { Id = Guid.NewGuid(), ParentId = Guid.NewGuid(), Path = "/media/owner.mkv", Overview = "owner description", Genres = ["owner genre"] };

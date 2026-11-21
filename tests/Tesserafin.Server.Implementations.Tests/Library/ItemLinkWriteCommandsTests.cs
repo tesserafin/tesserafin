@@ -176,7 +176,7 @@ public sealed class ItemLinkWriteCommandsTests
     {
         public Context()
         {
-            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Mock.Of<IItemResolutionService>(), Mock.Of<ILibraryItemOptions>(), Lookup.Object, Linked.Object), Persistence.Object, Cache, Lookup.Object, Linked.Object, Metadata.Object, Mock.Of<IFileSystem>(), Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(Mock.Of<IServerConfigurationManager>(), Mock.Of<IFileSystem>()), Mock.Of<IItemResolutionService>(), Mock.Of<IItemRepository>(), Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(Lookup.Object, Mock.Of<IFileSystem>(), NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
+            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Mock.Of<IItemResolutionService>(), Mock.Of<ILibraryItemOptions>(), Lookup.Object, Linked.Object), Persistence.Object, Cache, Lookup.Object, Linked.Object, Metadata.Object, Mock.Of<IFileSystem>(), Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(Mock.Of<IServerConfigurationManager>(), Mock.Of<IFileSystem>()), Mock.Of<IItemResolutionService>(), Mock.Of<IItemRepository>(), Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(Lookup.Object, NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
         }
 
         public Mock<ILinkedChildrenService> Linked { get; } = new();

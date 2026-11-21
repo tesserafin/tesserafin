@@ -16,7 +16,6 @@ public sealed class LinkedChildResolver
     private readonly Func<InternalItemsQuery, IReadOnlyList<BaseItem>>? _query;
     private readonly Func<Guid, BaseItem?> _lookup;
     private readonly Func<string, BaseItem?> _findPath;
-    private readonly IFileSystem _files;
     private readonly ILogger _logger;
 
     /// <summary>
@@ -25,15 +24,13 @@ public sealed class LinkedChildResolver
     /// <param name="repository">The repository for batched item reads.</param>
     /// <param name="lookup">The item lookup service.</param>
     /// <param name="paths">The stored-path lookup service.</param>
-    /// <param name="files">The filesystem for resolving relative paths.</param>
     /// <param name="logger">The logger.</param>
     public LinkedChildResolver(
         IItemRepository repository,
         IItemLookupService lookup,
         IItemPathLookupService paths,
-        IFileSystem files,
         ILogger<LinkedChildResolver> logger)
-        : this(repository.GetItemList, lookup.GetItemById, path => paths.FindByPath(path, null), files, logger)
+        : this(repository.GetItemList, lookup.GetItemById, path => paths.FindByPath(path, null), logger)
     {
     }
 
@@ -41,13 +38,11 @@ public sealed class LinkedChildResolver
         Func<InternalItemsQuery, IReadOnlyList<BaseItem>>? query,
         Func<Guid, BaseItem?> lookup,
         Func<string, BaseItem?> findPath,
-        IFileSystem files,
         ILogger logger)
     {
         _query = query;
         _lookup = lookup;
         _findPath = findPath;
-        _files = files;
         _logger = logger;
     }
 
@@ -150,7 +145,7 @@ public sealed class LinkedChildResolver
     {
         if (!string.IsNullOrEmpty(link.Path))
         {
-            var path = _files.MakeAbsolutePath(folder.ContainingFolderPath, link.Path);
+            var path = FilePath.MakeAbsolute(folder.ContainingFolderPath, link.Path);
             var item = _findPath(path);
             if (item is null)
             {

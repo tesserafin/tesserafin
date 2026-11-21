@@ -329,7 +329,7 @@ namespace Tesserafin.Controller.Entities.TV
             return list;
         }
 
-        public override IEnumerable<FileSystemMetadata> GetDeletePaths()
+        public override IEnumerable<FileSystemMetadata> GetDeletePaths(IFileSystem fileSystem)
         {
             return new[]
             {
@@ -338,7 +338,7 @@ namespace Tesserafin.Controller.Entities.TV
                     FullName = Path,
                     IsDirectory = IsFolder
                 }
-            }.Concat(GetLocalMetadataFilesToDelete());
+            }.Concat(GetLocalMetadataFilesToDelete(fileSystem));
         }
 
         public override UnratedItem GetBlockUnratedType()

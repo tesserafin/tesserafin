@@ -74,7 +74,6 @@ public sealed class AlbumMetadataServiceTests
             repository.Object,
             lookup.Object,
             Mock.Of<IItemPathLookupService>(MockBehavior.Strict),
-            Mock.Of<IFileSystem>(MockBehavior.Strict),
             NullLogger<LinkedChildResolver>.Instance);
         var service = new ExposedAlbumMetadataService(
             repository.Object,

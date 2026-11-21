@@ -199,7 +199,6 @@ public sealed class PrimaryVersionTransferTests
             resolution.Setup(r => r.GetNewItemId(It.IsAny<string>(), It.IsAny<Type>()))
                 .Returns((string path, Type type) => Rows.Values.First(item => string.Equals(item.Path, path, StringComparison.Ordinal) && item.GetType() == type).Id);
             var files = new Mock<IFileSystem>();
-            files.Setup(f => f.IsPathFile(It.IsAny<string>())).Returns(true);
             Metadata.Setup(m => m.SaveAsync(It.IsAny<BaseItem>(), It.IsAny<ItemUpdateType>(), It.IsAny<CancellationToken>(), It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
             Persistence.Setup(p => p.SaveItems(It.IsAny<IReadOnlyList<BaseItem>>(), It.IsAny<CancellationToken>())).Callback((IReadOnlyList<BaseItem> items, CancellationToken _) =>
             {
@@ -220,7 +219,7 @@ public sealed class PrimaryVersionTransferTests
                     Links[(item.Id, LinkedChildType.LinkedAlternateVersion)] = item.LinkedAlternateVersions.Select(child => child.ItemId!.Value).ToArray();
                 }
             });
-            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(resolution.Object, Mock.Of<ILibraryItemOptions>(), Lookup.Object, Linked.Object), Persistence.Object, this, Lookup.Object, Linked.Object, Metadata.Object, files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(Mock.Of<IServerConfigurationManager>(), files.Object), resolution.Object, Mock.Of<IItemRepository>(), Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(Lookup.Object, Mock.Of<IFileSystem>(), NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
+            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(resolution.Object, Mock.Of<ILibraryItemOptions>(), Lookup.Object, Linked.Object), Persistence.Object, this, Lookup.Object, Linked.Object, Metadata.Object, files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(Mock.Of<IServerConfigurationManager>(), files.Object), resolution.Object, Mock.Of<IItemRepository>(), Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(Lookup.Object, NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
         }
 
         public Dictionary<Guid, Video> Rows { get; } = [];

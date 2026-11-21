@@ -70,7 +70,7 @@ internal sealed class ItemResolutionService(
                 throw new IOException($"Shortcut has no target: {file.FullName}");
             }
 
-            var target = _fileSystem.MakeAbsolutePath(owner.ContainingFolderPath, expanded);
+            var target = FilePath.MakeAbsolute(owner.ContainingFolderPath, expanded);
             if (string.IsNullOrWhiteSpace(target))
             {
                 throw new IOException($"Shortcut has no absolute target: {file.FullName}");

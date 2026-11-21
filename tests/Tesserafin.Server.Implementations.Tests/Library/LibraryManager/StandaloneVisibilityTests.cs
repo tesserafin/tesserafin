@@ -1105,8 +1105,6 @@ public sealed class StandaloneVisibilityTests
     {
         _repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.Path != null)))
             .Returns((InternalItemsQuery q) => _items.Values.Where(i => i.Path == q.Path).OrderByDescending(i => i.DateCreated).Take(1).ToList());
-        Mock.Get(BaseItem.FileSystem).Setup(f => f.MakeAbsolutePath(It.IsAny<string>(), It.IsAny<string>()))
-            .Returns((string folder, string file) => System.IO.Path.GetFullPath(file, folder));
         BaseItem.Logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<BaseItem>.Instance;
     }
 

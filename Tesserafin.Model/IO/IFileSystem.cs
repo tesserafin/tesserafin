@@ -31,8 +31,6 @@ namespace Tesserafin.Model.IO
         /// <param name="target">The target.</param>
         void CreateShortcut(string shortcutPath, string target);
 
-        string MakeAbsolutePath(string folderPath, string filePath);
-
         /// <summary>
         /// Moves a directory to a new location.
         /// </summary>
@@ -127,13 +125,6 @@ namespace Tesserafin.Model.IO
         /// <param name="info">The information.</param>
         /// <returns>System.String.</returns>
         string GetFileNameWithoutExtension(FileSystemMetadata info);
-
-        /// <summary>
-        /// Determines whether [is path file] [the specified path].
-        /// </summary>
-        /// <param name="path">The path.</param>
-        /// <returns><c>true</c> if [is path file] [the specified path]; otherwise, <c>false</c>.</returns>
-        bool IsPathFile(string path);
 
         /// <summary>
         /// Deletes the file.

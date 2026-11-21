@@ -11,6 +11,7 @@ using Tesserafin.Controller;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
@@ -192,9 +193,48 @@ public sealed class ItemDeletionCommandsTests
         var item = new StubGenre { Id = Guid.NewGuid(), Name = "genre", Path = file };
         context.Configuration.Setup(c => c.ApplicationPaths.GenrePath).Returns(managedRoot);
         context.Files.Setup(f => f.ContainsSubPath(managedRoot, file)).Returns(insideRoot);
+        context.Files.Setup(f => f.GetFileSystemInfo(file)).Returns(new FileSystemMetadata { FullName = file });
         await context.Commands.DeleteAsync(item, new DeleteOptions { DeleteFileLocation = false }, null, TestContext.Current.CancellationToken);
         Assert.Equal(!insideRoot, File.Exists(file));
         context.Files.Verify(f => f.ContainsSubPath(managedRoot, file), Times.Once);
+        context.Files.Verify(f => f.GetFileSystemInfo(file), insideRoot ? Times.Once() : Times.Never());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MixedEpisodeDeletion_UsesInjectedFileSystemForSidecars(bool bulk)
+    {
+        using var context = new Context();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var source = context.Video();
+        var episode = new StubEpisode
+        {
+            Id = source.Id,
+            Path = source.Path,
+            IsInMixedFolder = true,
+            OwnerId = Guid.NewGuid()
+        };
+        var directory = Path.GetDirectoryName(episode.Path)!;
+        var sidecar = Path.ChangeExtension(episode.Path, ".nfo");
+        var unrelated = Path.Combine(directory, "other.nfo");
+        await File.WriteAllTextAsync(sidecar, "episode", cancellationToken);
+        await File.WriteAllTextAsync(unrelated, "other", cancellationToken);
+        context.Files.Setup(f => f.GetFiles(directory, It.IsAny<IReadOnlyList<string>>(), false, false))
+            .Returns([new FileSystemMetadata { FullName = sidecar }, new FileSystemMetadata { FullName = unrelated }]);
+
+        if (bulk)
+        {
+            await context.Commands.DeleteUnreferencedAsync([episode], true, cancellationToken);
+        }
+        else
+        {
+            await context.Commands.DeleteAsync(episode, new DeleteOptions { DeleteFileLocation = true }, null, cancellationToken);
+        }
+
+        Assert.False(File.Exists(episode.Path));
+        Assert.False(File.Exists(sidecar));
+        Assert.True(File.Exists(unrelated));
     }
 
     [Fact]
@@ -304,8 +344,15 @@ public sealed class ItemDeletionCommandsTests
     private sealed class StubGenre : Genre
     {
         public override string GetInternalMetadataPath(string basePath) => Path + ".metadata";
+    }
 
-        public override IEnumerable<FileSystemMetadata> GetDeletePaths() => [new FileSystemMetadata { FullName = Path }];
+    private sealed class StubEpisode : Episode
+    {
+        public override SourceType SourceType => SourceType.Library;
+
+        public override string GetInternalMetadataPath(string basePath) => Path + ".metadata";
+
+        public override IReadOnlyList<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, IChannelManager channelManager) => [];
     }
 
     private sealed class StubVideo(string metadata) : Video
@@ -316,7 +363,7 @@ public sealed class ItemDeletionCommandsTests
 
         public override string GetInternalMetadataPath(string basePath) => metadata;
 
-        public override IEnumerable<FileSystemMetadata> GetDeletePaths() => [new FileSystemMetadata { FullName = Path }];
+        public override IEnumerable<FileSystemMetadata> GetDeletePaths(IFileSystem fileSystem) => [new FileSystemMetadata { FullName = Path }];
 
         public override IReadOnlyList<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution, IMediaSourceManager mediaSourceManager, IMediaSegmentManager mediaSegmentManager, IChannelManager channelManager) => [];
 

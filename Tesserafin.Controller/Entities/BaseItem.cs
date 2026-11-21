@@ -332,7 +332,7 @@ namespace Tesserafin.Controller.Entities
                     return LocationType.Virtual;
                 }
 
-                return FileSystem.IsPathFile(path) ? LocationType.FileSystem : LocationType.Remote;
+                return MediaPath.IsFile(path) ? LocationType.FileSystem : LocationType.Remote;
             }
         }
 
@@ -2244,10 +2244,11 @@ namespace Tesserafin.Controller.Entities
         /// Deletes the image.
         /// </summary>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
+        /// <param name="fileSystem">The filesystem used to delete local images.</param>
         /// <param name="type">The type.</param>
         /// <param name="index">The index.</param>
         /// <returns>A task.</returns>
-        public async Task DeleteImageAsync(IItemWriteCommands writes, ImageType type, int index)
+        public async Task DeleteImageAsync(IItemWriteCommands writes, IFileSystem fileSystem, ImageType type, int index)
         {
             var info = GetImageInfo(type, index);
 
@@ -2261,7 +2262,7 @@ namespace Tesserafin.Controller.Entities
             var path = info.Path;
             if (info.IsLocalFile && !string.IsNullOrWhiteSpace(path))
             {
-                FileSystem.DeleteFile(path);
+                fileSystem.DeleteFile(path);
             }
 
             // Remove from item
@@ -2401,7 +2402,7 @@ namespace Tesserafin.Controller.Entities
                 {
                     if (existing.IsLocalFile)
                     {
-                        var newDateModified = FileSystem.GetLastWriteTimeUtc(newImage);
+                        var newDateModified = newImage.LastWriteTimeUtc;
 
                         // If date changed then we need to reset saved image dimensions
                         if (existing.DateModified != newDateModified && (existing.Width > 0 || existing.Height > 0))
@@ -2424,29 +2425,30 @@ namespace Tesserafin.Controller.Entities
             return imageUpdated || newImageList.Count > 0;
         }
 
-        private ItemImageInfo GetImageInfo(FileSystemMetadata file, ImageType type)
+        private static ItemImageInfo GetImageInfo(FileSystemMetadata file, ImageType type)
         {
             return new ItemImageInfo
             {
                 Path = file.FullName,
                 Type = type,
-                DateModified = FileSystem.GetLastWriteTimeUtc(file)
+                DateModified = file.LastWriteTimeUtc
             };
         }
 
         /// <summary>
         /// Gets the file system path to delete when the item is to be deleted.
         /// </summary>
+        /// <param name="fileSystem">The filesystem that supplies source and sidecar metadata.</param>
         /// <returns>The metadata for the deleted paths.</returns>
-        public virtual IEnumerable<FileSystemMetadata> GetDeletePaths()
+        public virtual IEnumerable<FileSystemMetadata> GetDeletePaths(IFileSystem fileSystem)
         {
             return new[]
             {
-                FileSystem.GetFileSystemInfo(Path)
-            }.Concat(GetLocalMetadataFilesToDelete());
+                fileSystem.GetFileSystemInfo(Path)
+            }.Concat(GetLocalMetadataFilesToDelete(fileSystem));
         }
 
-        protected List<FileSystemMetadata> GetLocalMetadataFilesToDelete()
+        protected List<FileSystemMetadata> GetLocalMetadataFilesToDelete(IFileSystem fileSystem)
         {
             if (IsFolder || !IsInMixedFolder)
             {
@@ -2455,7 +2457,7 @@ namespace Tesserafin.Controller.Entities
 
             var filename = System.IO.Path.GetFileNameWithoutExtension(Path);
 
-            return FileSystem.GetFiles(System.IO.Path.GetDirectoryName(Path), _supportedExtensions, false, false)
+            return fileSystem.GetFiles(System.IO.Path.GetDirectoryName(Path), _supportedExtensions, false, false)
                 .Where(i => System.IO.Path.GetFileNameWithoutExtension(i.FullName).StartsWith(filename, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
@@ -2465,7 +2467,7 @@ namespace Tesserafin.Controller.Entities
             return type == ImageType.Backdrop || type == ImageType.Chapter;
         }
 
-        public Task SwapImagesAsync(IItemWriteCommands writes, ImageType type, int index1, int index2)
+        public Task SwapImagesAsync(IItemWriteCommands writes, IFileSystem fileSystem, ImageType type, int index1, int index2)
         {
             if (!AllowsMultipleImages(type))
             {
@@ -2490,11 +2492,11 @@ namespace Tesserafin.Controller.Entities
             var path1 = info1.Path;
             var path2 = info2.Path;
 
-            FileSystem.SwapFiles(path1, path2);
+            fileSystem.SwapFiles(path1, path2);
 
             // Refresh these values
-            info1.DateModified = FileSystem.GetLastWriteTimeUtc(info1.Path);
-            info2.DateModified = FileSystem.GetLastWriteTimeUtc(info2.Path);
+            info1.DateModified = fileSystem.GetLastWriteTimeUtc(info1.Path);
+            info2.DateModified = fileSystem.GetLastWriteTimeUtc(info2.Path);
 
             info1.Width = 0;
             info1.Height = 0;

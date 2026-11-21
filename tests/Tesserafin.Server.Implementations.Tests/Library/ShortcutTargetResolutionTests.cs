@@ -90,7 +90,6 @@ public sealed class ShortcutTargetResolutionTests
         public Context(string dataPath = "/data")
         {
             Files.Setup(f => f.IsShortcut(It.IsAny<string>())).Returns((string path) => path.EndsWith(".mblink", StringComparison.OrdinalIgnoreCase));
-            Files.Setup(f => f.MakeAbsolutePath(It.IsAny<string>(), It.IsAny<string>())).Returns((string parent, string path) => Path.GetFullPath(Path.Combine(parent, path)));
             Service = new ItemResolutionService(Mock.Of<IServerConfigurationManager>(c => c.ApplicationPaths == Mock.Of<IServerApplicationPaths>(p => p.VirtualDataPath == "%ROOT%" && p.DataPath == dataPath && p.VirtualInternalMetadataPath == "%MetadataPath%" && p.InternalMetadataPath == "/metadata")), Files.Object, Mock.Of<ILibraryItemOptions>(), Mock.Of<IItemLookupService>(), new NamingOptions(), NullLogger<ItemResolutionService>.Instance, NullLoggerFactory.Instance, Mock.Of<IDirectoryService>(), new DotIgnoreIgnoreRule());
         }
 

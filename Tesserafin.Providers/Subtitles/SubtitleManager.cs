@@ -411,7 +411,7 @@ namespace Tesserafin.Providers.Subtitles
                 _monitor.ReportFileSystemChangeComplete(path, false);
             }
 
-            return item.RefreshMetadata(_deletions, _writes, _providers.Value, CancellationToken.None);
+            return item.RefreshMetadata(_deletions, _writes, _providers.Value, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), CancellationToken.None);
         }
 
         /// <inheritdoc />

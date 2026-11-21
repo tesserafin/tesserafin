@@ -7,7 +7,6 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Playlists;
-using Tesserafin.Model.IO;
 using Xunit;
 
 namespace Tesserafin.Server.Implementations.Tests.Library;
@@ -46,10 +45,7 @@ public sealed class LinkedChildResolverTests
         paths.Setup(p => p.FindByPath(resolvedPath, null)).Returns(recovered);
         var missingPath = Path.Combine(Path.GetDirectoryName(playlistPath)!, "missing.mkv");
         paths.Setup(p => p.FindByPath(missingPath, null)).Returns((BaseItem?)null);
-        var files = new Mock<IFileSystem>(MockBehavior.Strict);
-        files.Setup(f => f.MakeAbsolutePath(folder.ContainingFolderPath, "recovered.mkv")).Returns(resolvedPath);
-        files.Setup(f => f.MakeAbsolutePath(folder.ContainingFolderPath, "missing.mkv")).Returns(missingPath);
-        var resolver = new LinkedChildResolver(repository.Object, lookup.Object, paths.Object, files.Object, NullLogger<LinkedChildResolver>.Instance);
+        var resolver = new LinkedChildResolver(repository.Object, lookup.Object, paths.Object, NullLogger<LinkedChildResolver>.Instance);
 
         var items = resolver.Resolve(folder);
 

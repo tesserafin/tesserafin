@@ -13,6 +13,7 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
+using Tesserafin.Model.MediaInfo;
 
 namespace Tesserafin.Server.Core.Library;
 
@@ -290,7 +291,7 @@ internal sealed partial class ItemWriteCommands(
         {
             cancellationToken.ThrowIfCancellationRequested();
             draft.DateLastSaved = DateTime.UtcNow;
-            if (!string.IsNullOrEmpty(draft.Path) && files.IsPathFile(draft.Path))
+            if (!string.IsNullOrEmpty(draft.Path) && MediaPath.IsFile(draft.Path))
             {
                 await metadataExporter.SaveAsync(draft, propagated.Contains(draft.Id) ? ItemUpdateType.MetadataDownload : reason, cancellationToken).ConfigureAwait(false);
             }
@@ -369,7 +370,7 @@ internal sealed partial class ItemWriteCommands(
     public async Task<bool> RefreshOwnedVideosAsync(Video owner, IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (owner.ParentId.Equals(Guid.Empty) || !files.IsPathFile(owner.Path))
+        if (owner.ParentId.Equals(Guid.Empty) || !MediaPath.IsFile(owner.Path))
         {
             return false;
         }

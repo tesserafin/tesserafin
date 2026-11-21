@@ -1473,7 +1473,6 @@ namespace Tesserafin.Controller.Entities
                 scope is null
                     ? path => LibraryManager.GetItemList(ItemPathQuery.Create(path, null)).FirstOrDefault()
                     : scope.FindByPath,
-                FileSystem,
                 Logger);
         }
 

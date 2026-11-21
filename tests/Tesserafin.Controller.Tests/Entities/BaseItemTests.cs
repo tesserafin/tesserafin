@@ -23,6 +23,19 @@ namespace Tesserafin.Controller.Tests.Entities;
 [Collection(BaseItemStaticStateFixture.Name)]
 public class BaseItemTests
 {
+    [Theory]
+    [InlineData(null, false, LocationType.Virtual)]
+    [InlineData(null, true, LocationType.Remote)]
+    [InlineData("/library/film.mkv", false, LocationType.FileSystem)]
+    [InlineData("file:///library/film.mkv", false, LocationType.FileSystem)]
+    [InlineData("https://example.test/film.mkv", false, LocationType.Remote)]
+    public void LocationType_ClassifiesThePathWithoutUsingTheFileSystem(string? path, bool isChannel, LocationType expected)
+    {
+        var item = new Movie { Path = path!, ChannelId = isChannel ? Guid.NewGuid() : Guid.Empty };
+
+        Assert.Equal(expected, item.LocationType);
+    }
+
     [Fact]
     public async Task RefreshMetadata_UsesSuppliedProviderManager()
     {

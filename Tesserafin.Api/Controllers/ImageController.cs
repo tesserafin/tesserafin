@@ -325,7 +325,7 @@ public class ImageController : BaseTesserafinApiController
             return NotFound();
         }
 
-        await item.DeleteImageAsync(_writes, imageType, imageIndex ?? 0).ConfigureAwait(false);
+        await item.DeleteImageAsync(_writes, _fileSystem, imageType, imageIndex ?? 0).ConfigureAwait(false);
         return NoContent();
     }
 
@@ -353,7 +353,7 @@ public class ImageController : BaseTesserafinApiController
             return NotFound();
         }
 
-        await item.DeleteImageAsync(_writes, imageType, imageIndex).ConfigureAwait(false);
+        await item.DeleteImageAsync(_writes, _fileSystem, imageType, imageIndex).ConfigureAwait(false);
         return NoContent();
     }
 
@@ -469,7 +469,7 @@ public class ImageController : BaseTesserafinApiController
             return NotFound();
         }
 
-        await item.SwapImagesAsync(_writes, imageType, imageIndex, newIndex).ConfigureAwait(false);
+        await item.SwapImagesAsync(_writes, _fileSystem, imageType, imageIndex, newIndex).ConfigureAwait(false);
         return NoContent();
     }
 

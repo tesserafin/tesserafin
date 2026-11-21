@@ -9,6 +9,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.Library.Validators;
 
@@ -31,6 +32,7 @@ public class MusicGenresValidator
     /// </summary>
     private readonly ILogger<MusicGenresValidator> _logger;
     private readonly IItemRepository _itemRepo;
+    private readonly IFileSystem _fileSystem;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MusicGenresValidator" /> class.
@@ -41,7 +43,15 @@ public class MusicGenresValidator
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
-    public MusicGenresValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, IProviderManager providers, ILibraryManager libraryManager, ILogger<MusicGenresValidator> logger, IItemRepository itemRepo)
+    /// <param name="fileSystem">The filesystem used to read refresh directories.</param>
+    public MusicGenresValidator(
+        IItemWriteCommands writes,
+        IItemDeletionCommands deletions,
+        IProviderManager providers,
+        ILibraryManager libraryManager,
+        ILogger<MusicGenresValidator> logger,
+        IItemRepository itemRepo,
+        IFileSystem fileSystem)
     {
         _writes = writes;
         _deletions = deletions;
@@ -49,6 +59,7 @@ public class MusicGenresValidator
         _libraryManager = libraryManager;
         _logger = logger;
         _itemRepo = itemRepo;
+        _fileSystem = fileSystem;
     }
 
     /// <summary>
@@ -76,7 +87,7 @@ public class MusicGenresValidator
                 var item = _writes.GetOrCreateNamedItem<MusicGenre>(name, cancellationToken);
                 if (!existingMusicGenreIds.Contains(item.Id))
                 {
-                    await item.RefreshMetadata(_deletions, _writes, _providers, cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(_deletions, _writes, _providers, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), cancellationToken).ConfigureAwait(false);
                     refreshed++;
                 }
             }

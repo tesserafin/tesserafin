@@ -15,6 +15,7 @@ using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Globalization;
+using Tesserafin.Model.IO;
 using Tesserafin.Model.Tasks;
 
 namespace Tesserafin.Providers.MediaInfo
@@ -32,6 +33,7 @@ namespace Tesserafin.Providers.MediaInfo
         private readonly ILocalizationManager _localization;
         private readonly ISubtitleProvider[] _subtitleProviders;
         private readonly IMediaSourceManager _mediaSourceManager;
+        private readonly IFileSystem _fileSystem;
 
         public SubtitleScheduledTask(
             IItemWriteCommands writes,
@@ -44,7 +46,8 @@ namespace Tesserafin.Providers.MediaInfo
             ILogger<SubtitleScheduledTask> logger,
             ILocalizationManager localization,
             IEnumerable<ISubtitleProvider> subtitleProviders,
-            IMediaSourceManager mediaSourceManager)
+            IMediaSourceManager mediaSourceManager,
+            IFileSystem fileSystem)
         {
             _writes = writes;
             _deletions = deletions;
@@ -59,6 +62,7 @@ namespace Tesserafin.Providers.MediaInfo
                 .OrderBy(i => i is IHasOrder hasOrder ? hasOrder.Order : 0)
                 .ToArray();
             _mediaSourceManager = mediaSourceManager;
+            _fileSystem = fileSystem;
         }
 
         public string Name => _localization.GetLocalizedString("TaskDownloadMissingSubtitles");
@@ -193,7 +197,7 @@ namespace Tesserafin.Providers.MediaInfo
             // Rescan
             if (downloadedLanguages.Count > 0)
             {
-                await video.RefreshMetadata(_deletions, _writes, _providers, cancellationToken).ConfigureAwait(false);
+                await video.RefreshMetadata(_deletions, _writes, _providers, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), cancellationToken).ConfigureAwait(false);
                 return false;
             }
 
