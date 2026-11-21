@@ -114,7 +114,6 @@ public class LibraryManagerItemLookupTests
 
     private static void SetConfigurationManagerStatic(IServerConfigurationManager configurationManager)
     {
-        BaseItem.ConfigurationManager = configurationManager;
     }
 
     private static void SetLibraryManagerStatic(ILibraryManager libraryManager)

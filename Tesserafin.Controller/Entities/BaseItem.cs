@@ -15,7 +15,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Channels;
-using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
@@ -467,8 +466,6 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         public static ILibraryManager LibraryManager { get; set; }
 
-        public static IServerConfigurationManager ConfigurationManager { get; set; }
-
         /// <summary>
         /// Gets or sets the catalogue reads this item performs on itself (children, played state, active recording).
         /// The catalogue attaches them when it loads or saves the item.
@@ -505,6 +502,11 @@ namespace Tesserafin.Controller.Entities
                     {
                         // Need the ToLower because that's what CreateSortName does
                         _sortName = ModifySortChunks(ForcedSortName).ToLowerInvariant();
+                    }
+                    else if (ReadServices is null)
+                    {
+                        // A detached item may be bound to a catalogue with different sort rules later.
+                        return CreateSortName();
                     }
                     else
                     {
@@ -954,8 +956,9 @@ namespace Tesserafin.Controller.Entities
             }
 
             var sortable = Name.Trim().ToLowerInvariant();
+            var defaults = ReadServices?.MetadataDefaults ?? ItemMetadataDefaults.BuiltIn;
 
-            foreach (var search in ConfigurationManager.Configuration.SortRemoveWords)
+            foreach (var search in defaults.SortRemoveWords)
             {
                 // Remove from beginning if a space follows
                 if (sortable.StartsWith(search + " ", StringComparison.Ordinal))
@@ -973,12 +976,12 @@ namespace Tesserafin.Controller.Entities
                 }
             }
 
-            foreach (var removeChar in ConfigurationManager.Configuration.SortRemoveCharacters)
+            foreach (var removeChar in defaults.SortRemoveCharacters)
             {
                 sortable = sortable.Replace(removeChar, string.Empty, StringComparison.Ordinal);
             }
 
-            foreach (var replaceChar in ConfigurationManager.Configuration.SortReplaceCharacters)
+            foreach (var replaceChar in defaults.SortReplaceCharacters)
             {
                 sortable = sortable.Replace(replaceChar, " ", StringComparison.Ordinal);
             }
@@ -1712,7 +1715,7 @@ namespace Tesserafin.Controller.Entities
                 GetParents,
                 () => LibraryManager.GetCollectionFolders(this),
                 () => LibraryManager.GetLibraryOptions(this).PreferredMetadataLanguage,
-                () => ConfigurationManager.Configuration.PreferredMetadataLanguage);
+                () => (ReadServices?.MetadataDefaults ?? ItemMetadataDefaults.BuiltIn).Language);
 
         /// <summary>Resolves the item's language followed by the parent, library and server defaults.</summary>
         /// <param name="getParents">Reads the item's parents in nearest-first order.</param>
@@ -1746,7 +1749,7 @@ namespace Tesserafin.Controller.Entities
                 static item => item.PreferredMetadataCountryCode,
                 () => (scope is null ? LibraryManager.GetLibraryOptions(this) : scope.GetLibraryOptions(this))?.MetadataCountryCode,
                 () => scope is null
-                    ? ConfigurationManager.Configuration.MetadataCountryCode
+                    ? (ReadServices?.MetadataDefaults ?? ItemMetadataDefaults.BuiltIn).CountryCode
                     : scope.GetServerMetadataCountryCode());
 
         /// <summary>Resolves inherited metadata preferences from the supplied catalogue and settings.</summary>

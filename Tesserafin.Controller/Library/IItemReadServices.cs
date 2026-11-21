@@ -21,6 +21,15 @@ public interface IItemReadServices
     /// <summary>Gets a value indicating whether specials should appear in their aired seasons.</summary>
     bool DisplaySpecialsWithinSeasons { get; }
 
+    /// <summary>Gets the configured defaults for metadata and name sorting.</summary>
+    ItemMetadataDefaults MetadataDefaults { get; }
+
+    /// <summary>Gets a value indicating whether channel names are included in Live TV user data keys.</summary>
+    bool IncludeLiveTvChannelNameInUserDataKeys { get; }
+
+    /// <summary>Gets the configured movie title prefix for the legacy guide provider.</summary>
+    string? LiveTvMoviePrefix { get; }
+
     /// <summary>Checks whether a path is inside the server-managed data directory.</summary>
     /// <param name="path">The catalogue item path.</param>
     /// <returns>Whether this item is managed by the server.</returns>

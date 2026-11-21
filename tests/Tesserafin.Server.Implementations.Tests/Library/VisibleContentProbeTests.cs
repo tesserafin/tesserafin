@@ -368,7 +368,6 @@ public sealed class VisibleContentProbeTests
         {
             _config.Setup(c => c.Configuration).Returns(new ServerConfiguration());
             _config.Setup(c => c.ApplicationPaths.DataPath).Returns("/data");
-            BaseItem.ConfigurationManager = _config.Object;
 
             var localization = new Mock<ILocalizationManager>();
             localization

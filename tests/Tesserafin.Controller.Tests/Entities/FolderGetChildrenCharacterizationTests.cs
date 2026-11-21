@@ -35,7 +35,6 @@ public class FolderGetChildrenCharacterizationTests
     private static void SetStatics(ILibraryManager libraryManager)
     {
         BaseItem.LibraryManager = libraryManager;
-        BaseItem.ConfigurationManager = Mock.Of<IServerConfigurationManager>(x => x.Configuration == new ServerConfiguration());
     }
 
     private static (Mock<IChannelManager> ChannelManager, Mock<ICollectionManager> CollectionManager, Mock<IUserViewManager> UserViewManager, Mock<ITVSeriesManager> TvSeriesManager) StrictManagers()
@@ -132,7 +131,13 @@ public class FolderGetChildrenCharacterizationTests
     public void SeasonGetChildren_ReturnsSeriesEpisodesForSeason()
     {
         var user = CreateUser();
-        var series = new Series { Id = Guid.NewGuid(), Name = "Series", PresentationUniqueKey = "series-key" };
+        var series = new Series
+        {
+            Id = Guid.NewGuid(),
+            Name = "Series",
+            PresentationUniqueKey = "series-key",
+            ReadServices = Mock.Of<IItemReadServices>(reads => reads.DisplaySpecialsWithinSeasons)
+        };
         var season = new Season { Id = Guid.NewGuid(), Name = "Season 1", IndexNumber = 1, SeriesId = series.Id };
         var episode = new Episode { Id = Guid.NewGuid(), Name = "Episode", ParentIndexNumber = 1, IndexNumber = 1 };
 
@@ -143,7 +148,6 @@ public class FolderGetChildrenCharacterizationTests
             .Setup(x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), user, It.IsAny<IEnumerable<ItemSortBy>>(), SortOrder.Ascending))
             .Returns((IEnumerable<BaseItem> items, User _, IEnumerable<ItemSortBy> _, SortOrder _) => items);
         SetStatics(libraryManager.Object);
-        BaseItem.ConfigurationManager = Mock.Of<IServerConfigurationManager>(x => x.Configuration == new ServerConfiguration { DisplaySpecialsWithinSeasons = true });
 
         var result = season.GetChildren(user, true, PermissiveVisibility.Query(user));
 
@@ -154,7 +158,13 @@ public class FolderGetChildrenCharacterizationTests
     public void SeriesGetChildren_ReturnsSeasonsFromLibraryQuery()
     {
         var user = CreateUser();
-        var series = new Series { Id = Guid.NewGuid(), Name = "Series", PresentationUniqueKey = "series-key" };
+        var series = new Series
+        {
+            Id = Guid.NewGuid(),
+            Name = "Series",
+            PresentationUniqueKey = "series-key",
+            ReadServices = Mock.Of<IItemReadServices>(reads => reads.DisplaySpecialsWithinSeasons)
+        };
         var season = new Season { Id = Guid.NewGuid(), Name = "Season 1", IndexNumber = 1 };
 
         var libraryManager = new Mock<ILibraryManager>();
@@ -254,7 +264,13 @@ public class FolderGetChildrenCharacterizationTests
     public void SeasonGetChildren_ServiceAwarePathPassesSortServiceToGetEpisodes()
     {
         var user = CreateUser();
-        var series = new Series { Id = Guid.NewGuid(), Name = "Series", PresentationUniqueKey = "series-key" };
+        var series = new Series
+        {
+            Id = Guid.NewGuid(),
+            Name = "Series",
+            PresentationUniqueKey = "series-key",
+            ReadServices = Mock.Of<IItemReadServices>(reads => reads.DisplaySpecialsWithinSeasons)
+        };
         var season = new Season { Id = Guid.NewGuid(), Name = "Season 1", IndexNumber = 1, SeriesId = series.Id };
         var episode = new Episode { Id = Guid.NewGuid(), Name = "Episode", ParentIndexNumber = 1, IndexNumber = 1 };
 
@@ -262,7 +278,6 @@ public class FolderGetChildrenCharacterizationTests
         libraryManager.Setup(x => x.GetItemById(series.Id)).Returns(series);
         libraryManager.Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(new List<BaseItem> { episode });
         SetStatics(libraryManager.Object);
-        BaseItem.ConfigurationManager = Mock.Of<IServerConfigurationManager>(x => x.Configuration == new ServerConfiguration { DisplaySpecialsWithinSeasons = true });
         var sortService = new RecordingItemSortService();
 
         var query = PermissiveVisibility.Query(user);

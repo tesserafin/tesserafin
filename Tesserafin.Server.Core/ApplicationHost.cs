@@ -834,7 +834,6 @@ namespace Tesserafin.Server.Core
         private void SetStaticProperties()
         {
             // For now there's no real way to inject these properly
-            BaseItem.ConfigurationManager = ConfigurationManager;
             BaseItem.LibraryManager = Resolve<ILibraryManager>();
         }
 
