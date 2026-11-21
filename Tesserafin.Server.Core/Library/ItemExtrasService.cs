@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Tesserafin.Controller.Entities;
@@ -10,10 +9,10 @@ using Tesserafin.Model.Entities;
 namespace Tesserafin.Server.Core.Library;
 
 /// <inheritdoc />
-internal sealed class ItemExtrasService(Lazy<IItemQueryService> query) : IItemExtrasService
+internal sealed class ItemExtrasService(IItemCatalogueQuery query) : IItemExtrasService
 {
     public IReadOnlyList<BaseItem> GetExtras(BaseItem item, User? user = null, IReadOnlyCollection<ExtraType>? extraTypes = null)
-        => query.Value.GetItemList(new InternalItemsQuery(user)
+        => query.GetItemList(new InternalItemsQuery(user)
         {
             OwnerIds = item is Video video ? video.GetAllVersions().Select(version => version.Id).ToArray() : [item.Id],
             ExtraTypes = extraTypes?.ToArray() ?? [],

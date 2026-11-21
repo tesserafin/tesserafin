@@ -232,7 +232,7 @@ namespace Tesserafin.Server.Integration.Tests
         }
 
         [Fact]
-        public void UserViewCatalog_EagerGraph_DefersOnlyThePreExistingExceptions()
+        public void UserViewCatalog_EagerGraph_DefersOnlyTheExpectedServices()
         {
             var graph = new DependencyGraph(_registrations.Value);
 
@@ -242,14 +242,18 @@ namespace Tesserafin.Server.Integration.Tests
                 .OrderBy(e => e, StringComparer.Ordinal)
                 .ToArray();
 
-            // docs/pr111-di-closure-audit.md exceptions 1 and 3; exception 4 (Lazy<IItemQueryService>) is gone.
-            // The repository and its read services defer the saved-link resolver: LinkedChildResolver reads back through IItemRepository.
+            // Entity reads can call back into the repository or the root folder provider after
+            // an item has loaded. Keep those reads deferred so loading can attach the context.
             Assert.Equal(
                 [
                     "IUserViewCatalog -> ILiveTvPresenceProvider =>(deferred) Lazy[IReadOnlyList[ILiveTvService]]",
+                    "IUserViewCatalog -> IUserRootFolderProvider -> IItemReadServices =>(deferred) Lazy[ICollectionFolderResolver]",
+                    "IUserViewCatalog -> IUserRootFolderProvider -> IItemReadServices =>(deferred) Lazy[IItemLookupService]",
+                    "IUserViewCatalog -> IUserRootFolderProvider -> IItemReadServices =>(deferred) Lazy[IItemRepository]",
+                    "IUserViewCatalog -> IUserRootFolderProvider -> IItemReadServices =>(deferred) Lazy[ILibraryItemOptions]",
+                    "IUserViewCatalog -> IUserRootFolderProvider -> IItemReadServices =>(deferred) Lazy[ILinkedChildrenService]",
                     "IUserViewCatalog -> IUserRootFolderProvider -> IItemReadServices =>(deferred) Lazy[LinkedChildResolver]",
                     "IUserViewCatalog -> IUserViewFactory =>(deferred) Lazy[IProviderManager]",
-                    "IUserViewCatalog -> IVisibleContentProbe -> IItemRepository -> BaseItemRepository =>(deferred) Lazy[LinkedChildResolver]",
                 ],
                 deferred);
         }

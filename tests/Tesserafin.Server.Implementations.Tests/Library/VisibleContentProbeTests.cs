@@ -523,11 +523,14 @@ public sealed class VisibleContentProbeTests
                 Mock.Of<ITVSeriesManager>(),
                 _config.Object,
                 new Tesserafin.Server.Core.Sorting.ItemSortService(Mock.Of<IUserManager>(), Mock.Of<IUserDataManager>()),
-                Mock.Of<IItemLookupService>(),
-                Mock.Of<IItemRepository>(),
-                Mock.Of<IItemQueryScopeService>(),
                 Scope,
-                Mock.Of<IItemListingServices>());
+                Mock.Of<IItemListingServices>(),
+                new ItemCatalogueQuery(
+                    Mock.Of<IItemLookupService>(),
+                    Mock.Of<IItemRepository>(),
+                    Mock.Of<IItemQueryScopeService>(),
+                    Mock.Of<IItemAccessService>(),
+                    Mock.Of<IItemCountService>()));
 
         private bool LegacyProbe(Folder library, User user)
         {

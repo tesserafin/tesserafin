@@ -33,5 +33,8 @@ namespace Tesserafin.Controller.Library
 
         /// <summary>Gets the item sort service.</summary>
         IItemSortService Sort { get; }
+
+        /// <summary>Gets the catalogue queries for this listing request.</summary>
+        IItemCatalogueQuery Queries { get; }
     }
 }

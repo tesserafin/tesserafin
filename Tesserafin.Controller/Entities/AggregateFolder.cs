@@ -72,7 +72,7 @@ namespace Tesserafin.Controller.Entities
                     return list;
                 }
 
-                return _childrenIds.Select(lookup.GetItemById).Where(i => i is not null).ToList();
+                return _childrenIds.Select(id => lookup is null ? GetRelatedItem(id) : lookup.GetItemById(id)).Where(i => i is not null).ToList();
             }
         }
 

@@ -516,40 +516,7 @@ namespace Tesserafin.Server.Core.Library
         private void AddUserToQuery(InternalItemsQuery query, User user, bool allowExternalContent = true)
         {
             _queryScope.AddUserToQuery(query, user, allowExternalContent);
-            ExcludeBoxSetsAndPlaylistsRefusedToTheUser(query, user);
-        }
-
-        /// <summary>
-        /// A query that can hold box sets or playlists (names them, names no type, or groups its items into their
-        /// box sets) excludes, in the query itself, those the user is refused by id: the libraries above scope only
-        /// the folders, so its items, pages, totals, counts and aggregated values stay those access by id admits
-        /// (GHSA-c5pr-6h39-jp86).
-        /// </summary>
-        // ponytail: decides every box set and playlist of the server per such query; scope the candidates
-        // to the query if their number makes listings slow.
-        private void ExcludeBoxSetsAndPlaylistsRefusedToTheUser(InternalItemsQuery query, User user)
-        {
-            if (query.CollapseBoxSetItems != true
-                && query.IncludeItemTypes.Length > 0
-                && !query.IncludeItemTypes.Any(t => t == BaseItemKind.BoxSet || t == BaseItemKind.Playlist))
-            {
-                return;
-            }
-
-            var refused = GetItemList(new InternalItemsQuery
-            {
-                IncludeItemTypes = [BaseItemKind.BoxSet, BaseItemKind.Playlist],
-                Recursive = true,
-                DtoOptions = new DtoOptions(false) { EnableImages = false }
-            })
-                .Where(i => !_itemAccessService.IsVisibleStandalone(i, user))
-                .Select(i => i.Id)
-                .ToArray();
-
-            if (refused.Length > 0)
-            {
-                query.ExcludeItemIds = [.. query.ExcludeItemIds.Except(refused), .. refused];
-            }
+            ItemQueryScopeService.ExcludeRefusedCollections(query, user, _itemRepository, _itemAccessService);
         }
 
         /// <inheritdoc/>

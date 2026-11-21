@@ -621,7 +621,7 @@ namespace Tesserafin.Controller.Entities
             }
 
             // LibraryManager excludes the box sets and playlists the user is refused by id (GHSA-c5pr-6h39-jp86).
-            return LibraryManager.GetItemsResult(query);
+            return query.RequireListing().Queries.GetItems(query);
         }
 
         protected QueryResult<BaseItem> QueryWithPostFiltering(InternalItemsQuery query)
@@ -632,7 +632,7 @@ namespace Tesserafin.Controller.Entities
             query.StartIndex = null;
             query.Limit = null;
 
-            IEnumerable<BaseItem> itemsList = LibraryManager.GetItemList(query);
+            IEnumerable<BaseItem> itemsList = query.RequireListing().Queries.GetItemList(query);
             var user = query.User;
 
             if (user is not null)
@@ -709,7 +709,7 @@ namespace Tesserafin.Controller.Entities
         {
             if (query.ItemIds.Length > 0)
             {
-                var result = LibraryManager.GetItemsResult(query);
+                var result = query.RequireListing().Queries.GetItems(query);
 
                 if (query.OrderBy.Count == 0 && query.ItemIds.Length > 1)
                 {
@@ -728,7 +728,7 @@ namespace Tesserafin.Controller.Entities
 
             if (query.ItemIds.Length > 0)
             {
-                var result = LibraryManager.GetItemList(query);
+                var result = query.RequireListing().Queries.GetItemList(query);
 
                 if (query.OrderBy.Count == 0 && query.ItemIds.Length > 1)
                 {
@@ -831,7 +831,8 @@ namespace Tesserafin.Controller.Entities
                 NameStartsWith = query.NameStartsWith,
                 NameStartsWithOrGreater = query.NameStartsWithOrGreater,
                 NameLessThan = query.NameLessThan,
-                Visibility = query.Visibility
+                Visibility = query.Visibility,
+                Listing = query.Listing
             };
 
             return UserViewBuilder.Filter(
