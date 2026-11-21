@@ -814,6 +814,16 @@ namespace Tesserafin.Controller.Entities
             return Id.ToString("N", CultureInfo.InvariantCulture);
         }
 
+        /// <summary>Gets the libraries containing this item.</summary>
+        /// <param name="candidates">The libraries to check, when supplied by the caller.</param>
+        /// <returns>The containing libraries.</returns>
+        protected IReadOnlyList<Folder> GetContainingLibraries(IEnumerable<Folder> candidates = null)
+            => ReadServices?.GetCollectionFolders(this, candidates) ?? [];
+
+        /// <summary>Gets the item's effective library options.</summary>
+        /// <returns>The effective options or library defaults.</returns>
+        protected LibraryOptions GetEffectiveLibraryOptions() => ReadServices?.GetLibraryOptions(this) ?? new LibraryOptions();
+
         /// <summary>Resolves a saved item reference through the attached catalogue.</summary>
         /// <param name="id">The referenced item's id.</param>
         /// <returns>The referenced item, if present.</returns>
@@ -851,7 +861,7 @@ namespace Tesserafin.Controller.Entities
                 return allowed.Contains(ChannelId);
             }
 
-            var collectionFolders = LibraryManager.GetCollectionFolders(this, allCollectionFolders);
+            var collectionFolders = GetContainingLibraries(allCollectionFolders);
 
             foreach (var folder in collectionFolders)
             {
@@ -886,9 +896,7 @@ namespace Tesserafin.Controller.Entities
 
         public virtual bool CanDelete(User user, IChannelManager channels)
         {
-            var allCollectionFolders = LibraryManager.GetUserRootFolder().Children.OfType<Folder>().ToList();
-
-            return CanDelete(user, allCollectionFolders, channels);
+            return CanDelete(user, null, channels);
         }
 
         public virtual bool CanDownload()
@@ -1688,8 +1696,8 @@ namespace Tesserafin.Controller.Entities
         public string GetPreferredMetadataLanguage()
             => GetPreferredMetadataLanguage(
                 GetParents,
-                () => LibraryManager.GetCollectionFolders(this),
-                () => LibraryManager.GetLibraryOptions(this).PreferredMetadataLanguage,
+                () => GetContainingLibraries(),
+                () => GetEffectiveLibraryOptions().PreferredMetadataLanguage,
                 () => (ReadServices?.MetadataDefaults ?? ItemMetadataDefaults.BuiltIn).Language);
 
         /// <summary>Resolves the item's language followed by the parent, library and server defaults.</summary>
@@ -1720,9 +1728,9 @@ namespace Tesserafin.Controller.Entities
             => ResolveMetadataPreference(
                 PreferredMetadataCountryCode,
                 () => scope?.GetParents(this) ?? GetParents(),
-                () => scope?.GetCollectionFolders(this) ?? LibraryManager.GetCollectionFolders(this),
+                () => scope?.GetCollectionFolders(this) ?? GetContainingLibraries(),
                 static item => item.PreferredMetadataCountryCode,
-                () => (scope is null ? LibraryManager.GetLibraryOptions(this) : scope.GetLibraryOptions(this))?.MetadataCountryCode,
+                () => (scope is null ? GetEffectiveLibraryOptions() : scope.GetLibraryOptions(this))?.MetadataCountryCode,
                 () => scope is null
                     ? (ReadServices?.MetadataDefaults ?? ItemMetadataDefaults.BuiltIn).CountryCode
                     : scope.GetServerMetadataCountryCode());
@@ -1822,9 +1830,7 @@ namespace Tesserafin.Controller.Entities
                 return false;
             }
 
-            var libraryOptions = LibraryManager.GetLibraryOptions(this);
-
-            return libraryOptions.SaveLocalMetadata;
+            return GetEffectiveLibraryOptions().SaveLocalMetadata;
         }
 
         /// <summary>
@@ -1907,7 +1913,7 @@ namespace Tesserafin.Controller.Entities
 
         public List<string> GetInheritedTags()
         {
-            return CombineInheritedTags(this, GetParents(), LibraryManager.GetCollectionFolders(this)).ToList();
+            return CombineInheritedTags(this, GetParents(), GetContainingLibraries()).ToList();
         }
 
         /// <summary>
@@ -2584,7 +2590,7 @@ namespace Tesserafin.Controller.Entities
 
         public virtual IEnumerable<Guid> GetAncestorIds()
         {
-            return GetParents().Select(i => i.Id).Concat(LibraryManager.GetCollectionFolders(this).Select(i => i.Id));
+            return GetParents().Select(i => i.Id).Concat(GetContainingLibraries().Select(i => i.Id));
         }
 
         public BaseItem GetTopParent()

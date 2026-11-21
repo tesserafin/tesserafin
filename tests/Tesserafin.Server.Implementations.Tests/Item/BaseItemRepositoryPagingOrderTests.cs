@@ -8,7 +8,7 @@ using Moq;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
-using Tesserafin.Controller.Persistence;
+using Tesserafin.Controller.Library;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
@@ -68,10 +68,7 @@ public sealed class BaseItemRepositoryPagingOrderTests : IDisposable
             _types,
             serverConfigurationManager.Object,
             NullLogger<BaseItemRepository>.Instance,
-            new Tesserafin.Controller.LiveTv.ActiveRecordings(),
-            new(),
-            new(),
-            new(() => Mock.Of<ILinkedChildrenService>()));
+            Mock.Of<IItemReadServices>());
 
         _user = new User("paging", "auth", "reset");
         using (var ctx = CreateDbContext())

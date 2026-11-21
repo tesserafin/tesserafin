@@ -82,10 +82,10 @@ namespace Tesserafin.Controller.Entities.TV
 
         public override string CreatePresentationUniqueKey()
         {
-            var key = GetGroupingKey(LibraryManager.GetLibraryOptions(this).EnableAutomaticSeriesGrouping);
+            var key = GetGroupingKey(GetEffectiveLibraryOptions().EnableAutomaticSeriesGrouping);
             return key is null
                 ? base.CreatePresentationUniqueKey()
-                : FormatGroupingKey(key, GetPreferredMetadataLanguage(), LibraryManager.GetCollectionFolders(this));
+                : FormatGroupingKey(key, GetPreferredMetadataLanguage(), GetContainingLibraries());
         }
 
         /// <summary>Computes the series presentation key from the supplied catalogue and settings.</summary>
