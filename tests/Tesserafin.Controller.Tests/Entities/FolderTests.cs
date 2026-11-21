@@ -209,7 +209,6 @@ public class FolderTests
         var libraryManager = new Mock<ILibraryManager>();
         libraryManager.Setup(x => x.GetItemById(displayParent.Id)).Returns(displayParent);
         BaseItem.LibraryManager = libraryManager.Object;
-        BaseItem.Logger = NullLogger<BaseItem>.Instance;
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
         channelManager

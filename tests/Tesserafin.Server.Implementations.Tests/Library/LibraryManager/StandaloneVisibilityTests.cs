@@ -100,7 +100,7 @@ public sealed class StandaloneVisibilityTests
         var localization = new Mock<ILocalizationManager>();
         localization.Setup(l => l.GetRatingScore(It.IsAny<string>(), It.IsAny<string?>()))
             .Returns((string rating, string? country) => _scores?.GetRatingScore(rating, country)!);
-        _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, localization.Object, configuration.Object, _activeRecordings, libraryOptions));
+        _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, localization.Object, configuration.Object, _activeRecordings, libraryOptions, Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.TagVisibilityService>.Instance));
 
         BaseItem.LibraryManager = manager;
         _repository = repository;
@@ -489,7 +489,6 @@ public sealed class StandaloneVisibilityTests
             l.GetRatingScore("R", "US") == new ParentalRatingScore(17, null)
             && l.GetRatingScore("R", "FR") == new ParentalRatingScore(12, null)
             && l.GetRatingScore("TV-14", "US") == new ParentalRatingScore(14, 2));
-        BaseItem.Logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<BaseItem>.Instance;
         var teen = User(all: true);
         teen.MaxParentalRatingScore = 14;
         teen.MaxParentalRatingSubScore = 1;
@@ -541,7 +540,6 @@ public sealed class StandaloneVisibilityTests
             l.GetRatingScore("R", "US") == new ParentalRatingScore(17, null)
             && l.GetRatingScore("R", "FR") == new ParentalRatingScore(12, null)
             && l.GetRatingScore("TV-14", "US") == new ParentalRatingScore(14, 2));
-        BaseItem.Logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<BaseItem>.Instance;
         var users = new[] { User(all: true), User(all: true), User(all: true), User(all: true) };
         users[0].MaxParentalRatingScore = 14;
         users[0].MaxParentalRatingSubScore = 1;
@@ -695,7 +693,6 @@ public sealed class StandaloneVisibilityTests
         boxSet.LinkedChildren = [new LinkedChild { ItemId = Guid.NewGuid() }];
 
         // The search by path logs the miss.
-        BaseItem.Logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<BaseItem>.Instance;
 
         AssertVisible(boxSet, User(enabled: [Sets().Id]), true);
         AssertVisible(boxSet, User(enabled: [movies.Id]), false);
@@ -1102,7 +1099,6 @@ public sealed class StandaloneVisibilityTests
     {
         _repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.Path != null)))
             .Returns((InternalItemsQuery q) => _items.Values.Where(i => i.Path == q.Path).OrderByDescending(i => i.DateCreated).Take(1).ToList());
-        BaseItem.Logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<BaseItem>.Instance;
     }
 
     private void Scores(System.Linq.Expressions.Expression<Func<ILocalizationManager, bool>> scores) =>

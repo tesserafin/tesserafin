@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Data.Entities;
 using Tesserafin.Model.Configuration;
@@ -21,6 +22,9 @@ namespace Tesserafin.Controller.Library
     /// </remarks>
     public interface IStandaloneVisibilityService : ITagVisibilityService
     {
+        /// <summary>Gets the logger for diagnostics produced while applying this scope.</summary>
+        ILogger Logger { get; }
+
         /// <summary>
         /// Gets the item's parents, nearest first.
         /// </summary>

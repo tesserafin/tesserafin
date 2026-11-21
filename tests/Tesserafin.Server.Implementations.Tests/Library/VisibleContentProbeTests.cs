@@ -369,7 +369,6 @@ public sealed class VisibleContentProbeTests
             _config.Setup(c => c.Configuration).Returns(new ServerConfiguration());
             _config.Setup(c => c.ApplicationPaths.DataPath).Returns("/data");
             BaseItem.ConfigurationManager = _config.Object;
-            BaseItem.Logger = NullLogger<BaseItem>.Instance;
 
             var localization = new Mock<ILocalizationManager>();
             localization
@@ -397,7 +396,8 @@ public sealed class VisibleContentProbeTests
                 localization.Object,
                 _config.Object,
                 new Tesserafin.Controller.LiveTv.ActiveRecordings(),
-                Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(It.IsAny<BaseItem>()) == new LibraryOptions()));
+                Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(It.IsAny<BaseItem>()) == new LibraryOptions()),
+                NullLogger<TagVisibilityService>.Instance);
             Scope = scope;
             Probe = new VisibleContentProbe(lookup.Object, injectedRepository.Object, scope);
 

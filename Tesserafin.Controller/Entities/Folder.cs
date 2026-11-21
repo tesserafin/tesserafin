@@ -377,12 +377,12 @@ namespace Tesserafin.Controller.Entities
                 }
                 catch (IOException ex)
                 {
-                    Logger.LogError(ex, "Error retrieving children from file system");
+                    services.Logger.LogError(ex, "Error retrieving children from file system");
                     return;
                 }
                 catch (SecurityException ex)
                 {
-                    Logger.LogError(ex, "Error retrieving children from file system");
+                    services.Logger.LogError(ex, "Error retrieving children from file system");
                     return;
                 }
                 catch (OperationCanceledException)
@@ -391,7 +391,7 @@ namespace Tesserafin.Controller.Entities
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex, "Error retrieving children");
+                    services.Logger.LogError(ex, "Error retrieving children");
                     return;
                 }
 

@@ -36,7 +36,6 @@ public class FolderGetChildrenCharacterizationTests
     {
         BaseItem.LibraryManager = libraryManager;
         BaseItem.ConfigurationManager = Mock.Of<IServerConfigurationManager>(x => x.Configuration == new ServerConfiguration());
-        BaseItem.Logger = NullLogger<BaseItem>.Instance;
     }
 
     private static (Mock<IChannelManager> ChannelManager, Mock<ICollectionManager> CollectionManager, Mock<IUserViewManager> UserViewManager, Mock<ITVSeriesManager> TvSeriesManager) StrictManagers()

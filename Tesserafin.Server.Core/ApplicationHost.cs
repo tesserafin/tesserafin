@@ -836,7 +836,6 @@ namespace Tesserafin.Server.Core
             // For now there's no real way to inject these properly
             BaseItem.ConfigurationManager = ConfigurationManager;
             BaseItem.LibraryManager = Resolve<ILibraryManager>();
-            BaseItem.Logger = Resolve<ILogger<BaseItem>>();
         }
 
         /// <summary>

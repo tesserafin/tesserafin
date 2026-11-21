@@ -26,7 +26,7 @@ namespace Tesserafin.Controller.Entities
     {
         private readonly IUserViewManager _userViewManager;
         private readonly ILibraryManager _libraryManager;
-        private readonly ILogger<BaseItem> _logger;
+        private readonly ILogger _logger;
         private readonly ITVSeriesManager _tvSeriesManager;
         private readonly IChannelManager _channelManager;
         private readonly ICollectionManager _collectionManager;
@@ -37,7 +37,7 @@ namespace Tesserafin.Controller.Entities
         public UserViewBuilder(
             IUserViewManager userViewManager,
             ILibraryManager libraryManager,
-            ILogger<BaseItem> logger,
+            ILogger logger,
             ITVSeriesManager tvSeriesManager,
             IChannelManager channelManager,
             ICollectionManager collectionManager,

@@ -84,7 +84,7 @@ public sealed class InheritedTagVisibilityTests
             .Create();
 
         _lookup = lookup;
-        _tags = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, Mock.Of<ILocalizationManager>(), configuration.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings(), Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(It.IsAny<BaseItem>()) == new LibraryOptions()));
+        _tags = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, Mock.Of<ILocalizationManager>(), configuration.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings(), Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(It.IsAny<BaseItem>()) == new LibraryOptions()), Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.TagVisibilityService>.Instance);
         _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, _tags);
 
         BaseItem.LibraryManager = manager;

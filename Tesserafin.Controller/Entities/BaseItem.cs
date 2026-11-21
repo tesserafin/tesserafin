@@ -465,8 +465,6 @@ namespace Tesserafin.Controller.Entities
         /// <summary>
         /// Gets or sets the logger.
         /// </summary>
-        public static ILogger<BaseItem> Logger { get; set; }
-
         public static ILibraryManager LibraryManager { get; set; }
 
         public static IServerConfigurationManager ConfigurationManager { get; set; }
@@ -1528,7 +1526,7 @@ namespace Tesserafin.Controller.Entities
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex, "Error refreshing owned items for {Path}", Path ?? Name);
+                    providers.ReportOwnedItemRefreshFailure(this, ex);
                 }
             }
 
@@ -1893,7 +1891,7 @@ namespace Tesserafin.Controller.Entities
 
                 if (!isAllowed)
                 {
-                    Logger.LogDebug("{0} has an unrecognized parental rating of {1}.", Name, rating);
+                    scope.Logger.LogDebug("{0} has an unrecognized parental rating of {1}.", Name, rating);
                 }
 
                 return isAllowed;

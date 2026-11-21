@@ -326,7 +326,6 @@ public class ItemQueryServiceTests
         var libraryManager = new Mock<ILibraryManager>();
         libraryManager.Setup(x => x.GetItemById(displayParent.Id)).Returns(displayParent);
         var service = CreateService(out var channelManager, out var collectionManager, out var userViewManager, out var tvSeriesManager, out _, out _, out _, libraryManager: libraryManager.Object);
-        BaseItem.Logger = NullLogger<BaseItem>.Instance;
 
         channelManager
             .Setup(x => x.GetChannelItemsInternal(It.IsAny<InternalItemsQuery>(), It.IsAny<IProgress<double>>(), It.IsAny<System.Threading.CancellationToken>()))

@@ -67,7 +67,7 @@ public sealed class CollectionFolderMembershipTests
         fixture.Register<ILibraryOptionsStore>(() => store);
 
         var libraryOptions = new Tesserafin.Server.Core.Library.LibraryItemOptions(_resolver, lookup, rootProvider, configuration.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), store);
-        _scope = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, _resolver, rootProvider, repository.Object, Mock.Of<Tesserafin.Model.Globalization.ILocalizationManager>(), configuration.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings(), libraryOptions);
+        _scope = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, _resolver, rootProvider, repository.Object, Mock.Of<Tesserafin.Model.Globalization.ILocalizationManager>(), configuration.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings(), libraryOptions, Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.TagVisibilityService>.Instance);
 
         Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
 

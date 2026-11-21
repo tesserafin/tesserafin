@@ -181,6 +181,10 @@ namespace Tesserafin.Providers.Manager
         }
 
         /// <inheritdoc/>
+        public void ReportOwnedItemRefreshFailure(BaseItem item, Exception exception)
+            => _logger.LogError(exception, "Error refreshing owned items for {Path}", item.Path ?? item.Name);
+
+        /// <inheritdoc />
         public async Task<ItemUpdateType> RefreshSingleItem(BaseItem item, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
             if (item.ImageInfos.Length > 0)
