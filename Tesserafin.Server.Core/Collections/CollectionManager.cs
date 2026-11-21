@@ -208,7 +208,7 @@ namespace Tesserafin.Server.Core.Collections
                     DateModified = info.LastWriteTimeUtc
                 };
 
-                parentFolder.AddChild(_writes, collection);
+                _writes.CreateChild(parentFolder, collection);
 
                 if (options.ItemIdList.Count > 0)
                 {

@@ -11,6 +11,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Extensions;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.MediaInfo;
@@ -35,6 +36,7 @@ internal sealed partial class ItemWriteCommands(
     ILibraryItemOptions itemOptions,
     FolderChildReconciler childReconciler,
     CollectionFolderMembershipResolver collectionMembership,
+    IItemStore itemStore,
     ILogger<ItemWriteCommands> logger) : IItemWriteCommands
 {
     private readonly IItemResolutionService _resolution = resolution;
@@ -210,6 +212,28 @@ internal sealed partial class ItemWriteCommands(
     }
 
     public void CreateItem(BaseItem item, BaseItem? parent) => CreateItems([item], parent, CancellationToken.None);
+
+    public void CreateChild(Folder parent, BaseItem item)
+    {
+        item.SetParent(parent);
+        if (item.Id.IsEmpty())
+        {
+            item.Id = itemStore.GetNewItemId(item.Path, item.GetType());
+        }
+
+        var now = DateTime.UtcNow;
+        if (item.DateCreated == DateTime.MinValue)
+        {
+            item.DateCreated = now;
+        }
+
+        if (item.DateModified == DateTime.MinValue)
+        {
+            item.DateModified = now;
+        }
+
+        CreateItem(item, parent);
+    }
 
     public void CreateItems(IReadOnlyList<BaseItem> items, BaseItem? parent, CancellationToken cancellationToken)
     {

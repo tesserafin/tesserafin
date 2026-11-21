@@ -49,7 +49,7 @@ internal static class LibraryWriteFixture
         var namedItems = new NamedItemIdentity(configuration, fixture.Create<IFileSystem>());
         var catalog = new NamedItemCatalog(namedItems, fixture.Create<IItemLookupService>(), fixture.Create<ILinkedChildrenService>());
         fixture.Inject<INamedItemCatalog>(catalog);
-        var writes = new ItemWriteCommands(versions, fixture.Create<IItemPersistenceService>(), fixture.Create<IItemCacheStore>(), fixture.Create<IItemLookupService>(), fixture.Create<ILinkedChildrenService>(), fixture.Create<IItemMetadataExporter>(), fixture.Create<IFileSystem>(), fixture.Create<IItemChangePublisher>(), new ActiveRecordings(), catalog, namedItems, resolution, fixture.Create<IItemRepository>(), options, new FolderChildReconciler(fixture.Create<IItemLookupService>(), NullLogger<FolderChildReconciler>.Instance), CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
+        var writes = new ItemWriteCommands(versions, fixture.Create<IItemPersistenceService>(), fixture.Create<IItemCacheStore>(), fixture.Create<IItemLookupService>(), fixture.Create<ILinkedChildrenService>(), fixture.Create<IItemMetadataExporter>(), fixture.Create<IFileSystem>(), fixture.Create<IItemChangePublisher>(), new ActiveRecordings(), catalog, namedItems, resolution, fixture.Create<IItemRepository>(), options, new FolderChildReconciler(fixture.Create<IItemLookupService>(), NullLogger<FolderChildReconciler>.Instance), CreateCollectionMembershipResolver(), fixture.Create<IItemStore>(), NullLogger<ItemWriteCommands>.Instance);
         fixture.Inject<IItemWriteCommands>(writes);
         return writes;
     }
