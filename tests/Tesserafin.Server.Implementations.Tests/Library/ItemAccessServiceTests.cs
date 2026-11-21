@@ -139,6 +139,7 @@ public class ItemAccessServiceTests
         services.AddSingleton(Mock.Of<ILocalizationManager>());
         services.AddSingleton(Mock.Of<ILibraryItemOptions>());
         services.AddSingleton<Tesserafin.Controller.LiveTv.ActiveRecordings>();
+        services.AddSingleton(typeof(Microsoft.Extensions.Logging.ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         services.AddSingleton<IStandaloneVisibilityService, TagVisibilityService>();
         services.AddSingleton<IItemAccessService, ItemAccessService>();
 

@@ -243,10 +243,13 @@ namespace Tesserafin.Server.Integration.Tests
                 .ToArray();
 
             // docs/pr111-di-closure-audit.md exceptions 1 and 3; exception 4 (Lazy<IItemQueryService>) is gone.
+            // The repository and its read services defer the saved-link resolver: LinkedChildResolver reads back through IItemRepository.
             Assert.Equal(
                 [
                     "IUserViewCatalog -> ILiveTvPresenceProvider =>(deferred) Lazy[IReadOnlyList[ILiveTvService]]",
+                    "IUserViewCatalog -> IUserRootFolderProvider -> IItemReadServices =>(deferred) Lazy[LinkedChildResolver]",
                     "IUserViewCatalog -> IUserViewFactory =>(deferred) Lazy[IProviderManager]",
+                    "IUserViewCatalog -> IVisibleContentProbe -> IItemRepository -> BaseItemRepository =>(deferred) Lazy[LinkedChildResolver]",
                 ],
                 deferred);
         }
