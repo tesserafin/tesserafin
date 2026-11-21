@@ -68,6 +68,13 @@ namespace Tesserafin.Server.Core.Library
         public ILogger Logger { get; }
 
         /// <inheritdoc />
+        public (bool Movies, bool Shows) GetCollectionGrouping()
+        {
+            var configuration = _configurationManager.Configuration;
+            return (configuration.EnableGroupingMoviesIntoCollections, configuration.EnableGroupingShowsIntoCollections);
+        }
+
+        /// <inheritdoc />
         public IReadOnlyList<BaseItem> GetParents(BaseItem item)
         {
             return item.GetParents(_itemLookupService).ToList();

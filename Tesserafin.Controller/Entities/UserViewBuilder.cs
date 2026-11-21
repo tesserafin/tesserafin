@@ -299,6 +299,8 @@ namespace Tesserafin.Controller.Entities
         {
             var genres = parent.QueryRecursive(new InternalItemsQuery(user)
             {
+                Visibility = _visibility,
+                Listing = _listing,
                 IncludeItemTypes = [BaseItemKind.Movie],
                 Recursive = true,
                 EnableTotalRecordCount = false
@@ -427,6 +429,8 @@ namespace Tesserafin.Controller.Entities
         {
             var genres = parent.QueryRecursive(new InternalItemsQuery(user)
             {
+                Visibility = _visibility,
+                Listing = _listing,
                 IncludeItemTypes = [BaseItemKind.Series],
                 Recursive = true,
                 EnableTotalRecordCount = false

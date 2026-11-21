@@ -623,10 +623,14 @@ namespace Tesserafin.Controller.Entities
 
         public QueryResult<BaseItem> QueryRecursive(InternalItemsQuery query)
         {
-            if (!query.ForceDirect && CollapseBoxSetItems(query, this, query.User, ConfigurationManager))
+            if (!query.ForceDirect)
             {
-                query.CollapseBoxSetItems = true;
-                SetCollapseBoxSetItemTypes(query);
+                var grouping = query.RequireVisibility().GetCollectionGrouping();
+                if (CollapseBoxSetItems(query, this, query.User, grouping))
+                {
+                    query.CollapseBoxSetItems = true;
+                    SetCollapseBoxSetItemTypes(query, grouping);
+                }
             }
 
             if (this is not UserRootFolder
@@ -894,7 +898,7 @@ namespace Tesserafin.Controller.Entities
 
             if (user is not null)
             {
-                items = CollapseBoxSetItemsIfNeeded(items, query, this, user, ConfigurationManager, collectionManager);
+                items = CollapseBoxSetItemsIfNeeded(items, query, this, user, query.RequireVisibility().GetCollectionGrouping(), collectionManager);
 
                 // After collapse, BoxSets may have replaced items whose names matched the filter
                 // but the BoxSet's own name may not match. Re-apply name filtering so BoxSets
@@ -938,20 +942,17 @@ namespace Tesserafin.Controller.Entities
             InternalItemsQuery query,
             BaseItem queryParent,
             User user,
-            IServerConfigurationManager configurationManager,
+            (bool Movies, bool Shows) grouping,
             ICollectionManager collectionManager)
         {
             ArgumentNullException.ThrowIfNull(items);
 
-            if (!CollapseBoxSetItems(query, queryParent, user, configurationManager))
+            if (!CollapseBoxSetItems(query, queryParent, user, grouping))
             {
                 return items;
             }
 
-            var config = configurationManager.Configuration;
-
-            bool collapseMovies = config.EnableGroupingMoviesIntoCollections;
-            bool collapseSeries = config.EnableGroupingShowsIntoCollections;
+            var (collapseMovies, collapseSeries) = grouping;
 
             if (user is null || (collapseMovies && collapseSeries))
             {
@@ -992,7 +993,7 @@ namespace Tesserafin.Controller.Entities
             InternalItemsQuery query,
             BaseItem queryParent,
             User user,
-            IServerConfigurationManager configurationManager)
+            (bool Movies, bool Shows) grouping)
         {
             // Could end up stuck in a loop like this
             if (queryParent is BoxSet)
@@ -1021,13 +1022,10 @@ namespace Tesserafin.Controller.Entities
                 return param.Value && AllowBoxSetCollapsing(query);
             }
 
-            var config = configurationManager.Configuration;
-
             bool queryHasMovies = query.IncludeItemTypes.Length == 0 || query.IncludeItemTypes.Contains(BaseItemKind.Movie);
             bool queryHasSeries = query.IncludeItemTypes.Length == 0 || query.IncludeItemTypes.Contains(BaseItemKind.Series);
 
-            bool collapseMovies = config.EnableGroupingMoviesIntoCollections;
-            bool collapseSeries = config.EnableGroupingShowsIntoCollections;
+            var (collapseMovies, collapseSeries) = grouping;
 
             if (user is not null)
             {
@@ -1038,11 +1036,9 @@ namespace Tesserafin.Controller.Entities
             return (queryHasMovies || queryHasSeries) && AllowBoxSetCollapsing(query);
         }
 
-        private void SetCollapseBoxSetItemTypes(InternalItemsQuery query)
+        private static void SetCollapseBoxSetItemTypes(InternalItemsQuery query, (bool Movies, bool Shows) grouping)
         {
-            var config = ConfigurationManager.Configuration;
-            bool collapseMovies = config.EnableGroupingMoviesIntoCollections;
-            bool collapseSeries = config.EnableGroupingShowsIntoCollections;
+            var (collapseMovies, collapseSeries) = grouping;
 
             if (collapseMovies && collapseSeries)
             {

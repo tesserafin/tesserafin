@@ -186,7 +186,8 @@ public class ItemQueryServiceTests
             .Setup(x => x.CollapseItemsWithinBoxSets(It.IsAny<IEnumerable<BaseItem>>(), user))
             .Returns((IEnumerable<BaseItem> items, User _) => items);
 
-        InternalItemsQuery MakeQuery() => new() { Visibility = PermissiveVisibility.Scope, User = user, CollapseBoxSetItems = true };
+        var visibility = PermissiveVisibility.Create((true, true));
+        InternalItemsQuery MakeQuery() => new() { Visibility = visibility, User = user, CollapseBoxSetItems = true };
 
         // Parity test deliberately compares against the obsolete 5-parameter overload — see
         // docs/major-rewrite-plan-v13.md § PR28/N.

@@ -25,6 +25,10 @@ namespace Tesserafin.Controller.Library
         /// <summary>Gets the logger for diagnostics produced while applying this scope.</summary>
         ILogger Logger { get; }
 
+        /// <summary>Gets the collection grouping settings for movie and show listings.</summary>
+        /// <returns>The enabled grouping settings.</returns>
+        (bool Movies, bool Shows) GetCollectionGrouping();
+
         /// <summary>
         /// Gets the item's parents, nearest first.
         /// </summary>
