@@ -11,6 +11,7 @@ using Tesserafin.Data.Entities;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.Library
 {
@@ -66,6 +67,10 @@ namespace Tesserafin.Server.Core.Library
 
         /// <inheritdoc />
         public ILogger Logger { get; }
+
+        /// <inheritdoc />
+        public bool IsManagedLibraryPath(string path)
+            => FilePath.ContainsSubPath(_configurationManager.ApplicationPaths.DataPath, path);
 
         /// <inheritdoc />
         public (bool Movies, bool Shows) GetCollectionGrouping()

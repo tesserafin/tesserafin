@@ -25,6 +25,11 @@ namespace Tesserafin.Controller.Library
         /// <summary>Gets the logger for diagnostics produced while applying this scope.</summary>
         ILogger Logger { get; }
 
+        /// <summary>Checks whether a path is inside the server-managed data directory.</summary>
+        /// <param name="path">The catalogue item path.</param>
+        /// <returns>Whether this item is managed by the server.</returns>
+        bool IsManagedLibraryPath(string path);
+
         /// <summary>Gets the collection grouping settings for movie and show listings.</summary>
         /// <returns>The enabled grouping settings.</returns>
         (bool Movies, bool Shows) GetCollectionGrouping();
