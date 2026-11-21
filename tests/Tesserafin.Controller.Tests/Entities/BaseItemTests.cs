@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
@@ -52,6 +53,22 @@ public class BaseItemTests
             Mock.Of<IItemNamingService>(),
             NullLogger.Instance);
         Assert.True(item.RequiresRefresh(services));
+    }
+
+    [Theory]
+    [InlineData("/library/music.flac", true, "/share/music.flac")]
+    [InlineData("/library/music.flac", false, "/library/music.flac")]
+    [InlineData("https://example.test/music.flac", true, "https://example.test/music.flac")]
+    public void GetMediaSources_MapsOnlyLocalPathsWhenRequested(string path, bool substitute, string expected)
+    {
+        var item = new Audio { Id = Guid.NewGuid(), Path = path };
+        var sources = new Mock<IMediaSourceManager>();
+        sources.Setup(manager => manager.MapFilePath("/library/music.flac")).Returns("/share/music.flac");
+
+        var result = item.GetMediaSources(substitute, sources.Object, Mock.Of<IMediaSegmentManager>(), Mock.Of<IChannelManager>());
+
+        Assert.Equal(expected, Assert.Single(result).Path);
+        sources.Verify(manager => manager.MapFilePath(It.IsAny<string>()), expected == "/share/music.flac" ? Times.Once() : Times.Never());
     }
 
     [Fact]

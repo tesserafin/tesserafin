@@ -752,17 +752,7 @@ namespace Tesserafin.Server.Core.Library
         }
 
         public string GetPathAfterNetworkSubstitution(string path, BaseItem? ownerItem)
-        {
-            foreach (var map in _configurationManager.Configuration.PathSubstitutions)
-            {
-                if (path.TryReplaceSubPath(map.From, map.To, out var newPath))
-                {
-                    return newPath;
-                }
-            }
-
-            return path;
-        }
+            => path.ApplyNetworkPathSubstitutions(_configurationManager.Configuration.PathSubstitutions);
 
         public IReadOnlyList<PersonInfo> GetPeople(InternalPeopleQuery query)
         {

@@ -138,6 +138,11 @@ namespace Tesserafin.Controller.Library
 
         MediaProtocol GetPathProtocol(string path);
 
+        /// <summary>Applies the configured network substitution to a file path.</summary>
+        /// <param name="path">The local media path.</param>
+        /// <returns>The path to report to the client.</returns>
+        string MapFilePath(string path);
+
         void SetDefaultAudioAndSubtitleStreamIndices(BaseItem item, MediaSourceInfo source, User user);
 
         Task AddMediaInfoWithProbe(MediaSourceInfo mediaSource, bool isAudio, string cacheKey, bool addProbeDelay, bool isLiveStream, CancellationToken cancellationToken);

@@ -5,11 +5,13 @@ using AutoFixture;
 using AutoFixture.AutoMoq;
 using Castle.Components.DictionaryAdapter;
 using Moq;
+using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Data.Entities;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
@@ -49,6 +51,21 @@ namespace Tesserafin.Server.Implementations.Tests.Library
             _item = new Video { Id = Guid.NewGuid(), OwnerId = Guid.Empty, ParentId = Guid.Empty };
 
             _user = fixture.Create<User>();
+        }
+
+        [Fact]
+        public void MapFilePath_UsesTheInjectedConfiguration()
+        {
+            var configuration = new ServerConfiguration
+            {
+                PathSubstitutions = [new PathSubstitution { From = "/library", To = "/share" }]
+            };
+            var fixture = new Fixture().Customize(new AutoMoqCustomization { ConfigureMembers = true });
+            fixture.Inject(Mock.Of<IServerConfigurationManager>(manager => manager.Configuration == configuration));
+            using var manager = fixture.Create<MediaSourceManager>();
+
+            Assert.Equal("/share/film.mkv", manager.MapFilePath("/library/film.mkv"));
+            Assert.Equal("/other/film.mkv", manager.MapFilePath("/other/film.mkv"));
         }
 
         [Theory]

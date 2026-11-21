@@ -1242,7 +1242,7 @@ namespace Tesserafin.Controller.Entities
                 MediaStreams = mediaSourceManager.GetMediaStreams(item.Id),
                 MediaAttachments = mediaSourceManager.GetMediaAttachments(item.Id),
                 Name = GetMediaSourceName(item, commonPrefix),
-                Path = enablePathSubstitution ? GetMappedPath(item, itemPath, protocol) : itemPath,
+                Path = enablePathSubstitution && protocol == MediaProtocol.File ? mediaSourceManager.MapFilePath(itemPath) : itemPath,
                 RunTimeTicks = item.RunTimeTicks,
                 Container = item.Container,
                 Size = item.Size,
@@ -2562,16 +2562,6 @@ namespace Tesserafin.Controller.Entities
             }
 
             return hasChanges;
-        }
-
-        protected static string GetMappedPath(BaseItem item, string path, MediaProtocol? protocol)
-        {
-            if (protocol == MediaProtocol.File)
-            {
-                return LibraryManager.GetPathAfterNetworkSubstitution(path, item);
-            }
-
-            return path;
         }
 
         public virtual void FillUserDataDtoValues(
