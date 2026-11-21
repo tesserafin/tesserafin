@@ -41,6 +41,7 @@ public class UserLibraryController : BaseTesserafinApiController
     private readonly IUserManager _userManager;
     private readonly IUserDataManager _userDataRepository;
     private readonly ILibraryManager _libraryManager;
+    private readonly IItemExtrasService _extras;
     private readonly IDtoService _dtoService;
     private readonly IUserViewManager _userViewManager;
     private readonly IFileSystem _fileSystem;
@@ -55,6 +56,7 @@ public class UserLibraryController : BaseTesserafinApiController
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="userDataRepository">Instance of the <see cref="IUserDataManager"/> interface.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="extras">Reads items owned by the requested media.</param>
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
     /// <param name="userViewManager">Instance of the <see cref="IUserViewManager"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
@@ -66,6 +68,7 @@ public class UserLibraryController : BaseTesserafinApiController
         IUserManager userManager,
         IUserDataManager userDataRepository,
         ILibraryManager libraryManager,
+        IItemExtrasService extras,
         IDtoService dtoService,
         IUserViewManager userViewManager,
         IFileSystem fileSystem)
@@ -77,6 +80,7 @@ public class UserLibraryController : BaseTesserafinApiController
         _userManager = userManager;
         _userDataRepository = userDataRepository;
         _libraryManager = libraryManager;
+        _extras = extras;
         _dtoService = dtoService;
         _userViewManager = userViewManager;
         _fileSystem = fileSystem;
@@ -446,7 +450,7 @@ public class UserLibraryController : BaseTesserafinApiController
 
         var dtoOptions = new DtoOptions();
 
-        return Ok(item.GetExtras([ExtraType.Trailer], user)
+        return Ok(_extras.GetExtras(item, user, [ExtraType.Trailer])
             .Select(i => _dtoService.GetBaseItemDto(i, dtoOptions, user, item)));
     }
 
@@ -496,8 +500,7 @@ public class UserLibraryController : BaseTesserafinApiController
 
         var dtoOptions = new DtoOptions();
 
-        return Ok(item
-            .GetExtras(user)
+        return Ok(_extras.GetExtras(item, user)
             .Where(i => i.ExtraType.HasValue && BaseItem.DisplayExtraTypes.Contains(i.ExtraType.Value))
             .Select(i => _dtoService.GetBaseItemDto(i, dtoOptions, user, item)));
     }

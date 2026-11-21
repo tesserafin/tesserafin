@@ -56,7 +56,8 @@ public class DtoServiceTests
             new Mock<IChapterManager>().Object,
             new Mock<IItemCountService>().Object,
             Mock.Of<IStandaloneVisibilityService>(),
-            Mock.Of<IItemListingServices>());
+            Mock.Of<IItemListingServices>(),
+            Mock.Of<IItemExtrasService>());
     }
 
     [Fact]
