@@ -15,6 +15,7 @@ using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
@@ -69,6 +70,18 @@ public class BaseItemTests
 
         Assert.Equal(expected, Assert.Single(result).Path);
         sources.Verify(manager => manager.MapFilePath(It.IsAny<string>()), expected == "/share/music.flac" ? Times.Once() : Times.Never());
+    }
+
+    [Fact]
+    public void SortName_UsesTheCatalogueRulesAfterBinding()
+    {
+        var item = new Movie { Name = "The Film" };
+        Assert.Equal("film", item.SortName);
+
+        var defaults = ItemMetadataDefaults.FromConfiguration(new ServerConfiguration { SortRemoveWords = [] });
+        item.ReadServices = Mock.Of<IItemReadServices>(reads => reads.MetadataDefaults == defaults);
+
+        Assert.Equal("the film", item.SortName);
     }
 
     [Fact]

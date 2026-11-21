@@ -109,7 +109,6 @@ public sealed class StandaloneVisibilityTests
             _activeRecordings,
             new(() => new LinkedChildResolver(repository.Object, lookup, Mock.Of<IItemPathLookupService>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<LinkedChildResolver>.Instance)),
             configuration.Object);
-        BaseItem.ConfigurationManager = configuration.Object;
     }
 
     [Fact]
@@ -437,7 +436,7 @@ public sealed class StandaloneVisibilityTests
         // library options (none here), then the server's code (DEBT-SERVER-7).
         _items[saga.ParentId].PreferredMetadataCountryCode = null;
         Assert.NotNull(_access.GetVisibleItemById<BaseItem>(saga.Id, teen));
-        BaseItem.ConfigurationManager.Configuration.MetadataCountryCode = "FR";
+        _configuration.Configuration.MetadataCountryCode = "FR";
         Assert.Null(_access.GetVisibleItemById<BaseItem>(saga.Id, teen));
     }
 
@@ -466,9 +465,9 @@ public sealed class StandaloneVisibilityTests
         moviesOptions.MetadataCountryCode = "FR";
         AssertVisible(saga, teen, false);
         moviesOptions.MetadataCountryCode = null;
-        BaseItem.ConfigurationManager.Configuration.MetadataCountryCode = "FR";
+        _configuration.Configuration.MetadataCountryCode = "FR";
         AssertVisible(saga, teen, false);
-        BaseItem.ConfigurationManager.Configuration.MetadataCountryCode = "US";
+        _configuration.Configuration.MetadataCountryCode = "US";
 
         // A library requested directly reads its own options, even outside the user root.
         movies.OfficialRating = "R";
@@ -502,9 +501,9 @@ public sealed class StandaloneVisibilityTests
         movie.OfficialRating = "R";
         AssertVisible(movie, teen, false);
         AssertVisible(movie, unrestricted, true);
-        BaseItem.ConfigurationManager.Configuration.MetadataCountryCode = "FR";
+        _configuration.Configuration.MetadataCountryCode = "FR";
         AssertVisible(movie, teen, true);
-        BaseItem.ConfigurationManager.Configuration.MetadataCountryCode = "US";
+        _configuration.Configuration.MetadataCountryCode = "US";
 
         // The custom rating comes before the official one; on an equal score the sub-score decides.
         movie.CustomRating = "TV-14";
@@ -578,7 +577,6 @@ public sealed class StandaloneVisibilityTests
 
         // The three statics the check could read throw on any call.
         ThrowingStatic();
-        BaseItem.ConfigurationManager = new Mock<IServerConfigurationManager>(MockBehavior.Strict).Object;
 
         foreach (var state in states)
         {
@@ -1052,7 +1050,6 @@ public sealed class StandaloneVisibilityTests
 
         // Every static the check could read throws on any call.
         ThrowingStatic();
-        BaseItem.ConfigurationManager = new Mock<IServerConfigurationManager>(MockBehavior.Strict).Object;
 
         Assert.Equal(expected, items.Select(i => Decisions(i, users)));
 

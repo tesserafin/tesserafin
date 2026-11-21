@@ -50,7 +50,6 @@ public class ItemQueryServiceTests
         configurationManager ??= Mock.Of<IServerConfigurationManager>(x => x.Configuration == new ServerConfiguration());
 
         BaseItem.LibraryManager = libraryManager;
-        BaseItem.ConfigurationManager = configurationManager;
 
         return new ItemQueryService(channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object, configurationManager, itemSortService ?? new PassthroughItemSortService(), itemLookupService.Object, itemRepository.Object, scopeService.Object, PermissiveVisibility.Scope, Listing);
     }

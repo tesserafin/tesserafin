@@ -79,7 +79,6 @@ public sealed class CollectionFolderMembershipTests
         _libraryManager = manager;
 
         BaseItem.LibraryManager = manager;
-        BaseItem.ConfigurationManager = configuration.Object;
     }
 
     [Fact]

@@ -95,7 +95,7 @@ namespace Tesserafin.Controller.LiveTv
         {
             var list = base.GetUserDataKeys();
 
-            if (!ConfigurationManager.Configuration.DisableLiveTvChannelUserDataName)
+            if (ReadServices?.IncludeLiveTvChannelNameInUserDataKeys == true)
             {
                 list.Insert(0, GetClientTypeName() + "-" + Name);
             }

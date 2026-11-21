@@ -1,10 +1,13 @@
 using System;
 using Moq;
+using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Entities;
+using Tesserafin.Model.Configuration;
+using Tesserafin.Model.LiveTv;
 using Tesserafin.Server.Implementations.Item;
 using Xunit;
 
@@ -17,6 +20,26 @@ namespace Tesserafin.Server.Implementations.Tests.Item;
 public sealed class ItemReadServicesTests
 {
     [Fact]
+    public void LiveTvSettings_ReadTheCurrentCatalogueConfiguration()
+    {
+        var settings = new ServerConfiguration();
+        var liveTv = new LiveTvOptions
+        {
+            ListingProviders = [new ListingsProviderInfo(), new ListingsProviderInfo { MoviePrefix = "Movie:" }]
+        };
+        var configuration = new Mock<IServerConfigurationManager>(MockBehavior.Strict);
+        configuration.SetupGet(manager => manager.Configuration).Returns(settings);
+        configuration.Setup(manager => manager.GetConfiguration("livetv")).Returns(liveTv);
+        var services = new ItemReadServices(Mock.Of<IItemRepository>(), new ActiveRecordings(), new(), configuration.Object);
+
+        Assert.False(services.IncludeLiveTvChannelNameInUserDataKeys);
+        Assert.Equal("Movie:", services.LiveTvMoviePrefix);
+
+        settings.DisableLiveTvChannelUserDataName = false;
+        Assert.True(services.IncludeLiveTvChannelNameInUserDataKeys);
+    }
+
+    [Fact]
     public void GetChildren_QueriesTheRepositoryForTheFolder_Ungrouped()
     {
         var folder = new Folder { Id = Guid.NewGuid() };
@@ -26,7 +49,7 @@ public sealed class ItemReadServicesTests
             .Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.ParentId.Equals(folder.Id) && !q.GroupByPresentationUniqueKey)))
             .Returns([child]);
 
-        var children = new ItemReadServices(repository.Object, new ActiveRecordings(), new(), Mock.Of<Tesserafin.Controller.Configuration.IServerConfigurationManager>()).GetChildren(folder);
+        var children = new ItemReadServices(repository.Object, new ActiveRecordings(), new(), Mock.Of<IServerConfigurationManager>()).GetChildren(folder);
 
         Assert.Same(child, Assert.Single(children));
     }
@@ -38,10 +61,10 @@ public sealed class ItemReadServicesTests
         var folderId = Guid.NewGuid();
         var repository = Mock.Of<IItemRepository>(r => r.GetIsPlayed(user, folderId, true) == true);
 
-        Assert.True(new ItemReadServices(repository, new ActiveRecordings(), new(), Mock.Of<Tesserafin.Controller.Configuration.IServerConfigurationManager>()).IsPlayed(user, folderId));
+        Assert.True(new ItemReadServices(repository, new ActiveRecordings(), new(), Mock.Of<IServerConfigurationManager>()).IsPlayed(user, folderId));
     }
 
     [Fact]
     public void IsActiveRecording_NoRecordingInProgress_IsFalse()
-        => Assert.False(new ItemReadServices(Mock.Of<IItemRepository>(), new ActiveRecordings(), new(), Mock.Of<Tesserafin.Controller.Configuration.IServerConfigurationManager>()).IsActiveRecording("/rec/a.ts"));
+        => Assert.False(new ItemReadServices(Mock.Of<IItemRepository>(), new ActiveRecordings(), new(), Mock.Of<IServerConfigurationManager>()).IsActiveRecording("/rec/a.ts"));
 }

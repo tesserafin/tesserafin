@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
@@ -8,6 +10,7 @@ using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Entities;
 using Tesserafin.Model.IO;
+using Tesserafin.Model.LiveTv;
 
 namespace Tesserafin.Server.Implementations.Item;
 
@@ -29,6 +32,16 @@ public sealed class ItemReadServices(
 
     /// <inheritdoc />
     public bool DisplaySpecialsWithinSeasons => configuration.Configuration.DisplaySpecialsWithinSeasons;
+
+    /// <inheritdoc />
+    public ItemMetadataDefaults MetadataDefaults => ItemMetadataDefaults.FromConfiguration(configuration.Configuration);
+
+    /// <inheritdoc />
+    public bool IncludeLiveTvChannelNameInUserDataKeys => !configuration.Configuration.DisableLiveTvChannelUserDataName;
+
+    /// <inheritdoc />
+    public string? LiveTvMoviePrefix => configuration.GetConfiguration<LiveTvOptions>("livetv").ListingProviders
+        .FirstOrDefault(provider => !string.IsNullOrEmpty(provider.MoviePrefix))?.MoviePrefix;
 
     /// <inheritdoc />
     public bool IsManagedLibraryPath(string path)

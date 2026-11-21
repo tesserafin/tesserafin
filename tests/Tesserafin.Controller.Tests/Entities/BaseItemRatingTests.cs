@@ -1,5 +1,4 @@
 using Moq;
-using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
@@ -17,9 +16,6 @@ public sealed class BaseItemRatingTests
 {
     public BaseItemRatingTests()
     {
-        var configuration = new Mock<IServerConfigurationManager>();
-        configuration.Setup(c => c.Configuration).Returns(new ServerConfiguration { MetadataCountryCode = "US" });
-        BaseItem.ConfigurationManager = configuration.Object;
         var libraryManager = new Mock<ILibraryManager>();
         libraryManager.Setup(l => l.GetLibraryOptions(It.IsAny<BaseItem>())).Returns(new LibraryOptions());
         libraryManager.Setup(l => l.GetCollectionFolders(It.IsAny<BaseItem>())).Returns([]);

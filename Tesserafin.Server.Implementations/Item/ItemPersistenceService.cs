@@ -82,11 +82,14 @@ public class ItemPersistenceService : IItemPersistenceService
     /// <inheritdoc />
     public void SaveItems(IReadOnlyList<BaseItemDto> items, CancellationToken cancellationToken)
     {
-        UpdateOrInsertItems(items, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
         foreach (var item in items)
         {
             item.ReadServices ??= _readServices;
         }
+
+        UpdateOrInsertItems(items, cancellationToken);
     }
 
     /// <inheritdoc />

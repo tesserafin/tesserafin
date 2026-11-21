@@ -63,11 +63,6 @@ public sealed class UserRootFolderProviderTests : IDisposable
         _configurationManagerMock.Setup(c => c.Configuration).Returns(new ServerConfiguration());
         _configurationManagerMock.Setup(c => c.GetConfiguration("metadata")).Returns(new MetadataConfiguration());
 
-        // Same DeepCopy-reflection hazard as BaseItem.ItemRepository above: BaseItem.SortName's getter
-        // (also reflected over by DeepCopy) calls CreateSortName(), which reads
-        // BaseItem.ConfigurationManager.Configuration.SortRemoveWords.
-        BaseItem.ConfigurationManager = _configurationManagerMock.Object;
-
         _fileSystemMock = new Mock<IFileSystem>();
         _fileSystemMock
             .Setup(f => f.GetDirectoryInfo(_userRootPath))
@@ -94,7 +89,7 @@ public sealed class UserRootFolderProviderTests : IDisposable
             _itemStoreMock.Object,
             _itemLookupServiceMock.Object,
             NullLogger<UserRootFolderProvider>.Instance,
-            new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings(), new(), Mock.Of<Tesserafin.Controller.Configuration.IServerConfigurationManager>()));
+            new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings(), new(), _configurationManagerMock.Object));
     }
 
     public void Dispose()

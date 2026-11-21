@@ -339,7 +339,6 @@ public sealed class UserViewCatalogParityTests
             ConfigMock.Setup(c => c.ApplicationPaths.InternalMetadataPath).Returns(internalMetadataPath);
             ConfigMock.Setup(c => c.Configuration).Returns(new ServerConfiguration { EnableFolderView = enableFolderView });
             Config = ConfigMock.Object;
-            Tesserafin.Controller.Entities.BaseItem.ConfigurationManager = Config;
 
             // UserViewFactory.GetNamedView(string, CollectionType, string) - the "Folders" view's
             // overload (RFC PR106b) - calls item.UpdateToRepositoryAsync(...) on its new-item path,
