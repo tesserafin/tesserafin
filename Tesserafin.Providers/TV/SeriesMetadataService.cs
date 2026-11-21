@@ -456,7 +456,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             SeriesPresentationUniqueKey = series.PresentationUniqueKey ?? CreatePresentationUniqueKey(series)
         };
 
-        series.AddChild(Writes, season);
+        Writes.CreateChild(series, season);
         await season.RefreshMetadata(_deletions, Writes, ProviderManager, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken).ConfigureAwait(false);
 
         return season;

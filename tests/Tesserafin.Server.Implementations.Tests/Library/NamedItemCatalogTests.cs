@@ -233,7 +233,7 @@ public sealed class NamedItemCatalogTests
             links.Setup(l => l.FindArtists(It.IsAny<IReadOnlyList<string>>())).Returns(() => Stored.Values.OfType<MusicArtist>()
                 .GroupBy(artist => artist.Name, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.OrdinalIgnoreCase));
             Catalog = new NamedItemCatalog(Identity, lookup, links.Object);
-            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Mock.Of<IItemResolutionService>(), Mock.Of<ILibraryItemOptions>(), lookup, links.Object), Persistence.Object, lookup, lookup, links.Object, Mock.Of<IItemMetadataExporter>(), files.Object, Events.Object, new ActiveRecordings(), Catalog, Identity, Mock.Of<IItemResolutionService>(), Mock.Of<IItemRepository>(), Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(lookup, NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
+            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Mock.Of<IItemResolutionService>(), Mock.Of<ILibraryItemOptions>(), lookup, links.Object), Persistence.Object, lookup, lookup, links.Object, Mock.Of<IItemMetadataExporter>(), files.Object, Events.Object, new ActiveRecordings(), Catalog, Identity, Mock.Of<IItemResolutionService>(), Mock.Of<IItemRepository>(), Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(lookup, NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), Mock.Of<IItemStore>(), NullLogger<ItemWriteCommands>.Instance);
             AcceptWrites();
         }
 

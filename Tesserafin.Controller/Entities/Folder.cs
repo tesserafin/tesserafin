@@ -217,34 +217,6 @@ namespace Tesserafin.Controller.Entities
             return baseResult;
         }
 
-        /// <summary>
-        /// Adds the child.
-        /// </summary>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="item">The item.</param>
-        /// <exception cref="InvalidOperationException">Unable to add  + item.Name.</exception>
-        public void AddChild(IItemWriteCommands writes, BaseItem item)
-        {
-            item.SetParent(this);
-
-            if (item.Id.IsEmpty())
-            {
-                item.Id = LibraryManager.GetNewItemId(item.Path, item.GetType());
-            }
-
-            if (item.DateCreated == DateTime.MinValue)
-            {
-                item.DateCreated = DateTime.UtcNow;
-            }
-
-            if (item.DateModified == DateTime.MinValue)
-            {
-                item.DateModified = DateTime.UtcNow;
-            }
-
-            writes.CreateItem(item, this);
-        }
-
         public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
             if (this is ICollectionFolder && this is not BasePluginFolder)
