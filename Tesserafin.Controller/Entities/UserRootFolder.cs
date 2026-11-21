@@ -112,9 +112,7 @@ namespace Tesserafin.Controller.Entities
                 PresetViews = query.PresetViews
             });
 
-#pragma warning disable CS0618
-            return UserViewBuilder.SortAndPage(result, null, query, LibraryManager);
-#pragma warning restore CS0618
+            return UserViewBuilder.SortAndPage(result, null, query, GetListingServices(query)?.Sort);
         }
 
         protected override QueryResult<BaseItem> GetItemsInternal(InternalItemsQuery query, IChannelManager channelManager, ICollectionManager collectionManager, IUserViewManager userViewManager, ITVSeriesManager tvSeriesManager, IItemSortService itemSortService)
@@ -142,7 +140,7 @@ namespace Tesserafin.Controller.Entities
         protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user, InternalItemsQuery query)
         {
             var list = base.GetEligibleChildrenForRecursiveChildren(user, query).ToList();
-            list.AddRange(LibraryManager.RootFolder.VirtualChildren);
+            list.AddRange(GetListingServices(query).LibraryRoot.GetRootFolder().VirtualChildren);
 
             return list;
         }

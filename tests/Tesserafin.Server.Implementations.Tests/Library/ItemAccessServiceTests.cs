@@ -52,7 +52,6 @@ public class ItemAccessServiceTests
 
     private static void SetLibraryManagerStatic(ILibraryManager libraryManager)
     {
-        BaseItem.LibraryManager = libraryManager;
     }
 
     [Fact]

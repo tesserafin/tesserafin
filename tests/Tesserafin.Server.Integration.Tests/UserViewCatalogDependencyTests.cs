@@ -61,10 +61,20 @@ namespace Tesserafin.Server.Integration.Tests
         // Entity statics that are service locators for the cycle members.
         private static readonly (Type Type, string Name)[] _staticLocators =
         [
-            (typeof(BaseItem), nameof(BaseItem.LibraryManager)),
+            (typeof(BaseItem), "LibraryManager"),
         ];
 
         private static readonly Lazy<IServiceCollection> _registrations = new(BuildRegistrations);
+
+        [Theory]
+        [InlineData("LibraryManager")]
+        [InlineData("ConfigurationManager")]
+        [InlineData("FileSystem")]
+        [InlineData("Logger")]
+        public void BaseItem_HasNoStaticServiceLocator(string member)
+        {
+            Assert.Empty(typeof(BaseItem).GetMember(member, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static));
+        }
 
         [Fact]
         public void VisibleContentProbe_WholeGraph_ReachesNoCycleMemberNorLocator()
@@ -93,10 +103,7 @@ namespace Tesserafin.Server.Integration.Tests
 
             AssertNone(reached.Where(n => IsCycleMember(n.Type)).Select(n => n.Path));
 
-            // Exactly one locator edge, pre-existing, through the user root folder leaf: the persistence
-            // service holds the application host only to map virtual paths (BaseItemMapper.Map), and the
-            // walk stops there. Equality, not a filter: any further locator path fails, and so does this
-            // one disappearing, so the exception can neither widen nor outlive its reason.
+            // The only host edge maps stored virtual paths in item persistence.
             Assert.Equal(
                 ["ICollectionFolderResolver -> IUserRootFolderProvider -> IItemStore -> IItemPersistenceService -> IServerApplicationHost"],
                 reached.Where(n => _locatorTypes.Contains(n.Type)).Select(n => n.Path).Order(StringComparer.Ordinal));
@@ -248,6 +255,7 @@ namespace Tesserafin.Server.Integration.Tests
                 [
                     "IUserViewCatalog -> ILiveTvPresenceProvider =>(deferred) Lazy[IReadOnlyList[ILiveTvService]]",
                     "IUserViewCatalog -> IUserRootFolderProvider -> IItemReadServices =>(deferred) Lazy[ICollectionFolderResolver]",
+                    "IUserViewCatalog -> IUserRootFolderProvider -> IItemReadServices =>(deferred) Lazy[IItemListingReads]",
                     "IUserViewCatalog -> IUserRootFolderProvider -> IItemReadServices =>(deferred) Lazy[IItemLookupService]",
                     "IUserViewCatalog -> IUserRootFolderProvider -> IItemReadServices =>(deferred) Lazy[IItemRepository]",
                     "IUserViewCatalog -> IUserRootFolderProvider -> IItemReadServices =>(deferred) Lazy[ILibraryItemOptions]",

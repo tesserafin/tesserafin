@@ -313,33 +313,24 @@ public class ItemQueryScopeServiceTests
     public void AddUserToQuery_PlainViewResolvesTopParent_StaysOffStaticLibraryManager()
     {
         // Strict: any call to the static BaseItem.LibraryManager throws, failing the test.
-        var previous = BaseItem.LibraryManager;
-        BaseItem.LibraryManager = new Mock<ILibraryManager>(MockBehavior.Strict).Object;
-        try
-        {
-            var user = new User("test-user", "provider", "provider");
+        var user = new User("test-user", "provider", "provider");
 
-            // Aggregate root: makes its direct child a top parent (IsTopParentVia -> GetParent(lookup) is AggregateFolder).
-            var aggregate = new AggregateFolder { Id = Guid.NewGuid(), Name = "Root" };
-            var topFolder = new Folder { Id = Guid.NewGuid(), Name = "Top", ParentId = aggregate.Id };
-            // Leaf returned by GetUserViews: plain Folder, not top, parent is topFolder.
-            var leaf = new Folder { Id = Guid.NewGuid(), Name = "Leaf", ParentId = topFolder.Id };
+        // Aggregate root: makes its direct child a top parent (IsTopParentVia -> GetParent(lookup) is AggregateFolder).
+        var aggregate = new AggregateFolder { Id = Guid.NewGuid(), Name = "Root" };
+        var topFolder = new Folder { Id = Guid.NewGuid(), Name = "Top", ParentId = aggregate.Id };
+        // Leaf returned by GetUserViews: plain Folder, not top, parent is topFolder.
+        var leaf = new Folder { Id = Guid.NewGuid(), Name = "Leaf", ParentId = topFolder.Id };
 
-            _itemLookupServiceMock.Setup(m => m.GetItemById(topFolder.Id)).Returns(topFolder);
-            _itemLookupServiceMock.Setup(m => m.GetItemById(aggregate.Id)).Returns(aggregate);
-            _userViewCatalogMock.Setup(m => m.GetUserViews(It.IsAny<UserViewQuery>())).Returns(new[] { leaf });
+        _itemLookupServiceMock.Setup(m => m.GetItemById(topFolder.Id)).Returns(topFolder);
+        _itemLookupServiceMock.Setup(m => m.GetItemById(aggregate.Id)).Returns(aggregate);
+        _userViewCatalogMock.Setup(m => m.GetUserViews(It.IsAny<UserViewQuery>())).Returns(new[] { leaf });
 
-            var query = new InternalItemsQuery(user);
+        var query = new InternalItemsQuery(user);
 
-            _scopeService.AddUserToQuery(query, user);
+        _scopeService.AddUserToQuery(query, user);
 
-            // Resolved purely through the lookup mock: leaf -> topFolder (top parent).
-            Assert.Equal(new[] { topFolder.Id }, query.TopParentIds);
-        }
-        finally
-        {
-            BaseItem.LibraryManager = previous;
-        }
+        // Resolved purely through the lookup mock: leaf -> topFolder (top parent).
+        Assert.Equal(new[] { topFolder.Id }, query.TopParentIds);
     }
 
     // ---------------------------------------------------------------

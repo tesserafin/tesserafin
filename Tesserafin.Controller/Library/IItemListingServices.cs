@@ -1,6 +1,5 @@
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
-using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
 
 namespace Tesserafin.Controller.Library
@@ -14,7 +13,7 @@ namespace Tesserafin.Controller.Library
     /// that only list library children and must stay off those managers (the user-view catalog, the visible
     /// content probe) never take this service.
     /// </remarks>
-    public interface IItemListingServices
+    public interface IItemListingServices : IItemListingReads
     {
         /// <summary>Gets the channel manager.</summary>
         IChannelManager Channels { get; }
@@ -30,9 +29,6 @@ namespace Tesserafin.Controller.Library
 
         /// <summary>Gets the user data manager for item filters.</summary>
         IUserDataManager UserData { get; }
-
-        /// <summary>Gets the item sort service.</summary>
-        IItemSortService Sort { get; }
 
         /// <summary>Gets the catalogue queries for this listing request.</summary>
         IItemCatalogueQuery Queries { get; }

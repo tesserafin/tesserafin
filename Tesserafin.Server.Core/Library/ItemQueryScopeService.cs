@@ -308,10 +308,6 @@ namespace Tesserafin.Server.Core.Library
             return [];
         }
 
-        // Walks to the top-level parent using IItemLookupService instead of BaseItem.GetTopParent(),
-        // which would reach the static BaseItem.LibraryManager. Single consumer, so it stays a private
-        // helper here rather than a shared hierarchy service (see docs/pr90-*, and the removed
-        // IItemHierarchyService in PR83).
         private BaseItem? GetTopParentViaLookup(BaseItem item)
         {
             if (item.IsTopParentVia(_itemLookupService))

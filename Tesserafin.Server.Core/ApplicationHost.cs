@@ -567,6 +567,8 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddTransient(provider => new Lazy<IUserViewManager>(provider.GetRequiredService<IUserViewManager>));
             serviceCollection.AddTransient(provider => new Lazy<ITVSeriesManager>(provider.GetRequiredService<ITVSeriesManager>));
             serviceCollection.AddSingleton<IItemListingServices, ItemListingServices>();
+            serviceCollection.AddSingleton<IItemListingReads, ItemListingReads>();
+            serviceCollection.AddTransient(provider => new Lazy<IItemListingReads>(provider.GetRequiredService<IItemListingReads>));
             serviceCollection.AddSingleton<IFolderValidationServices, FolderValidationServices>();
 
             // LiveTvPresenceProvider (PR108) needs the registered ILiveTvService count to reproduce
@@ -602,6 +604,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemPeopleCommands, ItemPeopleCommands>();
             serviceCollection.AddSingleton<IUserViewFactory, UserViewFactory>();
             serviceCollection.AddSingleton<IUserRootFolderProvider, UserRootFolderProvider>();
+            serviceCollection.AddTransient(provider => new Lazy<IUserRootFolderProvider>(provider.GetRequiredService<IUserRootFolderProvider>));
             serviceCollection.AddSingleton<ILibraryOptionsStore, LibraryOptionsStore>();
             serviceCollection.AddSingleton<ICollectionFolderResolver, CollectionFolderResolver>();
             serviceCollection.AddSingleton<ActiveRecordings>();
@@ -612,6 +615,7 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IVisibleContentProbe, VisibleContentProbe>();
             serviceCollection.AddSingleton<IUserViewCatalog, UserViewCatalog>();
             serviceCollection.AddSingleton<ILibraryRootFolderProvider, LibraryRootFolderProvider>();
+            serviceCollection.AddTransient(provider => new Lazy<ILibraryRootFolderProvider>(provider.GetRequiredService<ILibraryRootFolderProvider>));
             serviceCollection.AddSingleton<ILibraryScanTraversal, LibraryScanTraversal>();
             serviceCollection.AddSingleton<ILibraryRefreshProgress, LibraryRefreshProgress>();
             serviceCollection.AddSingleton<ILibraryStructureCommands, LibraryStructureCommands>();
@@ -797,8 +801,6 @@ namespace Tesserafin.Server.Core
             var localizationManager = (LocalizationManager)Resolve<ILocalizationManager>();
             await localizationManager.LoadAll().ConfigureAwait(false);
 
-            SetStaticProperties();
-
             FindParts();
         }
 
@@ -833,15 +835,6 @@ namespace Tesserafin.Server.Core
                 Logger.LogError(ex, "Error loading cert from {CertificateLocation}", path);
                 return null;
             }
-        }
-
-        /// <summary>
-        /// Dirty hacks.
-        /// </summary>
-        private void SetStaticProperties()
-        {
-            // For now there's no real way to inject these properly
-            BaseItem.LibraryManager = Resolve<ILibraryManager>();
         }
 
         /// <summary>

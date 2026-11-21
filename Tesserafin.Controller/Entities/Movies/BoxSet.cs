@@ -110,23 +110,6 @@ namespace Tesserafin.Controller.Entities.Movies
             return true;
         }
 
-        private IEnumerable<BaseItem> Sort(IEnumerable<BaseItem> items, User user)
-        {
-            if (!Enum.TryParse<ItemSortBy>(DisplayOrder, out var sortBy))
-            {
-                sortBy = ItemSortBy.PremiereDate;
-            }
-
-            if (sortBy == ItemSortBy.Default)
-            {
-                return items;
-            }
-
-#pragma warning disable CS0618 // static LibraryManager.Sort facade left in place pending Folder.GetChildren cascade, see docs/major-rewrite-plan-v13.md § PR49/N
-            return LibraryManager.Sort(items, user, new[] { sortBy }, SortOrder.Ascending);
-#pragma warning restore CS0618
-        }
-
         private IEnumerable<BaseItem> Sort(IEnumerable<BaseItem> items, User user, IItemSortService itemSortService)
         {
             if (!Enum.TryParse<ItemSortBy>(DisplayOrder, out var sortBy))
@@ -145,7 +128,7 @@ namespace Tesserafin.Controller.Entities.Movies
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query)
         {
             var children = base.GetChildren(user, includeLinkedChildren, query);
-            return Sort(children, user).ToArray();
+            return Sort(children, user, GetListingServices(query)?.Sort).ToArray();
         }
 
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query, IItemSortService itemSortService)
@@ -157,7 +140,7 @@ namespace Tesserafin.Controller.Entities.Movies
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, out int totalItemCount, InternalItemsQuery query)
         {
             var children = base.GetChildren(user, includeLinkedChildren, out totalItemCount, query);
-            return Sort(children, user).ToArray();
+            return Sort(children, user, GetListingServices(query)?.Sort).ToArray();
         }
 
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, out int totalItemCount, InternalItemsQuery query, IItemSortService itemSortService)
@@ -169,7 +152,7 @@ namespace Tesserafin.Controller.Entities.Movies
         public override IReadOnlyList<BaseItem> GetRecursiveChildren(User user, InternalItemsQuery query, out int totalCount)
         {
             var children = base.GetRecursiveChildren(user, query, out totalCount);
-            return Sort(children, user).ToArray();
+            return Sort(children, user, GetListingServices(query)?.Sort).ToArray();
         }
 
         public override IReadOnlyList<BaseItem> GetRecursiveChildren(User user, InternalItemsQuery query, out int totalCount, IItemSortService itemSortService)

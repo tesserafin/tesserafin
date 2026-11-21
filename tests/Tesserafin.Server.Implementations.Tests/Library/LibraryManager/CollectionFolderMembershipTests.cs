@@ -25,7 +25,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library.LibraryManager;
 /// <summary>
 /// Characterisation of library membership resolution (<c>GetCollectionFolders</c>): which top-level
 /// libraries an item belongs to, and the visibility and deletion rules that read it through the
-/// static <see cref="BaseItem.LibraryManager"/>. Every expectation is hand-derived and was green on
+/// static <c>BaseItem.LibraryManager</c>. Every expectation is hand-derived and was green on
 /// the unmodified <c>LibraryManager</c>; membership is now asserted through both the
 /// <see cref="ILibraryManager"/> facade and <see cref="ICollectionFolderResolver"/> (DEBT-SERVER-2).
 /// </summary>
@@ -86,8 +86,6 @@ public sealed class CollectionFolderMembershipTests
                 fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
         _libraryManager = manager;
-
-        BaseItem.LibraryManager = manager;
     }
 
     [Fact]

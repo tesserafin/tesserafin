@@ -39,8 +39,6 @@ public class FolderTests
         var child2 = new Movie { Id = Guid.NewGuid() };
         folder.Children = new BaseItem[] { child1, child2 };
 
-        BaseItem.LibraryManager = new Mock<ILibraryManager>().Object;
-
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
 
         var result = folder.GetItems(new InternalItemsQuery { Visibility = PermissiveVisibility.Scope }, channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
@@ -84,8 +82,6 @@ public class FolderTests
         var child = new Movie { Id = Guid.NewGuid() };
         folder.Children = new BaseItem[] { child };
 
-        BaseItem.LibraryManager = new Mock<ILibraryManager>().Object;
-
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
 
         var result = folder.GetItemList(new InternalItemsQuery { Visibility = PermissiveVisibility.Scope }, channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
@@ -106,8 +102,6 @@ public class FolderTests
         folder.Children = new BaseItem[] { child };
 
         var user = new User("test-user", "provider", "provider");
-
-        BaseItem.LibraryManager = new Mock<ILibraryManager>().Object;
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
 
@@ -137,7 +131,6 @@ public class FolderTests
             .Returns(new UserItemData { Key = "played", IsFavorite = true, Played = true });
         userData.Setup(manager => manager.GetUserData(user, unplayedFavorite))
             .Returns(new UserItemData { Key = "unplayed", IsFavorite = true });
-        BaseItem.LibraryManager = Mock.Of<ILibraryManager>();
 
         var query = new InternalItemsQuery
         {
@@ -166,7 +159,6 @@ public class FolderTests
 
         var user = new User("test-user", "provider", "provider");
 
-        BaseItem.LibraryManager = new Mock<ILibraryManager>().Object;
         var visibility = PermissiveVisibility.Create((true, true));
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
@@ -203,7 +195,6 @@ public class FolderTests
         var channelItem = new Movie { Id = Guid.NewGuid() };
 
         userView.ReadServices = Mock.Of<IItemReadServices>(reads => reads.GetItemById(displayParent.Id) == displayParent);
-        BaseItem.LibraryManager = Mock.Of<ILibraryManager>();
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
         channelManager

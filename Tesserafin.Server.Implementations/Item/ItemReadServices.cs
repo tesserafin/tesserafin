@@ -28,6 +28,7 @@ namespace Tesserafin.Server.Implementations.Item;
 /// <param name="links">The persisted version links.</param>
 /// <param name="collections">The deferred library membership resolver.</param>
 /// <param name="options">The deferred effective library settings.</param>
+/// <param name="listing">The deferred listing services.</param>
 public sealed class ItemReadServices(
     Lazy<IItemRepository> repository,
     ActiveRecordings recordings,
@@ -36,8 +37,12 @@ public sealed class ItemReadServices(
     Lazy<IItemLookupService> lookup,
     Lazy<ILinkedChildrenService> links,
     Lazy<ICollectionFolderResolver> collections,
-    Lazy<ILibraryItemOptions> options) : IItemReadServices
+    Lazy<ILibraryItemOptions> options,
+    Lazy<IItemListingReads> listing) : IItemReadServices
 {
+    /// <inheritdoc />
+    public IItemListingReads Listing => listing.Value;
+
     /// <inheritdoc />
     public LinkedChildResolver LinkedChildren => linkedChildren.Value;
 

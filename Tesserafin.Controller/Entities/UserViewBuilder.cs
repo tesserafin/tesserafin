@@ -25,7 +25,7 @@ namespace Tesserafin.Controller.Entities
     public class UserViewBuilder
     {
         private readonly IUserViewManager _userViewManager;
-        private readonly ILibraryManager _libraryManager;
+        private readonly IItemCatalogueQuery _queries;
         private readonly ILogger _logger;
         private readonly ITVSeriesManager _tvSeriesManager;
         private readonly IChannelManager _channelManager;
@@ -33,22 +33,25 @@ namespace Tesserafin.Controller.Entities
         private readonly IItemSortService _itemSortService;
         private readonly IStandaloneVisibilityService _visibility;
         private readonly IItemListingServices _listing;
+        private readonly IItemListingReads _reads;
 
         public UserViewBuilder(
             IUserViewManager userViewManager,
-            ILibraryManager libraryManager,
+            IItemCatalogueQuery queries,
             ILogger logger,
             ITVSeriesManager tvSeriesManager,
             IChannelManager channelManager,
             ICollectionManager collectionManager,
             IItemSortService itemSortService,
             IStandaloneVisibilityService visibility,
-            IItemListingServices listing)
+            IItemListingServices listing,
+            IItemListingReads reads)
         {
+            _reads = reads;
             _visibility = visibility;
             _listing = listing;
             _userViewManager = userViewManager;
-            _libraryManager = libraryManager;
+            _queries = queries;
             _logger = logger;
             _tvSeriesManager = tvSeriesManager;
             _channelManager = channelManager;
@@ -73,7 +76,7 @@ namespace Tesserafin.Controller.Entities
             switch (viewType)
             {
                 case CollectionType.folders:
-                    return GetResult(GetChildren(_libraryManager.GetUserRootFolder(), user), query);
+                    return GetResult(GetChildren(_reads.UserRoot.GetUserRootFolder(), user), query);
 
                 case CollectionType.books:
                     return GetBooks(queryParent, user, query);
@@ -197,7 +200,7 @@ namespace Tesserafin.Controller.Entities
             query.IsFavorite = true;
             query.IncludeItemTypes = [BaseItemKind.Movie];
 
-            return _libraryManager.GetItemsResult(query);
+            return _queries.GetItems(query);
         }
 
         private QueryResult<BaseItem> GetFavoriteSeries(Folder parent, User user, InternalItemsQuery query)
@@ -208,7 +211,7 @@ namespace Tesserafin.Controller.Entities
             query.IsFavorite = true;
             query.IncludeItemTypes = [BaseItemKind.Series];
 
-            return _libraryManager.GetItemsResult(query);
+            return _queries.GetItems(query);
         }
 
         private QueryResult<BaseItem> GetFavoriteEpisodes(Folder parent, User user, InternalItemsQuery query)
@@ -219,7 +222,7 @@ namespace Tesserafin.Controller.Entities
             query.IsFavorite = true;
             query.IncludeItemTypes = [BaseItemKind.Episode];
 
-            return _libraryManager.GetItemsResult(query);
+            return _queries.GetItems(query);
         }
 
         private QueryResult<BaseItem> GetBooks(Folder parent, User user, InternalItemsQuery query)
@@ -230,7 +233,7 @@ namespace Tesserafin.Controller.Entities
 
             query.IncludeItemTypes = new[] { BaseItemKind.Book, BaseItemKind.AudioBook };
 
-            return _libraryManager.GetItemsResult(query);
+            return _queries.GetItems(query);
         }
 
         private QueryResult<BaseItem> GetMovieMovies(Folder parent, User user, InternalItemsQuery query)
@@ -241,7 +244,7 @@ namespace Tesserafin.Controller.Entities
 
             query.IncludeItemTypes = [BaseItemKind.Movie];
 
-            return _libraryManager.GetItemsResult(query);
+            return _queries.GetItems(query);
         }
 
         private QueryResult<BaseItem> GetMovieCollections(User user, InternalItemsQuery query)
@@ -251,7 +254,7 @@ namespace Tesserafin.Controller.Entities
             query.SetUser(user);
             query.Recursive = true;
 
-            return _libraryManager.GetItemsResult(query);
+            return _queries.GetItems(query);
         }
 
         private QueryResult<BaseItem> GetMovieLatest(Folder parent, User user, InternalItemsQuery query)
@@ -263,7 +266,7 @@ namespace Tesserafin.Controller.Entities
             query.Limit = GetSpecialItemsLimit();
             query.IncludeItemTypes = [BaseItemKind.Movie];
 
-            return ConvertToResult(_libraryManager.GetItemList(query));
+            return ConvertToResult(_queries.GetItemList(query));
         }
 
         private QueryResult<BaseItem> GetMovieResume(Folder parent, User user, InternalItemsQuery query)
@@ -276,7 +279,7 @@ namespace Tesserafin.Controller.Entities
             query.Limit = GetSpecialItemsLimit();
             query.IncludeItemTypes = [BaseItemKind.Movie];
 
-            return ConvertToResult(_libraryManager.GetItemList(query));
+            return ConvertToResult(_queries.GetItemList(query));
         }
 
         private QueryResult<BaseItem> ConvertToResult(IReadOnlyList<BaseItem> items)
@@ -286,7 +289,7 @@ namespace Tesserafin.Controller.Entities
 
         private Genre FindGenre(string name)
         {
-            return _libraryManager.GetItemList(new InternalItemsQuery
+            return _queries.GetItemList(new InternalItemsQuery
             {
                 IncludeItemTypes = [BaseItemKind.Genre],
                 Name = name,
@@ -334,7 +337,7 @@ namespace Tesserafin.Controller.Entities
 
             query.IncludeItemTypes = [BaseItemKind.Movie];
 
-            return _libraryManager.GetItemsResult(query);
+            return _queries.GetItems(query);
         }
 
         private QueryResult<BaseItem> GetTvView(Folder parent, User user, InternalItemsQuery query)
@@ -381,7 +384,7 @@ namespace Tesserafin.Controller.Entities
             query.IncludeItemTypes = [BaseItemKind.Episode];
             query.IsVirtualItem = false;
 
-            return ConvertToResult(_libraryManager.GetItemList(query));
+            return ConvertToResult(_queries.GetItemList(query));
         }
 
         private QueryResult<BaseItem> GetTvNextUp(Folder parent, InternalItemsQuery query)
@@ -411,7 +414,7 @@ namespace Tesserafin.Controller.Entities
             query.Limit = GetSpecialItemsLimit();
             query.IncludeItemTypes = [BaseItemKind.Episode];
 
-            return ConvertToResult(_libraryManager.GetItemList(query));
+            return ConvertToResult(_queries.GetItemList(query));
         }
 
         private QueryResult<BaseItem> GetTvSeries(Folder parent, User user, InternalItemsQuery query)
@@ -422,7 +425,7 @@ namespace Tesserafin.Controller.Entities
 
             query.IncludeItemTypes = [BaseItemKind.Series];
 
-            return _libraryManager.GetItemsResult(query);
+            return _queries.GetItems(query);
         }
 
         private QueryResult<BaseItem> GetTvGenres(Folder parent, User user, InternalItemsQuery query)
@@ -464,7 +467,7 @@ namespace Tesserafin.Controller.Entities
 
             query.IncludeItemTypes = [BaseItemKind.Series];
 
-            return _libraryManager.GetItemsResult(query);
+            return _queries.GetItems(query);
         }
 
         private QueryResult<BaseItem> GetResult<T>(
@@ -472,16 +475,8 @@ namespace Tesserafin.Controller.Entities
             InternalItemsQuery query)
             where T : BaseItem
         {
-            var filtered = Filter(items, query.User, query, _libraryManager);
-
-            if (_itemSortService is not null)
-            {
-                return SortAndPage(filtered, null, query, _itemSortService);
-            }
-
-#pragma warning disable CS0618
-            return SortAndPage(filtered, null, query, _libraryManager);
-#pragma warning restore CS0618
+            var filtered = Filter(items, query.User, query, _reads);
+            return SortAndPage(filtered, null, query, _itemSortService ?? _reads?.Sort);
         }
 
         /// <summary>
@@ -490,15 +485,15 @@ namespace Tesserafin.Controller.Entities
         /// <param name="items">The items to filter.</param>
         /// <param name="user">The user for filtering context.</param>
         /// <param name="query">The query parameters.</param>
-        /// <param name="libraryManager">The library manager.</param>
+        /// <param name="listing">The listing services.</param>
         /// <returns>The filtered items.</returns>
         public static IEnumerable<BaseItem> Filter(
             IEnumerable<BaseItem> items,
             User user,
             InternalItemsQuery query,
-            ILibraryManager libraryManager)
+            IItemListingReads listing)
         {
-            var filtered = items.Where(i => Filter(i, user, query, libraryManager));
+            var filtered = items.Where(i => Filter(i, user, query, listing));
 
             if (query.IsPlayed.HasValue && user is not null)
             {
@@ -507,7 +502,7 @@ namespace Tesserafin.Controller.Entities
 
                 if (folderIds.Count > 0)
                 {
-                    var counts = libraryManager.GetPlayedAndTotalCountBatch(folderIds, user);
+                    var counts = listing.Counts.GetPlayedAndTotalCountBatch(folderIds, user);
                     var isPlayedValue = query.IsPlayed.Value;
 
                     return itemList.Where(i =>
@@ -541,24 +536,6 @@ namespace Tesserafin.Controller.Entities
             return Page(items, totalRecordLimit, query);
         }
 
-        [Obsolete("Use SortAndPage with IItemSortService instead. See docs/major-rewrite-plan-v13.md § PR56/N.")]
-        public static QueryResult<BaseItem> SortAndPage(
-            IEnumerable<BaseItem> items,
-            int? totalRecordLimit,
-            InternalItemsQuery query,
-            ILibraryManager libraryManager)
-        {
-            if (query.OrderBy.Count > 0)
-            {
-                // ILibraryManager.Sort facade kept here pending Folder.GetChildren cascade (2 of 3 callers pass BaseItem.LibraryManager static), see docs/major-rewrite-plan-v13.md § PR49/N
-#pragma warning disable CS0618
-                items = libraryManager.Sort(items, query.User, query.OrderBy);
-#pragma warning restore CS0618
-            }
-
-            return Page(items, totalRecordLimit, query);
-        }
-
         private static QueryResult<BaseItem> Page(
             IEnumerable<BaseItem> items,
             int? totalRecordLimit,
@@ -586,7 +563,7 @@ namespace Tesserafin.Controller.Entities
             BaseItem item,
             User user,
             InternalItemsQuery query,
-            ILibraryManager libraryManager)
+            IItemListingReads listing)
         {
             if (!string.IsNullOrEmpty(query.NameStartsWith) && !item.SortName.StartsWith(query.NameStartsWith, StringComparison.InvariantCultureIgnoreCase))
             {
@@ -786,7 +763,7 @@ namespace Tesserafin.Controller.Entities
             // Apply studio filter
             if (query.StudioIds.Length > 0 && !query.StudioIds.Any(id =>
             {
-                var studioItem = libraryManager.GetItemById(id);
+                var studioItem = listing.Lookup.GetItemById(id);
                 return studioItem is not null && item.Studios.Contains(studioItem.Name, StringComparison.OrdinalIgnoreCase);
             }))
             {
@@ -796,7 +773,7 @@ namespace Tesserafin.Controller.Entities
             // Apply genre filter
             if (query.GenreIds.Count > 0 && !query.GenreIds.Any(id =>
             {
-                var genreItem = libraryManager.GetItemById(id);
+                var genreItem = listing.Lookup.GetItemById(id);
                 return genreItem is not null && item.Genres.Contains(genreItem.Name, StringComparison.OrdinalIgnoreCase);
             }))
             {
@@ -908,13 +885,13 @@ namespace Tesserafin.Controller.Entities
         {
             if (user is null)
             {
-                return _libraryManager.RootFolder
+                return _reads.LibraryRoot.GetRootFolder()
                     .Children
                     .OfType<Folder>()
                     .Where(UserView.IsEligibleForGrouping);
             }
 
-            return GetChildren(_libraryManager.GetUserRootFolder(), user)
+            return GetChildren(_reads.UserRoot.GetUserRootFolder(), user)
                 .OfType<Folder>()
                 .Where(i => user.IsFolderGrouped(i.Id) && UserView.IsEligibleForGrouping(i));
         }
