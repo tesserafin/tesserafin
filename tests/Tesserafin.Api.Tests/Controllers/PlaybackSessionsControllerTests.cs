@@ -225,18 +225,17 @@ public class PlaybackSessionsControllerTests
     }
 
     /// <summary>
-    /// Consolidation step 1 (docs/playback-path-inventory.md §7): every library video is offered to
-    /// the local video planner, and so reaches the engine; a channel-plugin item and a Live TV
-    /// recording still being written are not, and go to the existing chain unchanged.
+    /// Library and channel-plugin videos reach the session planner. A Live TV recording still
+    /// being written goes to the existing chain.
     /// </summary>
     /// <param name="kind">Which video the session is for.</param>
     /// <param name="offered">Whether the engine must be asked.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
     [Theory]
     [InlineData("library", true)]
-    [InlineData("channel", false)]
+    [InlineData("channel", true)]
     [InlineData("recording", false)]
-    public async Task CreatePlaybackSession_OffersOnlyLibraryVideosToTheLocalMediaPlanner(string kind, bool offered)
+    public async Task CreatePlaybackSession_OffersSupportedVideosToTheLocalMediaPlanner(string kind, bool offered)
     {
         const string MediaPath = "/media/home.mkv";
         var item = new Video { Id = _itemId, Path = MediaPath, ChannelId = kind == "channel" ? Guid.NewGuid() : Guid.Empty };
