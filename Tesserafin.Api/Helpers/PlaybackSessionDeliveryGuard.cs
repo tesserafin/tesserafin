@@ -131,8 +131,10 @@ public sealed class PlaybackSessionDeliveryGuard
                 return PlaybackSessionDelivery.NotFound;
             }
 
-            // A local file that is still there, or a remote file the executor reads from its url.
+            // A local file or disc folder that is still there, or a remote file the executor reads
+            // from its url.
             if (!(LocalMediaPlanner.IsLocalFileSource(source) && System.IO.File.Exists(source!.Path))
+                && !(LocalMediaPlanner.IsLocalDiscSource(source) && System.IO.Directory.Exists(source!.Path))
                 && !LocalMediaPlanner.IsSeekableRemoteSource(source))
             {
                 return PlaybackSessionDelivery.NotFound;
