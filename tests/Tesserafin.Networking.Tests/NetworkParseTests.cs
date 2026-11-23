@@ -55,10 +55,8 @@ namespace Tesserafin.Networking.Tests
                 LocalNetworkSubnets = lan?.Split(';') ?? throw new ArgumentNullException(nameof(lan))
             };
 
-            NetworkManager.MockNetworkSettings = interfaces;
             var startupConf = new Mock<IConfiguration>();
-            using var nm = new NetworkManager(NetworkParseTests.GetMockConfig(conf), startupConf.Object, new NullLogger<NetworkManager>());
-            NetworkManager.MockNetworkSettings = string.Empty;
+            using var nm = new NetworkManager(NetworkParseTests.GetMockConfig(conf), startupConf.Object, new MockNetworkInterfaceSource(interfaces), new NullLogger<NetworkManager>());
 
             Assert.Equal(value, "[" + string.Join(",", nm.GetInternalBindAddresses().Select(x => x.Address + "/" + x.Subnet.PrefixLength)) + "]");
         }
@@ -296,10 +294,8 @@ namespace Tesserafin.Networking.Tests
                 EnableIPv4 = true
             };
 
-            NetworkManager.MockNetworkSettings = "192.168.1.208/24,-16,eth16|200.200.200.200/24,11,eth11";
             var startupConf = new Mock<IConfiguration>();
-            using var nm = new NetworkManager(NetworkParseTests.GetMockConfig(conf), startupConf.Object, new NullLogger<NetworkManager>());
-            NetworkManager.MockNetworkSettings = string.Empty;
+            using var nm = new NetworkManager(NetworkParseTests.GetMockConfig(conf), startupConf.Object, new MockNetworkInterfaceSource("192.168.1.208/24,-16,eth16|200.200.200.200/24,11,eth11"), new NullLogger<NetworkManager>());
 
             // Check to see if DNS resolution is working. If not, skip test.
             if (!NetworkUtils.TryParseHost(source, out var host))
@@ -362,10 +358,8 @@ namespace Tesserafin.Networking.Tests
                 PublishedServerUriBySubnet = new string[] { publishedServers }
             };
 
-            NetworkManager.MockNetworkSettings = "192.168.1.208/24,-16,eth16|200.200.200.200/24,11,eth11";
             var startupConf = new Mock<IConfiguration>();
-            using var nm = new NetworkManager(NetworkParseTests.GetMockConfig(conf), startupConf.Object, new NullLogger<NetworkManager>());
-            NetworkManager.MockNetworkSettings = string.Empty;
+            using var nm = new NetworkManager(NetworkParseTests.GetMockConfig(conf), startupConf.Object, new MockNetworkInterfaceSource("192.168.1.208/24,-16,eth16|200.200.200.200/24,11,eth11"), new NullLogger<NetworkManager>());
 
             if (nm.TryParseInterface(result, out IReadOnlyList<IPData>? resultObj) && resultObj is not null)
             {
@@ -459,9 +453,8 @@ namespace Tesserafin.Networking.Tests
                 LocalNetworkAddresses = bind.Split(',')
             };
 
-            NetworkManager.MockNetworkSettings = interfaces;
             var startupConf = new Mock<IConfiguration>();
-            using var nm = new NetworkManager(NetworkParseTests.GetMockConfig(conf), startupConf.Object, new NullLogger<NetworkManager>());
+            using var nm = new NetworkManager(NetworkParseTests.GetMockConfig(conf), startupConf.Object, new MockNetworkInterfaceSource(interfaces), new NullLogger<NetworkManager>());
 
             var interfaceToUse = nm.GetBindAddress(string.Empty, out _);
 
@@ -486,9 +479,8 @@ namespace Tesserafin.Networking.Tests
                 LocalNetworkAddresses = bind.Split(',')
             };
 
-            NetworkManager.MockNetworkSettings = interfaces;
             var startupConf = new Mock<IConfiguration>();
-            using var nm = new NetworkManager(NetworkParseTests.GetMockConfig(conf), startupConf.Object, new NullLogger<NetworkManager>());
+            using var nm = new NetworkManager(NetworkParseTests.GetMockConfig(conf), startupConf.Object, new MockNetworkInterfaceSource(interfaces), new NullLogger<NetworkManager>());
 
             var interfaceToUse = nm.GetBindAddress(source, out _);
 

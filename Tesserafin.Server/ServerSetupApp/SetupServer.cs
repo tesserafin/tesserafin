@@ -118,9 +118,9 @@ public sealed class SetupServer : IDisposable
                         webHostBuilder
                                 .UseKestrel((builderContext, options) =>
                                 {
-                                    var knownBindInterfaces = NetworkManager.GetInterfacesCore(_loggerFactory.CreateLogger<SetupServer>(), config.EnableIPv4, config.EnableIPv6);
-                                    knownBindInterfaces = NetworkManager.FilterBindSettings(config, knownBindInterfaces.ToList(), config.EnableIPv4, config.EnableIPv6);
-                                    var bindInterfaces = NetworkManager.GetAllBindInterfaces(_loggerFactory.CreateLogger<NetworkManager>(), false, _configurationManager, knownBindInterfaces, config.EnableIPv4, config.EnableIPv6);
+                                    var setupLogger = _loggerFactory.CreateLogger<SetupServer>();
+                                    var knownInterfaces = new SystemNetworkInterfaceSource(setupLogger).GetInterfaces(config.EnableIPv4, config.EnableIPv6);
+                                    var bindInterfaces = NetworkTopology.GetListenInterfaces(config, knownInterfaces, setupLogger);
                                     Extensions.WebHostBuilderExtensions.SetupTesserafinWebServer(
                                         bindInterfaces,
                                         config.InternalHttpPort,

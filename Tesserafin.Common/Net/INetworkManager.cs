@@ -14,11 +14,6 @@ namespace Tesserafin.Common.Net
     public interface INetworkManager
     {
         /// <summary>
-        /// Event triggered on network changes.
-        /// </summary>
-        event EventHandler NetworkChanged;
-
-        /// <summary>
         /// Gets a value indicating whether IPv4 is enabled.
         /// </summary>
         bool IsIPv4Enabled { get; }
