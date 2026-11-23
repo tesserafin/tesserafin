@@ -94,7 +94,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 
             foreach (var season in seasons)
             {
-                var hasUpdate = refreshOptions is not null && season.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, ItemNamingService, _lookup);
+                var hasUpdate = refreshOptions is not null && season.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, RefreshServices, _lookup);
                 if (hasUpdate)
                 {
                     await season.UpdateToRepositoryAsync(Writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
@@ -456,7 +456,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             SeriesPresentationUniqueKey = series.PresentationUniqueKey ?? CreatePresentationUniqueKey(series)
         };
 
-        series.AddChild(Writes, season);
+        Writes.CreateChild(series, season);
         await season.RefreshMetadata(_deletions, Writes, ProviderManager, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken).ConfigureAwait(false);
 
         return season;

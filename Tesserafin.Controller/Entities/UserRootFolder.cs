@@ -89,7 +89,7 @@ namespace Tesserafin.Controller.Entities
                     return list;
                 }
 
-                return _childrenIds.Select(lookup.GetItemById).Where(i => i is not null).ToList();
+                return _childrenIds.Select(id => lookup is null ? GetRelatedItem(id) : lookup.GetItemById(id)).Where(i => i is not null).ToList();
             }
         }
 
@@ -112,9 +112,7 @@ namespace Tesserafin.Controller.Entities
                 PresetViews = query.PresetViews
             });
 
-#pragma warning disable CS0618
-            return UserViewBuilder.SortAndPage(result, null, query, LibraryManager);
-#pragma warning restore CS0618
+            return UserViewBuilder.SortAndPage(result, null, query, GetListingServices(query)?.Sort);
         }
 
         protected override QueryResult<BaseItem> GetItemsInternal(InternalItemsQuery query, IChannelManager channelManager, ICollectionManager collectionManager, IUserViewManager userViewManager, ITVSeriesManager tvSeriesManager, IItemSortService itemSortService)
@@ -142,15 +140,15 @@ namespace Tesserafin.Controller.Entities
         protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user, InternalItemsQuery query)
         {
             var list = base.GetEligibleChildrenForRecursiveChildren(user, query).ToList();
-            list.AddRange(LibraryManager.RootFolder.VirtualChildren);
+            list.AddRange(GetListingServices(query).LibraryRoot.GetRootFolder().VirtualChildren);
 
             return list;
         }
 
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
             ClearCache();
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, services);
 
             if (string.Equals("default", Name, StringComparison.OrdinalIgnoreCase))
             {

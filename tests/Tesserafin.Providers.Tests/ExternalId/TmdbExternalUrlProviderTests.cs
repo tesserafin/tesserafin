@@ -10,24 +10,10 @@ using Xunit;
 
 namespace Tesserafin.Providers.Tests.ExternalId
 {
-    // put tests that mock the static LibraryManager in the same collection to avoid test interference
-    [Collection("LibraryManagerTests")]
-    public sealed class TmdbExternalUrlProviderTests : IDisposable
+    public sealed class TmdbExternalUrlProviderTests
     {
         private readonly TmdbExternalUrlProvider _provider = new();
-        private readonly Mock<ILibraryManager> _libraryManagerMock = new();
-        private readonly ILibraryManager? _previousLibraryManager;
-
-        public TmdbExternalUrlProviderTests()
-        {
-            _previousLibraryManager = BaseItem.LibraryManager;
-            BaseItem.LibraryManager = _libraryManagerMock.Object;
-        }
-
-        public void Dispose()
-        {
-            BaseItem.LibraryManager = _previousLibraryManager;
-        }
+        private readonly Mock<IItemReadServices> _reads = new();
 
         [Fact]
         public void GetExternalUrls_SeriesWithTmdbId_ReturnsCorrectUrl()
@@ -56,8 +42,8 @@ namespace Tesserafin.Providers.Tests.ExternalId
             var series = new Series { Id = Guid.NewGuid() };
             series.SetProviderId(MetadataProvider.Tmdb, "1399");
 
-            var season = new Season { IndexNumber = 3, SeriesId = series.Id };
-            _libraryManagerMock.Setup(m => m.GetItemById(series.Id)).Returns(series);
+            var season = new Season { IndexNumber = 3, SeriesId = series.Id, ReadServices = _reads.Object };
+            _reads.Setup(m => m.GetItemById(series.Id)).Returns(series);
 
             var urls = _provider.GetExternalUrls(season);
 
@@ -68,8 +54,8 @@ namespace Tesserafin.Providers.Tests.ExternalId
         public void GetExternalUrls_SeasonWithNoSeriesTmdbId_ReturnsNoUrl()
         {
             var series = new Series { Id = Guid.NewGuid() };
-            var season = new Season { IndexNumber = 1, SeriesId = series.Id };
-            _libraryManagerMock.Setup(m => m.GetItemById(series.Id)).Returns(series);
+            var season = new Season { IndexNumber = 1, SeriesId = series.Id, ReadServices = _reads.Object };
+            _reads.Setup(m => m.GetItemById(series.Id)).Returns(series);
 
             var urls = _provider.GetExternalUrls(season);
 
@@ -81,8 +67,8 @@ namespace Tesserafin.Providers.Tests.ExternalId
         {
             var series = new Series { Id = Guid.NewGuid() };
             series.SetProviderId(MetadataProvider.Tmdb, "1399");
-            var season = new Season { IndexNumber = null, SeriesId = series.Id };
-            _libraryManagerMock.Setup(m => m.GetItemById(series.Id)).Returns(series);
+            var season = new Season { IndexNumber = null, SeriesId = series.Id, ReadServices = _reads.Object };
+            _reads.Setup(m => m.GetItemById(series.Id)).Returns(series);
 
             var urls = _provider.GetExternalUrls(season);
 
@@ -95,17 +81,18 @@ namespace Tesserafin.Providers.Tests.ExternalId
             var series = new Series { Id = Guid.NewGuid() };
             series.SetProviderId(MetadataProvider.Tmdb, "1399");
 
-            var season = new Season { Id = Guid.NewGuid(), IndexNumber = 2, SeriesId = series.Id };
+            var season = new Season { Id = Guid.NewGuid(), IndexNumber = 2, SeriesId = series.Id, ReadServices = _reads.Object };
 
             var episode = new Episode
             {
                 IndexNumber = 5,
                 SeasonId = season.Id,
-                SeriesId = series.Id
+                SeriesId = series.Id,
+                ReadServices = _reads.Object
             };
 
-            _libraryManagerMock.Setup(m => m.GetItemById(series.Id)).Returns(series);
-            _libraryManagerMock.Setup(m => m.GetItemById(season.Id)).Returns(season);
+            _reads.Setup(m => m.GetItemById(series.Id)).Returns(series);
+            _reads.Setup(m => m.GetItemById(season.Id)).Returns(season);
 
             var urls = _provider.GetExternalUrls(episode);
 
@@ -116,11 +103,11 @@ namespace Tesserafin.Providers.Tests.ExternalId
         public void GetExternalUrls_EpisodeWithNoSeriesTmdbId_ReturnsNoUrl()
         {
             var series = new Series { Id = Guid.NewGuid() };
-            var season = new Season { Id = Guid.NewGuid(), IndexNumber = 1, SeriesId = series.Id };
-            var episode = new Episode { IndexNumber = 1, SeasonId = season.Id, SeriesId = series.Id };
+            var season = new Season { Id = Guid.NewGuid(), IndexNumber = 1, SeriesId = series.Id, ReadServices = _reads.Object };
+            var episode = new Episode { IndexNumber = 1, SeasonId = season.Id, SeriesId = series.Id, ReadServices = _reads.Object };
 
-            _libraryManagerMock.Setup(m => m.GetItemById(series.Id)).Returns(series);
-            _libraryManagerMock.Setup(m => m.GetItemById(season.Id)).Returns(season);
+            _reads.Setup(m => m.GetItemById(series.Id)).Returns(series);
+            _reads.Setup(m => m.GetItemById(season.Id)).Returns(season);
 
             var urls = _provider.GetExternalUrls(episode);
 

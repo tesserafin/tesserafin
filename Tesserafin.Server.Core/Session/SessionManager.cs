@@ -1511,7 +1511,7 @@ namespace Tesserafin.Server.Core.Session
 
             if (item is IItemByName byName)
             {
-                return byName.GetTaggedItems(new InternalItemsQuery(user)
+                var query = new InternalItemsQuery(user)
                 {
                     IsFolder = false,
                     Recursive = true,
@@ -1525,7 +1525,9 @@ namespace Tesserafin.Server.Core.Session
                     },
                     IsVirtualItem = false,
                     OrderBy = new[] { (ItemSortBy.SortName, SortOrder.Ascending) }
-                });
+                };
+
+                return byName.TryApplyTaggedItemsFilter(query) ? _itemQueryService.GetItemList(query) : [];
             }
 
             if (item.IsFolder)

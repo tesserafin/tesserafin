@@ -30,7 +30,7 @@ public sealed class OwnedExtrasCommandsTests
     [Fact]
     public async Task Refresh_ReconcilesBonusIds_LeavesAlternateVersionsAndSources_AndRefreshesDetachedCopiesOnce()
     {
-        using var context = new Context();
+        var context = new Context();
         var extra = new Video { Id = Guid.NewGuid(), Name = "new bonus", ExtraType = ExtraType.Trailer, ParentId = Guid.NewGuid() };
         var removed = new Video { Id = Guid.NewGuid(), OwnerId = context.Owner.Id, ExtraType = ExtraType.Clip };
         var alternate = new Video { Id = Guid.NewGuid(), OwnerId = context.Owner.Id };
@@ -57,7 +57,7 @@ public sealed class OwnedExtrasCommandsTests
     [Fact]
     public async Task UnchangedExtras_WithOwnedAlternateVersions_DoNotRefreshOrDelete()
     {
-        using var context = new Context();
+        var context = new Context();
         var extra = new Video { Id = Guid.NewGuid(), OwnerId = context.Owner.Id, ExtraType = ExtraType.Trailer };
         context.Candidates = [extra];
         context.Owned = [extra, new Video { Id = Guid.NewGuid(), OwnerId = context.Owner.Id }];
@@ -73,7 +73,7 @@ public sealed class OwnedExtrasCommandsTests
     [InlineData(true)]
     public async Task OwnedMetadata_InheritsOnlyWhenRequested_AndDoesNotMutateCallerOptions(bool inherit)
     {
-        using var context = new Context();
+        var context = new Context();
         var extra = new Video { Id = Guid.NewGuid(), Overview = "original" };
         var options = context.Options();
         options.SearchResult = new RemoteSearchResult { Name = "owner lookup" };
@@ -92,7 +92,7 @@ public sealed class OwnedExtrasCommandsTests
     [Fact]
     public async Task FailedRefresh_DoesNotPublishStagedOwnershipOrMetadataToTheOriginalCandidate()
     {
-        using var context = new Context();
+        var context = new Context();
         var extra = new Video { Id = Guid.NewGuid(), ExtraType = ExtraType.Trailer, Overview = "saved" };
         context.Candidates = [extra];
         context.Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>())).ThrowsAsync(new IOException("refresh failed"));
@@ -107,7 +107,7 @@ public sealed class OwnedExtrasCommandsTests
     [Fact]
     public async Task CancelledAdmission_DoesNotDiscoverReadDeleteOrRefresh()
     {
-        using var context = new Context();
+        var context = new Context();
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
@@ -122,7 +122,7 @@ public sealed class OwnedExtrasCommandsTests
     [Fact]
     public async Task CancellationDuringRefresh_DrainsAlreadyStartedWorkBeforePropagating()
     {
-        using var context = new Context();
+        var context = new Context();
         using var cancellation = new CancellationTokenSource();
         var first = new Video { Id = Guid.NewGuid(), ExtraType = ExtraType.Trailer };
         context.Candidates = [first, new Video { Id = Guid.NewGuid(), ExtraType = ExtraType.Clip }];
@@ -144,7 +144,7 @@ public sealed class OwnedExtrasCommandsTests
     [Fact]
     public async Task EntityRefresh_PropagatesOwnedRefreshCancellation_WithoutRefreshingTheOwner()
     {
-        using var context = new Context();
+        var context = new Context();
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
         var owner = new CancelledOwner { Path = "/Owner.mkv" };
@@ -174,10 +174,8 @@ public sealed class OwnedExtrasCommandsTests
             => Task.FromCanceled<bool>(cancellationToken);
     }
 
-    private sealed class Context : IDisposable
+    private sealed class Context
     {
-        private readonly ILibraryManager _previousManager = BaseItem.LibraryManager;
-
         public Context()
         {
             var configuration = new Mock<IServerConfigurationManager>();
@@ -187,8 +185,7 @@ public sealed class OwnedExtrasCommandsTests
             Repository.Setup(r => r.GetItemList(It.IsAny<InternalItemsQuery>())).Returns(() => Owned);
             Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>()))
                 .Callback((BaseItem item, MetadataRefreshOptions options, CancellationToken _) => Refreshed.Add((item, options))).ReturnsAsync(ItemUpdateType.MetadataEdit);
-            BaseItem.LibraryManager = new Mock<ILibraryManager>(MockBehavior.Strict).Object;
-            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, Mock.Of<ILibraryItemOptions>(), lookup, Mock.Of<ILinkedChildrenService>()), Mock.Of<IItemPersistenceService>(), lookup, lookup, Mock.Of<ILinkedChildrenService>(), Mock.Of<IItemMetadataExporter>(), Mock.Of<IFileSystem>(), Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(configuration.Object, Mock.Of<IFileSystem>()), Resolution.Object, Repository.Object, Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(lookup, Mock.Of<IFileSystem>(), NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
+            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, Mock.Of<ILibraryItemOptions>(), lookup, Mock.Of<ILinkedChildrenService>()), Mock.Of<IItemPersistenceService>(), lookup, lookup, Mock.Of<ILinkedChildrenService>(), Mock.Of<IItemMetadataExporter>(), Mock.Of<IFileSystem>(), Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(configuration.Object, Mock.Of<IFileSystem>()), Resolution.Object, Repository.Object, Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(lookup, NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), Mock.Of<IItemStore>(), NullLogger<ItemWriteCommands>.Instance);
         }
 
         public Movie Owner { get; } = new() { Id = Guid.NewGuid(), Genres = ["genre"], Studios = ["studio"], Overview = "owner overview" };
@@ -210,10 +207,5 @@ public sealed class OwnedExtrasCommandsTests
         public ItemWriteCommands Commands { get; }
 
         public MetadataRefreshOptions Options() => new(Mock.Of<IDirectoryService>());
-
-        public void Dispose()
-        {
-            BaseItem.LibraryManager = _previousManager;
-        }
     }
 }

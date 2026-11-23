@@ -169,7 +169,7 @@ namespace Tesserafin.Server.Core.Playlists
                 };
 
                 playlist.SetMediaType(request.MediaType);
-                parentFolder.AddChild(_writes, playlist);
+                _writes.CreateChild(parentFolder, playlist);
 
                 await playlist.RefreshMetadata(_deletions, _writes, _providerManager, new MetadataRefreshOptions(new DirectoryService(_fileSystem)) { ForceSave = true }, CancellationToken.None)
                     .ConfigureAwait(false);

@@ -65,6 +65,7 @@ namespace Tesserafin.Providers.Manager
         private readonly IServerApplicationPaths _appPaths;
         private readonly ILibraryItemOptions _itemOptions;
         private readonly IItemRepository _itemRepository;
+        private readonly IItemReadServices _itemReads;
         private readonly IItemLookupService _itemLookup;
         private readonly ILibraryScanCoordinator _scans;
         private readonly ISubtitleManager _subtitleManager;
@@ -116,6 +117,7 @@ namespace Tesserafin.Providers.Manager
         /// <param name="remoteImages">The image-only HTTP source.</param>
         /// <param name="mediaSegmentManager">The media segment manager.</param>
         /// <param name="similarItemsManager">The similar items manager.</param>
+        /// <param name="itemReads">The catalogue context for an item entering metadata refresh.</param>
         public ProviderManager(
             IItemWriteCommands writes,
             IItemMetadataExporter metadataExporter,
@@ -138,7 +140,8 @@ namespace Tesserafin.Providers.Manager
             ILyricManager lyricManager,
             IRemoteImageSource remoteImages,
             IMediaSegmentManager mediaSegmentManager,
-            ISimilarItemsManager similarItemsManager)
+            ISimilarItemsManager similarItemsManager,
+            IItemReadServices itemReads)
         {
             _validation = validation;
             _writes = writes;
@@ -153,6 +156,7 @@ namespace Tesserafin.Providers.Manager
             _appPaths = appPaths;
             _itemOptions = itemOptions;
             _itemRepository = itemRepository;
+            _itemReads = itemReads;
             _itemLookup = itemLookup;
             _scans = scans;
             _subtitleManager = subtitleManager;
@@ -181,8 +185,14 @@ namespace Tesserafin.Providers.Manager
         }
 
         /// <inheritdoc/>
+        public void ReportOwnedItemRefreshFailure(BaseItem item, Exception exception)
+            => _logger.LogError(exception, "Error refreshing owned items for {Path}", item.Path ?? item.Name);
+
+        /// <inheritdoc />
         public async Task<ItemUpdateType> RefreshSingleItem(BaseItem item, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
+            item.ReadServices ??= _itemReads;
+
             if (item.ImageInfos.Length > 0)
             {
                 var images = await _images.PrepareRefreshAsync(item, false, true, cancellationToken).ConfigureAwait(false);

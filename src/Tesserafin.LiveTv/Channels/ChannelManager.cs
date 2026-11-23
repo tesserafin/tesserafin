@@ -1133,7 +1133,7 @@ namespace Tesserafin.LiveTv.Channels
                 item.Path = mediaSource?.Path;
             }
 
-            if (LiveTvChannelImageHelper.UpdateChannelImageIfNeeded(item, null, info.ImageUrl))
+            if (LiveTvChannelImageHelper.UpdateChannelImageIfNeeded(item, null, info.ImageUrl, _fileSystem))
             {
                 _logger.LogDebug("Forcing update due to ImageUrl {0}", item.Name);
                 forceUpdate = true;

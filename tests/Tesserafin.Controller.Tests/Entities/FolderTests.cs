@@ -39,8 +39,6 @@ public class FolderTests
         var child2 = new Movie { Id = Guid.NewGuid() };
         folder.Children = new BaseItem[] { child1, child2 };
 
-        BaseItem.LibraryManager = new Mock<ILibraryManager>().Object;
-
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
 
         var result = folder.GetItems(new InternalItemsQuery { Visibility = PermissiveVisibility.Scope }, channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
@@ -84,8 +82,6 @@ public class FolderTests
         var child = new Movie { Id = Guid.NewGuid() };
         folder.Children = new BaseItem[] { child };
 
-        BaseItem.LibraryManager = new Mock<ILibraryManager>().Object;
-
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
 
         var result = folder.GetItemList(new InternalItemsQuery { Visibility = PermissiveVisibility.Scope }, channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
@@ -106,8 +102,6 @@ public class FolderTests
         folder.Children = new BaseItem[] { child };
 
         var user = new User("test-user", "provider", "provider");
-
-        BaseItem.LibraryManager = new Mock<ILibraryManager>().Object;
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
 
@@ -137,7 +131,6 @@ public class FolderTests
             .Returns(new UserItemData { Key = "played", IsFavorite = true, Played = true });
         userData.Setup(manager => manager.GetUserData(user, unplayedFavorite))
             .Returns(new UserItemData { Key = "unplayed", IsFavorite = true });
-        BaseItem.LibraryManager = Mock.Of<ILibraryManager>();
 
         var query = new InternalItemsQuery
         {
@@ -166,12 +159,7 @@ public class FolderTests
 
         var user = new User("test-user", "provider", "provider");
 
-        BaseItem.LibraryManager = new Mock<ILibraryManager>().Object;
-        BaseItem.ConfigurationManager = Mock.Of<IServerConfigurationManager>(x => x.Configuration == new ServerConfiguration
-        {
-            EnableGroupingMoviesIntoCollections = true,
-            EnableGroupingShowsIntoCollections = true,
-        });
+        var visibility = PermissiveVisibility.Create((true, true));
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
         collectionManager
@@ -181,7 +169,7 @@ public class FolderTests
         // Explicit CollapseBoxSetItems = true, both grouping settings enabled: PostFilterAndSort
         // must route through CollapseBoxSetItemsIfNeeded -> collectionManager.CollapseItemsWithinBoxSets,
         // the branch left uncovered by PR15 (cf. plan doc, point 1 "reste du point 1").
-        var query = new InternalItemsQuery { Visibility = PermissiveVisibility.Scope, User = user, CollapseBoxSetItems = true };
+        var query = new InternalItemsQuery { Visibility = visibility, User = user, CollapseBoxSetItems = true };
 
         var result = folder.GetItems(query, channelManager.Object, collectionManager.Object, userViewManager.Object, tvSeriesManager.Object);
 
@@ -206,10 +194,7 @@ public class FolderTests
         var userView = new UserView { Id = Guid.NewGuid(), DisplayParentId = displayParent.Id };
         var channelItem = new Movie { Id = Guid.NewGuid() };
 
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(x => x.GetItemById(displayParent.Id)).Returns(displayParent);
-        BaseItem.LibraryManager = libraryManager.Object;
-        BaseItem.Logger = NullLogger<BaseItem>.Instance;
+        userView.ReadServices = Mock.Of<IItemReadServices>(reads => reads.GetItemById(displayParent.Id) == displayParent);
 
         var (channelManager, collectionManager, userViewManager, tvSeriesManager) = StrictManagers();
         channelManager

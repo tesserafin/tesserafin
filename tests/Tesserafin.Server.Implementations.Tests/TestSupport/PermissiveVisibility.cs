@@ -17,7 +17,7 @@ internal static class PermissiveVisibility
 
     public static InternalItemsQuery Query(User? user) => new(user) { Visibility = Scope };
 
-    private static IStandaloneVisibilityService Create()
+    public static IStandaloneVisibilityService Create((bool Movies, bool Shows) grouping = default)
     {
         var scope = new Mock<IStandaloneVisibilityService>();
         scope.Setup(s => s.IsVisibleViaTags(It.IsAny<BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())).Returns(true);
@@ -25,6 +25,7 @@ internal static class PermissiveVisibility
         scope.Setup(s => s.GetCollectionFolders(It.IsAny<BaseItem>())).Returns(Array.Empty<Folder>());
         scope.Setup(s => s.GetLibraryIds()).Returns(Array.Empty<Guid>());
         scope.Setup(s => s.GetLibraryOptions(It.IsAny<BaseItem>())).Returns(new LibraryOptions());
+        scope.Setup(s => s.GetCollectionGrouping()).Returns(grouping);
         return scope.Object;
     }
 }

@@ -16,7 +16,6 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
-using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Entities
 {
@@ -62,12 +61,6 @@ namespace Tesserafin.Controller.Entities
             return false;
         }
 
-        protected override FileSystemMetadata[] GetFileSystemChildren(IDirectoryService directoryService)
-        {
-            return ReadLibraryDirectory(directoryService, true).Entries
-                ?? throw new DirectoryNotFoundException($"Cannot read library directory {ContainingFolderPath}.");
-        }
-
         protected override IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
             lock (_childIdsLock)
@@ -79,7 +72,7 @@ namespace Tesserafin.Controller.Entities
                     return list;
                 }
 
-                return _childrenIds.Select(lookup.GetItemById).Where(i => i is not null).ToList();
+                return _childrenIds.Select(id => lookup is null ? GetRelatedItem(id) : lookup.GetItemById(id)).Where(i => i is not null).ToList();
             }
         }
 
@@ -91,15 +84,18 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        public override bool RequiresRefresh()
+        public override bool RequiresRefresh(MetadataRefreshServices services)
         {
-            var changed = base.RequiresRefresh() || _requiresRefresh;
+            var changed = base.RequiresRefresh(services) || _requiresRefresh;
 
             if (!changed)
             {
                 var locations = PhysicalLocations;
 
-                var newLocations = ReadLibraryDirectory(new DirectoryService(FileSystem), false).PhysicalLocations;
+                ClearCache();
+                var directory = services.FileSystem.GetDirectoryInfo(ContainingFolderPath);
+                var (_, newLocations) = FileData.ReadLibraryDirectory(directory, new DirectoryService(services.FileSystem), services.FileSystem, services.ApplicationPaths, services.Logger, physicalRoot: true);
+                _requiresRefresh = _requiresRefresh || !newLocations.SequenceEqual(locations);
 
                 if (!locations.SequenceEqual(newLocations))
                 {
@@ -110,33 +106,28 @@ namespace Tesserafin.Controller.Entities
             return changed;
         }
 
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
             ClearCache();
 
-            var changed = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService) || _requiresRefresh;
+            var changed = base.BeforeMetadataRefresh(replaceAllMetadata, services) || _requiresRefresh;
             _requiresRefresh = false;
             return changed;
         }
 
-        private (FileSystemMetadata[] Entries, string[] PhysicalLocations) ReadLibraryDirectory(IDirectoryService directoryService, bool setPhysicalLocations)
+        protected override IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             ClearCache();
 
-            var directory = FileSystem.GetDirectoryInfo(ContainingFolderPath);
-            var discovery = FileData.ReadLibraryDirectory(directory, directoryService, FileSystem, ConfigurationManager.ApplicationPaths, Logger, physicalRoot: true);
-            _requiresRefresh = _requiresRefresh || !discovery.PhysicalLocations.SequenceEqual(PhysicalLocations);
-            if (setPhysicalLocations)
-            {
-                PhysicalLocationsList = discovery.PhysicalLocations;
-            }
+            var (entries, locations) = resolution.DiscoverPhysicalRoot(this, directoryService);
+            _requiresRefresh = _requiresRefresh || !locations.SequenceEqual(PhysicalLocations);
+            PhysicalLocationsList = locations;
 
-            return discovery;
-        }
-
-        protected override IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
-        {
-            return base.GetNonCachedChildren(resolution, directoryService, cancellationToken).Concat(_virtualChildren);
+            return resolution.ResolveFolderChildren(
+                this,
+                entries ?? throw new DirectoryNotFoundException($"Cannot read library directory {ContainingFolderPath}."),
+                directoryService,
+                cancellationToken).Concat(_virtualChildren);
         }
 
         protected override async Task ValidateChildrenInternal(IFolderValidationServices services, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)

@@ -32,7 +32,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library.LibraryManager;
 /// skipped), then the library restriction - blocked libraries when the user has any, otherwise all
 /// libraries or the enabled ones - applied to the libraries the item belongs to, unless the top parent
 /// has no path or the item belongs to no library. Every expectation is hand-derived and was green on
-/// the unmodified entities, read through the static <see cref="BaseItem.LibraryManager"/>; each
+/// the unmodified entities, read through the static <c>BaseItem.LibraryManager</c>; each
 /// decision is taken both through <see cref="IItemAccessService.GetVisibleItemById{T}"/> and through
 /// the static-backed <see cref="_access.IsVisibleStandalone(BaseItem, User)"/>, and the two must agree.
 /// </summary>
@@ -100,18 +100,19 @@ public sealed class StandaloneVisibilityTests
         var localization = new Mock<ILocalizationManager>();
         localization.Setup(l => l.GetRatingScore(It.IsAny<string>(), It.IsAny<string?>()))
             .Returns((string rating, string? country) => _scores?.GetRatingScore(rating, country)!);
-        _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, localization.Object, configuration.Object, _activeRecordings, libraryOptions));
+        _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, localization.Object, configuration.Object, _activeRecordings, libraryOptions, Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.TagVisibilityService>.Instance));
 
-        BaseItem.LibraryManager = manager;
         _repository = repository;
-        _readServices = new Tesserafin.Server.Implementations.Item.ItemReadServices(repository.Object, _activeRecordings);
-        BaseItem.ConfigurationManager = configuration.Object;
-        // The static answers from the same recordings as the service (Record).
-
-        var fileSystem = new Mock<Tesserafin.Model.IO.IFileSystem>();
-        fileSystem.Setup(f => f.ContainsSubPath(It.IsAny<string>(), It.IsAny<string>()))
-            .Returns((string parent, string path) => path.StartsWith(parent + "/", StringComparison.Ordinal));
-        BaseItem.FileSystem = fileSystem.Object;
+        _readServices = new Tesserafin.Server.Implementations.Item.ItemReadServices(
+            new(() => repository.Object),
+            _activeRecordings,
+            new(() => new LinkedChildResolver(repository.Object, lookup, Mock.Of<IItemPathLookupService>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<LinkedChildResolver>.Instance)),
+            configuration.Object,
+            new(() => lookup),
+            new(() => Mock.Of<ILinkedChildrenService>()),
+            new(() => resolver),
+            new(() => libraryOptions),
+            new());
     }
 
     [Fact]
@@ -409,7 +410,6 @@ public sealed class StandaloneVisibilityTests
 
         // Control: the static-backed path reads the throwing static.
         Assert.Equal(expected, users.Select(u => _access.IsVisibleStandalone(saga, u)));
-        ThrowingStatic();
 
         Assert.Equal(expected, users.Select(u => _access.GetVisibleItemById<BaseItem>(saga.Id, u) is not null));
     }
@@ -428,7 +428,6 @@ public sealed class StandaloneVisibilityTests
         Assert.True(_access.IsVisibleStandalone(saga, teen));
         movies.PreferredMetadataCountryCode = "FR";
         Assert.False(_access.IsVisibleStandalone(saga, teen));
-        ThrowingStatic();
 
         Assert.Null(_access.GetVisibleItemById<BaseItem>(saga.Id, teen));
         movies.PreferredMetadataCountryCode = null;
@@ -439,7 +438,7 @@ public sealed class StandaloneVisibilityTests
         // library options (none here), then the server's code (DEBT-SERVER-7).
         _items[saga.ParentId].PreferredMetadataCountryCode = null;
         Assert.NotNull(_access.GetVisibleItemById<BaseItem>(saga.Id, teen));
-        BaseItem.ConfigurationManager.Configuration.MetadataCountryCode = "FR";
+        _configuration.Configuration.MetadataCountryCode = "FR";
         Assert.Null(_access.GetVisibleItemById<BaseItem>(saga.Id, teen));
     }
 
@@ -449,7 +448,7 @@ public sealed class StandaloneVisibilityTests
         var movies = AddLibrary("Movies", "/media/movies");
         var vault = AddLibrary("Vault", "/media/vault", "/media/movies");
         var saga = MovieIn(movies);
-        Assert.Equal([movies, vault], BaseItem.LibraryManager.GetCollectionFolders(saga));
+        Assert.Equal([movies, vault], _manager.GetCollectionFolders(saga));
         Scores(l =>
             l.GetRatingScore("R", "FR") == new ParentalRatingScore(18, null)
             && l.GetRatingScore("R", "DE") == new ParentalRatingScore(18, null)
@@ -468,9 +467,9 @@ public sealed class StandaloneVisibilityTests
         moviesOptions.MetadataCountryCode = "FR";
         AssertVisible(saga, teen, false);
         moviesOptions.MetadataCountryCode = null;
-        BaseItem.ConfigurationManager.Configuration.MetadataCountryCode = "FR";
+        _configuration.Configuration.MetadataCountryCode = "FR";
         AssertVisible(saga, teen, false);
-        BaseItem.ConfigurationManager.Configuration.MetadataCountryCode = "US";
+        _configuration.Configuration.MetadataCountryCode = "US";
 
         // A library requested directly reads its own options, even outside the user root.
         movies.OfficialRating = "R";
@@ -479,7 +478,7 @@ public sealed class StandaloneVisibilityTests
         AssertVisible(movies, teen, false);
         var orphan = Add(new CollectionFolder { Path = "/config/root/Orphan", PhysicalLocationsList = ["/media/orphan"], OfficialRating = "R" });
         _options[System.IO.Path.Combine(orphan.Path, "options.xml")] = new LibraryOptions { MetadataCountryCode = "FR" };
-        Assert.Empty(BaseItem.LibraryManager.GetCollectionFolders(orphan));
+        Assert.Empty(_manager.GetCollectionFolders(orphan));
         AssertVisible(orphan, teen, false);
     }
 
@@ -492,7 +491,6 @@ public sealed class StandaloneVisibilityTests
             l.GetRatingScore("R", "US") == new ParentalRatingScore(17, null)
             && l.GetRatingScore("R", "FR") == new ParentalRatingScore(12, null)
             && l.GetRatingScore("TV-14", "US") == new ParentalRatingScore(14, 2));
-        BaseItem.Logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<BaseItem>.Instance;
         var teen = User(all: true);
         teen.MaxParentalRatingScore = 14;
         teen.MaxParentalRatingSubScore = 1;
@@ -505,9 +503,9 @@ public sealed class StandaloneVisibilityTests
         movie.OfficialRating = "R";
         AssertVisible(movie, teen, false);
         AssertVisible(movie, unrestricted, true);
-        BaseItem.ConfigurationManager.Configuration.MetadataCountryCode = "FR";
+        _configuration.Configuration.MetadataCountryCode = "FR";
         AssertVisible(movie, teen, true);
-        BaseItem.ConfigurationManager.Configuration.MetadataCountryCode = "US";
+        _configuration.Configuration.MetadataCountryCode = "US";
 
         // The custom rating comes before the official one; on an equal score the sub-score decides.
         movie.CustomRating = "TV-14";
@@ -544,7 +542,6 @@ public sealed class StandaloneVisibilityTests
             l.GetRatingScore("R", "US") == new ParentalRatingScore(17, null)
             && l.GetRatingScore("R", "FR") == new ParentalRatingScore(12, null)
             && l.GetRatingScore("TV-14", "US") == new ParentalRatingScore(14, 2));
-        BaseItem.Logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<BaseItem>.Instance;
         var users = new[] { User(all: true), User(all: true), User(all: true), User(all: true) };
         users[0].MaxParentalRatingScore = 14;
         users[0].MaxParentalRatingSubScore = 1;
@@ -581,8 +578,6 @@ public sealed class StandaloneVisibilityTests
         }
 
         // The three statics the check could read throw on any call.
-        ThrowingStatic();
-        BaseItem.ConfigurationManager = new Mock<IServerConfigurationManager>(MockBehavior.Strict).Object;
 
         foreach (var state in states)
         {
@@ -595,7 +590,6 @@ public sealed class StandaloneVisibilityTests
     public void AccessPath_SameProcess_RightsAndTagChangesApplyWithoutRebuildingAnything()
     {
         var (saga, movies, vault, _) = ProductionLikeGraph();
-        ThrowingStatic();
         var bea = User(enabled: [movies.Id]);
         var alex = User(all: true);
 
@@ -698,7 +692,6 @@ public sealed class StandaloneVisibilityTests
         boxSet.LinkedChildren = [new LinkedChild { ItemId = Guid.NewGuid() }];
 
         // The search by path logs the miss.
-        BaseItem.Logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<BaseItem>.Instance;
 
         AssertVisible(boxSet, User(enabled: [Sets().Id]), true);
         AssertVisible(boxSet, User(enabled: [movies.Id]), false);
@@ -834,7 +827,6 @@ public sealed class StandaloneVisibilityTests
         family.OfficialRating = "R";
         Assert.All(users, u => Assert.False(_access.IsVisibleStandalone(rated, u)));
         family.OfficialRating = "PG";
-        ThrowingStatic();
 
         Assert.Equal(expectedRated, Decisions(rated, users));
         Assert.Equal(expectedNested, Decisions(nested, users));
@@ -886,7 +878,6 @@ public sealed class StandaloneVisibilityTests
         // its rating; the children's libraries (Movies and Vault, Kids) decide, the hosting library first.
         var expected = new[] { true, false, false, true, true, true, true, false, true, false, false };
         Assert.Equal(expected, users.Select(Static));
-        ThrowingStatic();
 
         Assert.Equal(expected, users.Select(Access));
         Assert.Equal(family.Id, boxSet.LinkedChildren[0].ItemId);
@@ -903,7 +894,6 @@ public sealed class StandaloneVisibilityTests
     {
         var (saga, movies, _, kids) = ProductionLikeGraph();
         var boxSet = AddBoxSet(saga);
-        ThrowingStatic();
         var bea = User(enabled: [movies.Id]);
         var alex = User(all: true);
 
@@ -1056,8 +1046,6 @@ public sealed class StandaloneVisibilityTests
         Assert.Equal(expected, items.Select(i => users.Select(u => _access.IsVisibleStandalone(i, u)).ToArray()));
 
         // Every static the check could read throws on any call.
-        ThrowingStatic();
-        BaseItem.ConfigurationManager = new Mock<IServerConfigurationManager>(MockBehavior.Strict).Object;
 
         Assert.Equal(expected, items.Select(i => Decisions(i, users)));
 
@@ -1086,7 +1074,6 @@ public sealed class StandaloneVisibilityTests
         Assert.Equal(expected, users.Select(u => _access.IsVisibleStandalone(item, u)));
 
         // Both statics of the channel branch throw on any call: the channel lookup and the library manager.
-        ThrowingStatic();
 
         Assert.Equal(expected, Decisions(item, users));
         Assert.Equal(expected, Decisions(channel, users));
@@ -1105,9 +1092,6 @@ public sealed class StandaloneVisibilityTests
     {
         _repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.Path != null)))
             .Returns((InternalItemsQuery q) => _items.Values.Where(i => i.Path == q.Path).OrderByDescending(i => i.DateCreated).Take(1).ToList());
-        Mock.Get(BaseItem.FileSystem).Setup(f => f.MakeAbsolutePath(It.IsAny<string>(), It.IsAny<string>()))
-            .Returns((string folder, string file) => System.IO.Path.GetFullPath(file, folder));
-        BaseItem.Logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<BaseItem>.Instance;
     }
 
     private void Scores(System.Linq.Expressions.Expression<Func<ILocalizationManager, bool>> scores) =>
@@ -1177,8 +1161,6 @@ public sealed class StandaloneVisibilityTests
         User(all: true, allowedTags: ["other"], blockedTags: ["x"]),
         User(enabled: [movies.Id]),
     ];
-
-    private static void ThrowingStatic() => BaseItem.LibraryManager = new Mock<ILibraryManager>(MockBehavior.Strict).Object;
 
     private static User User(bool all = false, Guid[]? enabled = null, Guid[]? blocked = null, string[]? blockedTags = null, string[]? allowedTags = null)
     {

@@ -29,7 +29,7 @@ public sealed class OwnedVideosCommandsTests
     [Fact]
     public async Task Refresh_UsesTypedAlternatesAndGenericParts_OnceEach_WithoutSharingTitleMetadataOrOptions()
     {
-        using var context = new Context();
+        var context = new Context();
         var part = context.Candidate<Video>("/media/part.mkv");
         var alternate = context.Candidate<Movie>("/media/alternate.mkv");
         alternate.Overview = "alternate description";
@@ -68,7 +68,7 @@ public sealed class OwnedVideosCommandsTests
     [Fact]
     public async Task ExistingVersion_FailedRefreshLeavesPublishedOwnershipLinksAndPathsUntouched_ThenRetries()
     {
-        using var context = new Context();
+        var context = new Context();
         var alternate = context.Candidate<Movie>("/media/existing.mkv");
         context.Persisted[alternate.Id] = alternate;
         context.Cache.Register(alternate);
@@ -105,7 +105,7 @@ public sealed class OwnedVideosCommandsTests
     [InlineData(true)]
     public async Task ForeignOwnership_IsRejectedBeforeRefreshOrLinking(bool primaryOnly)
     {
-        using var context = new Context();
+        var context = new Context();
         var alternate = context.Candidate<Movie>("/media/foreign.mkv");
         if (primaryOnly)
         {
@@ -130,7 +130,7 @@ public sealed class OwnedVideosCommandsTests
     [Fact]
     public async Task ForeignGenericVersion_IsNotDeletedToMakeRoomForATypedAlternate()
     {
-        using var context = new Context();
+        var context = new Context();
         const string path = "/media/foreign-generic.mkv";
         var generic = context.Candidate<Video>(path);
         generic.OwnerId = Guid.NewGuid();
@@ -149,7 +149,7 @@ public sealed class OwnedVideosCommandsTests
     [InlineData(true)]
     public async Task SelfOwnership_IsRejectedBeforePersistence(bool part)
     {
-        using var context = new Context();
+        var context = new Context();
         if (part)
         {
             context.Owner.AdditionalParts = [context.Owner.Path];
@@ -169,7 +169,7 @@ public sealed class OwnedVideosCommandsTests
     [Fact]
     public async Task CreatedPart_FailedProviderRefreshDoesNotChangeItsAlreadyPublishedCreation()
     {
-        using var context = new Context();
+        var context = new Context();
         var part = context.Candidate<Video>("/media/new-part.mkv");
         context.Owner.AdditionalParts = [part.Path];
         context.Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>())).ThrowsAsync(new IOException("provider rejected"));
@@ -187,7 +187,7 @@ public sealed class OwnedVideosCommandsTests
     [Fact]
     public async Task MissingPart_RemovesOnlyItsOwnedCatalogueEntry()
     {
-        using var context = new Context();
+        var context = new Context();
         var part = context.Candidate<Video>("/media/gone.mkv");
         part.OwnerId = context.Owner.Id;
         context.Persisted[part.Id] = part;
@@ -204,7 +204,7 @@ public sealed class OwnedVideosCommandsTests
     [Fact]
     public async Task CancellationDuringParts_DrainsStartedRefresh_AndDoesNotPublishPrunedPaths()
     {
-        using var context = new Context();
+        var context = new Context();
         using var cancellation = new CancellationTokenSource();
         var first = context.Candidate<Video>("/media/first.mkv");
         var second = context.Candidate<Video>("/media/second.mkv");
@@ -232,7 +232,7 @@ public sealed class OwnedVideosCommandsTests
     [Fact]
     public async Task CancelledAdmission_DoesNotReadResolveRefreshOrWrite()
     {
-        using var context = new Context();
+        var context = new Context();
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
@@ -245,9 +245,8 @@ public sealed class OwnedVideosCommandsTests
         context.Persistence.VerifyNoOtherCalls();
     }
 
-    private sealed class Context : IDisposable
+    private sealed class Context
     {
-        private readonly ILibraryManager _previousManager = BaseItem.LibraryManager;
         private readonly Dictionary<(string Path, Type Type), Guid> _identities = [];
 
         public Context()
@@ -257,7 +256,6 @@ public sealed class OwnedVideosCommandsTests
             Repository.Setup(r => r.RetrieveItem(It.IsAny<Guid>())).Returns((Guid id) => Persisted.GetValueOrDefault(id)!);
             Lookup = new ItemLookupService(Repository.Object, configuration.Object);
             Cache = Lookup;
-            Files.Setup(f => f.IsPathFile(It.IsAny<string>())).Returns(true);
             Files.Setup(f => f.FileExists(It.IsAny<string>())).Returns(true);
             Files.Setup(f => f.AreEqual(It.IsAny<string>(), It.IsAny<string>())).Returns((string a, string b) => string.Equals(a, b, StringComparison.Ordinal));
             Resolution.Setup(r => r.GetNewItemId(It.IsAny<string>(), It.IsAny<Type>())).Returns((string path, Type type) =>
@@ -283,8 +281,7 @@ public sealed class OwnedVideosCommandsTests
                 });
             Provider.Setup(p => p.RefreshSingleItem(It.IsAny<BaseItem>(), It.IsAny<MetadataRefreshOptions>(), It.IsAny<CancellationToken>()))
                 .Callback((BaseItem item, MetadataRefreshOptions options, CancellationToken _) => Refreshed.Add(((Video)item, options))).ReturnsAsync(ItemUpdateType.None);
-            BaseItem.LibraryManager = new Mock<ILibraryManager>(MockBehavior.Strict).Object;
-            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, itemOptions.Object, Lookup, Linked.Object), Persistence.Object, Cache, Lookup, Linked.Object, Mock.Of<IItemMetadataExporter>(), Files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(configuration.Object, Files.Object), Resolution.Object, Repository.Object, itemOptions.Object, new FolderChildReconciler(Lookup, Mock.Of<IFileSystem>(), NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
+            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, itemOptions.Object, Lookup, Linked.Object), Persistence.Object, Cache, Lookup, Linked.Object, Mock.Of<IItemMetadataExporter>(), Files.Object, Mock.Of<IItemChangePublisher>(), new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(configuration.Object, Files.Object), Resolution.Object, Repository.Object, itemOptions.Object, new FolderChildReconciler(Lookup, NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), Mock.Of<IItemStore>(), NullLogger<ItemWriteCommands>.Instance);
         }
 
         public Movie Owner { get; } = new() { Id = Guid.NewGuid(), ParentId = Guid.NewGuid(), Path = "/media/owner.mkv", Overview = "owner description", Genres = ["owner genre"] };
@@ -322,11 +319,6 @@ public sealed class OwnedVideosCommandsTests
             Resolution.Setup(r => r.GetNewItemId(path, typeof(T))).Returns(candidate.Id);
             Resolution.Setup(r => r.ResolveAlternateVersion(path, typeof(T), null, CollectionType.movies)).Returns(candidate);
             return candidate;
-        }
-
-        public void Dispose()
-        {
-            BaseItem.LibraryManager = _previousManager;
         }
     }
 }

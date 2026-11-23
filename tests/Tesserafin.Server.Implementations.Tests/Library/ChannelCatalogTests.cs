@@ -54,8 +54,6 @@ public sealed class ChannelCatalogTests
             Id = id,
             ChannelId = id,
             Name = name,
-            // Avoid BaseItem.SortName's CreateSortName() fallback, which reads the static
-            // BaseItem.ConfigurationManager - not something this leaf (or its tests) should need.
             ForcedSortName = name
         };
     }

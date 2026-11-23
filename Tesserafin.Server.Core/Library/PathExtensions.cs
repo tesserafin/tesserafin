@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Tesserafin.Common.Providers;
+using Tesserafin.Model.Configuration;
 
 namespace Tesserafin.Server.Core.Library
 {
@@ -132,6 +134,19 @@ namespace Tesserafin.Server.Core.Library
             newPath = string.Concat(newSubPathTrimmed, path.AsSpan(idx));
 
             return true;
+        }
+
+        internal static string ApplyNetworkPathSubstitutions(this string path, IReadOnlyList<PathSubstitution> substitutions)
+        {
+            foreach (var substitution in substitutions)
+            {
+                if (path.TryReplaceSubPath(substitution.From, substitution.To, out var mappedPath))
+                {
+                    return mappedPath;
+                }
+            }
+
+            return path;
         }
 
         /// <summary>

@@ -277,7 +277,7 @@ public class LyricManager : ILyricManager
             }
         }
 
-        return audio.RefreshMetadata(_deletions, _writes, _providers.Value, CancellationToken.None);
+        return audio.RefreshMetadata(_deletions, _writes, _providers.Value, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), CancellationToken.None);
     }
 
     /// <inheritdoc />

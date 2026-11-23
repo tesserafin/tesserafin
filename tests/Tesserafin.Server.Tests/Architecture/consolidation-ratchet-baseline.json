@@ -1,13 +1,6 @@
 {
-  "entityStaticServiceAccessFiles": [
-    "Tesserafin.Controller/Entities/BaseItemExtensions.cs",
-    "Tesserafin.Server.Core/ApplicationHost.cs"
-  ],
-  "entityStaticServices": [
-    "BaseItem.ConfigurationManager",
-    "BaseItem.FileSystem",
-    "BaseItem.LibraryManager"
-  ],
+  "entityStaticServiceAccessFiles": [],
+  "entityStaticServices": [],
   "forbiddenDependencies": [],
   "streamBuilderFiles": [
     "Tesserafin.Api/Helpers/MediaInfoHelper.cs",

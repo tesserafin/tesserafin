@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Persistence;
@@ -15,6 +16,9 @@ namespace Tesserafin.Controller.Library;
 /// </remarks>
 public interface IFolderValidationServices
 {
+    /// <summary>Gets the logger for folder validation and discovery.</summary>
+    ILogger Logger { get; }
+
     /// <summary>Gets the deletion commands.</summary>
     IItemDeletionCommands Deletions { get; }
 

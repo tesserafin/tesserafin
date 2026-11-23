@@ -175,6 +175,11 @@ public sealed partial class ConsolidationRatchetTests
     private static SortedSet<string> MeasureEntityStaticServiceAccess(string root)
     {
         var services = MeasureEntityStaticServices(root);
+        if (services.Count == 0)
+        {
+            return services;
+        }
+
         var pattern = new Regex(@"\b(" + string.Join("|", services.Select(Regex.Escape)) + @")\b", RegexOptions.CultureInvariant);
         return FilesMatching(root, pattern);
     }

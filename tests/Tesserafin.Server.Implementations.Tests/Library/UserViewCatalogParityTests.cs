@@ -339,14 +339,12 @@ public sealed class UserViewCatalogParityTests
             ConfigMock.Setup(c => c.ApplicationPaths.InternalMetadataPath).Returns(internalMetadataPath);
             ConfigMock.Setup(c => c.Configuration).Returns(new ServerConfiguration { EnableFolderView = enableFolderView });
             Config = ConfigMock.Object;
-            Tesserafin.Controller.Entities.BaseItem.ConfigurationManager = Config;
 
             // UserViewFactory.GetNamedView(string, CollectionType, string) - the "Folders" view's
             // overload (RFC PR106b) - calls item.UpdateToRepositoryAsync(...) on its new-item path,
             // which reaches the static BaseItem.LibraryManager fallback (BaseItem.cs:2370):
             // pre-existing behavior, reproduced verbatim by UserViewFactory (see its type-level
             // remarks and LibraryManagerUserViewFactoryTests' identical setup for the same overload).
-            Tesserafin.Controller.Entities.BaseItem.LibraryManager = Mock.Of<ILibraryManager>();
 
             var localizationMock = new Mock<ILocalizationManager>();
             localizationMock.Setup(l => l.GetLocalizedString("Movies")).Returns("Movies");
@@ -356,7 +354,7 @@ public sealed class UserViewCatalogParityTests
 
             CollectionManager = Mock.Of<ICollectionManager>();
             TvSeriesManager = Mock.Of<ITVSeriesManager>();
-            ItemSortService = new Tesserafin.Server.Core.Sorting.ItemSortService(Mock.Of<IUserManager>(), Mock.Of<IUserDataManager>());
+            ItemSortService = new Tesserafin.Server.Core.Sorting.ItemSortService(Mock.Of<IUserDataManager>());
 
             var itemRepositoryMock = new Mock<IItemRepository>();
             itemRepositoryMock.Setup(i => i.RetrieveItem(It.IsAny<Guid>())).Returns<BaseItem>(null);

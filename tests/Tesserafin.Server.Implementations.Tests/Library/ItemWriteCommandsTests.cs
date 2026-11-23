@@ -24,6 +24,28 @@ namespace Tesserafin.Server.Implementations.Tests.Library;
 public sealed class ItemWriteCommandsTests
 {
     [Fact]
+    public void CreateChild_AllocatesIdentityAndInitializesDatesBeforeSaving()
+    {
+        var context = new Context();
+        var parent = new Folder { Id = Guid.NewGuid() };
+        var child = new Folder { Path = "/library/films" };
+        var id = Guid.NewGuid();
+        context.Store.Setup(store => store.GetNewItemId(child.Path, typeof(Folder))).Returns(id);
+
+        context.Commands.CreateChild(parent, child);
+
+        Assert.Equal(id, child.Id);
+        Assert.Equal(parent.Id, child.ParentId);
+        Assert.NotEqual(DateTime.MinValue, child.DateCreated);
+        Assert.Equal(child.DateCreated, child.DateModified);
+        context.Persistence.Verify(
+            persistence => persistence.SaveItems(
+                It.Is<IReadOnlyList<BaseItem>>(graph => graph.Count == 1 && graph[0].Id.Equals(id)),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public void Creation_PreparesOneTypedMultipartAlternate_ThenSavesCachesAndNotifies()
     {
         var context = new Context();
@@ -172,7 +194,6 @@ public sealed class ItemWriteCommandsTests
         var context = new Context();
         var item = context.Movie();
         item.Path = "https://example.test/movie.mkv";
-        context.Files.Setup(f => f.IsPathFile(item.Path)).Returns(false);
 
         await context.Commands.UpdateItemAsync(item, null, ItemUpdateType.MetadataEdit, TestContext.Current.CancellationToken);
 
@@ -239,11 +260,12 @@ public sealed class ItemWriteCommandsTests
     {
         public Context()
         {
-            Files.Setup(f => f.IsPathFile(It.IsAny<string>())).Returns(true);
             Linked.Setup(l => l.GetLinkedChildrenIds(It.IsAny<Guid>(), It.IsAny<int?>())).Returns([]);
             Metadata.Setup(m => m.SaveAsync(It.IsAny<BaseItem>(), It.IsAny<ItemUpdateType>(), It.IsAny<CancellationToken>(), It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
-            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, Mock.Of<ILibraryItemOptions>(), Lookup.Object, Linked.Object), Persistence.Object, Cache, Lookup.Object, Linked.Object, Metadata.Object, Files.Object, Events, new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(Mock.Of<IServerConfigurationManager>(), Mock.Of<IFileSystem>()), Mock.Of<IItemResolutionService>(), Mock.Of<IItemRepository>(), Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(Lookup.Object, Mock.Of<IFileSystem>(), NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), NullLogger<ItemWriteCommands>.Instance);
+            Commands = new ItemWriteCommands(new ItemVersionGraphPlanner(Resolution.Object, Mock.Of<ILibraryItemOptions>(), Lookup.Object, Linked.Object), Persistence.Object, Cache, Lookup.Object, Linked.Object, Metadata.Object, Files.Object, Events, new ActiveRecordings(), Mock.Of<INamedItemCatalog>(), new NamedItemIdentity(Mock.Of<IServerConfigurationManager>(), Mock.Of<IFileSystem>()), Mock.Of<IItemResolutionService>(), Mock.Of<IItemRepository>(), Mock.Of<ILibraryItemOptions>(), new FolderChildReconciler(Lookup.Object, NullLogger<FolderChildReconciler>.Instance), LibraryWriteFixture.CreateCollectionMembershipResolver(), Store.Object, NullLogger<ItemWriteCommands>.Instance);
         }
+
+        public Mock<IItemStore> Store { get; } = new();
 
         public Mock<IItemResolutionService> Resolution { get; } = new();
 

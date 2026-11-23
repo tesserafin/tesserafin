@@ -104,14 +104,15 @@ namespace Tesserafin.Controller.Entities
 
             if (!DisplayParentId.IsEmpty())
             {
-                parent = LibraryManager.GetItemById(DisplayParentId) as Folder ?? parent;
+                parent = GetRelatedItem(DisplayParentId) as Folder ?? parent;
             }
             else if (!ParentId.IsEmpty())
             {
-                parent = LibraryManager.GetItemById(ParentId) as Folder ?? parent;
+                parent = GetParent() as Folder ?? parent;
             }
 
-            return new UserViewBuilder(userViewManager, LibraryManager, Logger, tvSeriesManager, channelManager, collectionManager, null, query.RequireVisibility(), query.Listing)
+            var scope = query.RequireVisibility();
+            return new UserViewBuilder(userViewManager, query.Listing?.Queries, scope.Logger, tvSeriesManager, channelManager, collectionManager, null, scope, query.Listing, GetListingServices(query))
                 .GetUserItems(parent, this, CollectionType, query);
         }
 
@@ -122,14 +123,15 @@ namespace Tesserafin.Controller.Entities
 
             if (!DisplayParentId.IsEmpty())
             {
-                parent = LibraryManager.GetItemById(DisplayParentId) as Folder ?? parent;
+                parent = GetRelatedItem(DisplayParentId) as Folder ?? parent;
             }
             else if (!ParentId.IsEmpty())
             {
-                parent = LibraryManager.GetItemById(ParentId) as Folder ?? parent;
+                parent = GetParent() as Folder ?? parent;
             }
 
-            return new UserViewBuilder(userViewManager, LibraryManager, Logger, tvSeriesManager, channelManager, collectionManager, itemSortService, query.RequireVisibility(), query.Listing)
+            var scope = query.RequireVisibility();
+            return new UserViewBuilder(userViewManager, query.Listing?.Queries, scope.Logger, tvSeriesManager, channelManager, collectionManager, itemSortService, scope, query.Listing, GetListingServices(query))
                 .GetUserItems(parent, this, CollectionType, query);
         }
 

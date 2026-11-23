@@ -138,11 +138,6 @@ namespace Tesserafin.Providers.Tests.Manager
             var oldTime = new DateTime(1970, 1, 1);
             var updatedTime = updateTime ? new DateTime(2021, 1, 1) : oldTime;
 
-            var fileSystem = new Mock<IFileSystem>();
-            fileSystem.Setup(fs => fs.GetLastWriteTimeUtc(It.IsAny<FileSystemMetadata>()))
-                .Returns(updatedTime);
-            BaseItem.FileSystem = fileSystem.Object;
-
             // all valid paths - matching for strictly updating
             var item = GetItemWithImages(imageType, imageCount, true);
             // set size to non-zero to allow for image size reset to occur
@@ -154,7 +149,14 @@ namespace Tesserafin.Providers.Tests.Manager
             }
 
             var images = GetImages(imageType, imageCount, true);
+            foreach (var image in images)
+            {
+                image.FileInfo.LastWriteTimeUtc = updatedTime;
+            }
 
+            var fileSystem = new Mock<IFileSystem>();
+            fileSystem.Setup(fs => fs.GetLastWriteTimeUtc(It.IsAny<FileSystemMetadata>()))
+                .Returns((FileSystemMetadata file) => file.LastWriteTimeUtc);
             var itemImageProvider = GetItemImageProvider(null, fileSystem);
             var changed = itemImageProvider.MergeImages(item, images, new ImageRefreshOptions(Mock.Of<IDirectoryService>()));
 
@@ -266,7 +268,6 @@ namespace Tesserafin.Providers.Tests.Manager
         public async Task RefreshImages_EmptyItemPopulatedProviderDynamic_AddsImages(ImageType imageType, int imageCount, bool responseHasPath, MediaProtocol protocol)
         {
             // Has to exist for querying DateModified time on file, results stored but not checked so not populating
-            BaseItem.FileSystem = Mock.Of<IFileSystem>();
 
             var item = new Video();
 
@@ -577,7 +578,6 @@ namespace Tesserafin.Providers.Tests.Manager
         private static Video GetItemWithImages(ImageType type, int count, bool validPaths)
         {
             // Has to exist for querying DateModified time on file, results stored but not checked so not populating
-            BaseItem.FileSystem ??= Mock.Of<IFileSystem>();
 
             var item = new Mock<Video>
             {

@@ -22,10 +22,7 @@ namespace Tesserafin.Server.Core.Library
     /// Tag inheritance and the tag filter (DEBT-SERVER-3), then the parents and the libraries of the
     /// folder restriction (DEBT-SERVER-4), come from <see cref="IStandaloneVisibilityService"/>, passed
     /// down the entities' visibility overrides through
-    /// <see cref="BaseItem.IsVisibleStandalone(User, IStandaloneVisibilityService)"/>. What still reads the
-    /// static <see cref="BaseItem.LibraryManager"/> on this path is channel and box set visibility, and
-    /// the library options read for a rating's country code once neither the item, its parents nor its
-    /// libraries carry one.
+    /// <see cref="BaseItem.IsVisibleStandalone(User, IStandaloneVisibilityService)"/>.
     /// </remarks>
     internal sealed class ItemAccessService : IItemAccessService
     {

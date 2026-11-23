@@ -1,5 +1,6 @@
 using Tesserafin.Controller.Entities;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.LiveTv;
 
@@ -15,8 +16,9 @@ internal static class LiveTvChannelImageHelper
     /// <param name="item">The channel item.</param>
     /// <param name="imagePath">The local image path from the tuner, if any.</param>
     /// <param name="imageUrl">The remote image URL from the guide provider, if any.</param>
+    /// <param name="fileSystem">The filesystem used for local channel icons.</param>
     /// <returns><c>true</c> when the item image metadata was updated.</returns>
-    internal static bool UpdateChannelImageIfNeeded(BaseItem item, string? imagePath, string? imageUrl)
+    internal static bool UpdateChannelImageIfNeeded(BaseItem item, string? imagePath, string? imageUrl, IFileSystem fileSystem)
     {
         var newImageSource = !string.IsNullOrWhiteSpace(imagePath)
             ? imagePath
@@ -27,7 +29,7 @@ internal static class LiveTvChannelImageHelper
             return false;
         }
 
-        item.SetImagePath(ImageType.Primary, newImageSource);
+        item.SetImagePath(ImageType.Primary, newImageSource, fileSystem);
         return true;
     }
 }

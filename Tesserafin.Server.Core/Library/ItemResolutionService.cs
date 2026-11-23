@@ -34,7 +34,8 @@ internal sealed class ItemResolutionService(
     ILogger<ItemResolutionService> logger,
     ILoggerFactory loggerFactory,
     IDirectoryService directoryService,
-    DotIgnoreIgnoreRule dotIgnore) : IItemResolutionService
+    DotIgnoreIgnoreRule dotIgnore,
+    IItemReadServices reads) : IItemResolutionService
 {
     private readonly IServerConfigurationManager _configurationManager = configuration;
     private readonly IFileSystem _fileSystem = files;
@@ -70,7 +71,7 @@ internal sealed class ItemResolutionService(
                 throw new IOException($"Shortcut has no target: {file.FullName}");
             }
 
-            var target = _fileSystem.MakeAbsolutePath(owner.ContainingFolderPath, expanded);
+            var target = FilePath.MakeAbsolute(owner.ContainingFolderPath, expanded);
             if (string.IsNullOrWhiteSpace(target))
             {
                 throw new IOException($"Shortcut has no absolute target: {file.FullName}");
@@ -194,6 +195,7 @@ internal sealed class ItemResolutionService(
 
         if (item is not null)
         {
+            item.ReadServices ??= reads;
             ResolverHelper.SetInitialItemValues(item, args, _fileSystem, this, _configurationManager.GetMetadataConfiguration().UseFileCreationTimeForDateAdded);
         }
 
@@ -374,6 +376,15 @@ internal sealed class ItemResolutionService(
     public bool IgnoreFile(FileSystemMetadata file, BaseItem? parent)
         => EntityResolutionIgnoreRules.Any(r => r.ShouldIgnore(file, parent));
 
+    public (FileSystemMetadata[]? Entries, string[] PhysicalLocations) DiscoverPhysicalRoot(AggregateFolder folder, IDirectoryService directoryService)
+        => FileData.ReadLibraryDirectory(
+            _fileSystem.GetDirectoryInfo(folder.ContainingFolderPath),
+            directoryService,
+            _fileSystem,
+            _configurationManager.ApplicationPaths,
+            _logger,
+            physicalRoot: true);
+
     public IEnumerable<BaseItem> ResolveFolderChildren(Folder parent, IReadOnlyList<FileSystemMetadata> files, IDirectoryService directoryService, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -400,6 +411,7 @@ internal sealed class ItemResolutionService(
                 items.RemoveAll(item =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    item.ReadServices ??= reads;
                     return !ResolverHelper.SetInitialItemValues(item, parent, this, directoryService, useFileCreationTime);
                 });
                 items.AddRange(ResolveFileList(result.ExtraFiles, directoryService, parent, collectionType, libraryOptions, cancellationToken));

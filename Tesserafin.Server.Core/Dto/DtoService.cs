@@ -113,6 +113,7 @@ namespace Tesserafin.Server.Core.Dto
         }.ToFrozenDictionary();
 
         private readonly IItemListingServices _listing;
+        private readonly IItemExtrasService _extras;
 
         private readonly IStandaloneVisibilityService _visibility;
 
@@ -152,9 +153,11 @@ namespace Tesserafin.Server.Core.Dto
             IChapterManager chapterManager,
             IItemCountService itemCountService,
             IStandaloneVisibilityService visibility,
-            IItemListingServices listing)
+            IItemListingServices listing,
+            IItemExtrasService extras)
         {
             _listing = listing;
+            _extras = extras;
             _visibility = visibility;
             _logger = logger;
             _namedItems = namedItems;
@@ -1353,24 +1356,18 @@ namespace Tesserafin.Server.Core.Dto
                 }
             }
 
-            BaseItem[]? allExtras = null;
+            IReadOnlyList<BaseItem>? allExtras = null;
 
             if (options.ContainsField(ItemFields.SpecialFeatureCount))
             {
-                allExtras = item.GetExtras().ToArray();
+                allExtras = _extras.GetExtras(item);
                 dto.SpecialFeatureCount = allExtras.Count(i => i.ExtraType.HasValue && BaseItem.DisplayExtraTypes.Contains(i.ExtraType.Value));
             }
 
             if (options.ContainsField(ItemFields.LocalTrailerCount))
             {
-                if (item is IHasTrailers hasTrailers)
-                {
-                    dto.LocalTrailerCount = hasTrailers.LocalTrailers.Count;
-                }
-                else
-                {
-                    dto.LocalTrailerCount = (allExtras ?? item.GetExtras()).Count(i => i.ExtraType == ExtraType.Trailer);
-                }
+                dto.LocalTrailerCount = allExtras?.Count(i => i.ExtraType == ExtraType.Trailer)
+                    ?? _extras.GetExtras(item, extraTypes: [ExtraType.Trailer]).Count;
             }
 
             // Add EpisodeInfo

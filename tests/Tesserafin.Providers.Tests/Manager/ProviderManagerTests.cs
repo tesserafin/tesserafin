@@ -646,7 +646,8 @@ namespace Tesserafin.Providers.Tests.Manager
                 Mock.Of<ILyricManager>(),
                 Mock.Of<IRemoteImageSource>(),
                 Mock.Of<IMediaSegmentManager>(),
-                Mock.Of<ISimilarItemsManager>());
+                Mock.Of<ISimilarItemsManager>(),
+                Mock.Of<IItemReadServices>());
 
             return providerManager;
         }

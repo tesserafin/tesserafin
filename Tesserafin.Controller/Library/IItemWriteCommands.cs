@@ -97,6 +97,11 @@ public interface IItemWriteCommands
 
     void CreateItem(BaseItem item, BaseItem? parent);
 
+    /// <summary>Initializes and persists an item in the given folder.</summary>
+    /// <param name="parent">The parent folder.</param>
+    /// <param name="item">The item to create.</param>
+    void CreateChild(Folder parent, BaseItem item);
+
     void CreateItems(IReadOnlyList<BaseItem> items, BaseItem? parent, CancellationToken cancellationToken);
 
     Task UpdateItemAsync(BaseItem item, BaseItem? parent, ItemUpdateType reason, CancellationToken cancellationToken);

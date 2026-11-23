@@ -625,6 +625,26 @@ public sealed class LocalMediaPlannerTests
         Assert.False(LocalMediaPlanner.IsSeekableRemoteSource(remote));
     }
 
+    [Theory]
+    [InlineData(VideoType.Dvd)]
+    [InlineData(VideoType.BluRay)]
+    public void A_disc_folder_is_executed_by_the_session_never_played_as_it_is(VideoType videoType)
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var disc = Source("disc", "h264", 1, -1, "mp4");
+        disc.Path = "/media/Disc Probe";
+        disc.VideoType = videoType;
+        disc.MediaStreams = [.. disc.MediaStreams.Where(stream => stream.Type != MediaStreamType.Subtitle)];
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(Browser(hlsOutput: true), _declared));
+        var plan = planner.PlanVideo(Options(disc));
+
+        Assert.NotEqual(PlayMethod.DirectPlay, plan?.PlayMethod);
+        Assert.True(LocalMediaPlanner.IsExecutableSessionOutput(store.TakeCaptured()?.ExecutionPlan));
+        Assert.True(LocalMediaPlanner.IsLocalDiscSource(disc));
+    }
+
     [Fact]
     public void Only_an_hls_copy_of_one_audio_stream_is_an_executable_audio_remux()
     {

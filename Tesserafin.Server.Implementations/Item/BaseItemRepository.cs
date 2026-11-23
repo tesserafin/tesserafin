@@ -8,7 +8,6 @@ using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
@@ -58,16 +57,16 @@ public sealed partial class BaseItemRepository
     /// <param name="itemTypeLookup">The static type lookup.</param>
     /// <param name="serverConfigurationManager">The server Configuration manager.</param>
     /// <param name="logger">System logger.</param>
-    /// <param name="activeRecordings">The recordings in progress, for the catalogue reads attached to every loaded item.</param>
+    /// <param name="readServices">The catalogue reads attached to loaded items.</param>
     public BaseItemRepository(
         IDbContextFactory<TesserafinDbContext> dbProvider,
         IServerApplicationHost appHost,
         IItemTypeLookup itemTypeLookup,
         IServerConfigurationManager serverConfigurationManager,
         ILogger<BaseItemRepository> logger,
-        ActiveRecordings activeRecordings)
+        IItemReadServices readServices)
     {
-        _readServices = new ItemReadServices(this, activeRecordings);
+        _readServices = readServices;
         _dbProvider = dbProvider;
         _appHost = appHost;
         _itemTypeLookup = itemTypeLookup;
