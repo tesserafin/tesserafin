@@ -9,7 +9,7 @@
       ]
     },
     "microsoft.dotnet.apicompat.tool": {
-      "version": "10.0.302",
+      "version": "11.0.100",
       "commands": [
         "apicompat"
       ]
