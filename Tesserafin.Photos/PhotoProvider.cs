@@ -15,6 +15,7 @@ using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Drawing;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Photos;
 
@@ -25,6 +26,7 @@ public class PhotoProvider : ICustomMetadataProvider<Photo>, IForcedProvider, IH
 {
     private readonly ILogger<PhotoProvider> _logger;
     private readonly IImageProcessor _imageProcessor;
+    private readonly IFileSystem _fileSystem;
 
     // Other extensions might cause taglib to hang
     private readonly string[] _includeExtensions = [".jpg", ".jpeg", ".png", ".tiff", ".cr2", ".webp", ".avif"];
@@ -34,10 +36,12 @@ public class PhotoProvider : ICustomMetadataProvider<Photo>, IForcedProvider, IH
     /// </summary>
     /// <param name="logger">The logger.</param>
     /// <param name="imageProcessor">The image processor.</param>
-    public PhotoProvider(ILogger<PhotoProvider> logger, IImageProcessor imageProcessor)
+    /// <param name="fileSystem">The filesystem used for local image metadata.</param>
+    public PhotoProvider(ILogger<PhotoProvider> logger, IImageProcessor imageProcessor, IFileSystem fileSystem)
     {
         _logger = logger;
         _imageProcessor = imageProcessor;
+        _fileSystem = fileSystem;
     }
 
     /// <inheritdoc />
@@ -58,7 +62,7 @@ public class PhotoProvider : ICustomMetadataProvider<Photo>, IForcedProvider, IH
     /// <inheritdoc />
     public Task<ItemUpdateType> FetchAsync(Photo item, MetadataRefreshOptions options, CancellationToken cancellationToken)
     {
-        item.SetImagePath(ImageType.Primary, item.Path);
+        item.SetImagePath(ImageType.Primary, item.Path, _fileSystem);
 
         // Examples: https://github.com/mono/taglib-sharp/blob/a5f6949a53d09ce63ee7495580d6802921a21f14/tests/fixtures/TagLib.Tests.Images/NullOrientationTest.cs
         if (_includeExtensions.Contains(Path.GetExtension(item.Path.AsSpan()), StringComparison.OrdinalIgnoreCase))

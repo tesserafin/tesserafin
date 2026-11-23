@@ -25,7 +25,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library.LibraryManager;
 /// <summary>
 /// Characterisation of library membership resolution (<c>GetCollectionFolders</c>): which top-level
 /// libraries an item belongs to, and the visibility and deletion rules that read it through the
-/// static <see cref="BaseItem.LibraryManager"/>. Every expectation is hand-derived and was green on
+/// static <c>BaseItem.LibraryManager</c>. Every expectation is hand-derived and was green on
 /// the unmodified <c>LibraryManager</c>; membership is now asserted through both the
 /// <see cref="ILibraryManager"/> facade and <see cref="ICollectionFolderResolver"/> (DEBT-SERVER-2).
 /// </summary>
@@ -40,6 +40,7 @@ public sealed class CollectionFolderMembershipTests
     private readonly List<Folder> _libraries = [];
     private readonly ILibraryManager _libraryManager;
     private readonly ICollectionFolderResolver _resolver;
+    private readonly IItemReadServices _reads;
     private readonly IStandaloneVisibilityService _scope;
     private readonly Mock<IXmlSerializer> _xml = new();
 
@@ -67,7 +68,15 @@ public sealed class CollectionFolderMembershipTests
         fixture.Register<ILibraryOptionsStore>(() => store);
 
         var libraryOptions = new Tesserafin.Server.Core.Library.LibraryItemOptions(_resolver, lookup, rootProvider, configuration.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), store);
-        _scope = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, _resolver, rootProvider, repository.Object, Mock.Of<Tesserafin.Model.Globalization.ILocalizationManager>(), configuration.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings(), libraryOptions);
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(r => r.GetItemById(It.IsAny<Guid>())).Returns(lookup.GetItemById);
+        reads.Setup(r => r.GetLibraryOptions(It.IsAny<BaseItem>())).Returns(libraryOptions.GetLibraryOptions);
+        reads.Setup(r => r.GetCollectionFolders(It.IsAny<BaseItem>(), It.IsAny<IEnumerable<Folder>?>()))
+            .Returns((BaseItem item, IEnumerable<Folder>? candidates) => candidates is null
+                ? _resolver.GetCollectionFolders(item)
+                : _resolver.GetCollectionFolders(item, candidates));
+        _reads = reads.Object;
+        _scope = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, _resolver, rootProvider, repository.Object, Mock.Of<Tesserafin.Model.Globalization.ILocalizationManager>(), configuration.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings(), libraryOptions, Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.TagVisibilityService>.Instance);
 
         Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
 
@@ -77,9 +86,6 @@ public sealed class CollectionFolderMembershipTests
                 fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
         _libraryManager = manager;
-
-        BaseItem.LibraryManager = manager;
-        BaseItem.ConfigurationManager = configuration.Object;
     }
 
     [Fact]
@@ -274,6 +280,7 @@ public sealed class CollectionFolderMembershipTests
             item.Id = Guid.NewGuid();
         }
 
+        item.ReadServices = _reads;
         _items[item.Id] = item;
         return item;
     }

@@ -17,12 +17,6 @@ namespace Tesserafin.Controller.Sorting
         User User { get; set; }
 
         /// <summary>
-        /// Gets or sets the user manager.
-        /// </summary>
-        /// <value>The user manager.</value>
-        IUserManager UserManager { get; set; }
-
-        /// <summary>
         /// Gets or sets the user data repository.
         /// </summary>
         /// <value>The user data repository.</value>

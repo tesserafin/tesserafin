@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Moq;
-using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
@@ -11,7 +10,6 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Model.Configuration;
 using Xunit;
 
 namespace Tesserafin.Controller.Tests.Entities.TV;
@@ -19,7 +17,7 @@ namespace Tesserafin.Controller.Tests.Entities.TV;
 /// <summary>
 /// Characterization tests for the <see cref="Series.GetSeasonEpisodes"/>/<see cref="Series.GetEpisodes"/>/
 /// <see cref="Season.GetEpisodes"/> chain (docs/major-rewrite-plan-v13.md § PR49/N, § PR50/N). These
-/// entities read <c>BaseItem.LibraryManager</c>/<c>BaseItem.ConfigurationManager</c> statics, so this
+/// entities still read the <c>BaseItem.LibraryManager</c> static, so this
 /// class joins <see cref="BaseItemStaticStateFixture"/> like <c>FolderTests</c>.
 ///
 /// This suite deliberately exercises the obsolete static <c>ILibraryManager.Sort</c> fallback
@@ -30,8 +28,16 @@ namespace Tesserafin.Controller.Tests.Entities.TV;
 [Collection(BaseItemStaticStateFixture.Name)]
 public class SeriesGetSeasonEpisodesTests
 {
-    private static Series CreateSeries(string presentationUniqueKey = "series-key")
-        => new Series { Id = Guid.NewGuid(), Name = "Test Series", PresentationUniqueKey = presentationUniqueKey };
+    private bool _displaySpecialsWithinSeasons;
+
+    private Series CreateSeries(string presentationUniqueKey = "series-key")
+        => new Series
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Series",
+            PresentationUniqueKey = presentationUniqueKey,
+            ReadServices = Mock.Of<IItemReadServices>(reads => reads.DisplaySpecialsWithinSeasons == _displaySpecialsWithinSeasons)
+        };
 
     private static Season CreateSeason(int? indexNumber, string presentationUniqueKey = "season-key")
         => new Season
@@ -41,7 +47,7 @@ public class SeriesGetSeasonEpisodesTests
             IndexNumber = indexNumber,
             PresentationUniqueKey = presentationUniqueKey,
             // Path deliberately left null: LocationType then resolves to Virtual without
-            // touching the BaseItem.FileSystem static (see PR50/N test notes below).
+            // requiring filesystem access (see PR50/N test notes below).
         };
 
     // ParentId/SeasonId are deliberately left unset (Guid.Empty) on every Episode created by this
@@ -67,11 +73,8 @@ public class SeriesGetSeasonEpisodesTests
             AirsBeforeEpisodeNumber = airsBeforeEpisodeNumber,
         };
 
-    private static void SetDisplaySpecialsWithinSeasons(bool value)
-    {
-        BaseItem.ConfigurationManager = Mock.Of<IServerConfigurationManager>(
-            x => x.Configuration == new ServerConfiguration { DisplaySpecialsWithinSeasons = value });
-    }
+    private void SetDisplaySpecialsWithinSeasons(bool value)
+        => _displaySpecialsWithinSeasons = value;
 
     // ---- Series.FilterEpisodesBySeason (public static, pure) --------------------------------
 
@@ -154,18 +157,18 @@ public class SeriesGetSeasonEpisodesTests
         var special1 = CreateEpisode("Special B", 0, 2);
         var special2 = CreateEpisode("Special A", 0, 1);
 
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
+        var sorter = new Mock<IItemSortService>();
+        sorter
             .Setup(x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()))
             .Returns((IEnumerable<BaseItem> items, User u, IEnumerable<ItemSortBy> sortBy, SortOrder order) =>
                 order == SortOrder.Descending
                     ? items.OrderByDescending(i => i.SortName, StringComparer.OrdinalIgnoreCase)
                     : items.OrderBy(i => i.SortName, StringComparer.OrdinalIgnoreCase));
-        BaseItem.LibraryManager = libraryManager.Object;
+        Mock.Get(series.ReadServices).Setup(r => r.Listing).Returns(Mock.Of<IItemListingReads>(l => l.Sort == sorter.Object));
 
         var result = series.GetSeasonEpisodes(season0, null, new BaseItem[] { special1, special2 }, new DtoOptions(true), true);
 
-        libraryManager.Verify(
+        sorter.Verify(
             x => x.Sort(
                 It.IsAny<IEnumerable<BaseItem>>(),
                 null,
@@ -188,15 +191,15 @@ public class SeriesGetSeasonEpisodesTests
         var e1 = CreateEpisode("S01E01", 1, 1);
         var e2 = CreateEpisode("S01E02", 1, 2);
 
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
+        var sorter = new Mock<IItemSortService>();
+        sorter
             .Setup(x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()))
             .Returns((IEnumerable<BaseItem> items, User u, IEnumerable<ItemSortBy> sortBy, SortOrder order) => items);
-        BaseItem.LibraryManager = libraryManager.Object;
+        Mock.Get(series.ReadServices).Setup(r => r.Listing).Returns(Mock.Of<IItemListingReads>(l => l.Sort == sorter.Object));
 
         _ = series.GetSeasonEpisodes(season1, null, new BaseItem[] { e1, e2 }, new DtoOptions(true), true);
 
-        libraryManager.Verify(
+        sorter.Verify(
             x => x.Sort(
                 It.IsAny<IEnumerable<BaseItem>>(),
                 null,
@@ -216,15 +219,15 @@ public class SeriesGetSeasonEpisodesTests
         var e2x1 = CreateEpisode("S02E01", 2, 1); // must be filtered out before Sort is invoked
 
         IEnumerable<BaseItem>? sortedInput = null;
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
+        var sorter = new Mock<IItemSortService>();
+        sorter
             .Setup(x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()))
             .Returns((IEnumerable<BaseItem> items, User u, IEnumerable<ItemSortBy> sortBy, SortOrder order) =>
             {
                 sortedInput = items.ToList();
                 return items;
             });
-        BaseItem.LibraryManager = libraryManager.Object;
+        Mock.Get(series.ReadServices).Setup(r => r.Listing).Returns(Mock.Of<IItemListingReads>(l => l.Sort == sorter.Object));
 
         _ = series.GetSeasonEpisodes(season1, null, new BaseItem[] { e1x1, e2x1 }, new DtoOptions(true), true);
 
@@ -243,17 +246,18 @@ public class SeriesGetSeasonEpisodesTests
         var season1 = CreateSeason(1);
 
         InternalItemsQuery? capturedQuery = null;
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
+        var queries = new Mock<IItemQueryService>();
+        var sorter = new Mock<IItemSortService>();
+        queries
             .Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>()))
             .Callback<InternalItemsQuery>(q => capturedQuery = q)
             .Returns(new List<BaseItem>());
-        libraryManager
+        sorter
             .Setup(x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()))
             .Returns((IEnumerable<BaseItem> items, User u, IEnumerable<ItemSortBy> sortBy, SortOrder order) => items);
-        BaseItem.LibraryManager = libraryManager.Object;
+        var listing = Mock.Of<IItemListingServices>(l => l.Queries == queries.Object && l.Sort == sorter.Object);
 
-        _ = series.GetSeasonEpisodes(season1, null, new DtoOptions(true), shouldIncludeMissingEpisodes: false);
+        _ = series.GetSeasonEpisodes(season1, null, new DtoOptions(true), shouldIncludeMissingEpisodes: false, listing);
 
         Assert.NotNull(capturedQuery);
         Assert.False(capturedQuery.IsMissing);
@@ -268,17 +272,18 @@ public class SeriesGetSeasonEpisodesTests
         var season1 = CreateSeason(1);
 
         InternalItemsQuery? capturedQuery = null;
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
+        var queries = new Mock<IItemQueryService>();
+        var sorter = new Mock<IItemSortService>();
+        queries
             .Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>()))
             .Callback<InternalItemsQuery>(q => capturedQuery = q)
             .Returns(new List<BaseItem>());
-        libraryManager
+        sorter
             .Setup(x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()))
             .Returns((IEnumerable<BaseItem> items, User u, IEnumerable<ItemSortBy> sortBy, SortOrder order) => items);
-        BaseItem.LibraryManager = libraryManager.Object;
+        var listing = Mock.Of<IItemListingServices>(l => l.Queries == queries.Object && l.Sort == sorter.Object);
 
-        _ = series.GetSeasonEpisodes(season1, null, new DtoOptions(true), shouldIncludeMissingEpisodes: true);
+        _ = series.GetSeasonEpisodes(season1, null, new DtoOptions(true), shouldIncludeMissingEpisodes: true, listing);
 
         Assert.NotNull(capturedQuery);
         Assert.Null(capturedQuery.IsMissing);
@@ -293,14 +298,14 @@ public class SeriesGetSeasonEpisodesTests
         var season1 = CreateSeason(1, "season-key");
 
         InternalItemsQuery? capturedQuery = null;
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
+        var queries = new Mock<IItemQueryService>();
+        var listing = Mock.Of<IItemListingServices>(l => l.Queries == queries.Object && l.Sort == new RecordingItemSortService());
+        queries
             .Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>()))
             .Callback<InternalItemsQuery>(q => capturedQuery = q)
             .Returns(new List<BaseItem>());
-        BaseItem.LibraryManager = libraryManager.Object;
 
-        _ = series.GetSeasonEpisodes(season1, null, new DtoOptions(true), true);
+        _ = series.GetSeasonEpisodes(season1, null, new DtoOptions(true), true, listing);
 
         Assert.NotNull(capturedQuery);
         Assert.Equal("series-key", capturedQuery.SeriesPresentationUniqueKey);
@@ -316,14 +321,14 @@ public class SeriesGetSeasonEpisodesTests
         var season1 = CreateSeason(1, "season-key");
 
         InternalItemsQuery? capturedQuery = null;
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
+        var queries = new Mock<IItemQueryService>();
+        var listing = Mock.Of<IItemListingServices>(l => l.Queries == queries.Object && l.Sort == new RecordingItemSortService());
+        queries
             .Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>()))
             .Callback<InternalItemsQuery>(q => capturedQuery = q)
             .Returns(new List<BaseItem>());
-        BaseItem.LibraryManager = libraryManager.Object;
 
-        _ = series.GetSeasonEpisodes(season1, null, new DtoOptions(true), true);
+        _ = series.GetSeasonEpisodes(season1, null, new DtoOptions(true), true, listing);
 
         Assert.NotNull(capturedQuery);
         Assert.Equal("season-key", capturedQuery.AncestorWithPresentationUniqueKey);
@@ -345,8 +350,6 @@ public class SeriesGetSeasonEpisodesTests
 
         // Strict mock with no Sort setup: any call to the static facade throws immediately,
         // proving the service path is used instead when itemSortService is supplied.
-        var libraryManager = new Mock<ILibraryManager>(MockBehavior.Strict);
-        BaseItem.LibraryManager = libraryManager.Object;
 
         var sortService = new RecordingItemSortService();
 
@@ -354,7 +357,6 @@ public class SeriesGetSeasonEpisodesTests
 
         Assert.Single(sortService.Calls);
         Assert.Equal(new BaseItem[] { e1, e2 }, result);
-        libraryManager.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -381,11 +383,11 @@ public class SeriesGetSeasonEpisodesTests
 
         var sharedSortService = new RecordingItemSortService();
 
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
+        var sorter = new Mock<IItemSortService>();
+        sorter
             .Setup(x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()))
             .Returns((IEnumerable<BaseItem> items, User u, IEnumerable<ItemSortBy> sortBy, SortOrder order) => sharedSortService.Sort(items, u, sortBy, order));
-        BaseItem.LibraryManager = libraryManager.Object;
+        Mock.Get(series.ReadServices).Setup(r => r.Listing).Returns(Mock.Of<IItemListingReads>(l => l.Sort == sorter.Object));
 
         var beforeResult = series.GetSeasonEpisodes(season1, null, allEpisodes, new DtoOptions(true), true);
         var afterResult = series.GetSeasonEpisodes(season1, null, allEpisodes, new DtoOptions(true), true, Mock.Of<IItemListingServices>(l => l.Sort == sharedSortService));
@@ -404,23 +406,23 @@ public class SeriesGetSeasonEpisodesTests
         var e1 = CreateEpisode("S01E01", 1, 1);
         var e2 = CreateEpisode("S01E02", 1, 2);
 
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
+        var sorter = new Mock<IItemSortService>();
+        sorter
             .Setup(x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()))
             .Returns((IEnumerable<BaseItem> items, User u, IEnumerable<ItemSortBy> sortBy, SortOrder order) => items);
-        BaseItem.LibraryManager = libraryManager.Object;
+        Mock.Get(series.ReadServices).Setup(r => r.Listing).Returns(Mock.Of<IItemListingReads>(l => l.Sort == sorter.Object));
 
         var legacyResult = series.GetSeasonEpisodes(season1, null, new BaseItem[] { e1, e2 }, new DtoOptions(true), true);
         var explicitNullResult = series.GetSeasonEpisodes(season1, null, new BaseItem[] { e1, e2 }, new DtoOptions(true), true, null);
 
         Assert.Equal(legacyResult, explicitNullResult);
-        libraryManager.Verify(
+        sorter.Verify(
             x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()),
             Times.Exactly(2));
     }
 
     [Fact]
-    public void SeasonGetEpisodes_LegacyOverloadMatchesExplicitNullFallback()
+    public void SeasonGetEpisodes_OverloadsUseTheSameListingServices()
     {
         SetDisplaySpecialsWithinSeasons(true);
 
@@ -428,20 +430,21 @@ public class SeriesGetSeasonEpisodesTests
         var season1 = CreateSeason(1);
         var e1 = CreateEpisode("S01E01", 1, 1);
 
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
+        var queries = new Mock<IItemQueryService>();
+        var sorter = new Mock<IItemSortService>();
+        queries
             .Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>()))
             .Returns(new List<BaseItem> { e1 });
-        libraryManager
+        sorter
             .Setup(x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()))
             .Returns((IEnumerable<BaseItem> items, User u, IEnumerable<ItemSortBy> sortBy, SortOrder order) => items);
-        BaseItem.LibraryManager = libraryManager.Object;
+        var listing = Mock.Of<IItemListingServices>(l => l.Queries == queries.Object && l.Sort == sorter.Object);
 
-        var legacyResult = season1.GetEpisodes(series, null, new DtoOptions(true), true);
-        var explicitNullResult = season1.GetEpisodes(series, null, new DtoOptions(true), true, null);
+        var direct = season1.GetEpisodes(series, null, new DtoOptions(true), true, listing);
+        var withoutPreloadedEpisodes = season1.GetEpisodes(series, null, null, new DtoOptions(true), true, listing);
 
-        Assert.Equal(legacyResult, explicitNullResult);
-        libraryManager.Verify(
+        Assert.Equal(direct, withoutPreloadedEpisodes);
+        sorter.Verify(
             x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()),
             Times.Exactly(2));
     }
@@ -458,17 +461,13 @@ public class SeriesGetSeasonEpisodesTests
         // or sort call happens on this path.
         var season = CreateSeason(1);
 
-        var libraryManager = new Mock<ILibraryManager>(MockBehavior.Strict);
-        BaseItem.LibraryManager = libraryManager.Object;
-
-        var result = season.GetEpisodes();
+        var result = season.GetEpisodes(null, new DtoOptions(true), true, null);
 
         Assert.Empty(result);
-        libraryManager.VerifyNoOtherCalls();
     }
 
     [Fact]
-    public void SeasonGetEpisodes_WithExplicitSeriesAndNoItemSortService_StillFallsBackToStaticLibraryManagerSort()
+    public void SeasonGetEpisodes_WithExplicitSeriesAndNoItemSortService_UsesTheCatalogueSorter()
     {
         // Same chain as the no-arg overload above, but with a real Series supplied directly
         // (Season.GetEpisodes(Series, User, DtoOptions, bool)) so it actually reaches
@@ -481,19 +480,20 @@ public class SeriesGetSeasonEpisodesTests
         var season1 = CreateSeason(1);
         var e1 = CreateEpisode("S01E01", 1, 1);
 
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager
+        var queries = new Mock<IItemQueryService>();
+        var sorter = new Mock<IItemSortService>();
+        queries
             .Setup(x => x.GetItemList(It.IsAny<InternalItemsQuery>()))
             .Returns(new List<BaseItem> { e1 });
-        libraryManager
+        sorter
             .Setup(x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()))
             .Returns((IEnumerable<BaseItem> items, User u, IEnumerable<ItemSortBy> sortBy, SortOrder order) => items);
-        BaseItem.LibraryManager = libraryManager.Object;
+        var listing = Mock.Of<IItemListingServices>(l => l.Queries == queries.Object && l.Sort == sorter.Object);
 
-        var result = season1.GetEpisodes(series, null, new DtoOptions(true), true);
+        var result = season1.GetEpisodes(series, null, new DtoOptions(true), true, listing);
 
         Assert.Equal(new BaseItem[] { e1 }, result);
-        libraryManager.Verify(
+        sorter.Verify(
             x => x.Sort(It.IsAny<IEnumerable<BaseItem>>(), It.IsAny<User>(), It.IsAny<IEnumerable<ItemSortBy>>(), It.IsAny<SortOrder>()),
             Times.Once);
     }
@@ -502,7 +502,6 @@ public class SeriesGetSeasonEpisodesTests
     public void SeriesGetCatalogueEpisodes_ReadsPresentationGroupAndDeduplicatesSpecials()
     {
         SetDisplaySpecialsWithinSeasons(true);
-        BaseItem.LibraryManager = Mock.Of<ILibraryManager>(MockBehavior.Strict);
         var series = CreateSeries();
         var specials = CreateSeason(0);
         var season = CreateSeason(1);
@@ -527,7 +526,6 @@ public class SeriesGetSeasonEpisodesTests
     public void SeasonGetCatalogueEpisodes_ResolvesSeriesAndReadsConfiguredGroup(bool includeSpecials)
     {
         SetDisplaySpecialsWithinSeasons(includeSpecials);
-        BaseItem.LibraryManager = Mock.Of<ILibraryManager>(MockBehavior.Strict);
         var series = CreateSeries();
         var season = CreateSeason(1);
         season.SeriesId = series.Id;

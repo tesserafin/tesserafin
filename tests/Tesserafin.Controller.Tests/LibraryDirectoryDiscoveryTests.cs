@@ -1,10 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller;
+using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.IO;
+using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.IO;
 using Xunit;
@@ -13,6 +17,25 @@ namespace Tesserafin.Controller.Tests;
 
 public sealed class LibraryDirectoryDiscoveryTests
 {
+    [Fact]
+    public void AggregateFolder_UsesDiscoveredEntriesAndKeepsVirtualChildren()
+    {
+        var root = new TestAggregateFolder();
+        var physical = new Folder { Id = Guid.NewGuid() };
+        var virtualFolder = new Folder { Id = Guid.NewGuid() };
+        root.AddVirtualChild(virtualFolder);
+        FileSystemMetadata[] entries = [new()];
+        string[] locations = ["/media"];
+        var directories = Mock.Of<IDirectoryService>();
+        var resolver = new Mock<IItemResolutionService>(MockBehavior.Strict);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        resolver.Setup(r => r.DiscoverPhysicalRoot(root, directories)).Returns((entries, locations));
+        resolver.Setup(r => r.ResolveFolderChildren(root, entries, directories, cancellationToken)).Returns([physical]);
+
+        Assert.Equal(new[] { physical, virtualFolder }, root.Discover(resolver.Object, directories, cancellationToken));
+        Assert.Equal(locations, root.PhysicalLocations);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -82,4 +105,10 @@ public sealed class LibraryDirectoryDiscoveryTests
 
     private static FileSystemMetadata Entry(string path, bool isDirectory = false)
         => new() { FullName = path, IsDirectory = isDirectory };
+
+    private sealed class TestAggregateFolder : AggregateFolder
+    {
+        public IEnumerable<BaseItem> Discover(IItemResolutionService resolution, IDirectoryService directories, CancellationToken cancellationToken)
+            => GetNonCachedChildren(resolution, directories, cancellationToken);
+    }
 }

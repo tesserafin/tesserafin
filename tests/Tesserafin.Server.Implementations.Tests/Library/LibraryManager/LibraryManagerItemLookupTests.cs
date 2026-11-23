@@ -97,7 +97,7 @@ public class LibraryManagerItemLookupTests
         // instead of exercising the real ItemIsVisible/IsVisibleStandalone logic.
         _itemAccessService = new Tesserafin.Server.Core.Library.ItemAccessService(
             _itemLookupService,
-            new Tesserafin.Server.Core.Library.TagVisibilityService(_itemLookupService, fixture.Freeze<ICollectionFolderResolver>(), fixture.Freeze<IUserRootFolderProvider>(), _itemRepositoryMock.Object, fixture.Freeze<ILocalizationManager>(), fixture.Freeze<IServerConfigurationManager>(), new Tesserafin.Controller.LiveTv.ActiveRecordings(), Mock.Of<ILibraryItemOptions>()));
+            new Tesserafin.Server.Core.Library.TagVisibilityService(_itemLookupService, fixture.Freeze<ICollectionFolderResolver>(), fixture.Freeze<IUserRootFolderProvider>(), _itemRepositoryMock.Object, fixture.Freeze<ILocalizationManager>(), fixture.Freeze<IServerConfigurationManager>(), new Tesserafin.Controller.LiveTv.ActiveRecordings(), Mock.Of<ILibraryItemOptions>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.TagVisibilityService>.Instance));
         fixture.Register<IItemAccessService>(() => _itemAccessService);
 
         _writes = Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
@@ -110,16 +110,6 @@ public class LibraryManagerItemLookupTests
         fixture.Register<ILibraryManager>(() => _libraryManager);
         fixture.Inject<Microsoft.Extensions.Logging.ILogger<Tesserafin.Server.Core.Library.ItemDeletionCommands>>(Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.ItemDeletionCommands>.Instance);
         _deletions = fixture.Create<Tesserafin.Server.Core.Library.ItemDeletionCommands>();
-    }
-
-    private static void SetConfigurationManagerStatic(IServerConfigurationManager configurationManager)
-    {
-        BaseItem.ConfigurationManager = configurationManager;
-    }
-
-    private static void SetLibraryManagerStatic(ILibraryManager libraryManager)
-    {
-        BaseItem.LibraryManager = libraryManager;
     }
 
     // ---------------------------------------------------------------
@@ -303,8 +293,6 @@ public class LibraryManagerItemLookupTests
     [Fact]
     public async Task DeleteItem_CacheableItem_InvalidatesCache()
     {
-        SetConfigurationManagerStatic(_configurationManagerMock.Object);
-
         // LiveTvChannel keeps DeleteItem's side paths inert: SourceType is LiveTV (not Channel, so
         // no ChannelManager static needed), IsFolder is false (no recursive children), and with
         // Path left null, IsFileProtocol/IsInternalItem are both false so no filesystem deletion is
@@ -331,8 +319,6 @@ public class LibraryManagerItemLookupTests
     [Fact]
     public async Task DeleteUnreferenced_CacheableItem_InvalidatesCache()
     {
-        SetConfigurationManagerStatic(_configurationManagerMock.Object);
-
         var channel = new LiveTvChannel { Id = Guid.NewGuid(), Name = "Channel" };
         _itemLookupService.Register(channel);
         Assert.Same(channel, _libraryManager.GetItemById(channel.Id));
@@ -386,13 +372,10 @@ public class LibraryManagerItemLookupTests
     [Fact]
     public async Task DeleteItem_ParentResolution_UsesInstanceLookupNotStaticLibraryManager()
     {
-        SetConfigurationManagerStatic(_configurationManagerMock.Object);
-
         // Strict mock with zero setups: DeleteItem's parent resolution (item.GetOwner(this)
         // ?? item.GetParent(this), PR73) must resolve entirely through the LibraryManager
         // instance passed as "this". If it fell back to the static BaseItem.LibraryManager
         // (pre-PR73 behavior), any call on this mock throws and the test fails.
-        SetLibraryManagerStatic(new Mock<ILibraryManager>(MockBehavior.Strict).Object);
 
         var parentFolder = new Folder { Id = Guid.NewGuid(), Name = "Parent" };
         _itemLookupService.Register(parentFolder);
@@ -477,41 +460,40 @@ public class LibraryManagerItemLookupTests
     // ---------------------------------------------------------------
 
     [Fact]
-    public void GetParent_StaticAndLookupOverload_ResolveSameInstanceFromSameCache()
+    public void GetParent_AttachedCatalogueAndLookupOverload_ResolveSameInstanceFromSameCache()
     {
-        // Closing-audit check (PR76 point 5): the historical BaseItem.GetParent() (static
-        // BaseItem.LibraryManager, itself delegating to _itemLookupService per LibraryManager.cs:1599)
-        // and the PR72 BaseItem.GetParent(IItemLookupService) overload must resolve the exact same
-        // cached instance, not two independently-caching lookups.
-        SetLibraryManagerStatic(_libraryManager);
-
         var parent = new Folder { Id = Guid.NewGuid(), Name = "Parent" };
         _itemLookupService.Register(parent);
         var child = new Movie { Id = Guid.NewGuid(), Name = "Child", ParentId = parent.Id };
 
-        var viaStatic = child.GetParent();
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(r => r.GetItemById(It.IsAny<Guid>())).Returns(_itemLookupService.GetItemById);
+        child.ReadServices = reads.Object;
+
+        var viaCatalogue = child.GetParent();
         var viaLookup = child.GetParent(_itemLookupService);
 
-        Assert.Same(parent, viaStatic);
-        Assert.Same(viaStatic, viaLookup);
+        Assert.Same(parent, viaCatalogue);
+        Assert.Same(viaCatalogue, viaLookup);
         _itemRepositoryMock.Verify(r => r.RetrieveItem(It.IsAny<Guid>()), Times.Never);
     }
 
     [Fact]
-    public void GetOwner_StaticAndLookupOverload_ResolveSameInstanceFromSameCache()
+    public void GetOwner_AttachedCatalogueAndLookupOverload_ResolveSameInstanceFromSameCache()
     {
-        // Closing-audit check (PR76 point 6): same as above, for GetOwner()/GetOwner(lookup).
-        SetLibraryManagerStatic(_libraryManager);
-
         var owner = new Movie { Id = Guid.NewGuid(), Name = "Owner" };
         _itemLookupService.Register(owner);
         var item = new Movie { Id = Guid.NewGuid(), Name = "Item", OwnerId = owner.Id };
 
-        var viaStatic = item.GetOwner();
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(r => r.GetItemById(It.IsAny<Guid>())).Returns(_itemLookupService.GetItemById);
+        item.ReadServices = reads.Object;
+
+        var viaCatalogue = item.GetOwner();
         var viaLookup = item.GetOwner(_itemLookupService);
 
-        Assert.Same(owner, viaStatic);
-        Assert.Same(viaStatic, viaLookup);
+        Assert.Same(owner, viaCatalogue);
+        Assert.Same(viaCatalogue, viaLookup);
         _itemRepositoryMock.Verify(r => r.RetrieveItem(It.IsAny<Guid>()), Times.Never);
     }
 
@@ -569,10 +551,6 @@ public class LibraryManagerItemLookupTests
         // metadata refresh uses a provider mock supplied through the validation port.
         // What remains under test is exactly the PR75 fix: the missing-directory cleanup loop in
         // ValidateTopLibraryFolders must invalidate the cache entry after deleting from the DB.
-        SetLibraryManagerStatic(_libraryManager);
-        SetConfigurationManagerStatic(_configurationManagerMock.Object);
-        BaseItem.Logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<BaseItem>();
-        BaseItem.FileSystem = Mock.Of<Tesserafin.Model.IO.IFileSystem>();
 
         var missing = new CollectionFolder
         {

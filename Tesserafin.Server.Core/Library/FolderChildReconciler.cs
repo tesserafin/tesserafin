@@ -12,12 +12,12 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Entities;
-using Tesserafin.Model.IO;
+using Tesserafin.Model.MediaInfo;
 
 namespace Tesserafin.Server.Core.Library;
 
 /// <summary>Reconciles one completed discovery snapshot through explicit lifecycle commands.</summary>
-internal sealed class FolderChildReconciler(IItemLookupService lookup, IFileSystem files, ILogger<FolderChildReconciler> logger)
+internal sealed class FolderChildReconciler(IItemLookupService lookup, ILogger<FolderChildReconciler> logger)
 {
     public async Task<FolderChildReconciliationResult> ReconcileAsync(Folder parent, IReadOnlyList<BaseItem> currentSnapshot, IReadOnlyList<BaseItem> discovered, IDirectoryService directoryService, bool allowRemoveRoot, IItemWriteCommands writes, IItemDeletionCommands deletions, IItemImageService images, IChannelManager channels, CancellationToken cancellationToken)
     {
@@ -172,7 +172,7 @@ internal sealed class FolderChildReconciler(IItemLookupService lookup, IFileSyst
                     }
                 }
 
-                if (!string.IsNullOrEmpty(item.Path) && files.IsPathFile(item.Path))
+                if (!string.IsNullOrEmpty(item.Path) && MediaPath.IsFile(item.Path))
                 {
                     logger.LogDebug("Removed item: {Path}", item.Path);
 
@@ -314,7 +314,7 @@ internal sealed class FolderChildReconciler(IItemLookupService lookup, IFileSyst
 
     private bool IsLibraryFolderAccessible(IDirectoryService directoryService, BaseItem item, bool checkCollection)
     {
-        if (!checkCollection && (item is BoxSet || (!string.IsNullOrEmpty(item.Path) && files.IsPathFile(item.Path) && string.Equals(Path.GetFileNameWithoutExtension(item.Path), "collections", StringComparison.OrdinalIgnoreCase))))
+        if (!checkCollection && (item is BoxSet || (!string.IsNullOrEmpty(item.Path) && MediaPath.IsFile(item.Path) && string.Equals(Path.GetFileNameWithoutExtension(item.Path), "collections", StringComparison.OrdinalIgnoreCase))))
         {
             return true;
         }

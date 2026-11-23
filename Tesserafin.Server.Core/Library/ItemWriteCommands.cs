@@ -11,8 +11,10 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Extensions;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
+using Tesserafin.Model.MediaInfo;
 
 namespace Tesserafin.Server.Core.Library;
 
@@ -34,6 +36,7 @@ internal sealed partial class ItemWriteCommands(
     ILibraryItemOptions itemOptions,
     FolderChildReconciler childReconciler,
     CollectionFolderMembershipResolver collectionMembership,
+    IItemStore itemStore,
     ILogger<ItemWriteCommands> logger) : IItemWriteCommands
 {
     private readonly IItemResolutionService _resolution = resolution;
@@ -210,6 +213,28 @@ internal sealed partial class ItemWriteCommands(
 
     public void CreateItem(BaseItem item, BaseItem? parent) => CreateItems([item], parent, CancellationToken.None);
 
+    public void CreateChild(Folder parent, BaseItem item)
+    {
+        item.SetParent(parent);
+        if (item.Id.IsEmpty())
+        {
+            item.Id = itemStore.GetNewItemId(item.Path, item.GetType());
+        }
+
+        var now = DateTime.UtcNow;
+        if (item.DateCreated == DateTime.MinValue)
+        {
+            item.DateCreated = now;
+        }
+
+        if (item.DateModified == DateTime.MinValue)
+        {
+            item.DateModified = now;
+        }
+
+        CreateItem(item, parent);
+    }
+
     public void CreateItems(IReadOnlyList<BaseItem> items, BaseItem? parent, CancellationToken cancellationToken)
     {
         var graph = versions.Prepare(items, parent, cancellationToken);
@@ -290,7 +315,7 @@ internal sealed partial class ItemWriteCommands(
         {
             cancellationToken.ThrowIfCancellationRequested();
             draft.DateLastSaved = DateTime.UtcNow;
-            if (!string.IsNullOrEmpty(draft.Path) && files.IsPathFile(draft.Path))
+            if (!string.IsNullOrEmpty(draft.Path) && MediaPath.IsFile(draft.Path))
             {
                 await metadataExporter.SaveAsync(draft, propagated.Contains(draft.Id) ? ItemUpdateType.MetadataDownload : reason, cancellationToken).ConfigureAwait(false);
             }
@@ -369,7 +394,7 @@ internal sealed partial class ItemWriteCommands(
     public async Task<bool> RefreshOwnedVideosAsync(Video owner, IItemMetadataDispatcher metadata, IItemDeletionCommands deletions, MetadataRefreshOptions options, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (owner.ParentId.Equals(Guid.Empty) || !files.IsPathFile(owner.Path))
+        if (owner.ParentId.Equals(Guid.Empty) || !MediaPath.IsFile(owner.Path))
         {
             return false;
         }

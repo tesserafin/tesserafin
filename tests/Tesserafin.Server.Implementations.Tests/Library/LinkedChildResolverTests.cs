@@ -7,13 +7,33 @@ using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Playlists;
-using Tesserafin.Model.IO;
 using Xunit;
 
 namespace Tesserafin.Server.Implementations.Tests.Library;
 
 public sealed class LinkedChildResolverTests
 {
+    [Fact]
+    public void FolderGetLinkedChildren_UsesTheAttachedResolver()
+    {
+        var target = new Folder { Id = Guid.NewGuid() };
+        var repository = new Mock<IItemRepository>(MockBehavior.Strict);
+        repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q =>
+            q.ItemIds.Length == 1 && q.ItemIds[0].Equals(target.Id)))).Returns([target]);
+        var resolver = new LinkedChildResolver(
+            repository.Object,
+            Mock.Of<IItemLookupService>(MockBehavior.Strict),
+            Mock.Of<IItemPathLookupService>(MockBehavior.Strict),
+            NullLogger<LinkedChildResolver>.Instance);
+        var folder = new Folder
+        {
+            LinkedChildren = [LinkedChild.Create(target), LinkedChild.Create(target)],
+            ReadServices = Mock.Of<IItemReadServices>(reads => reads.LinkedChildren == resolver)
+        };
+
+        Assert.Equal(new[] { target, target }, folder.GetLinkedChildren());
+    }
+
     [Fact]
     public void Resolve_BatchesIdsButKeepsLinkOrderAndRecoversSavedPaths()
     {
@@ -46,10 +66,7 @@ public sealed class LinkedChildResolverTests
         paths.Setup(p => p.FindByPath(resolvedPath, null)).Returns(recovered);
         var missingPath = Path.Combine(Path.GetDirectoryName(playlistPath)!, "missing.mkv");
         paths.Setup(p => p.FindByPath(missingPath, null)).Returns((BaseItem?)null);
-        var files = new Mock<IFileSystem>(MockBehavior.Strict);
-        files.Setup(f => f.MakeAbsolutePath(folder.ContainingFolderPath, "recovered.mkv")).Returns(resolvedPath);
-        files.Setup(f => f.MakeAbsolutePath(folder.ContainingFolderPath, "missing.mkv")).Returns(missingPath);
-        var resolver = new LinkedChildResolver(repository.Object, lookup.Object, paths.Object, files.Object, NullLogger<LinkedChildResolver>.Instance);
+        var resolver = new LinkedChildResolver(repository.Object, lookup.Object, paths.Object, NullLogger<LinkedChildResolver>.Instance);
 
         var items = resolver.Resolve(folder);
 

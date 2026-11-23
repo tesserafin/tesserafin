@@ -10,7 +10,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library;
 /// <summary>
 /// Characterization tests for <c>Season.GetSeries(IItemLookupService)</c>, the service-aware
 /// sibling of the <c>Season.Series</c> property added in PR88. They prove series resolution goes
-/// through the injected lookup and never the static <see cref="BaseItem.LibraryManager"/> (set to a
+/// through the injected lookup and never the static <c>BaseItem.LibraryManager</c> (set to a
 /// <see cref="MockBehavior.Strict"/> mock that throws if any member is touched). The parameterless
 /// <c>Season.Series</c> property is intentionally left as a static compatibility wrapper; only
 /// DynamicImageProvider, the lookup-bearing consumer found in the PR88 audit, was migrated to the
@@ -19,16 +19,9 @@ namespace Tesserafin.Server.Implementations.Tests.Library;
 [Collection(Tesserafin.Server.Implementations.Tests.Library.LibraryManager.LibraryManagerStaticStateFixture.Name)]
 public class SeasonGetSeriesTests
 {
-    private static void SetStrictLibraryManagerStatic()
-    {
-        // Any fall-back to the static hierarchy path would hit an unconfigured strict member and throw.
-        BaseItem.LibraryManager = new Mock<ILibraryManager>(MockBehavior.Strict).Object;
-    }
-
     [Fact]
     public void GetSeries_SeriesIdSet_ResolvesViaLookupNotStatic()
     {
-        SetStrictLibraryManagerStatic();
         var series = new Series { Id = Guid.NewGuid(), Name = "Show" };
         var season = new Season { Id = Guid.NewGuid(), Name = "S1", SeriesId = series.Id };
         var lookup = new Mock<IItemLookupService>();
@@ -40,7 +33,6 @@ public class SeasonGetSeriesTests
     [Fact]
     public void GetSeries_EmptySeriesId_ResolvesViaParentChainThroughLookup()
     {
-        SetStrictLibraryManagerStatic();
         var series = new Series { Id = Guid.NewGuid(), Name = "Show" };
         var season = new Season { Id = Guid.NewGuid(), Name = "S1", SeriesId = Guid.Empty, ParentId = series.Id };
         var lookup = new Mock<IItemLookupService>();
@@ -55,7 +47,6 @@ public class SeasonGetSeriesTests
     [Fact]
     public void GetSeries_NoSeriesIdAndNoParent_ReturnsNullWithoutLookupOrStatic()
     {
-        SetStrictLibraryManagerStatic();
         var season = new Season { Id = Guid.NewGuid(), Name = "S1", SeriesId = Guid.Empty, ParentId = Guid.Empty };
         var lookup = new Mock<IItemLookupService>();
 

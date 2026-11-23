@@ -17,12 +17,11 @@ public class ItemSortServiceTests
     private const ItemSortBy NameSortBy = ItemSortBy.Name;
     private const ItemSortBy UserSortBy = ItemSortBy.IsPlayed;
 
-    private static ItemSortService CreateService(out Mock<IUserManager> userManager, out Mock<IUserDataManager> userDataManager)
+    private static ItemSortService CreateService(out Mock<IUserDataManager> userDataManager)
     {
-        userManager = new Mock<IUserManager>();
         userDataManager = new Mock<IUserDataManager>();
 
-        return new ItemSortService(userManager.Object, userDataManager.Object);
+        return new ItemSortService(userDataManager.Object);
     }
 
     private static BaseItem CreateItem(string name)
@@ -31,7 +30,7 @@ public class ItemSortServiceTests
     [Fact]
     public void Sort_WithUnregisteredComparer_ReturnsItemsUnchanged()
     {
-        var service = CreateService(out _, out _);
+        var service = CreateService(out _);
 
         var items = new[] { CreateItem("c"), CreateItem("a"), CreateItem("b") };
 
@@ -44,7 +43,7 @@ public class ItemSortServiceTests
     [Fact]
     public void Sort_Ascending_OrdersUsingRegisteredComparer()
     {
-        var service = CreateService(out _, out _);
+        var service = CreateService(out _);
         service.AddParts([new FakeNameComparer()]);
 
         var c = CreateItem("c");
@@ -59,7 +58,7 @@ public class ItemSortServiceTests
     [Fact]
     public void Sort_Descending_ReversesOrder()
     {
-        var service = CreateService(out _, out _);
+        var service = CreateService(out _);
         service.AddParts([new FakeNameComparer()]);
 
         var c = CreateItem("c");
@@ -74,7 +73,7 @@ public class ItemSortServiceTests
     [Fact]
     public void Sort_TupleOverload_SkipsUnregisteredComparer()
     {
-        var service = CreateService(out _, out _);
+        var service = CreateService(out _);
 
         var items = new[] { CreateItem("c"), CreateItem("a"), CreateItem("b") };
 
@@ -88,7 +87,7 @@ public class ItemSortServiceTests
     [Fact]
     public void Sort_TupleOverload_OrdersUsingRegisteredComparer()
     {
-        var service = CreateService(out _, out _);
+        var service = CreateService(out _);
         service.AddParts([new FakeNameComparer()]);
 
         var c = CreateItem("c");
@@ -103,7 +102,7 @@ public class ItemSortServiceTests
     [Fact]
     public void Sort_WithMultipleComparers_AppliesThenBy()
     {
-        var service = CreateService(out _, out _);
+        var service = CreateService(out _);
         service.AddParts([new FakeGroupComparer(), new FakeNameComparer()]);
 
         var a1 = CreateItem("a1"); // group 1
@@ -119,7 +118,7 @@ public class ItemSortServiceTests
     [Fact]
     public void Sort_WithUserComparer_InjectsUserAndManagersIntoANewInstancePerCall()
     {
-        var service = CreateService(out var userManager, out var userDataManager);
+        var service = CreateService(out var userDataManager);
         service.AddParts([new FakeUserComparer()]);
 
         var user = new User("test-user", "Tesserafin.Server.Implementations.Tests", "Tesserafin.Server.Implementations.Tests");
@@ -129,7 +128,6 @@ public class ItemSortServiceTests
 
         Assert.NotNull(FakeUserComparer.LastAssignedUser);
         Assert.Same(user, FakeUserComparer.LastAssignedUser);
-        Assert.Same(userManager.Object, FakeUserComparer.LastAssignedUserManager);
         Assert.Same(userDataManager.Object, FakeUserComparer.LastAssignedUserDataManager);
 
         // GetComparer creates a fresh instance (via Activator.CreateInstance) on every resolution
@@ -140,7 +138,7 @@ public class ItemSortServiceTests
     [Fact]
     public void Sort_WithRandomComparer_ShufflesButKeepsAllItems()
     {
-        var service = CreateService(out _, out _);
+        var service = CreateService(out _);
         service.AddParts([new RandomComparer()]);
 
         var items = Enumerable.Range(0, 10).Select(i => CreateItem(i.ToString(System.Globalization.CultureInfo.InvariantCulture))).ToArray();
@@ -154,7 +152,7 @@ public class ItemSortServiceTests
     [Fact]
     public void Sort_RandomFollowedByRealComparer_ResetsOrderingBeforeApplyingIt()
     {
-        var service = CreateService(out _, out _);
+        var service = CreateService(out _);
         service.AddParts([new RandomComparer(), new FakeNameComparer()]);
 
         var c = CreateItem("c");
@@ -192,7 +190,6 @@ public class ItemSortServiceTests
         private static int _instancesCreated;
 
         private User? _user;
-        private IUserManager? _userManager;
         private IUserDataManager? _userDataManager;
 
         public FakeUserComparer()
@@ -201,8 +198,6 @@ public class ItemSortServiceTests
         }
 
         public static User? LastAssignedUser { get; private set; }
-
-        public static IUserManager? LastAssignedUserManager { get; private set; }
 
         public static IUserDataManager? LastAssignedUserDataManager { get; private set; }
 
@@ -217,16 +212,6 @@ public class ItemSortServiceTests
             {
                 _user = value;
                 LastAssignedUser = value;
-            }
-        }
-
-        public IUserManager? UserManager
-        {
-            get => _userManager;
-            set
-            {
-                _userManager = value;
-                LastAssignedUserManager = value;
             }
         }
 

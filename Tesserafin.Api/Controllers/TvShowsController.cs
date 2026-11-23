@@ -261,7 +261,7 @@ public class TvShowsController : BaseTesserafinApiController
             }
 
             var seasonItem = series
-                .GetSeasons(user, dtoOptions)
+                .GetSeasons(user, dtoOptions, _listing)
                 .FirstOrDefault(i => i.IndexNumber == season.Value);
 
             episodes = seasonItem is null ?

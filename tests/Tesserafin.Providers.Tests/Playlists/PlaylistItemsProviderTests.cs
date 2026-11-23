@@ -10,7 +10,6 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
-using Tesserafin.Model.IO;
 using Tesserafin.Providers.Playlists;
 using Tesserafin.Providers.Tests.Plugins;
 using Xunit;
@@ -52,10 +51,7 @@ public sealed class PlaylistItemsProviderTests
         catalogue.Setup(c => c.FindByPath(first.Path, null)).Returns(first);
         catalogue.Setup(c => c.FindByPath(second.Path, null)).Returns(second);
         catalogue.Setup(c => c.FindByPath(unindexed, null)).Returns((BaseItem?)null);
-        var files = new Mock<IFileSystem>(MockBehavior.Strict);
-        files.Setup(f => f.MakeAbsolutePath(directory.Path, It.IsAny<string>()))
-            .Returns((string folder, string path) => Path.GetFullPath(Path.Combine(folder, path)));
-        var provider = new PlaylistItemsProvider(NullLogger<PlaylistItemsProvider>.Instance, roots, catalogue.Object, files.Object);
+        var provider = new PlaylistItemsProvider(NullLogger<PlaylistItemsProvider>.Instance, roots, catalogue.Object);
 
         var metadata = await provider.GetMetadata(new ItemInfo(new Playlist { Path = playlistPath }), Mock.Of<IDirectoryService>(), token);
 

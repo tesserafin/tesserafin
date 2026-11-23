@@ -88,21 +88,8 @@ namespace Tesserafin.Controller.Playlists
         [JsonIgnore]
         public override MediaType MediaType => PlaylistMediaType;
 
-        [JsonIgnore]
-        private bool IsSharedItem
-        {
-            get
-            {
-                var path = Path;
-
-                if (string.IsNullOrEmpty(path))
-                {
-                    return false;
-                }
-
-                return FileSystem.ContainsSubPath(ConfigurationManager.ApplicationPaths.DataPath, path);
-            }
-        }
+        private bool IsSharedItem(IStandaloneVisibilityService scope)
+            => !string.IsNullOrEmpty(Path) && scope.IsManagedLibraryPath(Path);
 
         public static bool IsPlaylistFile(string path)
         {
@@ -189,7 +176,7 @@ namespace Tesserafin.Controller.Playlists
         {
             if (item is MusicGenre musicGenre)
             {
-                return LibraryManager.GetItemList(new InternalItemsQuery(user)
+                return itemQueryService.GetItemList(new InternalItemsQuery(user)
                 {
                     Recursive = true,
                     IncludeItemTypes = [BaseItemKind.Audio],
@@ -201,7 +188,7 @@ namespace Tesserafin.Controller.Playlists
 
             if (item is MusicArtist musicArtist)
             {
-                return LibraryManager.GetItemList(new InternalItemsQuery(user)
+                return itemQueryService.GetItemList(new InternalItemsQuery(user)
                 {
                     Recursive = true,
                     IncludeItemTypes = [BaseItemKind.Audio],
@@ -230,7 +217,7 @@ namespace Tesserafin.Controller.Playlists
 
         public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
-            if (!IsSharedItem)
+            if (!IsSharedItem(tagVisibility))
             {
                 return base.IsVisible(user, skipAllowedTagsCheck, tagVisibility);
             }
@@ -262,7 +249,7 @@ namespace Tesserafin.Controller.Playlists
 
         public override bool IsVisibleStandalone(User user, IStandaloneVisibilityService tagVisibility)
         {
-            if (!IsSharedItem)
+            if (!IsSharedItem(tagVisibility))
             {
                 return base.IsVisibleStandalone(user, tagVisibility);
             }

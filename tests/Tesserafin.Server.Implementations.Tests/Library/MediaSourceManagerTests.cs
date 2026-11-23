@@ -5,11 +5,13 @@ using AutoFixture;
 using AutoFixture.AutoMoq;
 using Castle.Components.DictionaryAdapter;
 using Moq;
+using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Data.Entities;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
@@ -18,6 +20,7 @@ using Tesserafin.Model.MediaInfo;
 using Tesserafin.Server.Core.IO;
 using Tesserafin.Server.Core.Library;
 using Xunit;
+using LinkedChildType = Tesserafin.Controller.Entities.LinkedChildType;
 
 namespace Tesserafin.Server.Implementations.Tests.Library
 {
@@ -49,6 +52,21 @@ namespace Tesserafin.Server.Implementations.Tests.Library
             _item = new Video { Id = Guid.NewGuid(), OwnerId = Guid.Empty, ParentId = Guid.Empty };
 
             _user = fixture.Create<User>();
+        }
+
+        [Fact]
+        public void MapFilePath_UsesTheInjectedConfiguration()
+        {
+            var configuration = new ServerConfiguration
+            {
+                PathSubstitutions = [new PathSubstitution { From = "/library", To = "/share" }]
+            };
+            var fixture = new Fixture().Customize(new AutoMoqCustomization { ConfigureMembers = true });
+            fixture.Inject(Mock.Of<IServerConfigurationManager>(manager => manager.Configuration == configuration));
+            using var manager = fixture.Create<MediaSourceManager>();
+
+            Assert.Equal("/share/film.mkv", manager.MapFilePath("/library/film.mkv"));
+            Assert.Equal("/other/film.mkv", manager.MapFilePath("/other/film.mkv"));
         }
 
         [Theory]
@@ -266,19 +284,14 @@ namespace Tesserafin.Server.Implementations.Tests.Library
             mediaSourceManager.Setup(x => x.GetMediaStreams(It.IsAny<Guid>())).Returns(new List<MediaStream>());
             mediaSourceManager.Setup(x => x.GetMediaAttachments(It.IsAny<Guid>())).Returns(new List<MediaAttachment>());
 
-            var libraryManager = new Mock<ILibraryManager>();
-            libraryManager.Setup(x => x.GetLinkedAlternateVersions(It.IsAny<Video>())).Returns(Array.Empty<Video>());
-            libraryManager.Setup(x => x.GetLocalAlternateVersionIds(primary)).Returns(new[] { alt1.Id, alt2.Id });
-            libraryManager.Setup(x => x.GetLocalAlternateVersionIds(alt1)).Returns(Array.Empty<Guid>());
-            libraryManager.Setup(x => x.GetLocalAlternateVersionIds(alt2)).Returns(Array.Empty<Guid>());
-            libraryManager.Setup(x => x.GetItemById(primary.Id)).Returns(primary);
-            libraryManager.Setup(x => x.GetItemById(alt1.Id)).Returns(alt1);
-            libraryManager.Setup(x => x.GetItemById(alt2.Id)).Returns(alt2);
-
-            var recordingsManager = new Mock<IRecordingsManager>();
-            recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-
-            BaseItem.LibraryManager = libraryManager.Object;
+            var reads = new Mock<IItemReadServices>();
+            reads.Setup(x => x.GetVideoVersionIds(primary, LinkedChildType.LocalAlternateVersion)).Returns([alt1.Id, alt2.Id]);
+            reads.Setup(x => x.GetItemById(primary.Id)).Returns(primary);
+            reads.Setup(x => x.GetItemById(alt1.Id)).Returns(alt1);
+            reads.Setup(x => x.GetItemById(alt2.Id)).Returns(alt2);
+            primary.ReadServices = reads.Object;
+            alt1.ReadServices = reads.Object;
+            alt2.ReadServices = reads.Object;
 
             return (primary, alt1, alt2);
         }

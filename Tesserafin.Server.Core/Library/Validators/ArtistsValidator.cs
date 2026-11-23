@@ -10,6 +10,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.Library.Validators;
 
@@ -32,6 +33,7 @@ public class ArtistsValidator
     /// </summary>
     private readonly ILogger<ArtistsValidator> _logger;
     private readonly IItemRepository _itemRepo;
+    private readonly IFileSystem _fileSystem;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ArtistsValidator" /> class.
@@ -42,7 +44,15 @@ public class ArtistsValidator
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
-    public ArtistsValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, IProviderManager providers, ILibraryManager libraryManager, ILogger<ArtistsValidator> logger, IItemRepository itemRepo)
+    /// <param name="fileSystem">The filesystem used to read refresh directories.</param>
+    public ArtistsValidator(
+        IItemWriteCommands writes,
+        IItemDeletionCommands deletions,
+        IProviderManager providers,
+        ILibraryManager libraryManager,
+        ILogger<ArtistsValidator> logger,
+        IItemRepository itemRepo,
+        IFileSystem fileSystem)
     {
         _writes = writes;
         _deletions = deletions;
@@ -50,6 +60,7 @@ public class ArtistsValidator
         _libraryManager = libraryManager;
         _logger = logger;
         _itemRepo = itemRepo;
+        _fileSystem = fileSystem;
     }
 
     /// <summary>
@@ -89,7 +100,7 @@ public class ArtistsValidator
 
                 if (isNew || neverRefreshed)
                 {
-                    await item.RefreshMetadata(_deletions, _writes, _providers, cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(_deletions, _writes, _providers, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), cancellationToken).ConfigureAwait(false);
                     refreshed++;
                 }
             }

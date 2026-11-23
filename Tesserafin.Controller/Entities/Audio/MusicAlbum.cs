@@ -70,7 +70,7 @@ namespace Tesserafin.Controller.Entities.Audio
             => GetRecursiveCatalogueChildren(repository, lookup, links, static item => item is Audio);
 
         public MusicArtist GetMusicArtist()
-            => FindMusicArtist(GetParents(), name => LibraryManager.GetArtists([name]));
+            => FindMusicArtist(GetParents(), name => ReadServices?.FindArtists([name]));
 
         protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user, InternalItemsQuery query)
         {
@@ -187,7 +187,7 @@ namespace Tesserafin.Controller.Entities.Audio
             var name = AlbumArtist;
             if (!string.IsNullOrEmpty(name))
             {
-                return findArtists(name).TryGetValue(name, out var artists)
+                return findArtists(name)?.TryGetValue(name, out var artists) == true
                     ? artists.OrderBy(artist => artist.IsAccessedByName ? 1 : 0).ThenBy(artist => artist.Id).FirstOrDefault()
                     : null;
             }

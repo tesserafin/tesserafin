@@ -26,7 +26,7 @@ namespace Tesserafin.Providers.Tests.TV;
 /// The embedded mp4 episode tags are read by the episode metadata service through injected services,
 /// not by the entity through the former <c>Episode.MediaEncoder</c> static.
 /// </summary>
-/// <remarks>The refresh pipeline still reads <see cref="BaseItem.LibraryManager"/>; the test swaps it inside the
+/// <remarks>The refresh pipeline still reads <c>BaseItem.LibraryManager</c>; the test swaps it inside the
 /// collection that already serializes that static and restores it.</remarks>
 [Collection("LibraryManagerTests")]
 public sealed class EpisodeEmbeddedInfoProbeTests
@@ -109,12 +109,8 @@ public sealed class EpisodeEmbeddedInfoProbeTests
     [Fact]
     public async Task RefreshMetadata_RunsTheProbeBeforeTheEntityHook()
     {
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(l => l.GetLibraryOptions(It.IsAny<BaseItem>())).Returns(_enabled);
         var configuration = new Mock<IServerConfigurationManager>();
         configuration.Setup(c => c.Configuration).Returns(new ServerConfiguration());
-        var previousLibraryManager = BaseItem.LibraryManager;
-        BaseItem.LibraryManager = libraryManager.Object;
         var itemOptions = Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(It.IsAny<BaseItem>()) == _enabled);
         var naming = new Mock<IItemNamingService>();
         var episode = Mp4Episode();
@@ -147,17 +143,10 @@ public sealed class EpisodeEmbeddedInfoProbeTests
             Mock.Of<IItemLookupService>(),
             Mock.Of<ICollectionFolderResolver>());
 
-        try
-        {
-            await service.RefreshMetadata(
-                episode,
-                new MetadataRefreshOptions(Mock.Of<IDirectoryService>()) { ImageRefreshMode = MetadataRefreshMode.ValidationOnly },
-                CancellationToken.None);
-        }
-        finally
-        {
-            BaseItem.LibraryManager = previousLibraryManager;
-        }
+        await service.RefreshMetadata(
+            episode,
+            new MetadataRefreshOptions(Mock.Of<IDirectoryService>()) { ImageRefreshMode = MetadataRefreshMode.ValidationOnly },
+            CancellationToken.None);
 
         _encoder.Verify(e => e.GetMediaInfo(It.IsAny<MediaInfoRequest>(), It.IsAny<CancellationToken>()), Times.Once);
         naming.Verify(n => n.FillMissingEpisodeNumbersFromPath(episode, false), Times.Once);

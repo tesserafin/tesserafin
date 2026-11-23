@@ -17,6 +17,7 @@ using Tesserafin.Data.Enums;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
+using Tesserafin.Model.IO;
 using Tesserafin.Model.Lyrics;
 using Tesserafin.Model.Providers;
 using Tesserafin.Providers.Lyric;
@@ -87,7 +88,8 @@ public sealed class ScheduledSidecarDownloadTests
             NullLogger<SubtitleScheduledTask>.Instance,
             Mock.Of<ILocalizationManager>(),
             [Mock.Of<ISubtitleProvider>(p => p.Name == "Provider")],
-            mediaSources.Object);
+            mediaSources.Object,
+            Mock.Of<IFileSystem>());
 
         await task.ExecuteAsync(Mock.Of<IProgress<double>>(), token);
 

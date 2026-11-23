@@ -33,7 +33,6 @@ public abstract class UserDataLockingModeTests : IDisposable
     private const string PlaceholderKey = "00000000-0000-0000-0000-000000000001";
 
     private readonly MigratedSqliteDatabase _database;
-    private readonly ILibraryManager _previousLibraryManager;
     private readonly ItemPersistenceService _service;
     private readonly Guid _userId;
     private readonly Guid _otherUserId;
@@ -50,11 +49,6 @@ public abstract class UserDataLockingModeTests : IDisposable
             _userId = user.Id;
             _otherUserId = otherUser.Id;
         }
-
-        _previousLibraryManager = BaseItem.LibraryManager;
-        var libraryManager = new Mock<ILibraryManager>();
-        libraryManager.Setup(value => value.GetCollectionFolders(It.IsAny<BaseItem>())).Returns(() => []);
-        BaseItem.LibraryManager = libraryManager.Object;
 
         var appHost = new Mock<IServerApplicationHost>();
         appHost.Setup(value => value.ReverseVirtualPath(It.IsAny<string>())).Returns((string path) => path);
@@ -133,7 +127,6 @@ public abstract class UserDataLockingModeTests : IDisposable
     {
         if (disposing)
         {
-            BaseItem.LibraryManager = _previousLibraryManager;
             _database.Dispose();
         }
     }

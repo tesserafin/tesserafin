@@ -42,7 +42,8 @@ namespace Tesserafin.Controller.Entities
         /// <param name="item">The item.</param>
         /// <param name="imageType">Type of the image.</param>
         /// <param name="file">The file.</param>
-        public static void SetImagePath(this BaseItem item, ImageType imageType, string file)
+        /// <param name="fileSystem">The filesystem used for local image metadata.</param>
+        public static void SetImagePath(this BaseItem item, ImageType imageType, string file, IFileSystem fileSystem)
         {
             if (file.StartsWith("http", StringComparison.OrdinalIgnoreCase))
             {
@@ -56,7 +57,7 @@ namespace Tesserafin.Controller.Entities
             }
             else
             {
-                item.SetImagePath(imageType, BaseItem.FileSystem.GetFileInfo(file));
+                item.SetImagePath(imageType, fileSystem.GetFileInfo(file));
             }
         }
 

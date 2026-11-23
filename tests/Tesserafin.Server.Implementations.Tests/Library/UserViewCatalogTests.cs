@@ -33,15 +33,6 @@ namespace Tesserafin.Server.Implementations.Tests.Library;
 /// <c>UserViewManager.GetUserViews</c> on shared fakes live in
 /// <see cref="UserViewCatalogParityTests"/>.
 /// </summary>
-/// <remarks>
-/// <c>BaseItem.SortName</c> (used by the final <c>OrderBy</c>/<c>ThenBy</c> in
-/// <see cref="UserViewCatalog.GetUserViews"/>, verbatim from the historical implementation) reads
-/// the process-wide static <c>BaseItem.ConfigurationManager</c> - this class sets it per test and
-/// shares the same non-parallel xunit collection as <c>LibraryManagerUserViewFactoryTests</c> et al.
-/// so tests touching this static never race each other (see
-/// <see cref="Tesserafin.Server.Implementations.Tests.Library.LibraryManager.LibraryManagerStaticStateFixture"/>).
-/// </remarks>
-[Collection(Tesserafin.Server.Implementations.Tests.Library.LibraryManager.LibraryManagerStaticStateFixture.Name)]
 public sealed class UserViewCatalogTests
 {
     private static User MakeUser()
@@ -53,7 +44,6 @@ public sealed class UserViewCatalogTests
     {
         var mock = new Mock<IServerConfigurationManager>();
         mock.Setup(c => c.Configuration).Returns(new ServerConfiguration { EnableFolderView = enableFolderView });
-        Tesserafin.Controller.Entities.BaseItem.ConfigurationManager = mock.Object;
         return mock.Object;
     }
 
