@@ -10,8 +10,8 @@ namespace Tesserafin.Controller.Library
     /// <remarks>
     /// Extracted from the entities (DEBT-SERVER-3): <see cref="BaseItem.GetInheritedTags()"/> reads
     /// parents and member libraries through the static <c>BaseItem.LibraryManager</c>. A caller holding
-    /// this service passes it down <see cref="BaseItem.IsVisibleStandalone(User, ITagVisibilityService)"/>
-    /// and <see cref="BaseItem.IsVisible(User, bool, ITagVisibilityService)"/>, so every entity override
+    /// this service passes it down <see cref="BaseItem.IsVisibleStandalone(User, IStandaloneVisibilityService)"/>
+    /// and <see cref="BaseItem.IsVisible(User, bool, IStandaloneVisibilityService)"/>, so every entity override
     /// keeps its own rules while the tags come from here. Implementations must not depend on
     /// <see cref="ILibraryManager"/>, directly or deferred.
     /// </remarks>

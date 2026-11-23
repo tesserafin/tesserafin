@@ -19,6 +19,7 @@ using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.Providers;
 
@@ -35,22 +36,24 @@ namespace Tesserafin.Providers.Manager
             ILogger<MetadataService<TItemType, TIdType>> logger,
             IProviderManager providerManager,
             IFileSystem fileSystem,
-            ILibraryManager libraryManager,
+            ILibraryItemOptions itemOptions,
             IItemNamingService itemNamingService,
             IExternalDataManager externalDataManager,
-            IItemRepository itemRepository)
+            IItemRepository itemRepository,
+            ILocalizationManager localizationManager)
         {
+            LocalizationManager = localizationManager;
             Writes = writes;
             PeopleCommands = peopleCommands;
             ServerConfigurationManager = serverConfigurationManager;
             Logger = logger;
             ProviderManager = providerManager;
             FileSystem = fileSystem;
-            LibraryManager = libraryManager;
+            ItemOptions = itemOptions;
             ItemNamingService = itemNamingService;
             ExternalDataManager = externalDataManager;
             ItemRepository = itemRepository;
-            ImageProvider = new ItemImageProvider(Logger, ProviderManager, FileSystem);
+            ImageProvider = new ItemImageProvider(Logger, ProviderManager, FileSystem, ServerConfigurationManager.ApplicationPaths);
         }
 
         protected IItemWriteCommands Writes { get; }
@@ -67,13 +70,15 @@ namespace Tesserafin.Providers.Manager
 
         protected IFileSystem FileSystem { get; }
 
-        protected ILibraryManager LibraryManager { get; }
+        protected ILibraryItemOptions ItemOptions { get; }
 
         protected IItemNamingService ItemNamingService { get; }
 
         protected IExternalDataManager ExternalDataManager { get; }
 
         protected IItemRepository ItemRepository { get; }
+
+        protected ILocalizationManager LocalizationManager { get; }
 
         protected virtual bool EnableUpdatingPremiereDateFromChildren => false;
 
@@ -98,12 +103,16 @@ namespace Tesserafin.Providers.Manager
             }
         }
 
+        protected virtual TIdType GetLookupInfo(TItemType item, LibraryOptions libraryOptions) => item.GetLookupInfo();
+
+        protected virtual string CreatePresentationUniqueKey(TItemType item) => item.CreatePresentationUniqueKey();
+
         public virtual async Task<ItemUpdateType> RefreshMetadata(BaseItem item, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
         {
             var itemOfType = (TItemType)item;
             var updateType = ItemUpdateType.None;
 
-            var libraryOptions = LibraryManager.GetLibraryOptions(item);
+            var libraryOptions = ItemOptions.GetLibraryOptions(item);
             var isFirstRefresh = item.DateLastRefreshed == DateTime.MinValue;
             var hasRefreshedMetadata = true;
             var hasRefreshedImages = true;
@@ -176,7 +185,12 @@ namespace Tesserafin.Providers.Manager
 
                 if (providers.Count > 0 || isFirstRefresh || requiresRefresh)
                 {
-                    if (item.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, ItemNamingService))
+                    if (await BeforeMetadataRefreshAsync(itemOfType, libraryOptions, refreshOptions, cancellationToken).ConfigureAwait(false))
+                    {
+                        updateType |= ItemUpdateType.MetadataImport;
+                    }
+
+                    if (BeforeMetadataRefresh(itemOfType, refreshOptions.ReplaceAllMetadata))
                     {
                         updateType |= ItemUpdateType.MetadataImport;
                     }
@@ -184,7 +198,7 @@ namespace Tesserafin.Providers.Manager
 
                 if (providers.Count > 0)
                 {
-                    var id = itemOfType.GetLookupInfo();
+                    var id = GetLookupInfo(itemOfType, libraryOptions);
 
                     if (refreshOptions.SearchResult is not null)
                     {
@@ -224,7 +238,7 @@ namespace Tesserafin.Providers.Manager
             if (hasRefreshedMetadata && hasRefreshedImages)
             {
                 item.DateLastRefreshed = DateTime.UtcNow;
-                updateType |= item.OnMetadataChanged();
+                updateType |= ApplyMetadataChanged(item);
             }
 
             updateType = await SaveInternal(item, refreshOptions, updateType, isFirstRefresh, requiresRefresh, metadataResult, cancellationToken).ConfigureAwait(false);
@@ -303,6 +317,44 @@ namespace Tesserafin.Providers.Manager
             }
         }
 
+        /// <summary>
+        /// Reads metadata the item's own media carries, before <see cref="BaseItem.BeforeMetadataRefresh"/>
+        /// and the providers run. Services, not the entity, own any I/O this needs.
+        /// </summary>
+        /// <param name="item">The item.</param>
+        /// <param name="libraryOptions">The options of the item's library.</param>
+        /// <param name="refreshOptions">The refresh options.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns><c>true</c> when the item changed.</returns>
+        protected virtual Task<bool> BeforeMetadataRefreshAsync(TItemType item, LibraryOptions libraryOptions, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
+            => Task.FromResult(false);
+
+        /// <summary>Lets the item normalise its own metadata before providers run.</summary>
+        /// <param name="item">The item.</param>
+        /// <param name="replaceAllMetadata">Whether all metadata is being replaced.</param>
+        /// <returns><c>true</c> when the item changed.</returns>
+        protected virtual bool BeforeMetadataRefresh(TItemType item, bool replaceAllMetadata)
+            => item.BeforeMetadataRefresh(replaceAllMetadata, ItemNamingService);
+
+        /// <summary>
+        /// Normalises the original language to its two-letter code, then lets the item recompute what derives
+        /// from its metadata (the inherited parental rating among others).
+        /// </summary>
+        /// <param name="item">The item.</param>
+        /// <returns>What changed.</returns>
+        private ItemUpdateType ApplyMetadataChanged(BaseItem item)
+        {
+            var updateType = ItemUpdateType.None;
+            var language = LocalizationManager.NormalizeLanguage(item.OriginalLanguage);
+            if (!string.Equals(language, item.OriginalLanguage, StringComparison.Ordinal))
+            {
+                item.OriginalLanguage = language;
+                updateType |= ItemUpdateType.MetadataImport;
+            }
+
+            return updateType | item.OnMetadataChanged(LocalizationManager);
+        }
+
         protected virtual Task AfterMetadataRefresh(TItemType item, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
         {
             item.AfterMetadataRefresh();
@@ -320,7 +372,7 @@ namespace Tesserafin.Providers.Manager
         {
             var updateType = BeforeSaveInternal(item, isFullRefresh, currentUpdateType);
 
-            updateType |= item.OnMetadataChanged();
+            updateType |= ApplyMetadataChanged(item);
 
             if (updateType == ItemUpdateType.None)
             {
@@ -341,7 +393,7 @@ namespace Tesserafin.Providers.Manager
                 updateType = UpdateMetadataFromChildren(item, children, isFullRefresh, updateType);
             }
 
-            var presentationUniqueKey = item.CreatePresentationUniqueKey();
+            var presentationUniqueKey = CreatePresentationUniqueKey(item);
             if (!string.Equals(item.PresentationUniqueKey, presentationUniqueKey, StringComparison.Ordinal))
             {
                 item.PresentationUniqueKey = presentationUniqueKey;
@@ -604,7 +656,7 @@ namespace Tesserafin.Providers.Manager
 
             if (!item.LockedFields.Contains(MetadataField.OfficialRating))
             {
-                if (item.UpdateRatingToItems(children))
+                if (item.UpdateRatingToItems(children, LocalizationManager))
                 {
                     updateType |= ItemUpdateType.MetadataEdit;
                 }

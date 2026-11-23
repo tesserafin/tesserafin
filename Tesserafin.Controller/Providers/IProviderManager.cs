@@ -9,7 +9,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
-using Tesserafin.Data.Events;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Providers;
@@ -19,14 +18,8 @@ namespace Tesserafin.Controller.Providers
     /// <summary>
     /// Interface IProviderManager.
     /// </summary>
-    public interface IProviderManager
+    public interface IProviderManager : IItemMetadataDispatcher
     {
-        event EventHandler<GenericEventArgs<BaseItem>> RefreshStarted;
-
-        event EventHandler<GenericEventArgs<BaseItem>> RefreshCompleted;
-
-        event EventHandler<GenericEventArgs<Tuple<BaseItem, double>>> RefreshProgress;
-
         /// <summary>
         /// Queues the refresh.
         /// </summary>
@@ -43,15 +36,6 @@ namespace Tesserafin.Controller.Providers
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
         Task RefreshFullItem(BaseItem item, MetadataRefreshOptions options, CancellationToken cancellationToken);
-
-        /// <summary>
-        /// Refreshes the metadata.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        /// <param name="options">The options.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>Task.</returns>
-        Task<ItemUpdateType> RefreshSingleItem(BaseItem item, MetadataRefreshOptions options, CancellationToken cancellationToken);
 
         /// <summary>
         /// Saves the image.
@@ -202,13 +186,5 @@ namespace Tesserafin.Controller.Providers
             where TLookupType : ItemLookupInfo;
 
         HashSet<Guid> GetRefreshQueue();
-
-        void OnRefreshStart(BaseItem item);
-
-        void OnRefreshProgress(BaseItem item, double progress);
-
-        void OnRefreshComplete(BaseItem item);
-
-        double? GetRefreshProgress(Guid id);
     }
 }

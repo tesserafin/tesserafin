@@ -112,12 +112,14 @@ public sealed class LiveTvPresenceProviderParityTests
             Mock.Of<IDtoService>(),
             userManagerMock.Object,
             libraryManagerMock.Object,
+            Mock.Of<IItemPathLookupService>(),
             localizationMock.Object,
             Mock.Of<Tesserafin.Controller.Channels.IChannelManager>(),
             Mock.Of<IRecordingsManager>(),
             liveTvDtoService,
             services,
-            Mock.Of<IUserViewFactory>());
+            Mock.Of<IUserViewFactory>(),
+            Mock.Of<IStandaloneVisibilityService>());
 
         var providerResult = provider.GetEnabledUsers().Select(u => u.Id).ToArray();
         var managerResult = manager.GetEnabledUsers().Select(u => u.Id).ToArray();
@@ -157,12 +159,14 @@ public sealed class LiveTvPresenceProviderParityTests
             Mock.Of<IDtoService>(),
             Mock.Of<IUserManager>(),
             libraryManagerMock.Object,
+            Mock.Of<IItemPathLookupService>(),
             localizationMock.Object,
             Mock.Of<Tesserafin.Controller.Channels.IChannelManager>(),
             Mock.Of<IRecordingsManager>(),
             liveTvDtoService,
             services,
-            userViewFactoryMock.Object);
+            userViewFactoryMock.Object,
+            Mock.Of<IStandaloneVisibilityService>());
 
         var providerResult = provider.GetLiveTvFolder(CancellationToken.None);
         var managerResult = manager.GetInternalLiveTvFolder(CancellationToken.None);

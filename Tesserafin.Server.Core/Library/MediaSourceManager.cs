@@ -17,6 +17,7 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Configuration;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.IO;
@@ -47,13 +48,13 @@ namespace Tesserafin.Server.Core.Library
 
         private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
+        private readonly Lazy<IProviderManager> _providerManager;
 
         private readonly IServerApplicationHost _appHost;
         private readonly IItemRepository _itemRepo;
         private readonly IUserManager _userManager;
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemAccessService _itemAccessService;
-        private readonly IFileSystem _fileSystem;
         private readonly ILogger<MediaSourceManager> _logger;
         private readonly IUserDataManager _userDataManager;
         private readonly IMediaEncoder _mediaEncoder;
@@ -63,6 +64,7 @@ namespace Tesserafin.Server.Core.Library
         private readonly IMediaStreamRepository _mediaStreamRepository;
         private readonly IMediaAttachmentRepository _mediaAttachmentRepository;
         private readonly IMediaSegmentManager _mediaSegmentManager;
+        private readonly Lazy<IChannelManager> _channelManager;
         private readonly ConcurrentDictionary<string, ILiveStream> _openStreams = new ConcurrentDictionary<string, ILiveStream>(StringComparer.OrdinalIgnoreCase);
         private readonly AsyncNonKeyedLocker _liveStreamLocker = new(1);
         private readonly JsonSerializerOptions _jsonOptions = JsonDefaults.Options;
@@ -72,6 +74,7 @@ namespace Tesserafin.Server.Core.Library
         public MediaSourceManager(
             IItemWriteCommands writes,
             IItemDeletionCommands deletions,
+            Lazy<IProviderManager> providers,
             IServerApplicationHost appHost,
             IItemRepository itemRepo,
             IApplicationPaths applicationPaths,
@@ -80,23 +83,24 @@ namespace Tesserafin.Server.Core.Library
             IItemLookupService itemLookupService,
             IItemAccessService itemAccessService,
             ILogger<MediaSourceManager> logger,
-            IFileSystem fileSystem,
             IUserDataManager userDataManager,
             IMediaEncoder mediaEncoder,
             IDirectoryService directoryService,
             IMediaStreamRepository mediaStreamRepository,
             IMediaAttachmentRepository mediaAttachmentRepository,
-            IMediaSegmentManager mediaSegmentManager)
+            IMediaSegmentManager mediaSegmentManager,
+            Lazy<IChannelManager> channelManager)
         {
             _writes = writes;
             _deletions = deletions;
+            _providerManager = providers;
+            _channelManager = channelManager;
             _appHost = appHost;
             _itemRepo = itemRepo;
             _userManager = userManager;
             _itemLookupService = itemLookupService;
             _itemAccessService = itemAccessService;
             _logger = logger;
-            _fileSystem = fileSystem;
             _userDataManager = userDataManager;
             _mediaEncoder = mediaEncoder;
             _localizationManager = localizationManager;
@@ -201,6 +205,7 @@ namespace Tesserafin.Server.Core.Library
                 await item.RefreshMetadata(
                     _deletions,
                     _writes,
+                    _providerManager.Value,
                     new MetadataRefreshOptions(_directoryService)
                     {
                         EnableRemoteContentProbe = true,
@@ -251,46 +256,9 @@ namespace Tesserafin.Server.Core.Library
             return SortMediaSources(list, preferredId).ToArray();
         }
 
-        /// <inheritdoc />>
+        /// <inheritdoc />
         public MediaProtocol GetPathProtocol(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                return MediaProtocol.File;
-            }
-
-            if (path.StartsWith("Rtsp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Rtsp;
-            }
-
-            if (path.StartsWith("Rtmp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Rtmp;
-            }
-
-            if (path.StartsWith("Http", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Http;
-            }
-
-            if (path.StartsWith("rtp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Rtp;
-            }
-
-            if (path.StartsWith("ftp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Ftp;
-            }
-
-            if (path.StartsWith("udp", StringComparison.OrdinalIgnoreCase))
-            {
-                return MediaProtocol.Udp;
-            }
-
-            return _fileSystem.IsPathFile(path) ? MediaProtocol.File : MediaProtocol.Http;
-        }
+            => MediaPath.GetProtocol(path);
 
         public bool SupportsDirectStream(string path, MediaProtocol protocol)
         {
@@ -401,9 +369,8 @@ namespace Tesserafin.Server.Core.Library
 
             var hasMediaSources = (IHasMediaSources)item;
 
-            // channelManager not injectable here: IChannelManager -> IDtoService -> IMediaSourceManager
-            // is an existing DI edge, so IMediaSourceManager -> IChannelManager would be circular.
-            var sources = hasMediaSources.GetMediaSources(enablePathSubstitution, this, _mediaSegmentManager, BaseItem.ChannelManager);
+            // Deferred: IChannelManager -> IDtoService -> IMediaSourceManager.
+            var sources = hasMediaSources.GetMediaSources(enablePathSubstitution, this, _mediaSegmentManager, _channelManager.Value);
 
             if (user is not null)
             {

@@ -630,3 +630,91 @@ streaming controllers (retained behind the v2 execution adapter for now).
   resolved before returning. Provider failures are isolated; request cancellation propagates
   through the new cancellable provider contract. This is pre-playback intro selection, not episode
   intro/credits detection. HTTP/OpenAPI shapes are unchanged.
+
+- **Named metadata.** `INamedItemCatalog` reads artists, studios, genres, music genres and years;
+  identity calculation and lookup never materialize them. The old named factories/ID methods and
+  `IItemWriteCommands` constructor dependency are removed from `LibraryManager`. Explicit
+  `GetOrCreateNamedItem<T>` commands use the existing writer and its persistence/cache/event order.
+  Only named materialization is serialized within that singleton. Artist lookup prefers real
+  folders and has a stable tie-break. Paths share the entities' policy with injected filesystem
+  and configured roots, rather than reading entity service statics in the new owners.
+  Validators and album refresh materialize names; album getters, DTOs, HTTP filters and genre
+  views read only. Years are materialized from a distinct SQL projection after scan. A missing
+  named GET returns 404; four previously implicit error responses are declared in OpenAPI.
+  Empty HTTP filters do not replace an unknown valid name: its deterministic identity preserves
+  an empty result. The existing behavior for syntactically invalid filter values is unchanged.
+  Managed directories remain outside the SQL transaction and can survive a failed create for a
+  later retry. The lock does not serialize general updates, deletion, or separate server processes.
+
+- **Configured library reads.** `ILibraryStructureReader` owns virtual-folder definition projection
+  (shortcut locations, collection markers and existing catalogue options/identities). The manager's
+  two read methods and its application-host and deferred-provider constructor dependencies are
+  removed. API, system storage, recording maintenance and migrations use the reader directly.
+  The HTTP controller supplies refresh state through its injected provider; the reader never calls
+  `Folder.GetRefreshProgress`, so metadata provider statics are not an indirect dependency.
+  The user-root catalogue resolves cached library IDs through the injected item lookup. Existing
+  definition commands remain the write boundary. HTTP/OpenAPI and SDK shapes are unchanged.
+
+- **Person reads and maintenance.** The existing `IItemPeopleService` owns persisted person lookup
+  and credit-page expansion. Paths and identities use configured filesystem/root inputs; reads
+  never materialize a person. Page expansion keeps repository ordering/paging metadata, isolates
+  malformed names and applies the entity visibility rule with an explicit scope. API, DTO and NFO
+  readers use this port. `PeopleValidator` owns managed-root preparation, credited-person refresh
+  and batched unlocked-orphan cleanup; the scheduled task takes it and an item lookup directly.
+  The three manager entry points, its people repository and its logger field are removed. Validation
+  reports monotonic progress, counts missing entries and checks cancellation before root creation.
+
+- **Shared query scope.** `LibraryManager` now uses the existing `IItemQueryScopeService` for
+  parent/ancestor and visible-user-library scoping, including the named-metadata ancestor-to-library
+  projection. Its duplicate private scope methods and direct user-view-catalogue dependency are
+  removed. The shared implementation resolves top parents through explicit lookup. Manager query
+  orchestration still applies its unchanged playlist/collection refusal exclusion after user scoping;
+  that filter is not dropped or moved behind a new dependency. No deferred registration is added.
+
+- **Owned bonus lifecycle.** Filesystem discovery of trailers, special features and theme media now
+  belongs to `IItemResolutionService`, with the existing naming and `.ignore` rules. Persisted
+  candidates are copied before extra-type/mixed-folder classification. The existing writer owns
+  extra reconciliation and owned-item metadata refresh, including title-metadata inheritance.
+  `BaseItem` and `Video` pass their existing explicit write/deletion ports, without new entity statics
+  or manager forwarding methods. Bonus IDs are deduplicated, non-extra owned versions are excluded,
+  source files are preserved on catalogue removal, and admitted refresh tasks are awaited together.
+  Cancellation propagates through the entity refresh boundary. Metadata/sidecar changes remain
+  separate operations; no cross-item rollback or global concurrent-refresh serialization is added.
+
+- **Owned video refresh.** `IItemWriteCommands.RefreshOwnedVideosAsync` owns multipart and local
+  alternate admission, typed construction, metadata refresh and link creation. `Video` only calls
+  the explicit command after its base bonus refresh; the unused base owned-video helper is removed.
+  The shared library-options service supplies effective collection policy without manager statics.
+  Duplicate IDs are admitted once, saved candidates are copied before edits, foreign ownership is
+  rejected, and pruned alternate paths are published only after all admitted refreshes complete.
+  Missing owned multipart rows are removed through catalogue-only deletion. Initial creates,
+  obsolete-generic cleanup, provider refresh and link writes remain distinct operations; a later
+  failure does not roll back successful earlier work. There is no global refresh serialization.
+
+- **Primary-version transfers.** Folder validation delegates demotion and removed-primary transfer
+  to the existing item writer. The version graph planner reads saved identities and typed links,
+  stages the old/new primaries and their versions, and preserves local ownership versus independent
+  linked versions. One bulk graph save moves ownership before old links can orphan-delete a source.
+  Caller snapshots change only after persistence. Manual-reference rerouting precedes the graph
+  update, so failure leaves the old primary discoverable by a later scan. Catalogue deletion follows.
+  Sidecar exports and later operations remain outside the graph transaction. No refresh lock is added.
+
+- **Folder child reconciliation.** Folder validation materializes filesystem discovery before
+  invoking the writer; an I/O/security failure skips the folder and cancellation propagates.
+  The internal folder-child reconciler owns comparison, staged resolved updates, catalogue-only
+  deletion, creation, version transfer and history reattachment through explicit lifecycle ports.
+  Its constructor takes lookup, filesystem and logging only. Images retain explicit prepare/commit/
+  dispose ownership. Folder keeps traversal, progress and metadata refresh. Root/child accessibility
+  checks use explicit parent lookup, and inaccessible retyped paths keep their previous identities.
+  Resolved fields/parents are staged on copies before persistence; prior successful operations and
+  sidecars are not rolled back by a later failure. There is no whole-folder transaction or new lock.
+
+- **Shortcut links.** The resolution service reads/expands a complete shortcut snapshot with its
+  injected filesystem/application host; Folder no longer performs shortcut I/O through statics.
+  The writer resolves known targets with the existing path query, preserves canonical non-shortcut
+  links and deduplicates aliases with manual links taking precedence. Missing targets retain their
+  discovery paths without implicit materialization. Saving precedes caller/cache publication;
+  unreadable targets and cancellation cannot publish a partial set. Canonical SQL comparison also
+  backfills links after a previously unscanned target appears. The asynchronous entity hook retains
+  CollectionFolder's separate physical-membership refresh. Metadata/sidecar operations remain
+  separate, and no global refresh/manual-edit lock or snapshot-isolation guarantee is added.

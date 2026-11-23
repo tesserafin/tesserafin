@@ -28,6 +28,7 @@ public static class LiveTvServiceCollectionExtensions
         services.AddSingleton<TimerManager>();
         services.AddSingleton<SeriesTimerManager>();
         services.AddSingleton<RecordingsMetadataManager>();
+        services.AddSingleton<RecordingRetentionReader>();
 
         services.AddSingleton<ILiveTvManager, LiveTvManager>();
         services.AddSingleton<IChannelManager, ChannelManager>();

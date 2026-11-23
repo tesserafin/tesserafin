@@ -30,6 +30,8 @@ namespace Tesserafin.Api.Controllers;
 [Tags("UserView")]
 public class UserViewsController : BaseTesserafinApiController
 {
+    private readonly IItemListingServices _listing;
+    private readonly IStandaloneVisibilityService _visibility;
     private readonly IUserManager _userManager;
     private readonly IUserViewManager _userViewManager;
     private readonly IDtoService _dtoService;
@@ -44,13 +46,19 @@ public class UserViewsController : BaseTesserafinApiController
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
+    /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
+    /// <param name="listing">Supplies a folder's own listing logic (user views, channels, collections, next up).</param>
     public UserViewsController(
         IUserManager userManager,
         IUserViewManager userViewManager,
         IDtoService dtoService,
         ILibraryManager libraryManager,
-        IItemSortService itemSortService)
+        IItemSortService itemSortService,
+        IStandaloneVisibilityService visibility,
+        IItemListingServices listing)
     {
+        _listing = listing;
+        _visibility = visibility;
         _userManager = userManager;
         _userViewManager = userViewManager;
         _dtoService = dtoService;
@@ -143,7 +151,7 @@ public class UserViewsController : BaseTesserafinApiController
         }
 
         return Ok(_libraryManager.GetUserRootFolder()
-            .GetChildren(user, true, null, _itemSortService)
+            .GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility, Listing = _listing }, _itemSortService)
             .OfType<Folder>()
             .Where(UserView.IsEligibleForGrouping)
             .Select(i => new SpecialViewOptionDto

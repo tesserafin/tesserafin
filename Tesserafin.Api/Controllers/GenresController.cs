@@ -28,6 +28,7 @@ namespace Tesserafin.Api.Controllers;
 public class GenresController : BaseTesserafinApiController
 {
     private readonly IUserManager _userManager;
+    private readonly INamedItemCatalog _namedItems;
     private readonly ILibraryManager _libraryManager;
     private readonly IDtoService _dtoService;
 
@@ -35,14 +36,17 @@ public class GenresController : BaseTesserafinApiController
     /// Initializes a new instance of the <see cref="GenresController"/> class.
     /// </summary>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
+    /// <param name="namedItems">Read-only named catalogue.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
     public GenresController(
         IUserManager userManager,
+        INamedItemCatalog namedItems,
         ILibraryManager libraryManager,
         IDtoService dtoService)
     {
         _userManager = userManager;
+        _namedItems = namedItems;
         _libraryManager = libraryManager;
         _dtoService = dtoService;
     }
@@ -155,6 +159,7 @@ public class GenresController : BaseTesserafinApiController
     /// <returns>An <see cref="OkResult"/> containing the genre.</returns>
     [HttpGet("{genreName}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult<BaseItemDto> GetGenre([FromRoute, Required] string genreName, [FromQuery] Guid? userId)
     {
         userId = RequestHelpers.GetUserId(User, userId);
@@ -167,10 +172,13 @@ public class GenresController : BaseTesserafinApiController
         }
         else
         {
-            item = _libraryManager.GetGenre(genreName);
+            item = _namedItems.Find<Genre>(genreName);
         }
 
-        item ??= new Genre();
+        if (item is null)
+        {
+            return NotFound();
+        }
 
         var user = userId.IsNullOrEmpty()
             ? null

@@ -10,13 +10,16 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.IO;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.IO;
 using MetadataProvider = Tesserafin.Model.Entities.MetadataProvider;
 
 namespace Tesserafin.Controller.Entities.Audio
@@ -57,21 +60,11 @@ namespace Tesserafin.Controller.Entities.Audio
         public override string ContainingFolderPath => Path;
 
         [JsonIgnore]
-        public override IEnumerable<BaseItem> Children
-        {
-            get
-            {
-                if (IsAccessedByName)
-                {
-                    return Enumerable.Empty<BaseItem>();
-                }
-
-                return base.Children;
-            }
-        }
-
-        [JsonIgnore]
         public override bool SupportsPeople => false;
+
+        /// <inheritdoc />
+        public override IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
+            => IsAccessedByName ? [] : base.GetCatalogueChildren(repository, lookup);
 
         public static string GetPath(string name)
         {
@@ -83,7 +76,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return 1;
         }
 
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             return !IsAccessedByName;
         }
@@ -99,9 +92,9 @@ namespace Tesserafin.Controller.Entities.Audio
             return LibraryManager.GetItemList(query);
         }
 
-        public override int GetChildCount(User user)
+        public override int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
         {
-            return IsAccessedByName ? 0 : base.GetChildCount(user);
+            return IsAccessedByName ? 0 : base.GetChildCount(user, scope, listing);
         }
 
         public override bool IsSaveLocalMetadataEnabled()
@@ -114,7 +107,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return base.IsSaveLocalMetadataEnabled();
         }
 
-        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override async Task ValidateChildrenInternal(IFolderValidationServices services, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             if (IsAccessedByName)
             {
@@ -122,7 +115,7 @@ namespace Tesserafin.Controller.Entities.Audio
                 return;
             }
 
-            await base.ValidateChildrenInternal(deletions, writes, images, progress, recursive, refreshChildMetadata, false, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
+            await base.ValidateChildrenInternal(services, progress, recursive, refreshChildMetadata, false, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
         }
 
         public override List<string> GetUserDataKeys()
@@ -173,13 +166,16 @@ namespace Tesserafin.Controller.Entities.Audio
         }
 
         public static string GetPath(string name, bool normalizeName)
+            => GetPath(name, FileSystem, ConfigurationManager.ApplicationPaths.ArtistsPath, normalizeName);
+
+        public static string GetPath(string name, IFileSystem fileSystem, string root, bool normalizeName = true)
         {
             // Trim the period at the end because windows will have a hard time with that
             var validName = normalizeName ?
-                FileSystem.GetValidFilename(name).Trim().TrimEnd('.') :
+                fileSystem.GetValidFilename(name).Trim().TrimEnd('.') :
                 name;
 
-            return SafeDirectoryLeafName.CombineWithRoot(ConfigurationManager.ApplicationPaths.ArtistsPath, validName, nameof(name));
+            return SafeDirectoryLeafName.CombineWithRoot(root, validName, nameof(name));
         }
 
         private string GetRebasedPath()

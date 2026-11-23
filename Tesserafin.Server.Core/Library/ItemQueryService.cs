@@ -25,6 +25,7 @@ namespace Tesserafin.Server.Core.Library
 {
     public class ItemQueryService : IItemQueryService
     {
+        private readonly IItemListingServices _listing;
         private readonly IChannelManager _channelManager;
         private readonly ICollectionManager _collectionManager;
         private readonly IUserViewManager _userViewManager;
@@ -34,9 +35,12 @@ namespace Tesserafin.Server.Core.Library
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemRepository _itemRepository;
         private readonly IItemQueryScopeService _scopeService;
+        private readonly IStandaloneVisibilityService _visibility;
 
-        public ItemQueryService(IChannelManager channelManager, ICollectionManager collectionManager, IUserViewManager userViewManager, ITVSeriesManager tvSeriesManager, IServerConfigurationManager configurationManager, IItemSortService itemSortService, IItemLookupService itemLookupService, IItemRepository itemRepository, IItemQueryScopeService scopeService)
+        public ItemQueryService(IChannelManager channelManager, ICollectionManager collectionManager, IUserViewManager userViewManager, ITVSeriesManager tvSeriesManager, IServerConfigurationManager configurationManager, IItemSortService itemSortService, IItemLookupService itemLookupService, IItemRepository itemRepository, IItemQueryScopeService scopeService, IStandaloneVisibilityService visibility, IItemListingServices listing)
         {
+            _listing = listing;
+            _visibility = visibility;
             _channelManager = channelManager;
             _collectionManager = collectionManager;
             _userViewManager = userViewManager;
@@ -50,6 +54,9 @@ namespace Tesserafin.Server.Core.Library
 
         public QueryResult<BaseItem> GetItems(Folder folder, InternalItemsQuery query)
         {
+            query.Visibility ??= _visibility;
+            query.Listing ??= _listing;
+
             if (!CanUseRawQueryItemsFastPath(folder, query))
             {
                 return folder.GetItems(query, _channelManager, _collectionManager, _userViewManager, _tvSeriesManager, _itemSortService);
@@ -60,6 +67,9 @@ namespace Tesserafin.Server.Core.Library
 
         public IReadOnlyList<BaseItem> GetItemList(Folder folder, InternalItemsQuery query)
         {
+            query.Visibility ??= _visibility;
+            query.Listing ??= _listing;
+
             if (!CanUseRawQueryItemsFastPath(folder, query))
             {
                 return folder.GetItemList(query, _channelManager, _collectionManager, _userViewManager, _tvSeriesManager, _itemSortService);
@@ -72,6 +82,9 @@ namespace Tesserafin.Server.Core.Library
 
         public IReadOnlyList<BaseItem> GetItemList(InternalItemsQuery query)
         {
+            query.Visibility ??= _visibility;
+            query.Listing ??= _listing;
+
             if (query.Recursive && !query.ParentId.IsEmpty())
             {
                 var parent = _itemLookupService.GetItemById(query.ParentId);
@@ -91,6 +104,9 @@ namespace Tesserafin.Server.Core.Library
 
         public QueryResult<BaseItem> GetItems(InternalItemsQuery query)
         {
+            query.Visibility ??= _visibility;
+            query.Listing ??= _listing;
+
             if (query.Recursive && !query.ParentId.IsEmpty())
             {
                 var parent = _itemLookupService.GetItemById(query.ParentId);

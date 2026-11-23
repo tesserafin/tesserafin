@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Tesserafin.Controller;
-using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
@@ -28,23 +27,15 @@ public class MediaInfoResolverTests
 {
     public const string VideoDirectoryPath = "Test Data/Video";
     public const string VideoDirectoryRegex = @"Test Data[/\\]Video";
-    public const string MetadataDirectoryPath = "library/00/00000000000000000000000000000000";
-    public const string MetadataDirectoryRegex = "library.*";
+    public const string MetadataRoot = "metadata";
+    public const string MetadataDirectoryPath = MetadataRoot + "/library/00/00000000000000000000000000000000";
+    public const string MetadataDirectoryRegex = @"metadata[/\\]library.*";
 
     private readonly ILocalizationManager _localizationManager;
     private readonly MediaInfoResolver _subtitleResolver;
 
     public MediaInfoResolverTests()
     {
-        // prep BaseItem and Video for calls made that expect managers
-        Video.RecordingsManager = Mock.Of<IRecordingsManager>();
-
-        var applicationPaths = new Mock<IServerApplicationPaths>().Object;
-        var serverConfig = new Mock<IServerConfigurationManager>();
-        serverConfig.Setup(c => c.ApplicationPaths)
-            .Returns(applicationPaths);
-        BaseItem.ConfigurationManager = serverConfig.Object;
-
         // build resolver to test with
         var englishCultureDto = new CultureDto("English", "English", "en", new[] { "eng" });
 
@@ -71,18 +62,12 @@ public class MediaInfoResolverTests
         fileSystem.Setup(fs => fs.DirectoryExists(It.IsRegex(MetadataDirectoryRegex)))
             .Returns(true);
 
-        _subtitleResolver = new SubtitleResolver(Mock.Of<ILogger<SubtitleResolver>>(), _localizationManager, mediaEncoder.Object, fileSystem.Object, new NamingOptions());
+        _subtitleResolver = new SubtitleResolver(Mock.Of<ILogger<SubtitleResolver>>(), _localizationManager, mediaEncoder.Object, fileSystem.Object, Mock.Of<IServerApplicationPaths>(paths => paths.InternalMetadataPath == MetadataRoot), new NamingOptions());
     }
 
     [Fact]
     public void GetExternalFiles_BadProtocol_ReturnsNoSubtitles()
     {
-        // need a media source manager capable of returning something other than file protocol
-        var mediaSourceManager = new Mock<IMediaSourceManager>();
-        mediaSourceManager.Setup(m => m.GetPathProtocol(It.IsRegex("http.*")))
-            .Returns(MediaProtocol.Http);
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
-
         var video = new Movie
         {
             Path = "https://url.com/My.Video.mkv"
@@ -96,8 +81,6 @@ public class MediaInfoResolverTests
     [InlineData(true)]
     public void GetExternalFiles_MissingDirectory_DirectoryNotQueried(bool metadataDirectory)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         string containingFolderPath, metadataPath;
 
         if (metadataDirectory)
@@ -116,7 +99,7 @@ public class MediaInfoResolverTests
             .Returns(VideoDirectoryPath + "/My.Video.mkv");
         video.Setup(m => m.ContainingFolderPath)
             .Returns(containingFolderPath);
-        video.Setup(m => m.GetInternalMetadataPath())
+        video.Setup(m => m.GetInternalMetadataPath(MetadataRoot))
             .Returns(metadataPath);
 
         string pathNotFoundRegex = metadataDirectory ? MetadataDirectoryRegex : VideoDirectoryRegex;
@@ -141,8 +124,6 @@ public class MediaInfoResolverTests
     [InlineData("[LTDB] Who Framed Roger Rabbit (1998) - [Bluray-1080p].mkv", "[LTDB] Who Framed Roger Rabbit (1998) - [Bluray-1080p].en.srt", "eng")]
     public void GetExternalFiles_NameMatching_MatchesAndParsesToken(string movie, string file, string? language, bool metadataDirectory = false)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         var video = new Movie
         {
             Path = VideoDirectoryPath + "/" + movie
@@ -166,8 +147,6 @@ public class MediaInfoResolverTests
     [InlineData("Some.Other.Video.srt")]
     public void GetExternalFiles_NameMatching_RejectsNonMatches(string file)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         var video = new Movie
         {
             Path = VideoDirectoryPath + "/My.Video.mkv"
@@ -184,12 +163,6 @@ public class MediaInfoResolverTests
     [InlineData(VideoDirectoryPath)] // valid but no files found for this test
     public async Task GetExternalStreams_BadPaths_ReturnsNoSubtitles(string path)
     {
-        // need a media source manager capable of returning something other than file protocol
-        var mediaSourceManager = new Mock<IMediaSourceManager>();
-        mediaSourceManager.Setup(m => m.GetPathProtocol(It.IsRegex("http.*")))
-            .Returns(MediaProtocol.Http);
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
-
         var video = new Movie
         {
             Path = path
@@ -202,7 +175,7 @@ public class MediaInfoResolverTests
         var mediaEncoder = Mock.Of<IMediaEncoder>(MockBehavior.Strict);
         var fileSystem = Mock.Of<IFileSystem>();
 
-        var subtitleResolver = new SubtitleResolver(Mock.Of<ILogger<SubtitleResolver>>(), _localizationManager, mediaEncoder, fileSystem, new NamingOptions());
+        var subtitleResolver = new SubtitleResolver(Mock.Of<ILogger<SubtitleResolver>>(), _localizationManager, mediaEncoder, fileSystem, Mock.Of<IServerApplicationPaths>(paths => paths.InternalMetadataPath == MetadataRoot), new NamingOptions());
 
         var streams = await subtitleResolver.GetExternalStreamsAsync(video, 0, directoryService.Object, false, CancellationToken.None);
 
@@ -277,8 +250,6 @@ public class MediaInfoResolverTests
     [MemberData(nameof(GetExternalStreams_MergeMetadata_HandlesOverridesCorrectly_Data))]
     public async Task GetExternalStreams_MergeMetadata_HandlesOverridesCorrectly(string file, MediaStream[] inputStreams, MediaStream[] expectedStreams)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         var video = new Movie
         {
             Path = VideoDirectoryPath + "/My.Video.mkv"
@@ -297,7 +268,7 @@ public class MediaInfoResolverTests
         fileSystem.Setup(fs => fs.DirectoryExists(It.IsRegex(MetadataDirectoryRegex)))
             .Returns(true);
 
-        var subtitleResolver = new SubtitleResolver(Mock.Of<ILogger<SubtitleResolver>>(), _localizationManager, mediaEncoder.Object, fileSystem.Object, new NamingOptions());
+        var subtitleResolver = new SubtitleResolver(Mock.Of<ILogger<SubtitleResolver>>(), _localizationManager, mediaEncoder.Object, fileSystem.Object, Mock.Of<IServerApplicationPaths>(paths => paths.InternalMetadataPath == MetadataRoot), new NamingOptions());
 
         var directoryService = GetDirectoryServiceForExternalFile(file);
         var streams = await subtitleResolver.GetExternalStreamsAsync(video, 0, directoryService, false, CancellationToken.None);
@@ -327,8 +298,6 @@ public class MediaInfoResolverTests
     [InlineData(2, 2)]
     public async Task GetExternalStreams_StreamIndex_HandlesFilesAndContainers(int fileCount, int streamCount)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         var video = new Movie
         {
             Path = VideoDirectoryPath + "/My.Video.mkv"
@@ -373,7 +342,7 @@ public class MediaInfoResolverTests
         fileSystem.Setup(fs => fs.DirectoryExists(It.IsRegex(MetadataDirectoryRegex)))
             .Returns(true);
 
-        var subtitleResolver = new SubtitleResolver(Mock.Of<ILogger<SubtitleResolver>>(), _localizationManager, mediaEncoder.Object, fileSystem.Object, new NamingOptions());
+        var subtitleResolver = new SubtitleResolver(Mock.Of<ILogger<SubtitleResolver>>(), _localizationManager, mediaEncoder.Object, fileSystem.Object, Mock.Of<IServerApplicationPaths>(paths => paths.InternalMetadataPath == MetadataRoot), new NamingOptions());
 
         int startIndex = 1;
         var streams = await subtitleResolver.GetExternalStreamsAsync(video, startIndex, directoryService.Object, false, CancellationToken.None);

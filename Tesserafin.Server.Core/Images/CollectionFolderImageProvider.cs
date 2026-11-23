@@ -5,7 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Tesserafin.Common.Configuration;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
@@ -22,7 +22,7 @@ namespace Tesserafin.Server.Core.Images
     {
         private readonly IItemQueryService _itemQueryService;
 
-        public CollectionFolderImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IApplicationPaths applicationPaths, IImageProcessor imageProcessor, IItemQueryService itemQueryService) : base(fileSystem, providerManager, applicationPaths, imageProcessor)
+        public CollectionFolderImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IServerApplicationPaths applicationPaths, IImageProcessor imageProcessor, IItemQueryService itemQueryService) : base(fileSystem, providerManager, applicationPaths, imageProcessor)
         {
             _itemQueryService = itemQueryService;
         }

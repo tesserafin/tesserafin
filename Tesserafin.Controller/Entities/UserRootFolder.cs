@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
@@ -51,17 +52,11 @@ namespace Tesserafin.Controller.Entities
 
         public override bool SupportsRawQueryItems => false;
 
-        /// <summary>
-        /// Gets or sets the libraries, read each time from the item cache: a list kept here would be
-        /// copies of them that an edit through the cache never reaches, so a tag saved on a library
-        /// would not apply to its items until the root was validated again.
-        /// </summary>
-        [JsonIgnore]
-        public override IEnumerable<BaseItem> Children
-        {
-            get => LoadChildren();
-            set => base.Children = value;
-        }
+        // Keep only the IDs so a library edit is visible without waiting for the next root scan.
+
+        /// <inheritdoc />
+        public override IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
+            => LoadChildren(repository, lookup);
 
         private void ClearCache()
         {
@@ -71,14 +66,8 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        protected override IReadOnlyList<BaseItem> LoadChildren()
-        {
-            return LoadChildren(id => LibraryManager.GetItemById(id));
-        }
-
         /// <summary>
-        /// Gets the libraries as <see cref="Children"/> does, resolving them through the given lookup
-        /// instead of the static <see cref="BaseItem.LibraryManager"/> (DEBT-SERVER-4).
+        /// Gets the libraries, resolving cached child IDs through the supplied lookup.
         /// </summary>
         /// <param name="lookup">The id lookup.</param>
         /// <returns>The libraries.</returns>
@@ -86,21 +75,21 @@ namespace Tesserafin.Controller.Entities
         {
             ArgumentNullException.ThrowIfNull(lookup);
 
-            return LoadChildren(lookup.GetItemById);
+            return LoadChildren(null, lookup);
         }
 
-        private IReadOnlyList<BaseItem> LoadChildren(Func<Guid, BaseItem> getItemById)
+        protected override IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
             lock (_childIdsLock)
             {
                 if (_childrenIds is null)
                 {
-                    var list = base.LoadChildren();
+                    var list = base.LoadChildren(repository, lookup);
                     _childrenIds = list.Select(i => i.Id).ToList();
                     return list;
                 }
 
-                return _childrenIds.Select(getItemById).Where(i => i is not null).ToList();
+                return _childrenIds.Select(lookup.GetItemById).Where(i => i is not null).ToList();
             }
         }
 
@@ -117,7 +106,7 @@ namespace Tesserafin.Controller.Entities
                 return QueryRecursive(query);
             }
 
-            var result = UserViewManager.GetUserViews(new UserViewQuery
+            var result = userViewManager.GetUserViews(new UserViewQuery
             {
                 User = query.User,
                 PresetViews = query.PresetViews
@@ -136,7 +125,7 @@ namespace Tesserafin.Controller.Entities
                 return QueryRecursive(query);
             }
 
-            var result = UserViewManager.GetUserViews(new UserViewQuery
+            var result = userViewManager.GetUserViews(new UserViewQuery
             {
                 User = query.User,
                 PresetViews = query.PresetViews
@@ -145,14 +134,14 @@ namespace Tesserafin.Controller.Entities
             return UserViewBuilder.SortAndPage(result, null, query, itemSortService);
         }
 
-        public override int GetChildCount(User user)
+        public override int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
         {
-            return GetChildren(user, true).Count;
+            return GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope, Listing = listing }).Count;
         }
 
-        protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user)
+        protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user, InternalItemsQuery query)
         {
-            var list = base.GetEligibleChildrenForRecursiveChildren(user).ToList();
+            var list = base.GetEligibleChildrenForRecursiveChildren(user, query).ToList();
             list.AddRange(LibraryManager.RootFolder.VirtualChildren);
 
             return list;
@@ -172,18 +161,18 @@ namespace Tesserafin.Controller.Entities
             return hasChanges;
         }
 
-        protected override IEnumerable<BaseItem> GetNonCachedChildren(IDirectoryService directoryService)
+        protected override IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             ClearCache();
 
-            return base.GetNonCachedChildren(directoryService);
+            return base.GetNonCachedChildren(resolution, directoryService, cancellationToken);
         }
 
-        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override async Task ValidateChildrenInternal(IFolderValidationServices services, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             ClearCache();
 
-            await base.ValidateChildrenInternal(deletions, writes, images, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken)
+            await base.ValidateChildrenInternal(services, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken)
                 .ConfigureAwait(false);
 
             ClearCache();
@@ -194,9 +183,9 @@ namespace Tesserafin.Controller.Entities
             // Fix is in two places - make sure the folder gets saved
             // And here to remedy it for affected users.
             // In theory this can be removed eventually.
-            foreach (var item in Children)
+            foreach (var item in GetCatalogueChildren(services.Repository, services.Lookup))
             {
-                LibraryManager.RegisterItem(item);
+                services.Store.RegisterItem(item);
             }
         }
     }

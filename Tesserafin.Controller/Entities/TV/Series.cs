@@ -13,12 +13,14 @@ using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
 using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Querying;
 using MetadataProvider = Tesserafin.Model.Entities.MetadataProvider;
@@ -84,37 +86,61 @@ namespace Tesserafin.Controller.Entities.TV
 
         public override string CreatePresentationUniqueKey()
         {
-            if (LibraryManager.GetLibraryOptions(this).EnableAutomaticSeriesGrouping)
-            {
-                var userdatakeys = GetUserDataKeys();
-
-                if (userdatakeys.Count > 1)
-                {
-                    return AddLibrariesToPresentationUniqueKey(userdatakeys[0]);
-                }
-            }
-
-            return base.CreatePresentationUniqueKey();
+            var key = GetGroupingKey(LibraryManager.GetLibraryOptions(this).EnableAutomaticSeriesGrouping);
+            return key is null
+                ? base.CreatePresentationUniqueKey()
+                : FormatGroupingKey(key, GetPreferredMetadataLanguage(), LibraryManager.GetCollectionFolders(this));
         }
 
-        private string AddLibrariesToPresentationUniqueKey(string key)
+        /// <summary>Computes the series presentation key from the supplied catalogue and settings.</summary>
+        /// <param name="options">The effective library options.</param>
+        /// <param name="lookup">The lookup for parent language inheritance.</param>
+        /// <param name="collections">The library membership resolver.</param>
+        /// <param name="configuration">The server metadata defaults.</param>
+        /// <returns>The presentation key.</returns>
+        public string CreatePresentationUniqueKey(
+            LibraryOptions options,
+            IItemLookupService lookup,
+            ICollectionFolderResolver collections,
+            ServerConfiguration configuration)
         {
-            var lang = GetPreferredMetadataLanguage();
-            if (!string.IsNullOrEmpty(lang))
+            var key = GetGroupingKey(options.EnableAutomaticSeriesGrouping);
+            if (key is null)
             {
-                key += "-" + lang;
+                return base.CreatePresentationUniqueKey();
             }
 
-            var folders = LibraryManager.GetCollectionFolders(this)
-                .Select(i => i.Id.ToString("N", CultureInfo.InvariantCulture))
-                .ToArray();
+            var libraries = collections.GetCollectionFolders(this);
+            var language = GetPreferredMetadataLanguage(
+                () => GetParents(lookup),
+                () => libraries,
+                () => options.PreferredMetadataLanguage,
+                () => configuration.PreferredMetadataLanguage);
 
-            if (folders.Length == 0)
+            return FormatGroupingKey(key, language, libraries);
+        }
+
+        private string GetGroupingKey(bool enableAutomaticSeriesGrouping)
+        {
+            if (!enableAutomaticSeriesGrouping)
             {
-                return key;
+                return null;
             }
 
-            return key + "-" + string.Join('-', folders);
+            var keys = GetUserDataKeys();
+            return keys.Count > 1 ? keys[0] : null;
+        }
+
+        private static string FormatGroupingKey(string key, string language, IReadOnlyList<Folder> libraries)
+        {
+            if (!string.IsNullOrEmpty(language))
+            {
+                key += "-" + language;
+            }
+
+            return libraries.Count == 0
+                ? key
+                : key + "-" + string.Join('-', libraries.Select(library => library.Id.ToString("N", CultureInfo.InvariantCulture)));
         }
 
         private static string GetUniqueSeriesKey(BaseItem series)
@@ -122,7 +148,7 @@ namespace Tesserafin.Controller.Entities.TV
             return series.GetPresentationUniqueKey();
         }
 
-        public override int GetChildCount(User user)
+        public override int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
         {
             var seriesKey = GetUniqueSeriesKey(this);
 
@@ -140,32 +166,6 @@ namespace Tesserafin.Controller.Entities.TV
             });
 
             return result;
-        }
-
-        public override int GetRecursiveChildCount(User user)
-        {
-            var seriesKey = GetUniqueSeriesKey(this);
-
-            var query = new InternalItemsQuery(user)
-            {
-                AncestorWithPresentationUniqueKey = null,
-                SeriesPresentationUniqueKey = seriesKey,
-                DtoOptions = new DtoOptions(false)
-                {
-                    EnableImages = false
-                }
-            };
-
-            if (query.IncludeItemTypes.Length == 0)
-            {
-                query.IncludeItemTypes = new[] { BaseItemKind.Episode };
-            }
-
-            query.IsVirtualItem = false;
-            query.Limit = 0;
-            var totalRecordCount = LibraryManager.GetCount(query);
-
-            return totalRecordCount;
         }
 
         /// <summary>
@@ -275,7 +275,23 @@ namespace Tesserafin.Controller.Entities.TV
             return GetEpisodes(user, options, shouldIncludeMissingEpisodes, null);
         }
 
-        public IEnumerable<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+        public IEnumerable<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
+            => ReadEpisodes(user, options, shouldIncludeMissingEpisodes, listing, static query => LibraryManager.GetItemList(query));
+
+        /// <summary>Reads grouped episodes, including missing entries, for a background metadata refresh.</summary>
+        /// <param name="options">The item data to load.</param>
+        /// <param name="repository">The item repository.</param>
+        /// <param name="listing">Sort and channel services for episode listing.</param>
+        /// <returns>The grouped episodes in display order.</returns>
+        public IEnumerable<BaseItem> GetCatalogueEpisodes(DtoOptions options, IItemRepository repository, IItemListingServices listing)
+            => ReadEpisodes(null, options, true, listing, repository.GetItemList);
+
+        private IEnumerable<BaseItem> ReadEpisodes(
+            User user,
+            DtoOptions options,
+            bool shouldIncludeMissingEpisodes,
+            IItemListingServices listing,
+            Func<InternalItemsQuery, IReadOnlyList<BaseItem>> readItems)
         {
             var seriesKey = GetUniqueSeriesKey(this);
 
@@ -293,12 +309,12 @@ namespace Tesserafin.Controller.Entities.TV
                 query.IsMissing = false;
             }
 
-            var allItems = LibraryManager.GetItemList(query);
+            var allItems = readItems(query);
 
             var allSeriesEpisodes = allItems.OfType<Episode>().ToList();
 
             var allEpisodes = allItems.OfType<Season>()
-                .SelectMany(i => i.GetEpisodes(this, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, itemSortService))
+                .SelectMany(i => i.GetEpisodes(this, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, listing))
                 .Reverse();
 
             // Specials could appear twice based on above - once in season 0, once in the aired season
@@ -308,11 +324,11 @@ namespace Tesserafin.Controller.Entities.TV
             return allEpisodes.DistinctBy(i => i.Id).Reverse();
         }
 
-        public async Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
+        public async Task RefreshAllMetadata(IFolderValidationServices services, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
-            Children = null; // invalidate cached children.
+            InvalidateCatalogueChildren(services.Lookup);
             // Refresh bottom up, seasons and episodes first, then the series
-            var items = GetRecursiveChildren();
+            var items = GetRecursiveCatalogueChildren(services.Repository, services.Lookup, services.Links);
 
             var totalItems = items.Count;
             var numComplete = 0;
@@ -329,7 +345,7 @@ namespace Tesserafin.Controller.Entities.TV
 
                 if (refreshOptions.RefreshItem(item))
                 {
-                    await item.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(services.Deletions, services.Writes, services.Providers, refreshOptions, cancellationToken).ConfigureAwait(false);
                 }
 
                 numComplete++;
@@ -360,7 +376,7 @@ namespace Tesserafin.Controller.Entities.TV
                 {
                     if (refreshOptions.RefreshItem(item))
                     {
-                        await item.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                        await item.RefreshMetadata(services.Deletions, services.Writes, services.Providers, refreshOptions, cancellationToken).ConfigureAwait(false);
                     }
                 }
 
@@ -371,7 +387,7 @@ namespace Tesserafin.Controller.Entities.TV
             }
 
             refreshOptions = new MetadataRefreshOptions(refreshOptions);
-            await ProviderManager.RefreshSingleItem(this, refreshOptions, cancellationToken).ConfigureAwait(false);
+            await services.Providers.RefreshSingleItem(this, refreshOptions, cancellationToken).ConfigureAwait(false);
         }
 
         public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, DtoOptions options, bool shouldIncludeMissingEpisodes)
@@ -379,7 +395,19 @@ namespace Tesserafin.Controller.Entities.TV
             return GetSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, null);
         }
 
-        public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+        public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
+            => ReadSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, listing, static query => LibraryManager.GetItemList(query));
+
+        internal List<BaseItem> GetCatalogueSeasonEpisodes(Season parentSeason, DtoOptions options, IItemRepository repository, IItemListingServices listing)
+            => ReadSeasonEpisodes(parentSeason, null, options, true, listing, repository.GetItemList);
+
+        private List<BaseItem> ReadSeasonEpisodes(
+            Season parentSeason,
+            User user,
+            DtoOptions options,
+            bool shouldIncludeMissingEpisodes,
+            IItemListingServices listing,
+            Func<InternalItemsQuery, IReadOnlyList<BaseItem>> readItems)
         {
             var queryFromSeries = ConfigurationManager.Configuration.DisplaySpecialsWithinSeasons;
 
@@ -409,7 +437,8 @@ namespace Tesserafin.Controller.Entities.TV
                 {
                     query.Parent = parentSeason;
                     query.ChannelIds = [ChannelId];
-                    allItems = [.. ChannelManager.GetChannelItemsInternal(query, new Progress<double>(), CancellationToken.None).GetAwaiter().GetResult().Items];
+                    var channels = (listing ?? throw new InvalidOperationException("Listing a channel series needs the listing services.")).Channels;
+                    allItems = [.. channels.GetChannelItemsInternal(query, new Progress<double>(), CancellationToken.None).GetAwaiter().GetResult().Items];
                 }
                 catch
                 {
@@ -419,10 +448,10 @@ namespace Tesserafin.Controller.Entities.TV
             }
             else
             {
-                allItems = LibraryManager.GetItemList(query);
+                allItems = readItems(query);
             }
 
-            return GetSeasonEpisodes(parentSeason, user, allItems, options, shouldIncludeMissingEpisodes, itemSortService);
+            return GetSeasonEpisodes(parentSeason, user, allItems, options, shouldIncludeMissingEpisodes, listing);
         }
 
         public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, IEnumerable<BaseItem> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes)
@@ -430,11 +459,11 @@ namespace Tesserafin.Controller.Entities.TV
             return GetSeasonEpisodes(parentSeason, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, null);
         }
 
-        public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, IEnumerable<BaseItem> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+        public List<BaseItem> GetSeasonEpisodes(Season parentSeason, User user, IEnumerable<BaseItem> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
             if (allSeriesEpisodes is null)
             {
-                return GetSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, itemSortService);
+                return GetSeasonEpisodes(parentSeason, user, options, shouldIncludeMissingEpisodes, listing);
             }
 
             var episodes = FilterEpisodesBySeason(allSeriesEpisodes, parentSeason, ConfigurationManager.Configuration.DisplaySpecialsWithinSeasons);
@@ -446,9 +475,9 @@ namespace Tesserafin.Controller.Entities.TV
             // contract has no service to give) keep falling back to the obsolete static facade.
             // The pragma below therefore survives this tranche on purpose -- see
             // docs/major-rewrite-plan-v13.md § PR49/N and § PR50/N.
-            if (itemSortService is not null)
+            if (listing is not null)
             {
-                return itemSortService.Sort(episodes, user, new[] { sortBy }, SortOrder.Ascending).ToList();
+                return listing.Sort.Sort(episodes, user, new[] { sortBy }, SortOrder.Ascending).ToList();
             }
 
 #pragma warning disable CS0618 // static LibraryManager.Sort facade left in place pending Folder.GetChildren/Series.GetEpisodes cascade, see docs/major-rewrite-plan-v13.md § PR49/N
@@ -535,6 +564,9 @@ namespace Tesserafin.Controller.Entities.TV
 
             return info;
         }
+
+        public SeriesInfo GetLookupInfo((string Language, string CountryCode) locale)
+            => GetItemLookupInfo<SeriesInfo>(locale);
 
         public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
         {

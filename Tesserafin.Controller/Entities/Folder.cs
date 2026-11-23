@@ -19,6 +19,7 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
+using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LibraryTaskScheduler;
 using Tesserafin.Controller.Persistence;
@@ -50,10 +51,6 @@ namespace Tesserafin.Controller.Entities
         {
             LinkedChildren = Array.Empty<LinkedChild>();
         }
-
-        public static IUserViewManager UserViewManager { get; set; }
-
-        public static ILimitedConcurrencyLibraryScheduler LimitedConcurrencyLibraryScheduler { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether this instance is root.
@@ -136,7 +133,7 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public virtual IEnumerable<BaseItem> Children
         {
-            get => _children ??= LoadChildren();
+            get => GetCatalogueChildren(null, LibraryManager);
             set => _children = value;
         }
 
@@ -198,16 +195,14 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        public static ICollectionManager CollectionManager { get; set; }
-
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             if (IsRoot)
             {
                 return false;
             }
 
-            return base.CanDelete();
+            return base.CanDelete(channels);
         }
 
         public override bool RequiresRefresh()
@@ -250,7 +245,7 @@ namespace Tesserafin.Controller.Entities
             writes.CreateItem(item, this);
         }
 
-        public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
+        public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
             if (this is ICollectionFolder && this is not BasePluginFolder)
             {
@@ -275,78 +270,57 @@ namespace Tesserafin.Controller.Entities
             return base.IsVisible(user, skipAllowedTagsCheck, tagVisibility);
         }
 
-        /// <summary>
-        /// Loads our children.  Validation will occur externally.
-        /// We want this synchronous.
-        /// </summary>
-        /// <returns>Returns children.</returns>
-        protected virtual IReadOnlyList<BaseItem> LoadChildren()
-        {
-            // logger.LogDebug("Loading children from {0} {1} {2}", GetType().Name, Id, Path);
-            // just load our children from the repo - the library will be validated and maintained in other processes
-            return GetCachedChildren();
-        }
+        /// <summary>Gets the direct catalogue children using the supplied repository and identity lookup.</summary>
+        /// <param name="repository">The item repository.</param>
+        /// <param name="lookup">The identity lookup for folders that cache child identities.</param>
+        /// <returns>The folder's catalogue children.</returns>
+        public virtual IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
+            => _children ??= LoadChildren(repository, lookup);
 
-        public override double? GetRefreshProgress()
-        {
-            return ProviderManager.GetRefreshProgress(Id);
-        }
+        /// <summary>Invalidates the cached direct children.</summary>
+        /// <param name="lookup">The identity lookup for folders that delegate to physical folders.</param>
+        public virtual void InvalidateCatalogueChildren(IItemLookupService lookup)
+            => Children = null;
 
-        public Task ValidateChildren(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, CancellationToken cancellationToken)
+        /// <summary>Loads the folder's direct children from the catalogue.</summary>
+        /// <param name="repository">The item repository, or <c>null</c> to read through the attached catalogue services.</param>
+        /// <param name="lookup">The identity lookup for folders that cache child identities.</param>
+        /// <returns>The folder's persisted children.</returns>
+        protected virtual IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
-            return ValidateChildren(deletions, writes, images, progress, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken: cancellationToken);
+            if (repository is null)
+            {
+                return GetCachedChildren();
+            }
+
+            return repository.GetItemList(new InternalItemsQuery
+            {
+                Parent = this,
+                GroupByPresentationUniqueKey = false,
+                DtoOptions = new DtoOptions(true)
+            });
         }
 
         /// <summary>
         /// Validates that the children of the folder still exist.
         /// </summary>
-        /// <param name="deletions">Explicit deletion operations for this refresh.</param>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+        /// <param name="services">Deletion, write, image, scheduling and channel services for this validation.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="metadataRefreshOptions">The metadata refresh options.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
         /// <param name="allowRemoveRoot">remove item even this folder is root.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        public Task ValidateChildren(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, MetadataRefreshOptions metadataRefreshOptions, bool recursive = true, bool allowRemoveRoot = false, CancellationToken cancellationToken = default)
+        public Task ValidateChildren(IFolderValidationServices services, IProgress<double> progress, MetadataRefreshOptions metadataRefreshOptions, bool recursive = true, bool allowRemoveRoot = false, CancellationToken cancellationToken = default)
         {
             Children = null; // invalidate cached children.
-            return ValidateChildrenInternal(deletions, writes, images, progress, recursive, true, allowRemoveRoot, metadataRefreshOptions, metadataRefreshOptions.DirectoryService, cancellationToken);
-        }
-
-        private Dictionary<Guid, BaseItem> GetActualChildrenDictionary()
-        {
-            var dictionary = new Dictionary<Guid, BaseItem>();
-
-            Children = null; // invalidate cached children.
-            var childrenList = Children.ToList();
-
-            foreach (var child in childrenList)
-            {
-                var id = child.Id;
-                if (dictionary.ContainsKey(id))
-                {
-                    Logger.LogError(
-                        "Found folder containing items with duplicate id. Path: {Path}, Child Name: {ChildName}",
-                        Path ?? Name,
-                        child.Path ?? child.Name);
-                }
-                else
-                {
-                    dictionary[id] = child;
-                }
-            }
-
-            return dictionary;
+            return ValidateChildrenInternal(services, progress, recursive, true, allowRemoveRoot, metadataRefreshOptions, metadataRefreshOptions.DirectoryService, cancellationToken);
         }
 
         /// <summary>
         /// Validates the children internal.
         /// </summary>
-        /// <param name="deletions">Explicit deletion operations for this refresh.</param>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+        /// <param name="services">Deletion, write, image, scheduling and channel services for this validation.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
         /// <param name="refreshChildMetadata">if set to <c>true</c> [refresh child metadata].</param>
@@ -355,55 +329,37 @@ namespace Tesserafin.Controller.Entities
         /// <param name="directoryService">The directory service.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        protected virtual async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected virtual async Task ValidateChildrenInternal(IFolderValidationServices services, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             if (recursive)
             {
-                ProviderManager.OnRefreshStart(this);
+                services.RefreshProgress.OnRefreshStart(this);
             }
 
             try
             {
-                if (GetParents().Any(f => f.Id.Equals(Id)))
+                var ancestorIds = new HashSet<Guid> { Id };
+                foreach (var parent in GetParents(services.Lookup))
                 {
-                    throw new InvalidOperationException("Recursive datastructure detected abort processing this item.");
+                    if (!ancestorIds.Add(parent.Id))
+                    {
+                        throw new InvalidOperationException("Recursive datastructure detected abort processing this item.");
+                    }
                 }
 
-                await ValidateChildrenInternal2(deletions, writes, images, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
+                await ValidateChildrenInternal2(services, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
                 if (recursive)
                 {
-                    ProviderManager.OnRefreshComplete(this);
+                    services.RefreshProgress.OnRefreshComplete(this);
                 }
             }
         }
 
-        private static bool IsLibraryFolderAccessible(IDirectoryService directoryService, BaseItem item, bool checkCollection)
+        private async Task ValidateChildrenInternal2(IFolderValidationServices services, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
-            if (!checkCollection && (item is BoxSet || string.Equals(item.FileNameWithoutExtension, "collections", StringComparison.OrdinalIgnoreCase)))
-            {
-                return true;
-            }
-
-            // For top parents i.e. Library folders, skip the validation if it's empty or inaccessible
-            if (item.IsTopParent && !directoryService.IsAccessible(item.ContainingFolderPath))
-            {
-                Logger.LogWarning("Library folder {LibraryFolderPath} is inaccessible or empty, skipping", item.ContainingFolderPath);
-                return false;
-            }
-
-            return true;
-        }
-
-        private async Task ValidateChildrenInternal2(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
-        {
-            if (!IsLibraryFolderAccessible(directoryService, this, allowRemoveRoot))
-            {
-                return;
-            }
-
             cancellationToken.ThrowIfCancellationRequested();
 
             var validChildren = new List<BaseItem>();
@@ -412,19 +368,26 @@ namespace Tesserafin.Controller.Entities
 
             if (IsFileProtocol)
             {
-                IEnumerable<BaseItem> nonCachedChildren = [];
+                IReadOnlyList<BaseItem> nonCachedChildren;
 
                 try
                 {
-                    nonCachedChildren = GetNonCachedChildren(directoryService);
+                    nonCachedChildren = GetNonCachedChildren(services.Resolution, directoryService, cancellationToken).ToArray();
+                    cancellationToken.ThrowIfCancellationRequested();
                 }
                 catch (IOException ex)
                 {
                     Logger.LogError(ex, "Error retrieving children from file system");
+                    return;
                 }
                 catch (SecurityException ex)
                 {
                     Logger.LogError(ex, "Error retrieving children from file system");
+                    return;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -436,276 +399,18 @@ namespace Tesserafin.Controller.Entities
 
                 if (recursive)
                 {
-                    ProviderManager.OnRefreshProgress(this, ProgressHelpers.RetrievedChildren);
+                    services.RefreshProgress.OnRefreshProgress(this, ProgressHelpers.RetrievedChildren);
                 }
 
-                // Build a dictionary of the current children we have now by Id so we can compare quickly and easily
-                var currentChildren = GetActualChildrenDictionary();
-
-                // Create a list for our validated children
-                var newItems = new List<BaseItem>();
-                var actuallyRemoved = new List<BaseItem>();
-
-                // Build a reverse path→item lookup for detecting type changes
-                var currentChildrenByPath = new Dictionary<string, BaseItem>(StringComparer.OrdinalIgnoreCase);
-                foreach (var kvp in currentChildren)
+                Children = null;
+                var reconciliation = await services.Writes.ReconcileFolderChildrenAsync(this, GetCatalogueChildren(services.Repository, services.Lookup).ToArray(), nonCachedChildren, directoryService, allowRemoveRoot, services.Deletions, services.Images, services.Channels, cancellationToken).ConfigureAwait(false);
+                if (reconciliation.Skipped)
                 {
-                    if (!string.IsNullOrEmpty(kvp.Value.Path))
-                    {
-                        currentChildrenByPath.TryAdd(kvp.Value.Path, kvp.Value);
-                    }
+                    return;
                 }
 
-                cancellationToken.ThrowIfCancellationRequested();
-
-                foreach (var child in nonCachedChildren)
-                {
-                    if (!IsLibraryFolderAccessible(directoryService, child, allowRemoveRoot))
-                    {
-                        // Preserve inaccessible items so they aren't treated as removed.
-                        if (currentChildren.TryGetValue(child.Id, out var childrenToKeep))
-                        {
-                            validChildren.Add(childrenToKeep);
-                        }
-
-                        continue;
-                    }
-
-                    if (currentChildren.TryGetValue(child.Id, out BaseItem currentChild))
-                    {
-                        validChildren.Add(currentChild);
-                        accessibleChildren.Add(currentChild);
-
-                        if (currentChild.UpdateFromResolvedItem(child) > ItemUpdateType.None)
-                        {
-                            await currentChild.UpdateToRepositoryAsync(writes, ItemUpdateType.MetadataImport, cancellationToken).ConfigureAwait(false);
-                        }
-                        else
-                        {
-                            // metadata is up-to-date; make sure DB has correct images dimensions and hash
-                            var imageUpdate = await images.PrepareRefreshAsync(currentChild, false, true, cancellationToken).ConfigureAwait(false);
-                            await using (imageUpdate.ConfigureAwait(false))
-                            {
-                                await imageUpdate.CommitAsync(cancellationToken).ConfigureAwait(false);
-                            }
-                        }
-
-                        continue;
-                    }
-
-                    // Check if an existing item occupies the same path with different type/ID
-                    if (!string.IsNullOrEmpty(child.Path)
-                        && currentChildrenByPath.TryGetValue(child.Path, out var staleItem)
-                        && !staleItem.Id.Equals(child.Id))
-                    {
-                        Logger.LogInformation(
-                            "Item type changed at {Path}: {OldType} -> {NewType}, removing stale entry",
-                            child.Path,
-                            staleItem.GetType().Name,
-                            child.GetType().Name);
-
-                        currentChildren.Remove(staleItem.Id);
-                        currentChildrenByPath.Remove(child.Path);
-                        staleItem.SetParent(null);
-                        await deletions.DeleteAsync(staleItem, new DeleteOptions { DeleteFileLocation = false }, this, cancellationToken).ConfigureAwait(false);
-                        actuallyRemoved.Add(staleItem);
-                    }
-
-                    // Brand new item - needs to be added
-                    child.SetParent(this);
-                    newItems.Add(child);
-                    validChildren.Add(child);
-                    accessibleChildren.Add(child);
-                }
-
-                // That's all the new and changed ones - now see if any have been removed and need cleanup
-                var itemsRemoved = currentChildren.Values.Except(validChildren).ToList();
-
-                // If it's an AggregateFolder, don't remove
-                // Collect replaced primaries for deferred deletion (after CreateItems)
-                var replacedPrimaries = new List<(Video OldPrimary, Video NewPrimary)>();
-
-                // Build a set of paths that are alternate versions of valid children
-                // These items should not be deleted - they're managed by their primary video
-                var alternateVersionPaths = validChildren
-                    .OfType<Video>()
-                    .SelectMany(v => v.LocalAlternateVersions ?? [])
-                    .Where(p => !string.IsNullOrEmpty(p))
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-                if (itemsRemoved.Count > 0)
-                {
-                    foreach (var item in itemsRemoved)
-                    {
-                        if (!item.CanDelete())
-                        {
-                            Logger.LogDebug("Item marked as non-removable, skipping: {Path}", item.Path ?? item.Name);
-                            continue;
-                        }
-
-                        // Skip items that are alternate versions of another video
-                        if (item is Video video)
-                        {
-                            // Check if path is in LocalAlternateVersions of any valid child
-                            if (!string.IsNullOrEmpty(item.Path) && alternateVersionPaths.Contains(item.Path))
-                            {
-                                Logger.LogDebug("Item path matches an alternate version, skipping deletion: {Path}", item.Path);
-                                continue;
-                            }
-                        }
-
-                        // Defer deletion if this primary video is being replaced by a new primary
-                        // that takes over its alternates. Deleting now would trigger premature
-                        // promotion inside DeleteItem and write stale paths to collection NFOs.
-                        if (item is Video primaryVideo
-                            && !primaryVideo.PrimaryVersionId.HasValue
-                            && primaryVideo.OwnerId.IsEmpty()
-                            && (primaryVideo.LocalAlternateVersions ?? []).Any(p => alternateVersionPaths.Contains(p)))
-                        {
-                            var newPrimary = newItems
-                                .OfType<Video>()
-                                .FirstOrDefault(v => (v.LocalAlternateVersions ?? [])
-                                    .Any(p => (primaryVideo.LocalAlternateVersions ?? [])
-                                        .Any(op => string.Equals(op, p, StringComparison.OrdinalIgnoreCase))));
-                            if (newPrimary is not null)
-                            {
-                                Logger.LogDebug("Deferring deletion of replaced primary: {Path}", item.Path);
-                                replacedPrimaries.Add((primaryVideo, newPrimary));
-                                actuallyRemoved.Add(item);
-                                item.SetParent(null);
-                                continue;
-                            }
-                        }
-
-                        if (item.IsFileProtocol)
-                        {
-                            Logger.LogDebug("Removed item: {Path}", item.Path);
-
-                            actuallyRemoved.Add(item);
-                            item.SetParent(null);
-                            await deletions.DeleteAsync(item, new DeleteOptions { DeleteFileLocation = false }, this, cancellationToken).ConfigureAwait(false);
-                        }
-                    }
-                }
-
-                if (newItems.Count > 0)
-                {
-                    writes.CreateItems(newItems, this, cancellationToken);
-                }
-
-                // Process deferred replaced-primary deletions now that new primaries exist in DB/cache.
-                // This avoids the premature promotion that would occur if DeleteItem ran before CreateItems.
-                foreach (var (oldPrimary, newPrimary) in replacedPrimaries)
-                {
-                    Logger.LogInformation(
-                        "Processing deferred deletion of replaced primary {OldName} ({OldId}), new primary {NewName} ({NewId})",
-                        oldPrimary.Name,
-                        oldPrimary.Id,
-                        newPrimary.Name,
-                        newPrimary.Id);
-
-                    // Reroute collection/playlist references from old primary to new primary
-                    await writes.RerouteLinkedChildReferencesAsync(oldPrimary.Id, newPrimary.Id, cancellationToken).ConfigureAwait(false);
-
-                    // Transfer alternates from old primary to new primary
-                    var localAlternateIds = LibraryManager.GetLocalAlternateVersionIds(oldPrimary).ToHashSet();
-                    var allAlternateIds = localAlternateIds
-                        .Concat(LibraryManager.GetLinkedAlternateVersions(oldPrimary).Select(v => v.Id))
-                        .Distinct()
-                        .ToList();
-
-                    foreach (var altId in allAlternateIds)
-                    {
-                        if (LibraryManager.GetItemById(altId) is Video altVideo && !altVideo.Id.Equals(newPrimary.Id))
-                        {
-                            altVideo.SetPrimaryVersionId(newPrimary.Id);
-                            altVideo.OwnerId = localAlternateIds.Contains(altVideo.Id) ? newPrimary.Id : Guid.Empty;
-                            await altVideo.UpdateToRepositoryAsync(writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
-                        }
-                    }
-
-                    // Clear alternate arrays so DeleteItem won't trigger promotion
-                    oldPrimary.LocalAlternateVersions = [];
-                    oldPrimary.LinkedAlternateVersions = [];
-
-                    // Safe to delete now — no promotion will happen
-                    await deletions.DeleteAsync(oldPrimary, new DeleteOptions { DeleteFileLocation = false }, this, cancellationToken).ConfigureAwait(false);
-                }
-
-                // Demote old primaries that are now alternate versions of newly created primaries.
-                // This handles the case where a new file is added that becomes the new primary
-                // (e.g. movie-2 added, movie-3 was primary → movie-3 needs demotion).
-                // Items in replacedPrimaries are excluded (already in actuallyRemoved).
-                var oldPrimariesToDemote = new List<(Video OldPrimary, Video NewPrimary)>();
-                foreach (var item in itemsRemoved.Except(actuallyRemoved))
-                {
-                    if (item is Video video
-                        && video.OwnerId.IsEmpty()
-                        && !string.IsNullOrEmpty(item.Path)
-                        && alternateVersionPaths.Contains(item.Path))
-                    {
-                        var newPrimary = newItems
-                            .OfType<Video>()
-                            .FirstOrDefault(v => (v.LocalAlternateVersions ?? [])
-                                .Any(p => string.Equals(p, item.Path, StringComparison.OrdinalIgnoreCase)));
-                        if (newPrimary is not null)
-                        {
-                            oldPrimariesToDemote.Add((video, newPrimary));
-                        }
-                    }
-                }
-
-                foreach (var (oldPrimary, newPrimary) in oldPrimariesToDemote)
-                {
-                    Logger.LogInformation(
-                        "Demoting old primary {OldName} ({OldId}) to alternate of new primary {NewName} ({NewId})",
-                        oldPrimary.Name,
-                        oldPrimary.Id,
-                        newPrimary.Name,
-                        newPrimary.Id);
-
-                    // First: update old primary's alternate items to point to new primary.
-                    // Order matters — update alternates FIRST so they don't get orphan-deleted
-                    // when old primary's arrays are cleared.
-                    var oldAlternateIds = LibraryManager.GetLocalAlternateVersionIds(oldPrimary)
-                        .Concat(LibraryManager.GetLinkedAlternateVersions(oldPrimary).Select(v => v.Id))
-                        .Distinct()
-                        .ToList();
-
-                    foreach (var altId in oldAlternateIds)
-                    {
-                        if (LibraryManager.GetItemById(altId) is Video altVideo && !altVideo.Id.Equals(newPrimary.Id))
-                        {
-                            altVideo.SetPrimaryVersionId(newPrimary.Id);
-                            altVideo.OwnerId = newPrimary.Id;
-                            await altVideo.UpdateToRepositoryAsync(writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
-                        }
-                    }
-
-                    // Then: demote old primary — clear its arrays and set it as alternate of new primary
-                    oldPrimary.LocalAlternateVersions = [];
-                    oldPrimary.LinkedAlternateVersions = [];
-                    oldPrimary.SetPrimaryVersionId(newPrimary.Id);
-                    oldPrimary.OwnerId = newPrimary.Id;
-                    await oldPrimary.UpdateToRepositoryAsync(writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
-
-                    // Re-route playlist/collection references from old primary to new primary
-                    await writes.RerouteLinkedChildReferencesAsync(oldPrimary.Id, newPrimary.Id, cancellationToken).ConfigureAwait(false);
-                }
-
-                // After removing items, reattach any detached user data to remaining children
-                // that share the same user data keys (eg. same episode replaced with a new file).
-                if (actuallyRemoved.Count > 0)
-                {
-                    var removedKeys = actuallyRemoved.SelectMany(i => i.GetUserDataKeys()).ToHashSet();
-                    foreach (var child in validChildren)
-                    {
-                        if (child.GetUserDataKeys().Any(removedKeys.Contains))
-                        {
-                            await child.ReattachUserDataAsync(writes, cancellationToken).ConfigureAwait(false);
-                        }
-                    }
-                }
+                validChildren = reconciliation.ValidChildren.ToList();
+                accessibleChildren = reconciliation.AccessibleChildren.ToList();
             }
             else
             {
@@ -716,7 +421,7 @@ namespace Tesserafin.Controller.Entities
 
             if (recursive)
             {
-                ProviderManager.OnRefreshProgress(this, ProgressHelpers.UpdatedChildItems);
+                services.RefreshProgress.OnRefreshProgress(this, ProgressHelpers.UpdatedChildItems);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -730,16 +435,16 @@ namespace Tesserafin.Controller.Entities
 
                     progress.Report(percent);
 
-                    ProviderManager.OnRefreshProgress(folder, percent);
+                    services.RefreshProgress.OnRefreshProgress(folder, percent);
                 });
 
                 if (validChildrenNeedGeneration)
                 {
-                    validChildren = Children.ToList();
+                    validChildren = GetCatalogueChildren(services.Repository, services.Lookup).ToList();
                     validChildrenNeedGeneration = false;
                 }
 
-                await ValidateSubFolders(deletions, writes, images, accessibleChildren.OfType<Folder>().ToList(), directoryService, innerProgress, cancellationToken).ConfigureAwait(false);
+                await ValidateSubFolders(services, accessibleChildren.OfType<Folder>().ToList(), directoryService, innerProgress, cancellationToken).ConfigureAwait(false);
             }
 
             if (refreshChildMetadata)
@@ -748,7 +453,7 @@ namespace Tesserafin.Controller.Entities
 
                 if (recursive)
                 {
-                    ProviderManager.OnRefreshProgress(this, ProgressHelpers.ScannedSubfolders);
+                    services.RefreshProgress.OnRefreshProgress(this, ProgressHelpers.ScannedSubfolders);
                 }
 
                 var container = this as IMetadataContainer;
@@ -762,63 +467,64 @@ namespace Tesserafin.Controller.Entities
 
                     if (recursive)
                     {
-                        ProviderManager.OnRefreshProgress(folder, percent);
+                        services.RefreshProgress.OnRefreshProgress(folder, percent);
                     }
                 });
 
                 if (container is not null)
                 {
-                    await RefreshAllMetadataForContainer(deletions, writes, images, container, refreshOptions, innerProgress, cancellationToken).ConfigureAwait(false);
+                    await RefreshAllMetadataForContainer(services, container, refreshOptions, innerProgress, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
                     if (validChildrenNeedGeneration)
                     {
-                        Children = null; // invalidate cached children.
-                        validChildren = Children.ToList();
+                        InvalidateCatalogueChildren(services.Lookup);
+                        validChildren = GetCatalogueChildren(services.Repository, services.Lookup).ToList();
                     }
 
-                    await RefreshMetadataRecursive(deletions, writes, images, accessibleChildren, refreshOptions, recursive, innerProgress, cancellationToken).ConfigureAwait(false);
+                    await RefreshMetadataRecursive(services, accessibleChildren, refreshOptions, recursive, innerProgress, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
 
-        private async Task RefreshMetadataRecursive(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IList<BaseItem> children, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task RefreshMetadataRecursive(IFolderValidationServices services, IList<BaseItem> children, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
         {
             await RunTasks(
-                (baseItem, innerProgress) => RefreshChildMetadata(deletions, writes, images, baseItem, refreshOptions, recursive && baseItem.IsFolder, innerProgress, cancellationToken),
+                services.Scheduler,
+                (baseItem, innerProgress) => RefreshChildMetadata(services, baseItem, refreshOptions, recursive && baseItem.IsFolder, innerProgress, cancellationToken),
                 children,
                 progress,
                 cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task RefreshAllMetadataForContainer(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IMetadataContainer container, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task RefreshAllMetadataForContainer(IFolderValidationServices services, IMetadataContainer container, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
             if (container is Series series)
             {
-                await series.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                await series.RefreshMetadata(services.Deletions, services.Writes, services.Providers, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
 
-            await container.RefreshAllMetadata(deletions, writes, images, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
+            await container.RefreshAllMetadata(services, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task RefreshChildMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, BaseItem child, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task RefreshChildMetadata(IFolderValidationServices services, BaseItem child, MetadataRefreshOptions refreshOptions, bool recursive, IProgress<double> progress, CancellationToken cancellationToken)
         {
             if (child is IMetadataContainer container)
             {
-                await RefreshAllMetadataForContainer(deletions, writes, images, container, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
+                await RefreshAllMetadataForContainer(services, container, refreshOptions, progress, cancellationToken).ConfigureAwait(false);
             }
             else
             {
                 if (refreshOptions.RefreshItem(child))
                 {
-                    await child.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                    await child.RefreshMetadata(services.Deletions, services.Writes, services.Providers, refreshOptions, cancellationToken).ConfigureAwait(false);
                 }
 
                 if (recursive && child is Folder folder)
                 {
                     folder.Children = null; // invalidate cached children.
-                    await folder.RefreshMetadataRecursive(deletions, writes, images, folder.Children.Except([this, child]).ToList(), refreshOptions, true, progress, cancellationToken).ConfigureAwait(false);
+                    await folder.RefreshMetadataRecursive(services, folder.GetCatalogueChildren(services.Repository, services.Lookup).Except([this, child]).ToList(), refreshOptions, true, progress, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -826,18 +532,17 @@ namespace Tesserafin.Controller.Entities
         /// <summary>
         /// Refreshes the children.
         /// </summary>
-        /// <param name="deletions">Explicit deletion operations for this refresh.</param>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+        /// <param name="services">Deletion, write, image, scheduling and channel services for this validation.</param>
         /// <param name="children">The children.</param>
         /// <param name="directoryService">The directory service.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        private async Task ValidateSubFolders(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IList<Folder> children, IDirectoryService directoryService, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task ValidateSubFolders(IFolderValidationServices services, IList<Folder> children, IDirectoryService directoryService, IProgress<double> progress, CancellationToken cancellationToken)
         {
             await RunTasks(
-                (folder, innerProgress) => folder.ValidateChildrenInternal(deletions, writes, images, innerProgress, true, false, false, null, directoryService, cancellationToken),
+                services.Scheduler,
+                (folder, innerProgress) => folder.ValidateChildrenInternal(services, innerProgress, true, false, false, null, directoryService, cancellationToken),
                 children,
                 progress,
                 cancellationToken).ConfigureAwait(false);
@@ -846,14 +551,15 @@ namespace Tesserafin.Controller.Entities
         /// <summary>
         /// Runs an action block on a list of children.
         /// </summary>
+        /// <param name="scheduler">The bounded-concurrency scheduler.</param>
         /// <param name="task">The task to run for each child.</param>
         /// <param name="children">The list of children.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        private async Task RunTasks<T>(Func<T, IProgress<double>, Task> task, IList<T> children, IProgress<double> progress, CancellationToken cancellationToken)
+        private static async Task RunTasks<T>(ILimitedConcurrencyLibraryScheduler scheduler, Func<T, IProgress<double>, Task> task, IList<T> children, IProgress<double> progress, CancellationToken cancellationToken)
         {
-            await LimitedConcurrencyLibraryScheduler
+            await scheduler
                 .Enqueue(
                     children.ToArray(),
                     task,
@@ -862,19 +568,13 @@ namespace Tesserafin.Controller.Entities
                 .ConfigureAwait(false);
         }
 
-        /// <summary>
-        /// Get the children of this folder from the actual file system.
-        /// </summary>
-        /// <returns>IEnumerable{BaseItem}.</returns>
-        /// <param name="directoryService">The directory service to use for operation.</param>
-        /// <returns>Returns set of base items.</returns>
-        protected virtual IEnumerable<BaseItem> GetNonCachedChildren(IDirectoryService directoryService)
-        {
-            var collectionType = LibraryManager.GetContentType(this);
-            var libraryOptions = LibraryManager.GetLibraryOptions(this);
-
-            return LibraryManager.ResolvePaths(GetFileSystemChildren(directoryService), directoryService, this, libraryOptions, collectionType);
-        }
+        /// <summary>Discovers children for catalogue reconciliation.</summary>
+        /// <param name="resolution">The filesystem candidate resolver.</param>
+        /// <param name="directoryService">Access to filesystem entries.</param>
+        /// <param name="cancellationToken">Cancels discovery.</param>
+        /// <returns>The children resolved from the current filesystem entries.</returns>
+        protected virtual IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
+            => resolution.ResolveFolderChildren(this, GetFileSystemChildren(directoryService), directoryService, cancellationToken);
 
         /// <summary>
         /// Get our children from the repo - stubbed for now.
@@ -882,27 +582,20 @@ namespace Tesserafin.Controller.Entities
         /// <returns>IEnumerable{BaseItem}.</returns>
         protected IReadOnlyList<BaseItem> GetCachedChildren()
         {
-            return ItemRepository.GetItemList(new InternalItemsQuery
-            {
-                Parent = this,
-                GroupByPresentationUniqueKey = false,
-                DtoOptions = new DtoOptions(true)
-            });
+            return RequireReadServices().GetChildren(this);
         }
 
-        public virtual int GetChildCount(User user)
+        public virtual int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
         {
             if (LinkedChildren.Length > 0)
             {
                 if (this is not ICollectionFolder)
                 {
-                    return GetChildren(user, true).Count;
+                    return GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope, Listing = listing }).Count;
                 }
             }
 
-            // GetChildCount isn't part of the GetItemsInternal/GetItems/GetItemList chain the
-            // channelManager parameter was threaded through (out of scope: a much wider virtual
-            // with many more overrides/callers) — falls back to the static here.
+            // The listing services are the caller's (IItemListingServices), not statics.
             // Documented legitimate caller of the obsolete 5-parameter overload — see
             // docs/major-rewrite-plan-v13.md § PR28/N.
 #pragma warning disable CS0618
@@ -912,44 +605,20 @@ namespace Tesserafin.Controller.Entities
                     Recursive = false,
                     Limit = 0,
                     Parent = this,
+                    Visibility = scope,
+                    Listing = listing,
                     DtoOptions = new DtoOptions(false)
                     {
                         EnableImages = false
                     }
                 },
-                ChannelManager,
-                CollectionManager,
-                UserViewManager,
-                UserView.TVSeriesManager);
+                listing.Channels,
+                listing.Collections,
+                listing.UserViews,
+                listing.TVSeries);
 #pragma warning restore CS0618
 
             return result.TotalRecordCount;
-        }
-
-        public virtual int GetRecursiveChildCount(User user)
-        {
-            // Same scope boundary as GetChildCount above: falls back to the static.
-            // Documented legitimate caller of the obsolete 5-parameter overload — see
-            // docs/major-rewrite-plan-v13.md § PR28/N.
-#pragma warning disable CS0618
-            return GetItems(
-                new InternalItemsQuery(user)
-                {
-                    Recursive = true,
-                    IsFolder = false,
-                    IsVirtualItem = false,
-                    EnableTotalRecordCount = true,
-                    Limit = 0,
-                    DtoOptions = new DtoOptions(false)
-                    {
-                        EnableImages = false
-                    }
-                },
-                ChannelManager,
-                CollectionManager,
-                UserViewManager,
-                UserView.TVSeriesManager).TotalRecordCount;
-#pragma warning restore CS0618
         }
 
         public QueryResult<BaseItem> QueryRecursive(InternalItemsQuery query)
@@ -993,7 +662,8 @@ namespace Tesserafin.Controller.Entities
             if (user is not null)
             {
                 // needed for boxsets and playlists
-                itemsList = itemsList.Where(i => i.IsVisibleStandalone(query.User));
+                var scope = query.RequireVisibility();
+                itemsList = itemsList.Where(i => i.IsVisibleStandalone(user, scope));
             }
 
             IEnumerable<BaseItem> returnItems;
@@ -1034,8 +704,8 @@ namespace Tesserafin.Controller.Entities
         // migration step (GetItemsInternal cluster, PR11/PR12), not a stable API. Marked obsolete
         // (warning) so no new application consumer picks it up; the remaining documented callers
         // (internal fallback sites here and in UserView, UserViewBuilder's relay, ItemQueryService's
-        // own fallback path, UserViewManager's self-reference, RecordingsManager's DI-cycle
-        // fallback) suppress CS0618 locally with a pointer back to that doc section.
+        // own fallback path, UserViewManager's self-reference) suppress CS0618 locally with a
+        // pointer back to that doc section.
         [Obsolete("Application code should use IItemQueryService instead of calling Folder.GetItems/GetItemList directly. See docs/major-rewrite-plan-v13.md § PR28/N.")]
         public QueryResult<BaseItem> GetItems(InternalItemsQuery query, IChannelManager channelManager, ICollectionManager collectionManager, IUserViewManager userViewManager, ITVSeriesManager tvSeriesManager)
         {
@@ -1174,7 +844,7 @@ namespace Tesserafin.Controller.Entities
 
             if (user is null)
             {
-                return UserViewBuilder.Filter(Children, user, query, UserDataManager, LibraryManager);
+                return UserViewBuilder.Filter(Children, user, query, LibraryManager);
             }
 
             // need to pass this param to the children.
@@ -1184,14 +854,14 @@ namespace Tesserafin.Controller.Entities
                 DisplayAlbumFolders = query.DisplayAlbumFolders,
                 NameStartsWith = query.NameStartsWith,
                 NameStartsWithOrGreater = query.NameStartsWithOrGreater,
-                NameLessThan = query.NameLessThan
+                NameLessThan = query.NameLessThan,
+                Visibility = query.Visibility
             };
 
             return UserViewBuilder.Filter(
                 getChildren(user, true, childQuery),
                 user,
                 query,
-                UserDataManager,
                 LibraryManager);
         }
 
@@ -1573,21 +1243,30 @@ namespace Tesserafin.Controller.Entities
             return true;
         }
 
-        public virtual IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, out int totalItemCount, InternalItemsQuery query = null)
+        /// <summary>
+        /// Gets the children <paramref name="user"/> may see.
+        /// </summary>
+        /// <param name="user">The user.</param>
+        /// <param name="includeLinkedChildren">Whether linked children count as children.</param>
+        /// <param name="totalItemCount">The number of visible children before paging.</param>
+        /// <param name="query">The query; it must carry the visibility scope (<see cref="InternalItemsQuery.Visibility"/>).</param>
+        /// <returns>The visible children.</returns>
+        public virtual IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, out int totalItemCount, InternalItemsQuery query)
         {
             ArgumentNullException.ThrowIfNull(user);
-            query ??= new InternalItemsQuery();
+            ArgumentNullException.ThrowIfNull(query);
+            var scope = query.RequireVisibility();
             query.User = user;
 
             // the true root should return our users root folder children
             if (IsPhysicalRoot)
             {
-                return LibraryManager.GetUserRootFolder().GetChildren(user, includeLinkedChildren, out totalItemCount);
+                return LibraryManager.GetUserRootFolder().GetChildren(user, includeLinkedChildren, out totalItemCount, new InternalItemsQuery(user) { Visibility = scope });
             }
 
             var result = new Dictionary<Guid, BaseItem>();
 
-            totalItemCount = AddChildren(user, includeLinkedChildren, result, false, query);
+            totalItemCount = AddChildren(user, includeLinkedChildren, result, false, query, scope);
 
             return result.Values.ToArray();
         }
@@ -1597,7 +1276,7 @@ namespace Tesserafin.Controller.Entities
             return GetChildren(user, includeLinkedChildren, out totalItemCount, query);
         }
 
-        public virtual IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query = null)
+        public virtual IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query)
         {
             return GetChildren(user, includeLinkedChildren, out _, query);
         }
@@ -1607,7 +1286,7 @@ namespace Tesserafin.Controller.Entities
             return GetChildren(user, includeLinkedChildren, query);
         }
 
-        protected virtual IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user)
+        protected virtual IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user, InternalItemsQuery query)
         {
             return Children;
         }
@@ -1615,7 +1294,7 @@ namespace Tesserafin.Controller.Entities
         /// <summary>
         /// Adds the children to list.
         /// </summary>
-        private int AddChildren(User user, bool includeLinkedChildren, Dictionary<Guid, BaseItem> result, bool recursive, InternalItemsQuery query, HashSet<Folder> visitedFolders = null)
+        private int AddChildren(User user, bool includeLinkedChildren, Dictionary<Guid, BaseItem> result, bool recursive, InternalItemsQuery query, IStandaloneVisibilityService scope, HashSet<Folder> visitedFolders = null)
         {
             // Prevent infinite recursion of nested folders
             visitedFolders ??= new HashSet<Folder>();
@@ -1635,28 +1314,28 @@ namespace Tesserafin.Controller.Entities
             // If there are not sub-folders, proceed as normal.
             if (children is null)
             {
-                children = GetEligibleChildrenForRecursiveChildren(user);
+                children = GetEligibleChildrenForRecursiveChildren(user, query);
             }
 
             if (includeLinkedChildren)
             {
-                children = children.Concat(GetLinkedChildren(user)).ToArray();
+                children = children.Concat(GetLinkedChildren(user, scope)).ToArray();
             }
 
-            return AddChildrenFromCollection(children, user, includeLinkedChildren, result, recursive, query, visitedFolders);
+            return AddChildrenFromCollection(children, user, includeLinkedChildren, result, recursive, query, scope, visitedFolders);
         }
 
-        private int AddChildrenFromCollection(IEnumerable<BaseItem> children, User user, bool includeLinkedChildren, Dictionary<Guid, BaseItem> result, bool recursive, InternalItemsQuery query, HashSet<Folder> visitedFolders)
+        private int AddChildrenFromCollection(IEnumerable<BaseItem> children, User user, bool includeLinkedChildren, Dictionary<Guid, BaseItem> result, bool recursive, InternalItemsQuery query, IStandaloneVisibilityService scope, HashSet<Folder> visitedFolders)
         {
             query ??= new InternalItemsQuery();
             var limit = query.Limit > 0 ? query.Limit : int.MaxValue;
             query.Limit = 0;
 
             var visibleChildren = children
-                .Where(e => e.IsVisible(user))
+                .Where(e => e.IsVisible(user, false, scope))
                 .ToArray();
 
-            var realChildren = UserViewBuilder.Filter(visibleChildren, query.User, query, UserDataManager, LibraryManager)
+            var realChildren = UserViewBuilder.Filter(visibleChildren, query.User, query, LibraryManager)
                 .ToArray();
 
             var childCount = realChildren.Length;
@@ -1677,7 +1356,7 @@ namespace Tesserafin.Controller.Entities
                     .Where(e => e.IsFolder)
                     .OfType<Folder>())
                 {
-                    childCount += child.AddChildren(user, includeLinkedChildren, result, true, query, visitedFolders);
+                    childCount += child.AddChildren(user, includeLinkedChildren, result, true, query, scope, visitedFolders);
                 }
             }
 
@@ -1687,10 +1366,11 @@ namespace Tesserafin.Controller.Entities
         public virtual IReadOnlyList<BaseItem> GetRecursiveChildren(User user, InternalItemsQuery query, out int totalCount)
         {
             ArgumentNullException.ThrowIfNull(user);
+            ArgumentNullException.ThrowIfNull(query);
 
             var result = new Dictionary<Guid, BaseItem>();
 
-            totalCount = AddChildren(user, true, result, true, query);
+            totalCount = AddChildren(user, true, result, true, query, query.RequireVisibility());
 
             return result.Values.ToArray();
         }
@@ -1720,43 +1400,60 @@ namespace Tesserafin.Controller.Entities
         }
 
         public IReadOnlyList<BaseItem> GetRecursiveChildren(Func<BaseItem, bool> filter, bool includeLinkedChildren)
+            => ReadRecursiveChildren(filter, static folder => folder.Children, includeLinkedChildren ? static folder => folder.GetLinkedChildren() : null);
+
+        /// <summary>Reads the descendants and top-level saved links for a metadata refresh.</summary>
+        /// <param name="repository">The item repository.</param>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <param name="links">The saved link resolver.</param>
+        /// <param name="filter">An optional filter for items returned by the traversal.</param>
+        /// <returns>The distinct items in catalogue traversal order.</returns>
+        public IReadOnlyList<BaseItem> GetRecursiveCatalogueChildren(
+            IItemRepository repository,
+            IItemLookupService lookup,
+            LinkedChildResolver links,
+            Func<BaseItem, bool> filter = null)
+            => ReadRecursiveChildren(
+                filter,
+                folder => folder.GetCatalogueChildren(repository, lookup),
+                links.GetItems);
+
+        private IReadOnlyList<BaseItem> ReadRecursiveChildren(
+            Func<BaseItem, bool> filter,
+            Func<Folder, IEnumerable<BaseItem>> readChildren,
+            Func<Folder, IEnumerable<BaseItem>> readRootLinks)
         {
             var result = new Dictionary<Guid, BaseItem>();
 
-            AddChildrenToList(result, includeLinkedChildren, true, filter);
+            AddPhysicalChildren(this);
+            if (readRootLinks is not null)
+            {
+                // Only follow links from the starting folder, where they contribute items but no new branches.
+                foreach (var child in readRootLinks(this))
+                {
+                    AddMatching(child);
+                }
+            }
 
             return result.Values.ToArray();
-        }
 
-        /// <summary>
-        /// Adds the children to list.
-        /// </summary>
-        private void AddChildrenToList(Dictionary<Guid, BaseItem> result, bool includeLinkedChildren, bool recursive, Func<BaseItem, bool> filter)
-        {
-            foreach (var child in Children)
+            void AddPhysicalChildren(Folder folder)
+            {
+                foreach (var child in readChildren(folder))
+                {
+                    AddMatching(child);
+                    if (child.IsFolder)
+                    {
+                        AddPhysicalChildren((Folder)child);
+                    }
+                }
+            }
+
+            void AddMatching(BaseItem child)
             {
                 if (filter is null || filter(child))
                 {
                     result[child.Id] = child;
-                }
-
-                if (recursive && child.IsFolder)
-                {
-                    var folder = (Folder)child;
-
-                    // We can only support includeLinkedChildren for the first folder, or we might end up stuck in a loop of linked items
-                    folder.AddChildrenToList(result, false, true, filter);
-                }
-            }
-
-            if (includeLinkedChildren)
-            {
-                foreach (var child in GetLinkedChildren())
-                {
-                    if (filter is null || filter(child))
-                    {
-                        result[child.Id] = child;
-                    }
                 }
             }
         }
@@ -1766,44 +1463,21 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <returns>IEnumerable{BaseItem}.</returns>
         public List<BaseItem> GetLinkedChildren()
-        {
-            var resolved = ResolveLinkedChildren(LinkedChildren);
-            var list = new List<BaseItem>(resolved.Count);
-            foreach (var (_, item) in resolved)
-            {
-                list.Add(item);
-            }
+            => CreateLinkedChildResolver().Resolve(this).Select(entry => entry.Item).ToList();
 
-            return list;
+        protected static LinkedChildResolver CreateLinkedChildResolver(IStandaloneVisibilityService scope = null)
+        {
+            return new LinkedChildResolver(
+                scope is null ? query => LibraryManager.GetItemList(query) : null,
+                scope is null ? id => LibraryManager.GetItemById(id) : scope.GetItemById,
+                scope is null
+                    ? path => LibraryManager.GetItemList(ItemPathQuery.Create(path, null)).FirstOrDefault()
+                    : scope.FindByPath,
+                FileSystem,
+                Logger);
         }
 
-        public bool ContainsLinkedChildByItemId(Guid itemId)
-        {
-            var linkedChildren = LinkedChildren;
-            foreach (var i in linkedChildren)
-            {
-                if (i.ItemId.HasValue)
-                {
-                    if (i.ItemId.Value.Equals(itemId))
-                    {
-                        return true;
-                    }
-
-                    continue;
-                }
-
-                var child = GetLinkedChild(i);
-
-                if (child is not null && child.Id.Equals(itemId))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        public List<BaseItem> GetLinkedChildren(User user)
+        public List<BaseItem> GetLinkedChildren(User user, IStandaloneVisibilityService scope)
         {
             if (!FilterLinkedChildrenPerUser || user is null)
             {
@@ -1819,7 +1493,7 @@ namespace Tesserafin.Controller.Entities
             }
 
             var allUserRootChildren = LibraryManager.GetUserRootFolder()
-                .GetChildren(user, true)
+                .GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope })
                 .OfType<Folder>()
                 .ToList();
 
@@ -1827,9 +1501,10 @@ namespace Tesserafin.Controller.Entities
                 .Select(i => i.Id)
                 .ToList();
 
+            var resolver = CreateLinkedChildResolver();
             foreach (var i in linkedChildren)
             {
-                var child = GetLinkedChild(i);
+                var child = resolver.ResolveSingle(this, i);
 
                 if (child is null)
                 {
@@ -1843,7 +1518,7 @@ namespace Tesserafin.Controller.Entities
                     var childProtocol = childOwner.PathProtocol;
                     if (!childProtocol.HasValue || childProtocol.Value != Tesserafin.Model.MediaInfo.MediaProtocol.File)
                     {
-                        if (!childOwner.IsVisibleStandalone(user))
+                        if (!childOwner.IsVisibleStandalone(user, scope))
                         {
                             continue;
                         }
@@ -1866,163 +1541,41 @@ namespace Tesserafin.Controller.Entities
             return list;
         }
 
-        /// <summary>
-        /// Gets the linked children.
-        /// </summary>
-        /// <returns>IEnumerable{BaseItem}.</returns>
-        public IReadOnlyList<Tuple<LinkedChild, BaseItem>> GetLinkedChildrenInfos()
-        {
-            return ResolveLinkedChildren(LinkedChildren)
-                .Select(t => new Tuple<LinkedChild, BaseItem>(t.Info, t.Item))
-                .ToArray();
-        }
-
-        /// <summary>
-        /// Resolves a list of <see cref="LinkedChild"/> entries to their <see cref="BaseItem"/> targets,
-        /// batching the database lookup across all entries with a known ItemId.
-        /// Entries without a usable ItemId fall back to the per-entry <see cref="BaseItem.GetLinkedChild(LinkedChild)"/>
-        /// path (legacy path-based resolution).
-        /// </summary>
-        /// <param name="linkedChildren">Linked children to resolve.</param>
-        /// <returns>Each input entry paired with its resolved item; entries that fail to resolve are dropped.</returns>
-        private List<(LinkedChild Info, BaseItem Item)> ResolveLinkedChildren(IReadOnlyList<LinkedChild> linkedChildren)
-        {
-            var resolved = new List<(LinkedChild Info, BaseItem Item)>(linkedChildren.Count);
-            if (linkedChildren.Count == 0)
-            {
-                return resolved;
-            }
-
-            var idsToBatch = new HashSet<Guid>();
-            foreach (var info in linkedChildren)
-            {
-                if (info.ItemId.HasValue && !info.ItemId.Value.IsEmpty())
-                {
-                    idsToBatch.Add(info.ItemId.Value);
-                }
-            }
-
-            Dictionary<Guid, BaseItem> byId = null;
-            if (idsToBatch.Count > 0)
-            {
-                var batched = LibraryManager.GetItemList(new InternalItemsQuery
-                {
-                    ItemIds = [.. idsToBatch]
-                });
-                byId = new Dictionary<Guid, BaseItem>(batched.Count);
-                foreach (var item in batched)
-                {
-                    byId[item.Id] = item;
-                }
-            }
-
-            foreach (var info in linkedChildren)
-            {
-                BaseItem item = null;
-                if (byId is not null && info.ItemId.HasValue && byId.TryGetValue(info.ItemId.Value, out var batchedItem))
-                {
-                    item = batchedItem;
-                }
-                else
-                {
-                    // ItemId is missing/empty or the batched query couldn't return the item
-                    // (e.g. it has been removed). Fall back to per-entry resolution, which also
-                    // handles legacy path-based linked children.
-                    item = GetLinkedChild(info);
-                }
-
-                if (item is not null)
-                {
-                    resolved.Add((info, item));
-                }
-            }
-
-            return resolved;
-        }
-
-        protected override async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        protected override async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
             var changesFound = false;
 
             if (IsFileProtocol)
             {
-                if (RefreshLinkedChildren(fileSystemChildren))
+                if (await RefreshLinkedChildrenAsync(writes, fileSystemChildren, cancellationToken).ConfigureAwait(false))
                 {
                     changesFound = true;
                 }
             }
 
-            var baseHasChanges = await base.RefreshedOwnedItems(deletions, writes, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
+            var baseHasChanges = await base.RefreshedOwnedItems(deletions, writes, providers, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
 
             return baseHasChanges || changesFound;
         }
 
-        /// <summary>
-        /// Refreshes the linked children.
-        /// </summary>
-        /// <param name="fileSystemChildren">The enumerable of file system metadata.</param>
-        /// <returns><c>true</c> if the linked children were updated, <c>false</c> otherwise.</returns>
-        protected virtual bool RefreshLinkedChildren(IEnumerable<FileSystemMetadata> fileSystemChildren)
+        /// <summary>Refreshes links through their explicit write owner.</summary>
+        /// <param name="writes">The item write owner.</param>
+        /// <param name="fileSystemChildren">Completed filesystem discovery.</param>
+        /// <param name="cancellationToken">The refresh cancellation token.</param>
+        /// <returns>Whether linked children changed.</returns>
+        protected virtual Task<bool> RefreshLinkedChildrenAsync(IItemWriteCommands writes, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+            => SupportsShortcutChildren
+                ? writes.RefreshShortcutLinksAsync(this, fileSystemChildren, cancellationToken)
+                : Task.FromResult(false);
+
+        public override bool IsPlayed(User user, IUserDataManager userDataManager, UserItemData userItemData = null)
         {
-            if (SupportsShortcutChildren)
-            {
-                var newShortcutLinks = fileSystemChildren
-                    .Where(i => !i.IsDirectory && FileSystem.IsShortcut(i.FullName))
-                    .Select(i =>
-                    {
-                        try
-                        {
-                            Logger.LogDebug("Found shortcut at {0}", i.FullName);
-
-                            var resolvedPath = CollectionFolder.ApplicationHost.ExpandVirtualPath(FileSystem.ResolveShortcut(i.FullName));
-
-                            if (!string.IsNullOrEmpty(resolvedPath))
-                            {
-#pragma warning disable CS0618 // Type or member is obsolete - shortcuts require Path for lazy ItemId resolution
-                                return new LinkedChild
-                                {
-                                    Path = resolvedPath,
-                                    Type = LinkedChildType.Shortcut
-                                };
-#pragma warning restore CS0618
-                            }
-
-                            Logger.LogError("Error resolving shortcut {0}", i.FullName);
-
-                            return null;
-                        }
-                        catch (IOException ex)
-                        {
-                            Logger.LogError(ex, "Error resolving shortcut {0}", i.FullName);
-                            return null;
-                        }
-                    })
-                    .Where(i => i is not null)
-                    .ToList();
-
-                var currentShortcutLinks = LinkedChildren.Where(i => i.Type == LinkedChildType.Shortcut).ToList();
-
-                if (!newShortcutLinks.SequenceEqual(currentShortcutLinks, new LinkedChildComparer(FileSystem)))
-                {
-                    Logger.LogInformation("Shortcut links have changed for {0}", Path);
-
-                    newShortcutLinks.AddRange(LinkedChildren.Where(i => i.Type == LinkedChildType.Manual));
-                    LinkedChildren = newShortcutLinks.ToArray();
-                    return true;
-                }
-            }
-
-            return false;
+            return RequireReadServices().IsPlayed(user, Id);
         }
 
-        public override bool IsPlayed(User user, UserItemData userItemData)
+        public override bool IsUnplayed(User user, IUserDataManager userDataManager, UserItemData userItemData = null)
         {
-            return ItemRepository.GetIsPlayed(user, Id, true);
-        }
-
-        public override bool IsUnplayed(User user, UserItemData userItemData)
-        {
-            return !IsPlayed(user, userItemData);
+            return !IsPlayed(user, userDataManager, userItemData);
         }
 
         public override void FillUserDataDtoValues(

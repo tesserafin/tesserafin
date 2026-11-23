@@ -221,7 +221,7 @@ public class VideosController : BaseTesserafinApiController
 
                     return 0;
                 })
-                .ThenByDescending(i => i.GetDefaultVideoStream()?.Width ?? 0)
+                .ThenByDescending(i => i.GetDefaultVideoStream(_mediaSourceManager)?.Width ?? 0)
                 .First();
         }
 

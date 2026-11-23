@@ -13,6 +13,7 @@ using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
@@ -131,9 +132,9 @@ namespace Tesserafin.Controller.Entities.TV
             return list;
         }
 
-        public override int GetChildCount(User user)
+        public override int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
         {
-            var result = GetChildren(user, true, null).Count;
+            var result = GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope, Listing = listing }).Count;
 
             return result;
         }
@@ -145,18 +146,16 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         public override string CreatePresentationUniqueKey()
-        {
-            if (IndexNumber.HasValue)
-            {
-                var series = Series;
-                if (series is not null)
-                {
-                    return series.PresentationUniqueKey + "-" + IndexNumber.Value.ToString("000", CultureInfo.InvariantCulture);
-                }
-            }
+            => IndexNumber is int number ? CreatePresentationUniqueKey(Series, number) : base.CreatePresentationUniqueKey();
 
-            return base.CreatePresentationUniqueKey();
-        }
+        /// <summary>Creates the presentation key using the supplied lookup for the owning series.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <returns>The presentation key.</returns>
+        public string CreatePresentationUniqueKey(IItemLookupService lookup)
+            => IndexNumber is int number ? CreatePresentationUniqueKey(GetSeries(lookup), number) : base.CreatePresentationUniqueKey();
+
+        private string CreatePresentationUniqueKey(Series series, int number)
+            => series is null ? base.CreatePresentationUniqueKey() : series.PresentationUniqueKey + "-" + number.ToString("000", CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Creates the name of the sort.
@@ -191,7 +190,7 @@ namespace Tesserafin.Controller.Entities.TV
 
             var user = query.User;
 
-            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true), user, query, UserDataManager, LibraryManager);
+            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true), user, query, LibraryManager);
 
             return PostFilterAndSort(items, query, collectionManager);
         }
@@ -220,7 +219,7 @@ namespace Tesserafin.Controller.Entities.TV
 
             var user = query.User;
 
-            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true, itemSortService), user, query, UserDataManager, LibraryManager);
+            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true, query.Listing), user, query, LibraryManager);
 
             return PostFilterAndSort(items, query, collectionManager, itemSortService);
         }
@@ -243,21 +242,34 @@ namespace Tesserafin.Controller.Entities.TV
         /// <param name="user">The user.</param>
         /// <param name="options">The options to use.</param>
         /// <param name="shouldIncludeMissingEpisodes">If missing episodes should be included.</param>
-        /// <param name="itemSortService">Sort service; falls back to the obsolete static <c>LibraryManager.Sort</c> facade when <c>null</c> (see docs/major-rewrite-plan-v13.md § PR50/N).</param>
+        /// <param name="listing">Listing services (sort, channels); the sort falls back to the obsolete static <c>LibraryManager.Sort</c> facade when <c>null</c> (see docs/major-rewrite-plan-v13.md § PR50/N).</param>
         /// <returns>Set of episodes.</returns>
-        public List<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+        public List<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
-            return GetEpisodes(Series, user, options, shouldIncludeMissingEpisodes, itemSortService);
+            return GetEpisodes(Series, user, options, shouldIncludeMissingEpisodes, listing);
         }
+
+        /// <summary>Reads grouped season episodes, including missing entries, for a background metadata refresh.</summary>
+        /// <param name="options">The item data to load.</param>
+        /// <param name="repository">The item repository.</param>
+        /// <param name="lookup">The lookup used to resolve the owning series.</param>
+        /// <param name="listing">Sort and channel services for episode listing.</param>
+        /// <returns>The season episodes in display order.</returns>
+        public IReadOnlyList<BaseItem> GetCatalogueEpisodes(
+            DtoOptions options,
+            IItemRepository repository,
+            IItemLookupService lookup,
+            IItemListingServices listing)
+            => GetSeries(lookup)?.GetCatalogueSeasonEpisodes(this, options, repository, listing) ?? [];
 
         public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes)
         {
             return GetEpisodes(series, user, options, shouldIncludeMissingEpisodes, null);
         }
 
-        public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+        public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
-            return GetEpisodes(series, user, null, options, shouldIncludeMissingEpisodes, itemSortService);
+            return GetEpisodes(series, user, null, options, shouldIncludeMissingEpisodes, listing);
         }
 
         public List<BaseItem> GetEpisodes(Series series, User user, IEnumerable<Episode> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes)
@@ -265,14 +277,14 @@ namespace Tesserafin.Controller.Entities.TV
             return GetEpisodes(series, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, null);
         }
 
-        public List<BaseItem> GetEpisodes(Series series, User user, IEnumerable<Episode> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemSortService itemSortService)
+        public List<BaseItem> GetEpisodes(Series series, User user, IEnumerable<Episode> allSeriesEpisodes, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
             if (series is null)
             {
                 return [];
             }
 
-            return series.GetSeasonEpisodes(this, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, itemSortService);
+            return series.GetSeasonEpisodes(this, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, listing);
         }
 
         public List<BaseItem> GetEpisodes()
@@ -290,7 +302,7 @@ namespace Tesserafin.Controller.Entities.TV
 
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query, IItemSortService itemSortService)
         {
-            return GetEpisodes(user, new DtoOptions(true), true, itemSortService);
+            return GetEpisodes(user, new DtoOptions(true), true, query.Listing);
         }
 
         protected override bool GetBlockUnratedValue(User user)
@@ -363,10 +375,18 @@ namespace Tesserafin.Controller.Entities.TV
         /// </summary>
         /// <returns>SeasonInfo.</returns>
         public SeasonInfo GetLookupInfo()
-        {
-            var id = GetItemLookupInfo<SeasonInfo>();
+            => CreateLookupInfo(Series, null);
 
-            var series = Series;
+        /// <summary>Builds provider lookup information using the supplied lookup for the owning series.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <param name="locale">The resolved metadata language and country.</param>
+        /// <returns>The lookup information.</returns>
+        public SeasonInfo GetLookupInfo(IItemLookupService lookup, (string Language, string CountryCode) locale)
+            => CreateLookupInfo(GetSeries(lookup), locale);
+
+        private SeasonInfo CreateLookupInfo(Series series, (string Language, string CountryCode)? locale)
+        {
+            var id = GetItemLookupInfo<SeasonInfo>(locale);
 
             if (series is not null)
             {
@@ -377,32 +397,22 @@ namespace Tesserafin.Controller.Entities.TV
             return id;
         }
 
-        /// <summary>
-        /// This is called before any metadata refresh and returns true or false indicating if changes were made.
-        /// </summary>
-        /// <param name="replaceAllMetadata"><c>true</c> to replace metadata, <c>false</c> to not.</param>
-        /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
-        /// <returns><c>true</c> if XXXX, <c>false</c> otherwise.</returns>
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        /// <summary>Prepares the season name and infers a missing season number from its path.</summary>
+        /// <param name="replaceAllMetadata">Whether to replace all metadata.</param>
+        /// <param name="itemNamingService">The season path parser.</param>
+        /// <param name="lookup">The catalogue lookup for the season folder's parent.</param>
+        /// <returns>Whether the preparation changed the season.</returns>
+        public bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IItemLookupService lookup)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
-
-            if (!IndexNumber.HasValue && !string.IsNullOrEmpty(Path))
+            var hasChanges = this.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            if (IndexNumber.HasValue || string.IsNullOrEmpty(Path))
             {
-                // Legacy parentId -> parentPath lookup stays on the BaseItem.LibraryManager
-                // static (GetParent(), out of scope for this migration); only the naming
-                // computation itself moves to the injected service (PR34/PR35 boundary).
-                var parentPath = GetParent()?.ContainingFolderPath;
-                IndexNumber ??= itemNamingService.GetSeasonNumberFromPath(Path, parentPath);
-
-                // If a change was made record it
-                if (IndexNumber.HasValue)
-                {
-                    hasChanges = true;
-                }
+                return hasChanges;
             }
 
-            return hasChanges;
+            var parentPath = GetParent(lookup)?.ContainingFolderPath;
+            IndexNumber = itemNamingService.GetSeasonNumberFromPath(Path, parentPath);
+            return hasChanges || IndexNumber.HasValue;
         }
     }
 }

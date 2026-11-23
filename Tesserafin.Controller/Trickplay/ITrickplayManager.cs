@@ -67,11 +67,11 @@ public interface ITrickplayManager
     Task DeleteTrickplayDataAsync(Guid itemId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Gets all trickplay infos for all media streams of an item.
+    /// Gets all trickplay infos for the media sources of a video.
     /// </summary>
-    /// <param name="item">The item.</param>
+    /// <param name="video">The video.</param>
     /// <returns>A map of media source id to a map of tile width to trickplay info.</returns>
-    Task<Dictionary<string, Dictionary<int, TrickplayInfo>>> GetTrickplayManifest(BaseItem item);
+    Task<Dictionary<string, Dictionary<int, TrickplayInfo>>> GetTrickplayManifest(Video video);
 
     /// <summary>
     /// Gets the path to a trickplay tile image.

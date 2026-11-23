@@ -37,6 +37,7 @@ public class UserLibraryController : BaseTesserafinApiController
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
     private readonly IPlaybackIntroService _intros;
+    private readonly IProviderManager _providers;
     private readonly IUserManager _userManager;
     private readonly IUserDataManager _userDataRepository;
     private readonly ILibraryManager _libraryManager;
@@ -50,6 +51,7 @@ public class UserLibraryController : BaseTesserafinApiController
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
     /// <param name="intros">Resolves visible playback intros.</param>
+    /// <param name="providers">The provider manager for metadata refreshes.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="userDataRepository">Instance of the <see cref="IUserDataManager"/> interface.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
@@ -60,6 +62,7 @@ public class UserLibraryController : BaseTesserafinApiController
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
         IPlaybackIntroService intros,
+        IProviderManager providers,
         IUserManager userManager,
         IUserDataManager userDataRepository,
         ILibraryManager libraryManager,
@@ -70,6 +73,7 @@ public class UserLibraryController : BaseTesserafinApiController
         _writes = writes;
         _deletions = deletions;
         _intros = intros;
+        _providers = providers;
         _userManager = userManager;
         _userDataRepository = userDataRepository;
         _libraryManager = libraryManager;
@@ -669,7 +673,7 @@ public class UserLibraryController : BaseTesserafinApiController
                     ForceSave = true
                 };
 
-                await item.RefreshMetadata(_deletions, _writes, options, CancellationToken.None).ConfigureAwait(false);
+                await item.RefreshMetadata(_deletions, _writes, _providers, options, CancellationToken.None).ConfigureAwait(false);
             }
         }
     }

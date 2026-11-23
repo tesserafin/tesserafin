@@ -9,6 +9,7 @@ using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.IO;
 using Tesserafin.Extensions;
 using Tesserafin.Model.IO;
+using Tesserafin.Model.MediaInfo;
 
 namespace Tesserafin.Server.Core.IO
 {
@@ -524,15 +525,7 @@ namespace Tesserafin.Server.Core.IO
 
         /// <inheritdoc />
         public virtual bool IsPathFile(string path)
-        {
-            if (path.Contains("://", StringComparison.OrdinalIgnoreCase)
-                && !path.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            return true;
-        }
+            => MediaPath.IsFile(path);
 
         /// <inheritdoc />
         public virtual void DeleteFile(string path)

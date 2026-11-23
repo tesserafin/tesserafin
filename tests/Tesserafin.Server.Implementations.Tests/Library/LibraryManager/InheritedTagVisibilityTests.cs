@@ -69,6 +69,14 @@ public sealed class InheritedTagVisibilityTests
         var resolver = new Tesserafin.Server.Core.Library.CollectionFolderResolver(lookup, rootProvider);
         fixture.Register<ICollectionFolderResolver>(() => resolver);
 
+        fixture.Inject<IItemQueryScopeService>(new Tesserafin.Server.Core.Library.ItemQueryScopeService(
+            lookup,
+            fixture.Freeze<IItemAccessService>(),
+            fixture.Freeze<IUserViewCatalog>(),
+            fixture.Freeze<IItemSortService>(),
+            rootProvider,
+            Mock.Of<IStandaloneVisibilityService>()));
+
         var manager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
                 Array.Empty<IResolverIgnoreRule>(),
                 Array.Empty<IItemResolver>(),
@@ -76,13 +84,11 @@ public sealed class InheritedTagVisibilityTests
             .Create();
 
         _lookup = lookup;
-        _tags = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, Mock.Of<ILocalizationManager>(), configuration.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings());
+        _tags = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, Mock.Of<ILocalizationManager>(), configuration.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings(), Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(It.IsAny<BaseItem>()) == new LibraryOptions()));
         _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, _tags);
 
         BaseItem.LibraryManager = manager;
         BaseItem.ConfigurationManager = configuration.Object;
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>(m => m.GetPathProtocol(It.IsAny<string>()) == MediaProtocol.File);
-        Video.RecordingsManager = Mock.Of<IRecordingsManager>();
     }
 
     [Fact]
@@ -194,7 +200,7 @@ public sealed class InheritedTagVisibilityTests
         AddLibrary("Movies", ["lib"], "/media/movies");
         var movie = AddMovie(Add(new Folder { Path = "/media/movies" }), "/media/movies/a.mkv");
 
-        foreach (var tags in new[] { null, _tags })
+        foreach (var tags in new[] { _tags })
         {
             Assert.False(movie.IsVisible(User(allowed: ["family"]), false, tags));
             Assert.True(movie.IsVisible(User(allowed: ["family"]), true, tags));
@@ -219,7 +225,7 @@ public sealed class InheritedTagVisibilityTests
         var root = Add((Folder)Activator.CreateInstance(rootType)!);
         var library = Add(new Folder { Path = "/media/movies", ParentId = root.Id, Tags = ["lib"] });
 
-        foreach (var tags in new[] { null, _tags })
+        foreach (var tags in new[] { _tags })
         {
             Assert.True(library.IsVisible(User(allowed: ["family"]), false, tags));
             Assert.False(library.IsVisible(User(blocked: ["lib"]), false, tags));
@@ -231,7 +237,6 @@ public sealed class InheritedTagVisibilityTests
     {
         var movie = Add(new Movie { Path = "/media/other/a.mkv" });
 
-        Assert.False(movie.IsVisible(User(allowed: ["family"])));
         Assert.False(movie.IsVisible(User(allowed: ["family"]), false, _tags));
     }
 
@@ -304,9 +309,6 @@ public sealed class InheritedTagVisibilityTests
 
         Assert.False(IsVisible(item, User(blocked: ["lib"])));
         Assert.True(IsVisible(item, User(allowed: ["lib"])));
-
-        Assert.True(item.IsVisibleStandalone(User(blocked: ["lib"])));
-        Assert.False(item.IsVisibleStandalone(User(allowed: ["lib"])));
     }
 
     private void BlindStatic()

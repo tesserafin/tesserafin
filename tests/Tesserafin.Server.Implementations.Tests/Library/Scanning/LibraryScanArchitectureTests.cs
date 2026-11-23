@@ -24,7 +24,10 @@ public sealed class LibraryScanArchitectureTests
 
         Assert.Null(manager.GetProperty("IsScanRunning"));
         Assert.Null(typeof(ILibraryManager).GetProperty("IsScanRunning"));
+        Assert.Null(manager.GetMethod("RegisterItem"));
+        Assert.Null(typeof(ILibraryManager).GetMethod("RegisterItem"));
         var dependencies = manager.GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToArray();
+        Assert.DoesNotContain(typeof(IItemCacheStore), dependencies);
         Assert.DoesNotContain(typeof(ITaskManager), dependencies);
         Assert.DoesNotContain(typeof(Lazy<ILibraryMonitor>), dependencies);
     }

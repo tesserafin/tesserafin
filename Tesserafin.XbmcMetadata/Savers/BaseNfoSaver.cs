@@ -798,7 +798,7 @@ namespace Tesserafin.XbmcMetadata.Savers
 
             if (item is not MusicAlbum && item is not MusicArtist)
             {
-                AddActors(people, writer, libraryManager, options.SaveImagePathsInNfo);
+                AddActors(people, writer, libraryManager, itemPeopleService, options.SaveImagePathsInNfo);
             }
 
             if (item is BoxSet folder)
@@ -934,7 +934,7 @@ namespace Tesserafin.XbmcMetadata.Savers
             writer.WriteEndElement();
         }
 
-        private void AddActors(IReadOnlyList<PersonInfo> people, XmlWriter writer, ILibraryManager libraryManager, bool saveImagePath)
+        private void AddActors(IReadOnlyList<PersonInfo> people, XmlWriter writer, ILibraryManager libraryManager, IItemPeopleService itemPeopleService, bool saveImagePath)
         {
             foreach (var person in people
                 .OrderBy(person => person.SortOrder ?? 0)
@@ -971,7 +971,7 @@ namespace Tesserafin.XbmcMetadata.Savers
 
                 if (saveImagePath)
                 {
-                    var personEntity = libraryManager.GetPerson(person.Name);
+                    var personEntity = itemPeopleService.GetPerson(person.Name);
                     var image = personEntity?.GetImageInfo(ImageType.Primary, 0);
 
                     if (image is not null)

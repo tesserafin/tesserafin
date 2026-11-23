@@ -34,7 +34,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library.LibraryManager;
 /// has no path or the item belongs to no library. Every expectation is hand-derived and was green on
 /// the unmodified entities, read through the static <see cref="BaseItem.LibraryManager"/>; each
 /// decision is taken both through <see cref="IItemAccessService.GetVisibleItemById{T}"/> and through
-/// the static-backed <see cref="BaseItem.IsVisibleStandalone(User)"/>, and the two must agree.
+/// the static-backed <see cref="_access.IsVisibleStandalone(BaseItem, User)"/>, and the two must agree.
 /// </summary>
 /// <remarks>
 /// The item graph is real entities over a real <c>ItemLookupService</c>; only the repository
@@ -47,6 +47,8 @@ public sealed class StandaloneVisibilityTests
     private readonly List<Folder> _libraries = [];
     private readonly Dictionary<string, LibraryOptions> _options = [];
     private readonly ActiveRecordings _activeRecordings = new();
+    private readonly Mock<IItemRepository> _repository;
+    private readonly IItemReadServices _readServices;
     private readonly IItemAccessService _access;
     private readonly IServerConfigurationManager _configuration;
     private readonly Tesserafin.Server.Core.Library.LibraryManager _manager;
@@ -78,8 +80,13 @@ public sealed class StandaloneVisibilityTests
         Mock.Get(rootProvider).Setup(p => p.GetUserRootFolder()).Returns(() => _root);
         fixture.Register(() => rootProvider);
 
+        var store = new Mock<ILibraryOptionsStore>();
+        store.Setup(s => s.Get(It.IsAny<string>()))
+            .Returns((string library) => _options.GetValueOrDefault(System.IO.Path.Combine(library, "options.xml")) ?? new LibraryOptions());
         var resolver = new Tesserafin.Server.Core.Library.CollectionFolderResolver(lookup, rootProvider);
         fixture.Register<ICollectionFolderResolver>(() => resolver);
+        fixture.Register(() => store.Object);
+        var libraryOptions = new Tesserafin.Server.Core.Library.LibraryItemOptions(resolver, lookup, rootProvider, configuration.Object, Mock.Of<Tesserafin.Model.IO.IFileSystem>(), store.Object);
 
         Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
 
@@ -93,23 +100,13 @@ public sealed class StandaloneVisibilityTests
         var localization = new Mock<ILocalizationManager>();
         localization.Setup(l => l.GetRatingScore(It.IsAny<string>(), It.IsAny<string?>()))
             .Returns((string rating, string? country) => _scores?.GetRatingScore(rating, country)!);
-        _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, localization.Object, configuration.Object, _activeRecordings));
-
-        var xml = new Mock<IXmlSerializer>();
-        xml.Setup(x => x.DeserializeFromFile(typeof(LibraryOptions), It.IsAny<string>()))
-            .Returns((Type _, string file) => _options.GetValueOrDefault(file)!);
-        CollectionFolder.XmlSerializer = xml.Object;
+        _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, localization.Object, configuration.Object, _activeRecordings, libraryOptions));
 
         BaseItem.LibraryManager = manager;
-        BaseItem.ChannelManager = Mock.Of<IChannelManager>();
-        Mock.Get(BaseItem.ChannelManager).Setup(c => c.GetChannel(It.IsAny<string>())).Returns((string id) => (manager.GetItemById(id) as Channel)!);
-        BaseItem.ItemRepository = repository.Object;
+        _repository = repository;
+        _readServices = new Tesserafin.Server.Implementations.Item.ItemReadServices(repository.Object, _activeRecordings);
         BaseItem.ConfigurationManager = configuration.Object;
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>(m => m.GetPathProtocol(It.IsAny<string>()) == MediaProtocol.File);
         // The static answers from the same recordings as the service (Record).
-        Video.RecordingsManager = Mock.Of<IRecordingsManager>();
-        Mock.Get(Video.RecordingsManager).Setup(r => r.GetActiveRecordingInfo(It.IsAny<string>()))
-            .Returns((string path) => _activeRecordings.GetActiveRecordingInfo(path));
 
         var fileSystem = new Mock<Tesserafin.Model.IO.IFileSystem>();
         fileSystem.Setup(f => f.ContainsSubPath(It.IsAny<string>(), It.IsAny<string>()))
@@ -411,9 +408,8 @@ public sealed class StandaloneVisibilityTests
         var expected = new[] { true, false, false, true, false, false, true, false, false, false, true };
 
         // Control: the static-backed path reads the throwing static.
-        Assert.Equal(expected, users.Select(u => saga.IsVisibleStandalone(u)));
+        Assert.Equal(expected, users.Select(u => _access.IsVisibleStandalone(saga, u)));
         ThrowingStatic();
-        Assert.Throws<MockException>(() => saga.IsVisibleStandalone(users[0]));
 
         Assert.Equal(expected, users.Select(u => _access.GetVisibleItemById<BaseItem>(saga.Id, u) is not null));
     }
@@ -429,9 +425,9 @@ public sealed class StandaloneVisibilityTests
         var teen = User(enabled: [movies.Id]);
         teen.MaxParentalRatingScore = 17;
 
-        Assert.True(saga.IsVisibleStandalone(teen));
+        Assert.True(_access.IsVisibleStandalone(saga, teen));
         movies.PreferredMetadataCountryCode = "FR";
-        Assert.False(saga.IsVisibleStandalone(teen));
+        Assert.False(_access.IsVisibleStandalone(saga, teen));
         ThrowingStatic();
 
         Assert.Null(_access.GetVisibleItemById<BaseItem>(saga.Id, teen));
@@ -581,14 +577,12 @@ public sealed class StandaloneVisibilityTests
         foreach (var state in states)
         {
             Apply(state);
-            Assert.Equal(state.Expected, users.Select(u => movie.IsVisibleStandalone(u)));
+            Assert.Equal(state.Expected, users.Select(u => _access.IsVisibleStandalone(movie, u)));
         }
 
         // The three statics the check could read throw on any call.
         ThrowingStatic();
         BaseItem.ConfigurationManager = new Mock<IServerConfigurationManager>(MockBehavior.Strict).Object;
-        BaseItem.LocalizationManager = new Mock<ILocalizationManager>(MockBehavior.Strict).Object;
-        Assert.Throws<MockException>(() => movie.IsVisibleStandalone(users[0]));
 
         foreach (var state in states)
         {
@@ -835,13 +829,12 @@ public sealed class StandaloneVisibilityTests
         // enabled-libraries list here names the hosting library, so none admits a box set (#320).
         var expectedRated = new[] { true, false, false, true, true, true, true, false, true, false, false };
         var expectedNested = new[] { true, false, false, true, true, true, false, false, true, false, false };
-        Assert.Equal(expectedRated, users.Select(u => rated.IsVisibleStandalone(u)));
-        Assert.Equal(expectedNested, users.Select(u => nested.IsVisibleStandalone(u)));
+        Assert.Equal(expectedRated, users.Select(u => _access.IsVisibleStandalone(rated, u)));
+        Assert.Equal(expectedNested, users.Select(u => _access.IsVisibleStandalone(nested, u)));
         family.OfficialRating = "R";
-        Assert.All(users, u => Assert.False(rated.IsVisibleStandalone(u)));
+        Assert.All(users, u => Assert.False(_access.IsVisibleStandalone(rated, u)));
         family.OfficialRating = "PG";
         ThrowingStatic();
-        Assert.Throws<MockException>(() => rated.IsVisibleStandalone(users[0]));
 
         Assert.Equal(expectedRated, Decisions(rated, users));
         Assert.Equal(expectedNested, Decisions(nested, users));
@@ -874,7 +867,7 @@ public sealed class StandaloneVisibilityTests
         bool Static(User u)
         {
             boxSet.LinkedChildren = Legacy();
-            return boxSet.IsVisibleStandalone(u);
+            return _access.IsVisibleStandalone(boxSet, u);
         }
 
         bool Access(User u)
@@ -894,7 +887,6 @@ public sealed class StandaloneVisibilityTests
         var expected = new[] { true, false, false, true, true, true, true, false, true, false, false };
         Assert.Equal(expected, users.Select(Static));
         ThrowingStatic();
-        Assert.Throws<MockException>(() => Static(users[0]));
 
         Assert.Equal(expected, users.Select(Access));
         Assert.Equal(family.Id, boxSet.LinkedChildren[0].ItemId);
@@ -999,7 +991,6 @@ public sealed class StandaloneVisibilityTests
         var item = Add(new Movie { Path = "http://channel.invalid/a.mp4", ChannelId = Guid.NewGuid() });
         var user = ChannelUser(all: true);
 
-        Assert.Throws<NullReferenceException>(() => item.IsVisibleStandalone(user));
         Assert.Throws<NullReferenceException>(() => _access.GetVisibleItemById<BaseItem>(item.Id, user));
     }
 
@@ -1011,7 +1002,6 @@ public sealed class StandaloneVisibilityTests
         var item = Add(new Video { Path = "/media/recordings/a.ts", ChannelId = Guid.NewGuid() });
         var user = ChannelUser(all: true);
 
-        Assert.Throws<NullReferenceException>(() => item.IsVisibleStandalone(user));
         Assert.Throws<NullReferenceException>(() => _access.GetVisibleItemById<BaseItem>(item.Id, user));
 
         Record(item);
@@ -1063,15 +1053,11 @@ public sealed class StandaloneVisibilityTests
 
         // Every video records: none is channel content, so a plain one is unrated other and a movie unrated movie.
         bool[][] expected = [[true, false, true], [true, false, true], [true, true, false], [true, true, false], [true, false, true]];
-        Assert.Equal(expected, items.Select(i => users.Select(u => i.IsVisibleStandalone(u)).ToArray()));
+        Assert.Equal(expected, items.Select(i => users.Select(u => _access.IsVisibleStandalone(i, u)).ToArray()));
 
         // Every static the check could read throws on any call.
         ThrowingStatic();
-        BaseItem.ChannelManager = new Mock<IChannelManager>(MockBehavior.Strict).Object;
         BaseItem.ConfigurationManager = new Mock<IServerConfigurationManager>(MockBehavior.Strict).Object;
-        BaseItem.LocalizationManager = new Mock<ILocalizationManager>(MockBehavior.Strict).Object;
-        Video.RecordingsManager = new Mock<IRecordingsManager>(MockBehavior.Strict).Object;
-        Assert.Throws<MockException>(() => homeVideo.IsVisibleStandalone(users[0]));
 
         Assert.Equal(expected, items.Select(i => Decisions(i, users)));
 
@@ -1097,12 +1083,10 @@ public sealed class StandaloneVisibilityTests
         };
         // The item inherits the channel's tags (its parent), so the allowed tag on the channel admits it.
         var expected = new[] { true, true, false, false, false, true };
-        Assert.Equal(expected, users.Select(u => item.IsVisibleStandalone(u)));
+        Assert.Equal(expected, users.Select(u => _access.IsVisibleStandalone(item, u)));
 
         // Both statics of the channel branch throw on any call: the channel lookup and the library manager.
         ThrowingStatic();
-        BaseItem.ChannelManager = new Mock<IChannelManager>(MockBehavior.Strict).Object;
-        Assert.Throws<MockException>(() => item.IsVisibleStandalone(users[0]));
 
         Assert.Equal(expected, Decisions(item, users));
         Assert.Equal(expected, Decisions(channel, users));
@@ -1119,7 +1103,7 @@ public sealed class StandaloneVisibilityTests
     /// </summary>
     private void LegacyLinkedChildSearch()
     {
-        Mock.Get(BaseItem.ItemRepository).Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.Path != null)))
+        _repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.Path != null)))
             .Returns((InternalItemsQuery q) => _items.Values.Where(i => i.Path == q.Path).OrderByDescending(i => i.DateCreated).Take(1).ToList());
         Mock.Get(BaseItem.FileSystem).Setup(f => f.MakeAbsolutePath(It.IsAny<string>(), It.IsAny<string>()))
             .Returns((string folder, string file) => System.IO.Path.GetFullPath(file, folder));
@@ -1127,7 +1111,7 @@ public sealed class StandaloneVisibilityTests
     }
 
     private void Scores(System.Linq.Expressions.Expression<Func<ILocalizationManager, bool>> scores) =>
-        BaseItem.LocalizationManager = _scores = Mock.Of(scores);
+        _scores = Mock.Of(scores);
 
     private void RatingScores() => Scores(l =>
         l.GetRatingScore("R", "US") == new ParentalRatingScore(17, null)
@@ -1171,7 +1155,7 @@ public sealed class StandaloneVisibilityTests
         _aggregateRoots.Setup(p => p.GetRootFolder()).Returns(aggregate);
 
         var userRoot = Add(new UserRootFolder { Path = "/config/data/root/default" });
-        Mock.Get(BaseItem.ItemRepository).Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.ParentId.Equals(userRoot.Id)))).Returns(_libraries);
+        _repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q => q.ParentId.Equals(userRoot.Id)))).Returns(_libraries);
         _root = userRoot;
         Assert.Equal(_libraries, userRoot.Children);
 
@@ -1244,7 +1228,7 @@ public sealed class StandaloneVisibilityTests
     private bool Decide(BaseItem item, User user)
     {
         var access = _access.GetVisibleItemById<BaseItem>(item.Id, user) is not null;
-        Assert.Equal(item.IsVisibleStandalone(user), access);
+        Assert.Equal(_access.IsVisibleStandalone(item, user), access);
         return access;
     }
 
@@ -1265,6 +1249,7 @@ public sealed class StandaloneVisibilityTests
             item.Id = Guid.NewGuid();
         }
 
+        item.ReadServices = _readServices;
         _items[item.Id] = item;
         return item;
     }

@@ -10,6 +10,7 @@ using System.Net.Mime;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.TV;
@@ -34,6 +35,7 @@ namespace Tesserafin.Providers.Manager
         private readonly ILogger _logger;
         private readonly IProviderManager _providerManager;
         private readonly IFileSystem _fileSystem;
+        private readonly IServerApplicationPaths _applicationPaths;
         private static readonly ImageType[] AllImageTypes = Enum.GetValues<ImageType>();
 
         /// <summary>
@@ -58,11 +60,13 @@ namespace Tesserafin.Providers.Manager
         /// <param name="logger">The logger.</param>
         /// <param name="providerManager">The provider manager for interacting with provider image references.</param>
         /// <param name="fileSystem">The filesystem.</param>
-        public ItemImageProvider(ILogger logger, IProviderManager providerManager, IFileSystem fileSystem)
+        /// <param name="applicationPaths">The server application paths.</param>
+        public ItemImageProvider(ILogger logger, IProviderManager providerManager, IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
             _logger = logger;
             _providerManager = providerManager;
             _fileSystem = fileSystem;
+            _applicationPaths = applicationPaths;
         }
 
         /// <summary>
@@ -74,7 +78,7 @@ namespace Tesserafin.Providers.Manager
         public bool RemoveImages(BaseItem item, bool canDeleteLocal = false)
         {
             var singular = new List<ItemImageInfo>();
-            var itemMetadataPath = item.GetInternalMetadataPath();
+            var itemMetadataPath = item.GetInternalMetadataPath(_applicationPaths.InternalMetadataPath);
             for (var i = 0; i < _singularImages.Length; i++)
             {
                 var currentImage = item.GetImageInfo(_singularImages[i], 0);

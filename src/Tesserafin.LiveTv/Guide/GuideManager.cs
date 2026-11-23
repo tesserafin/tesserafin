@@ -16,6 +16,7 @@ using Tesserafin.Extensions;
 using Tesserafin.LiveTv;
 using Tesserafin.LiveTv.Configuration;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.LiveTv;
 
@@ -30,9 +31,12 @@ public class GuideManager : IGuideManager
 
     private static readonly ParallelOptions _cacheParallelOptions = new() { MaxDegreeOfParallelism = Math.Min(Environment.ProcessorCount, 10) };
 
+    private readonly ILocalizationManager _localization;
+
     private readonly IItemWriteCommands _writes;
     private readonly IItemImageService _images;
     private readonly IItemDeletionCommands _deletions;
+    private readonly Lazy<IProviderManager> _providers;
     private readonly ILogger<GuideManager> _logger;
     private readonly IConfigurationManager _config;
     private readonly IFileSystem _fileSystem;
@@ -55,6 +59,7 @@ public class GuideManager : IGuideManager
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="images">Explicit image preparation and commit lifecycle.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="providers">The provider manager for metadata refreshes.</param>
     /// <param name="logger">The <see cref="ILogger{TCategoryName}"/>.</param>
     /// <param name="config">The <see cref="IConfigurationManager"/>.</param>
     /// <param name="fileSystem">The <see cref="IFileSystem"/>.</param>
@@ -65,10 +70,12 @@ public class GuideManager : IGuideManager
     /// <param name="recordingsManager">The <see cref="IRecordingsManager"/>.</param>
     /// <param name="schedulesDirectService">The <see cref="ISchedulesDirectService"/>.</param>
     /// <param name="tvDtoService">The <see cref="LiveTvDtoService"/>.</param>
+    /// <param name="localization">Scores ratings when item metadata changes.</param>
     public GuideManager(
         IItemWriteCommands writes,
         IItemImageService images,
         IItemDeletionCommands deletions,
+        Lazy<IProviderManager> providers,
         ILogger<GuideManager> logger,
         IConfigurationManager config,
         IFileSystem fileSystem,
@@ -78,11 +85,14 @@ public class GuideManager : IGuideManager
         ITunerHostManager tunerHostManager,
         IRecordingsManager recordingsManager,
         ISchedulesDirectService schedulesDirectService,
-        LiveTvDtoService tvDtoService)
+        LiveTvDtoService tvDtoService,
+        ILocalizationManager localization)
     {
+        _localization = localization;
         _writes = writes;
         _images = images;
         _deletions = deletions;
+        _providers = providers;
         _logger = logger;
         _config = config;
         _fileSystem = fileSystem;
@@ -322,6 +332,7 @@ public class GuideManager : IGuideManager
                 await currentChannel.RefreshMetadata(
                     _deletions,
                     _writes,
+                    _providers.Value,
                     new MetadataRefreshOptions(new DirectoryService(_fileSystem))
                     {
                         ForceSave = true
@@ -629,7 +640,7 @@ public class GuideManager : IGuideManager
 
         if (isNew)
         {
-            item.OnMetadataChanged();
+            item.OnMetadataChanged(_localization);
 
             return (item, true, false);
         }
@@ -648,7 +659,7 @@ public class GuideManager : IGuideManager
 
         if (isUpdated)
         {
-            item.OnMetadataChanged();
+            item.OnMetadataChanged(_localization);
 
             return (item, false, true);
         }

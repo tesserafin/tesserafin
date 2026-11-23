@@ -9,10 +9,12 @@ using System.Linq;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data;
 using Tesserafin.Data.Entities;
@@ -128,13 +130,13 @@ namespace Tesserafin.Controller.Playlists
             return true;
         }
 
-        protected override List<BaseItem> LoadChildren()
+        protected override List<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
             // Save a trip to the database
             return [];
         }
 
-        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override Task ValidateChildrenInternal(IFolderValidationServices services, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -144,7 +146,7 @@ namespace Tesserafin.Controller.Playlists
             return GetPlayableItems(user, query);
         }
 
-        protected override IReadOnlyList<BaseItem> GetNonCachedChildren(IDirectoryService directoryService)
+        protected override IReadOnlyList<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             return [];
         }
@@ -156,11 +158,6 @@ namespace Tesserafin.Controller.Playlists
             return items;
         }
 
-        public IReadOnlyList<Tuple<LinkedChild, BaseItem>> GetManageableItems()
-        {
-            return GetLinkedChildrenInfos();
-        }
-
         private IReadOnlyList<BaseItem> GetPlayableItems(User user, InternalItemsQuery query)
         {
             query ??= new InternalItemsQuery(user);
@@ -170,11 +167,11 @@ namespace Tesserafin.Controller.Playlists
             return base.GetChildren(user, true, query);
         }
 
-        public static IReadOnlyList<BaseItem> GetPlaylistItems(IEnumerable<BaseItem> inputItems, User user, DtoOptions options, IItemQueryService itemQueryService)
+        public static IReadOnlyList<BaseItem> GetPlaylistItems(IEnumerable<BaseItem> inputItems, User user, DtoOptions options, IItemQueryService itemQueryService, IStandaloneVisibilityService visibility)
         {
             if (user is not null)
             {
-                inputItems = inputItems.Where(i => i.IsVisibleStandalone(user));
+                inputItems = inputItems.Where(i => i.IsVisibleStandalone(user, visibility));
             }
 
             var list = new List<BaseItem>();
@@ -231,7 +228,7 @@ namespace Tesserafin.Controller.Playlists
             return [item];
         }
 
-        public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
+        public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
             if (!IsSharedItem)
             {
@@ -258,12 +255,12 @@ namespace Tesserafin.Controller.Playlists
             return shares.Any(s => s.UserId.Equals(userId));
         }
 
-        public override bool CanDelete(User user)
+        public override bool CanDelete(User user, IChannelManager channels)
         {
             return user.HasPermission(PermissionKind.IsAdministrator) || user.Id.Equals(OwnerUserId);
         }
 
-        public override bool IsVisibleStandalone(User user, ITagVisibilityService tagVisibility)
+        public override bool IsVisibleStandalone(User user, IStandaloneVisibilityService tagVisibility)
         {
             if (!IsSharedItem)
             {

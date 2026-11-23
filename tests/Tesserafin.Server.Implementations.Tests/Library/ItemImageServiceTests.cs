@@ -303,7 +303,7 @@ public sealed class ItemImageServiceTests
         }
 
         var dependencies = manager.GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToArray();
-        Assert.Contains(typeof(IItemWriteCommands), dependencies);
+        Assert.DoesNotContain(typeof(IItemWriteCommands), dependencies);
         Assert.DoesNotContain(typeof(IUserDataManager), dependencies);
         Assert.DoesNotContain(typeof(Tesserafin.Controller.MediaEncoding.IMediaEncoder), dependencies);
         Assert.DoesNotContain(typeof(IImageProcessor), dependencies);

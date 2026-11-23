@@ -5,16 +5,18 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Microsoft.Extensions.Logging;
-using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Resolvers;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Configuration;
+using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Naming.Common;
 using Tesserafin.Naming.Video;
@@ -26,23 +28,141 @@ namespace Tesserafin.Server.Core.Library;
 internal sealed class ItemResolutionService(
     IServerConfigurationManager configuration,
     IFileSystem files,
-    IServerApplicationHost appHost,
     ILibraryItemOptions options,
     IItemLookupService lookup,
     NamingOptions namingOptions,
-    ILogger<ItemResolutionService> logger) : IItemResolutionService
+    ILogger<ItemResolutionService> logger,
+    ILoggerFactory loggerFactory,
+    IDirectoryService directoryService,
+    DotIgnoreIgnoreRule dotIgnore) : IItemResolutionService
 {
     private readonly IServerConfigurationManager _configurationManager = configuration;
     private readonly IFileSystem _fileSystem = files;
-    private readonly IServerApplicationHost _appHost = appHost;
     private readonly NamingOptions _namingOptions = namingOptions;
     private readonly ILogger<ItemResolutionService> _logger = logger;
+
+    private readonly ExtraResolver _extraResolver = new(loggerFactory.CreateLogger<ExtraResolver>(), namingOptions, directoryService);
+    private readonly DotIgnoreIgnoreRule _dotIgnoreIgnoreRule = dotIgnore;
 
     private IResolverIgnoreRule[] EntityResolutionIgnoreRules { get; set; } = [];
 
     private IItemResolver[] EntityResolvers { get; set; } = [];
 
     private IMultiItemResolver[] MultiItemResolvers { get; set; } = [];
+
+    public IReadOnlyList<ResolvedShortcutTarget> ResolveShortcutTargets(Folder owner, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var result = new List<ResolvedShortcutTarget>();
+        foreach (var file in fileSystemChildren.Where(file => !file.IsDirectory && _fileSystem.IsShortcut(file.FullName)).OrderBy(file => file.FullName, StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _logger.LogDebug("Resolving shortcut {Path}", file.FullName);
+            var raw = _fileSystem.ResolveShortcut(file.FullName);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                throw new IOException($"Shortcut has no target: {file.FullName}");
+            }
+
+            var expanded = VirtualPaths.Expand(_configurationManager.ApplicationPaths, raw);
+            if (string.IsNullOrWhiteSpace(expanded))
+            {
+                throw new IOException($"Shortcut has no target: {file.FullName}");
+            }
+
+            var target = _fileSystem.MakeAbsolutePath(owner.ContainingFolderPath, expanded);
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                throw new IOException($"Shortcut has no absolute target: {file.FullName}");
+            }
+
+            result.Add(new ResolvedShortcutTarget(file.FullName, target));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return result;
+    }
+
+    /// <inheritdoc />
+    public IEnumerable<BaseItem> FindExtras(BaseItem owner, IReadOnlyList<FileSystemMetadata> fileSystemChildren, IDirectoryService directoryService)
+    {
+        // Apply .ignore rules
+        var filtered = fileSystemChildren.Where(c => !_dotIgnoreIgnoreRule.ShouldIgnore(c, owner)).ToList();
+        var isFolder = owner.IsFolder || (owner is Video video && (video.VideoType == VideoType.BluRay || video.VideoType == VideoType.Dvd));
+        var ownerVideoInfo = VideoResolver.Resolve(owner.Path, isFolder, _namingOptions, libraryRoot: owner.ContainingFolderPath);
+        if (ownerVideoInfo is null)
+        {
+            yield break;
+        }
+
+        var count = filtered.Count;
+        for (var i = 0; i < count; i++)
+        {
+            var current = filtered[i];
+            if (current.IsDirectory && _namingOptions.AllExtrasTypesFolderNames.ContainsKey(current.Name))
+            {
+                var filesInSubFolder = _fileSystem.GetFiles(current.FullName, null, false, false);
+                var filesInSubFolderList = filesInSubFolder.ToList();
+
+                bool subFolderIsMixedFolder = filesInSubFolderList.Count > 1;
+
+                foreach (var file in filesInSubFolderList)
+                {
+                    if (!_extraResolver.TryGetExtraTypeForOwner(file.FullName, ownerVideoInfo, out var extraType))
+                    {
+                        continue;
+                    }
+
+                    var extra = GetExtra(file, extraType.Value, subFolderIsMixedFolder);
+                    if (extra is not null)
+                    {
+                        yield return extra;
+                    }
+                }
+            }
+            else if (!current.IsDirectory && _extraResolver.TryGetExtraTypeForOwner(current.FullName, ownerVideoInfo, out var extraType))
+            {
+                var extra = GetExtra(current, extraType.Value, false);
+                if (extra is not null)
+                {
+                    yield return extra;
+                }
+            }
+        }
+
+        BaseItem? GetExtra(FileSystemMetadata file, ExtraType extraType, bool isInMixedFolder)
+        {
+            var extra = ResolvePath(_fileSystem.GetFileInfo(file.FullName), directoryService, _extraResolver.GetResolversForExtraType(extraType));
+            if (extra is not Video && extra is not Audio)
+            {
+                return null;
+            }
+
+            // Try to retrieve it from the db. If we don't find it, use the resolved version
+            var itemById = GetItemById(extra.Id);
+            if (itemById is not null)
+            {
+                extra = itemById.CopyForWrite();
+            }
+
+            // Only update extra type if it is more specific then the currently known extra type
+            if (extra.ExtraType is null or ExtraType.Unknown || extraType != ExtraType.Unknown)
+            {
+                extra.ExtraType = extraType;
+            }
+
+            // Only return items that are actual extras (have ExtraType set)
+            // Note: OwnerId and ParentId are set by RefreshExtras, not here,
+            // so that RefreshExtras can detect when they need updating and set ForceSave.
+            if (extra.ExtraType is not null)
+            {
+                extra.IsInMixedFolder = isInMixedFolder;
+                return extra;
+            }
+
+            return null;
+        }
+    }
 
     public void AddParts(IEnumerable<IResolverIgnoreRule> rules, IEnumerable<IItemResolver> resolvers)
     {
@@ -85,6 +205,10 @@ internal sealed class ItemResolutionService(
         try
         {
             return resolver.ResolvePath(args);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -207,39 +331,34 @@ internal sealed class ItemResolutionService(
         if (args.IsDirectory)
         {
             var isPhysicalRoot = args.IsPhysicalRoot;
-
-            // When resolving the root, we need it's grandchildren (children of user views)
-            var flattenFolderDepth = isPhysicalRoot ? 2 : 0;
-
-            FileSystemMetadata[] files;
             var isVf = args.IsVf;
 
             try
             {
-                files = FileData.GetFilteredFileSystemEntries(directoryService, args.Path, _fileSystem, _appHost, _logger, args, flattenFolderDepth: flattenFolderDepth, resolveShortcuts: isPhysicalRoot || isVf);
+                if (isPhysicalRoot || isVf)
+                {
+                    var discovery = FileData.ReadLibraryDirectory(args.FileInfo, directoryService, _fileSystem, _configurationManager.ApplicationPaths, _logger, isPhysicalRoot);
+                    args.FileSystemChildren = discovery.Entries;
+                    args.PhysicalLocations = discovery.PhysicalLocations;
+                }
+                else
+                {
+                    args.FileSystemChildren = directoryService.GetFileSystemEntries(args.Path);
+                }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 if (parent is not null && parent.IsPhysicalRoot)
                 {
-                    _logger.LogError(ex, "Error in GetFilteredFileSystemEntries isPhysicalRoot: {0} IsVf: {1}", isPhysicalRoot, isVf);
+                    _logger.LogError(ex, "Error reading folder entries (physical root: {PhysicalRoot}, virtual folder: {VirtualFolder})", isPhysicalRoot, isVf);
 
-                    files = [];
+                    args.FileSystemChildren = [];
                 }
                 else
                 {
                     throw;
                 }
             }
-
-            // Need to remove sub-paths that may have been resolved from shortcuts
-            // Example: if \\server\movies exists, then strip out \\server\movies\action
-            if (isPhysicalRoot)
-            {
-                files = NormalizeRootPathList(files).ToArray();
-            }
-
-            args.FileSystemChildren = files;
         }
 
         // Filter content based on ignore rules
@@ -255,80 +374,63 @@ internal sealed class ItemResolutionService(
     public bool IgnoreFile(FileSystemMetadata file, BaseItem? parent)
         => EntityResolutionIgnoreRules.Any(r => r.ShouldIgnore(file, parent));
 
-    public List<FileSystemMetadata> NormalizeRootPathList(IEnumerable<FileSystemMetadata> paths)
+    public IEnumerable<BaseItem> ResolveFolderChildren(Folder parent, IReadOnlyList<FileSystemMetadata> files, IDirectoryService directoryService, CancellationToken cancellationToken)
     {
-        var originalList = paths.ToList();
-
-        var list = originalList.Where(i => i.IsDirectory)
-            .Select(i => Path.TrimEndingDirectorySeparator(i.FullName))
-            .Distinct()
-            .ToList();
-
-        var dupes = list.Where(subPath => !subPath.EndsWith(":\\", StringComparison.Ordinal) && list.Any(i => _fileSystem.ContainsSubPath(i, subPath)))
-            .ToList();
-
-        foreach (var dupe in dupes)
+        cancellationToken.ThrowIfCancellationRequested();
+        var collectionType = options.GetContentType(parent);
+        var libraryOptions = options.GetLibraryOptions(parent);
+        var fileList = new List<FileSystemMetadata>(files.Count);
+        foreach (var file in files)
         {
-            _logger.LogInformation("Found duplicate path: {0}", dupe);
-        }
-
-        var newList = list.Except(dupes, StringComparer.Ordinal).Select(_fileSystem.GetDirectoryInfo).ToList();
-        newList.AddRange(originalList.Where(i => !i.IsDirectory));
-        return newList;
-    }
-
-    public IEnumerable<BaseItem> ResolvePaths(IEnumerable<FileSystemMetadata> files, IDirectoryService directoryService, Folder parent, LibraryOptions libraryOptions, CollectionType? collectionType = null)
-    {
-        return ResolvePaths(files, directoryService, parent, libraryOptions, collectionType, EntityResolvers);
-    }
-
-    public IEnumerable<BaseItem> ResolvePaths(
-        IEnumerable<FileSystemMetadata> files,
-        IDirectoryService directoryService,
-        Folder parent,
-        LibraryOptions libraryOptions,
-        CollectionType? collectionType,
-        IItemResolver[] resolvers)
-    {
-        var fileList = files.Where(i => !IgnoreFile(i, parent)).ToList();
-
-        if (parent is not null)
-        {
-            var multiItemResolvers = resolvers is null ? MultiItemResolvers : resolvers.OfType<IMultiItemResolver>();
-
-            foreach (var resolver in multiItemResolvers)
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IgnoreFile(file, parent))
             {
-                var result = resolver.ResolveMultiple(parent, fileList, collectionType, directoryService);
-
-                if (result?.Items.Count > 0)
-                {
-                    var items = result.Items;
-                    items.RemoveAll(item => !ResolverHelper.SetInitialItemValues(item, parent, this, directoryService, _configurationManager.GetMetadataConfiguration().UseFileCreationTimeForDateAdded));
-                    items.AddRange(ResolveFileList(result.ExtraFiles, directoryService, parent, collectionType, resolvers, libraryOptions));
-                    return items;
-                }
+                fileList.Add(file);
             }
         }
 
-        return ResolveFileList(fileList, directoryService, parent, collectionType, resolvers, libraryOptions);
+        foreach (var resolver in MultiItemResolvers)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = resolver.ResolveMultiple(parent, fileList, collectionType, directoryService);
+            if (result?.Items.Count > 0)
+            {
+                var useFileCreationTime = _configurationManager.GetMetadataConfiguration().UseFileCreationTimeForDateAdded;
+                var items = result.Items;
+                items.RemoveAll(item =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return !ResolverHelper.SetInitialItemValues(item, parent, this, directoryService, useFileCreationTime);
+                });
+                items.AddRange(ResolveFileList(result.ExtraFiles, directoryService, parent, collectionType, libraryOptions, cancellationToken));
+                return items;
+            }
+        }
+
+        return ResolveFileList(fileList, directoryService, parent, collectionType, libraryOptions, cancellationToken);
     }
 
     private IEnumerable<BaseItem> ResolveFileList(
         IReadOnlyList<FileSystemMetadata> fileList,
         IDirectoryService directoryService,
-        Folder? parent,
+        Folder parent,
         CollectionType? collectionType,
-        IItemResolver[]? resolvers,
-        LibraryOptions libraryOptions)
+        LibraryOptions libraryOptions,
+        CancellationToken cancellationToken)
     {
         // Given that fileList is a list we can save enumerator allocations by indexing
         for (var i = 0; i < fileList.Count; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var file = fileList[i];
             BaseItem? result = null;
             try
             {
-                result = ResolvePath(file, directoryService, resolvers, parent, collectionType, libraryOptions);
+                result = ResolvePath(file, directoryService, EntityResolvers, parent, collectionType, libraryOptions);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {

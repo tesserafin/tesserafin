@@ -35,9 +35,8 @@ namespace Tesserafin.Server.Core.Library
     /// <c>GetAllChannelEntitiesAsync</c> (which <c>GetChannelsInternalAsync</c> calls) does not just
     /// look items up - for a channel plugin with no matching library item yet, it falls back to a
     /// private async <c>GetChannel(IChannel, CancellationToken)</c> that creates the item and then
-    /// unconditionally calls <c>item.RefreshMetadata(...)</c>, which reaches the static
-    /// <c>BaseItem.ProviderManager</c> -&gt; <c>IProviderManager</c> -&gt; <c>ILibraryManager</c> (RFC
-    /// §2's <c>ProviderManager.cs:117</c> edge). That is exactly the kind of SCC-reaching runtime
+    /// unconditionally calls <c>item.RefreshMetadata(...)</c> with the injected <c>IProviderManager</c>,
+    /// which depends on <c>ILibraryManager</c>. That is exactly the kind of SCC-reaching runtime
     /// edge PR108 exists to keep out of this leaf, so it is deliberately <b>not</b> ported here:
     /// materialization stays <c>ChannelManager</c>'s job (its own <c>GetChannel</c>/<c>RefreshChannels</c>,
     /// the latter run periodically by <c>RefreshChannelsScheduledTask</c>). In steady state this
@@ -59,6 +58,7 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     internal sealed class ChannelCatalog : IChannelCatalog
     {
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly IChannel[] _channels;
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemStore _itemStore;
@@ -71,12 +71,15 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="itemLookupService">The item lookup service (read side; see PR75/PR76).</param>
         /// <param name="itemStore">The item store leaf (deterministic id generation; see PR106a).</param>
         /// <param name="userManager">The user manager (optional user-scoped filtering).</param>
+        /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
         public ChannelCatalog(
             IEnumerable<IChannel> channels,
             IItemLookupService itemLookupService,
             IItemStore itemStore,
-            IUserManager userManager)
+            IUserManager userManager,
+            IStandaloneVisibilityService visibility)
         {
+            _visibility = visibility;
             _channels = channels.ToArray();
             _itemLookupService = itemLookupService;
             _itemStore = itemStore;
@@ -162,7 +165,7 @@ namespace Tesserafin.Server.Core.Library
                 var userId = user.Id.ToString("N", CultureInfo.InvariantCulture);
                 channels = channels.Where(i =>
                 {
-                    if (!i.IsVisible(user))
+                    if (!i.IsVisible(user, false, _visibility))
                     {
                         return false;
                     }

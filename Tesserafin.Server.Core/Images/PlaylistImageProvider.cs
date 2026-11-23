@@ -4,11 +4,12 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using Tesserafin.Common.Configuration;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.TV;
+using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Entities;
@@ -18,19 +19,26 @@ namespace Tesserafin.Server.Core.Images
 {
     public class PlaylistImageProvider : BaseDynamicImageProvider<Playlist>
     {
-        public PlaylistImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IApplicationPaths applicationPaths, IImageProcessor imageProcessor) : base(fileSystem, providerManager, applicationPaths, imageProcessor)
+        private readonly LinkedChildResolver _linkedChildren;
+
+        public PlaylistImageProvider(
+            IFileSystem fileSystem,
+            IProviderManager providerManager,
+            IServerApplicationPaths applicationPaths,
+            IImageProcessor imageProcessor,
+            LinkedChildResolver linkedChildren)
+            : base(fileSystem, providerManager, applicationPaths, imageProcessor)
         {
+            _linkedChildren = linkedChildren;
         }
 
         protected override IReadOnlyList<BaseItem> GetItemsWithImages(BaseItem item)
         {
             var playlist = (Playlist)item;
 
-            return playlist.GetManageableItems()
-                .Select(i =>
+            return _linkedChildren.GetItems(playlist)
+                .Select(subItem =>
                 {
-                    var subItem = i.Item2;
-
                     if (subItem is Episode episode)
                     {
                         var series = episode.Series;

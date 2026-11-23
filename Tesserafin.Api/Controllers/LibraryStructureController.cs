@@ -10,6 +10,7 @@ using Tesserafin.Api.ModelBinders;
 using Tesserafin.Api.Models.LibraryStructureDto;
 using Tesserafin.Common.Api;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 
@@ -23,19 +24,27 @@ namespace Tesserafin.Api.Controllers;
 [FirstTimeSetupEndpoint]
 public class LibraryStructureController : BaseTesserafinApiController
 {
-    private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryStructureReader _reader;
+    private readonly IProviderManager _providers;
+    private readonly ILibraryRefreshProgress _refreshProgress;
     private readonly ILibraryStructureCommands _commands;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LibraryStructureController"/> class.
     /// </summary>
     /// <param name="commands">Library structure commands.</param>
-    /// <param name="libraryManager">Instance of <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="reader">Configured library reader.</param>
+    /// <param name="providers">The metadata refresh queue.</param>
+    /// <param name="refreshProgress">Progress of active recursive scans.</param>
     public LibraryStructureController(
-        ILibraryManager libraryManager,
+        ILibraryStructureReader reader,
+        IProviderManager providers,
+        ILibraryRefreshProgress refreshProgress,
         ILibraryStructureCommands commands)
     {
-        _libraryManager = libraryManager;
+        _reader = reader;
+        _providers = providers;
+        _refreshProgress = refreshProgress;
         _commands = commands;
     }
 
@@ -48,7 +57,18 @@ public class LibraryStructureController : BaseTesserafinApiController
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<IEnumerable<VirtualFolderInfo>> GetVirtualFolders()
     {
-        return _libraryManager.GetVirtualFolders(true);
+        var folders = _reader.GetVirtualFolders();
+        var queue = _providers.GetRefreshQueue();
+        foreach (var folder in folders)
+        {
+            if (Guid.TryParse(folder.ItemId, out var id))
+            {
+                folder.RefreshProgress = _refreshProgress.GetRefreshProgress(id);
+                folder.RefreshStatus = folder.RefreshProgress.HasValue ? "Active" : queue.Contains(id) ? "Queued" : "Idle";
+            }
+        }
+
+        return Ok<IEnumerable<VirtualFolderInfo>>(folders);
     }
 
     /// <summary>

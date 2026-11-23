@@ -28,7 +28,7 @@ public class GroupTests
         // instead of being decided by IItemAccessService. If HasAccessToQueue regresses to
         // calling BaseItem.IsVisibleStandalone directly, this test suite must fail loudly.
         MockItem = new Mock<BaseItem>();
-        MockItem.Setup(i => i.IsVisibleStandalone(It.IsAny<User>()))
+        MockItem.Setup(i => i.IsVisibleStandalone(It.IsAny<User>(), It.IsAny<IStandaloneVisibilityService>()))
             .Throws(new InvalidOperationException(
                 "BaseItem.IsVisibleStandalone should not be called directly; visibility must be decided by IItemAccessService."));
     }

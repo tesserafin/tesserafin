@@ -12,7 +12,6 @@ using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Session;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Entities;
@@ -28,10 +27,13 @@ namespace Tesserafin.Server.Core.EntryPoints;
 /// </summary>
 public sealed class LibraryChangedNotifier : IHostedService, IDisposable
 {
-    private readonly ILibraryManager _libraryManager;
+    private readonly IStandaloneVisibilityService _visibility;
+    private readonly ICollectionFolderResolver _collectionFolders;
+    private readonly IUserRootFolderProvider _roots;
+    private readonly IItemLookupService _lookup;
     private readonly IItemChangeEvents _changes;
     private readonly IServerConfigurationManager _configurationManager;
-    private readonly IProviderManager _providerManager;
+    private readonly ILibraryRefreshProgress _refreshProgress;
     private readonly ISessionManager _sessionManager;
     private readonly IUserManager _userManager;
     private readonly ILogger<LibraryChangedNotifier> _logger;
@@ -50,31 +52,40 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="LibraryChangedNotifier"/> class.
     /// </summary>
-    /// <param name="libraryManager">The <see cref="ILibraryManager"/>.</param>
+    /// <param name="collectionFolders">The resolver mapping items to configured libraries.</param>
+    /// <param name="roots">The user root provider.</param>
+    /// <param name="lookup">The catalogue lookup used for parent and physical folder identities.</param>
     /// <param name="changes">The completed item change feed.</param>
     /// <param name="configurationManager">The <see cref="IServerConfigurationManager"/>.</param>
     /// <param name="sessionManager">The <see cref="ISessionManager"/>.</param>
     /// <param name="userManager">The <see cref="IUserManager"/>.</param>
     /// <param name="logger">The <see cref="ILogger"/>.</param>
-    /// <param name="providerManager">The <see cref="IProviderManager"/>.</param>
+    /// <param name="refreshProgress">Progress of active recursive scans.</param>
     /// <param name="itemSortService">The <see cref="IItemSortService"/>.</param>
+    /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
     public LibraryChangedNotifier(
-        ILibraryManager libraryManager,
+        ICollectionFolderResolver collectionFolders,
+        IUserRootFolderProvider roots,
+        IItemLookupService lookup,
         IItemChangeEvents changes,
         IServerConfigurationManager configurationManager,
         ISessionManager sessionManager,
         IUserManager userManager,
         ILogger<LibraryChangedNotifier> logger,
-        IProviderManager providerManager,
-        IItemSortService itemSortService)
+        ILibraryRefreshProgress refreshProgress,
+        IItemSortService itemSortService,
+        IStandaloneVisibilityService visibility)
     {
-        _libraryManager = libraryManager;
+        _visibility = visibility;
+        _collectionFolders = collectionFolders;
+        _roots = roots;
+        _lookup = lookup;
         _changes = changes;
         _configurationManager = configurationManager;
         _sessionManager = sessionManager;
         _userManager = userManager;
         _logger = logger;
-        _providerManager = providerManager;
+        _refreshProgress = refreshProgress;
         _itemSortService = itemSortService;
     }
 
@@ -85,9 +96,9 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         _changes.ItemUpdated += OnLibraryItemUpdated;
         _changes.ItemRemoved += OnLibraryItemRemoved;
 
-        _providerManager.RefreshCompleted += OnProviderRefreshCompleted;
-        _providerManager.RefreshStarted += OnProviderRefreshStarted;
-        _providerManager.RefreshProgress += OnProviderRefreshProgress;
+        _refreshProgress.RefreshCompleted += OnLibraryRefreshCompleted;
+        _refreshProgress.RefreshStarted += OnLibraryRefreshStarted;
+        _refreshProgress.RefreshProgress += OnLibraryRefreshProgress;
 
         return Task.CompletedTask;
     }
@@ -99,14 +110,14 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         _changes.ItemUpdated -= OnLibraryItemUpdated;
         _changes.ItemRemoved -= OnLibraryItemRemoved;
 
-        _providerManager.RefreshCompleted -= OnProviderRefreshCompleted;
-        _providerManager.RefreshStarted -= OnProviderRefreshStarted;
-        _providerManager.RefreshProgress -= OnProviderRefreshProgress;
+        _refreshProgress.RefreshCompleted -= OnLibraryRefreshCompleted;
+        _refreshProgress.RefreshStarted -= OnLibraryRefreshStarted;
+        _refreshProgress.RefreshProgress -= OnLibraryRefreshProgress;
 
         return Task.CompletedTask;
     }
 
-    private void OnProviderRefreshProgress(object? sender, GenericEventArgs<Tuple<BaseItem, double>> e)
+    private void OnLibraryRefreshProgress(object? sender, GenericEventArgs<Tuple<BaseItem, double>> e)
     {
         var item = e.Argument.Item1;
 
@@ -139,14 +150,14 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         {
         }
 
-        var collectionFolders = _libraryManager.GetCollectionFolders(item);
+        var collectionFolders = _collectionFolders.GetCollectionFolders(item);
 
         foreach (var collectionFolder in collectionFolders)
         {
             var collectionFolderDict = new Dictionary<string, string>
             {
                 ["ItemId"] = collectionFolder.Id.ToString("N", CultureInfo.InvariantCulture),
-                ["Progress"] = (collectionFolder.GetRefreshProgress() ?? 0).ToString(CultureInfo.InvariantCulture)
+                ["Progress"] = GetLibraryRefreshProgress(collectionFolder).ToString(CultureInfo.InvariantCulture)
             };
 
             try
@@ -159,19 +170,32 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         }
     }
 
-    private void OnProviderRefreshStarted(object? sender, GenericEventArgs<BaseItem> e)
-        => OnProviderRefreshProgress(sender, new GenericEventArgs<Tuple<BaseItem, double>>(new Tuple<BaseItem, double>(e.Argument, 0)));
+    private void OnLibraryRefreshStarted(object? sender, GenericEventArgs<BaseItem> e)
+        => OnLibraryRefreshProgress(sender, new GenericEventArgs<Tuple<BaseItem, double>>(new Tuple<BaseItem, double>(e.Argument, 0)));
 
-    private void OnProviderRefreshCompleted(object? sender, GenericEventArgs<BaseItem> e)
+    private void OnLibraryRefreshCompleted(object? sender, GenericEventArgs<BaseItem> e)
     {
-        OnProviderRefreshProgress(sender, new GenericEventArgs<Tuple<BaseItem, double>>(new Tuple<BaseItem, double>(e.Argument, 100)));
+        OnLibraryRefreshProgress(sender, new GenericEventArgs<Tuple<BaseItem, double>>(new Tuple<BaseItem, double>(e.Argument, 100)));
 
         _lastProgressMessageTimes.TryRemove(e.Argument.Id, out _);
     }
 
-    private static bool EnableRefreshMessage(BaseItem item)
-        => item is Folder { IsRoot: false, IsTopParent: true }
-            and not (AggregateFolder or UserRootFolder or UserView or Channel);
+    private double GetLibraryRefreshProgress(Folder library)
+    {
+        if (library is not CollectionFolder collection)
+        {
+            return _refreshProgress.GetRefreshProgress(library.Id) ?? 0;
+        }
+
+        return collection.GetPhysicalFolders(_lookup)
+            .Select(folder => _refreshProgress.GetRefreshProgress(folder.Id))
+            .Average() ?? 0;
+    }
+
+    private bool EnableRefreshMessage(BaseItem item)
+        => item is Folder { IsRoot: false }
+            and not (AggregateFolder or UserRootFolder or UserView or Channel)
+            && item.IsTopParentVia(_lookup);
 
     private void OnLibraryItemAdded(object? sender, ItemChangeEventArgs e)
         => OnLibraryChange(e.Item, e.Parent, _itemsAdded, _foldersAddedTo);
@@ -317,8 +341,8 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         newAndRemoved.AddRange(foldersAddedTo);
         newAndRemoved.AddRange(foldersRemovedFrom);
 
-        var allUserRootChildren = _libraryManager.GetUserRootFolder()
-            .GetChildren(user, true, null, _itemSortService)
+        var allUserRootChildren = _roots.GetUserRootFolder()
+            .GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService)
             .OfType<Folder>()
             .ToList();
 
@@ -390,11 +414,11 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
         // If the physical root changed, return the user root
         if (item is AggregateFolder)
         {
-            return _libraryManager.GetUserRootFolder() is T t ? new[] { t } : Array.Empty<T>();
+            return _roots.GetUserRootFolder() is T t ? new[] { t } : Array.Empty<T>();
         }
 
         // Return it only if it's in the user's library
-        if (includeIfNotFound || item.IsVisibleStandalone(user))
+        if (includeIfNotFound || item.IsVisibleStandalone(user, _visibility))
         {
             return new[] { item };
         }
@@ -406,6 +430,5 @@ public sealed class LibraryChangedNotifier : IHostedService, IDisposable
     public void Dispose()
     {
         _libraryUpdateTimer?.Dispose();
-        _libraryUpdateTimer = null;
     }
 }

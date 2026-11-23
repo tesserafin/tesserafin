@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Entities;
 
 namespace Tesserafin.Controller.Library
@@ -31,5 +33,33 @@ namespace Tesserafin.Controller.Library
         /// <returns>The item if found and visible to <paramref name="user"/>; otherwise <c>null</c>.</returns>
         T? GetVisibleItemById<T>(Guid id, User user)
             where T : BaseItem;
+
+        /// <summary>
+        /// Gets a value indicating whether <paramref name="user"/> may see <paramref name="item"/> itself
+        /// (tags and parental rating), through the visibility services rather than the entity statics.
+        /// </summary>
+        /// <param name="item">The item.</param>
+        /// <param name="user">The user.</param>
+        /// <returns><c>true</c> when the item is visible.</returns>
+        bool IsVisible(BaseItem item, User user);
+
+        /// <summary>
+        /// Gets a value indicating whether <paramref name="user"/> may see <paramref name="item"/> on its own,
+        /// including its parents and libraries, through the visibility services rather than the entity statics.
+        /// </summary>
+        /// <param name="item">The item.</param>
+        /// <param name="user">The user.</param>
+        /// <returns><c>true</c> when the item is visible standalone.</returns>
+        bool IsVisibleStandalone(BaseItem item, User user);
+
+        /// <summary>
+        /// Gets the children of <paramref name="folder"/> that <paramref name="user"/> may see, read through the
+        /// visibility services.
+        /// </summary>
+        /// <param name="folder">The folder.</param>
+        /// <param name="user">The user.</param>
+        /// <param name="itemSortService">The sort service the folder's own ordering uses.</param>
+        /// <returns>The visible children.</returns>
+        IReadOnlyList<BaseItem> GetChildren(Folder folder, User user, IItemSortService itemSortService);
     }
 }

@@ -352,6 +352,7 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.OpenApiContractTests.CommittedContract_MatchesRunningServer
           --require Tesserafin.Server.Integration.Tests.OpenApiContractTests.Contract_IsByteIdentical_AcrossColdGenerations
           --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.CompleteJourney_ChangesDefinitionAndPaths_ButNeverDeletesSourceMedia
+          --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.HttpRead_UsesTheStructureReader_ReturnsOptionsAndLocations_AndPreservesDefinitionAndSources
           --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.ConcurrentCreates_ChooseDistinctNamesAfterAdmission_AndCanBeRemovedIndependently
           --require Tesserafin.Server.Integration.Tests.LibraryStructureCommandsEndToEndTests.FailedOptionWrite_KeepsPreviouslyPublishedOptions_AndReleasesTheMutationSlot
           --require Tesserafin.Server.Integration.Tests.ItemDeletionCommandsEndToEndTests.HttpDeletion_RemovesSourceAndCachedItem_ButConservesUserHistory
@@ -359,8 +360,20 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.ItemDeletionCommandsEndToEndTests.ItemChanges_AreSharedAndFollowCatalogueAndCachePublication
           --require Tesserafin.Server.Integration.Tests.ItemWriteCommandsEndToEndTests.VersionGraph_RollsBackFailedCreation_Retries_UpdatesAndPromotesMultipartAlternate
           --require Tesserafin.Server.Integration.Tests.ItemPeopleCommandsEndToEndTests.Credits_CreateOnePerson_UpdateMetadata_AndClearWithoutDeletingThePerson
+          --require Tesserafin.Server.Integration.Tests.ItemPeopleCommandsEndToEndTests.PersonReads_DoNotCreate_MetadataIsPaged_AndValidationRemovesOnlyUnlockedOrphans
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.ExplicitItemSelectionAuthorizationEndToEndTests.SharedScope_ListTotalsAndFilterValues_StayInsideTheSelectedVisibleLibrary
+          --require Tesserafin.Server.Integration.Tests.OwnedExtrasEndToEndTests.Extras_RejectsFailedSave_Retries_RefreshesAndReconcilesCatalogue_WithoutDeletingMediaOrVersions
+          --require Tesserafin.Server.Integration.Tests.OwnedVideosEndToEndTests.OwnedVersions_RejectFailedCreation_RetryThroughEntityRefresh_ExposeMultipartSourcesAndPreserveMedia
+          --require Tesserafin.Server.Integration.Tests.PrimaryVersionTransferEndToEndTests.FolderScan_FailedTransferRetries_DemotesAndReplacesPrimary_PreservingLinkedVersionsReferencesAndMedia
+          --require Tesserafin.Server.Integration.Tests.FolderChildReconciliationEndToEndTests.CompletedDiscovery_RejectsPartialReads_RetriesFailedUpdates_ReplacesTypesAndReattachesHistory_WithoutDeletingMedia
+          --require Tesserafin.Server.Integration.Tests.ShortcutLinksEndToEndTests.Shortcuts_RejectFailedSave_RetryThroughUserRootRefresh_PreserveManualAndPendingTargets_AndNeverDeleteMedia
+          --require Tesserafin.Server.Integration.Tests.LibraryScanEndToEndTests.StructureChangesAndFullScan_UseSharedRoot_AndReturnAfterReconciliation
+          --require Tesserafin.Server.Integration.Tests.CollectionFolderMembershipEndToEndTests.LibraryMembership_FailedLinkSaveRollsBackLocationsAndIds_RetryPublishesNestedFolder
           --require Tesserafin.Server.Integration.Tests.ItemLinkWriteCommandsEndToEndTests.Reroute_RollsBackBothSqlMutations_ThenReconcilesDeduplicatedCacheAndPreservesSources
           --require Tesserafin.Server.Integration.Tests.PlaybackIntroServiceEndToEndTests.HttpIntros_ResolveSavedVideos_FilterVisibility_AndIsolateProviderFailure_WithoutSavingCandidates
+          --require Tesserafin.Server.Integration.Tests.NamedItemCatalogEndToEndTests.HttpReadsAndUnknownFilters_DoNotMaterializeNames_ExplicitWritesBecomeVisible
+          --require Tesserafin.Server.Integration.Tests.NamedItemCatalogEndToEndTests.NamedWrite_FailedSqlCanRetry_AndConcurrentCreationPublishesOnce
+          --require Tesserafin.Server.Integration.Tests.NamedItemCatalogEndToEndTests.AlbumArtistReads_DoNotCreate_RealFoldersWin_AndPostScanMaterializesProductionYears
           --require Tesserafin.Server.Integration.Tests.ItemImageProcessingEndToEndTests.ImageInfos_LocalizesAndPersistsDimensionsAndBlurHash_WithoutSavingTheWholeItem
           --require Tesserafin.Server.Integration.Tests.ItemImageProcessingEndToEndTests.ImageGet_UsesThePreparedImage_AndConcurrentRequestsPublishOneManagedFile
           --require Tesserafin.Server.Integration.Tests.ItemImageProcessingEndToEndTests.DatabaseFailure_RollsBackRows_LeavesCacheUnchanged_CleansStagedFiles_AndAllowsRetry

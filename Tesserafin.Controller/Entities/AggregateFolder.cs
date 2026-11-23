@@ -5,12 +5,15 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
 using Tesserafin.Model.IO;
@@ -54,28 +57,29 @@ namespace Tesserafin.Controller.Entities
 
         public string[] PhysicalLocationsList { get; set; }
 
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             return false;
         }
 
         protected override FileSystemMetadata[] GetFileSystemChildren(IDirectoryService directoryService)
         {
-            return CreateResolveArgs(directoryService, true).FileSystemChildren;
+            return ReadLibraryDirectory(directoryService, true).Entries
+                ?? throw new DirectoryNotFoundException($"Cannot read library directory {ContainingFolderPath}.");
         }
 
-        protected override IReadOnlyList<BaseItem> LoadChildren()
+        protected override IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
             lock (_childIdsLock)
             {
                 if (_childrenIds is null || _childrenIds.Length == 0)
                 {
-                    var list = base.LoadChildren();
+                    var list = base.LoadChildren(repository, lookup);
                     _childrenIds = list.Select(i => i.Id).ToArray();
                     return list;
                 }
 
-                return _childrenIds.Select(LibraryManager.GetItemById).Where(i => i is not null).ToList();
+                return _childrenIds.Select(lookup.GetItemById).Where(i => i is not null).ToList();
             }
         }
 
@@ -95,7 +99,7 @@ namespace Tesserafin.Controller.Entities
             {
                 var locations = PhysicalLocations;
 
-                var newLocations = CreateResolveArgs(new DirectoryService(FileSystem), false).PhysicalLocations;
+                var newLocations = ReadLibraryDirectory(new DirectoryService(FileSystem), false).PhysicalLocations;
 
                 if (!locations.SequenceEqual(newLocations))
                 {
@@ -115,51 +119,31 @@ namespace Tesserafin.Controller.Entities
             return changed;
         }
 
-        private ItemResolveArgs CreateResolveArgs(IDirectoryService directoryService, bool setPhysicalLocations)
+        private (FileSystemMetadata[] Entries, string[] PhysicalLocations) ReadLibraryDirectory(IDirectoryService directoryService, bool setPhysicalLocations)
         {
             ClearCache();
 
-            var path = ContainingFolderPath;
-
-            var args = new ItemResolveArgs(ConfigurationManager.ApplicationPaths, LibraryManager)
-            {
-                FileInfo = FileSystem.GetDirectoryInfo(path)
-            };
-
-            // Gather child folder and files
-            if (args.IsDirectory)
-            {
-                // When resolving the root, we need it's grandchildren (children of user views)
-                var flattenFolderDepth = 2;
-
-                var files = FileData.GetFilteredFileSystemEntries(directoryService, args.Path, FileSystem, CollectionFolder.ApplicationHost, Logger, args, flattenFolderDepth: flattenFolderDepth, resolveShortcuts: true);
-
-                // Need to remove subpaths that may have been resolved from shortcuts
-                // Example: if \\server\movies exists, then strip out \\server\movies\action
-                files = LibraryManager.NormalizeRootPathList(files).ToArray();
-
-                args.FileSystemChildren = files;
-            }
-
-            _requiresRefresh = _requiresRefresh || !args.PhysicalLocations.SequenceEqual(PhysicalLocations);
+            var directory = FileSystem.GetDirectoryInfo(ContainingFolderPath);
+            var discovery = FileData.ReadLibraryDirectory(directory, directoryService, FileSystem, ConfigurationManager.ApplicationPaths, Logger, physicalRoot: true);
+            _requiresRefresh = _requiresRefresh || !discovery.PhysicalLocations.SequenceEqual(PhysicalLocations);
             if (setPhysicalLocations)
             {
-                PhysicalLocationsList = args.PhysicalLocations;
+                PhysicalLocationsList = discovery.PhysicalLocations;
             }
 
-            return args;
+            return discovery;
         }
 
-        protected override IEnumerable<BaseItem> GetNonCachedChildren(IDirectoryService directoryService)
+        protected override IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
-            return base.GetNonCachedChildren(directoryService).Concat(_virtualChildren);
+            return base.GetNonCachedChildren(resolution, directoryService, cancellationToken).Concat(_virtualChildren);
         }
 
-        protected override async Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override async Task ValidateChildrenInternal(IFolderValidationServices services, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             ClearCache();
 
-            await base.ValidateChildrenInternal(deletions, writes, images, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken)
+            await base.ValidateChildrenInternal(services, progress, recursive, refreshChildMetadata, allowRemoveRoot, refreshOptions, directoryService, cancellationToken)
                 .ConfigureAwait(false);
 
             ClearCache();

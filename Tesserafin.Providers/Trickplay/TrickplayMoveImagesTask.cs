@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Trickplay;
 using Tesserafin.Data.Enums;
 using Tesserafin.Model.Globalization;
@@ -19,7 +20,9 @@ namespace Tesserafin.Providers.Trickplay;
 public class TrickplayMoveImagesTask : IScheduledTask
 {
     private readonly ILogger<TrickplayMoveImagesTask> _logger;
-    private readonly ILibraryManager _libraryManager;
+    private readonly IItemQueryService _itemQueries;
+    private readonly IItemCountService _itemCounts;
+    private readonly ILibraryItemOptions _libraryOptions;
     private readonly ILocalizationManager _localization;
     private readonly ITrickplayManager _trickplayManager;
 
@@ -27,16 +30,22 @@ public class TrickplayMoveImagesTask : IScheduledTask
     /// Initializes a new instance of the <see cref="TrickplayMoveImagesTask"/> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
-    /// <param name="libraryManager">The library manager.</param>
+    /// <param name="itemQueries">The service for reading catalogue items.</param>
+    /// <param name="itemCounts">The service for counting catalogue items.</param>
+    /// <param name="libraryOptions">The effective library settings.</param>
     /// <param name="localization">The localization manager.</param>
     /// <param name="trickplayManager">The trickplay manager.</param>
     public TrickplayMoveImagesTask(
         ILogger<TrickplayMoveImagesTask> logger,
-        ILibraryManager libraryManager,
+        IItemQueryService itemQueries,
+        IItemCountService itemCounts,
+        ILibraryItemOptions libraryOptions,
         ILocalizationManager localization,
         ITrickplayManager trickplayManager)
     {
-        _libraryManager = libraryManager;
+        _itemQueries = itemQueries;
+        _itemCounts = itemCounts;
+        _libraryOptions = libraryOptions;
         _logger = logger;
         _localization = localization;
         _trickplayManager = trickplayManager;
@@ -64,7 +73,7 @@ public class TrickplayMoveImagesTask : IScheduledTask
         int itemCount = 0, offset = 0, previousCount;
 
         // This count may not be accurate, but just get something to show progress on the dashboard.
-        var totalVideoCount = _libraryManager.GetCount(new InternalItemsQuery
+        var totalVideoCount = _itemCounts.GetCount(new InternalItemsQuery
         {
             MediaTypes = [MediaType.Video],
             SourceTypes = [SourceType.Library],
@@ -90,7 +99,7 @@ public class TrickplayMoveImagesTask : IScheduledTask
             offset += Limit;
 
             trickplayQuery.ItemIds = trickplayInfos.Select(i => i.ItemId).Distinct().ToArray();
-            var items = _libraryManager.GetItemList(trickplayQuery);
+            var items = _itemQueries.GetItemList(trickplayQuery);
             foreach (var trickplayInfo in trickplayInfos)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -104,7 +113,7 @@ public class TrickplayMoveImagesTask : IScheduledTask
                 itemCount++;
                 try
                 {
-                    var libraryOptions = _libraryManager.GetLibraryOptions(video);
+                    var libraryOptions = _libraryOptions.GetLibraryOptions(video);
                     await _trickplayManager.MoveGeneratedTrickplayDataAsync(video, libraryOptions, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)

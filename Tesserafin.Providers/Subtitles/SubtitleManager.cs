@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
@@ -30,6 +31,9 @@ namespace Tesserafin.Providers.Subtitles
     {
         private readonly IItemWriteCommands _writes;
         private readonly IItemDeletionCommands _deletions;
+        private readonly Lazy<IProviderManager> _providers;
+        private readonly ILibraryItemOptions _itemOptions;
+        private readonly IServerApplicationPaths _applicationPaths;
         private readonly ILogger<SubtitleManager> _logger;
         private readonly IFileSystem _fileSystem;
         private readonly ILibraryMonitor _monitor;
@@ -42,6 +46,9 @@ namespace Tesserafin.Providers.Subtitles
         public SubtitleManager(
             IItemWriteCommands writes,
             IItemDeletionCommands deletions,
+            Lazy<IProviderManager> providers,
+            ILibraryItemOptions itemOptions,
+            IServerApplicationPaths applicationPaths,
             ILogger<SubtitleManager> logger,
             IFileSystem fileSystem,
             ILibraryMonitor monitor,
@@ -52,6 +59,9 @@ namespace Tesserafin.Providers.Subtitles
         {
             _writes = writes;
             _deletions = deletions;
+            _providers = providers;
+            _itemOptions = itemOptions;
+            _applicationPaths = applicationPaths;
             _logger = logger;
             _fileSystem = fileSystem;
             _monitor = monitor;
@@ -142,7 +152,7 @@ namespace Tesserafin.Providers.Subtitles
         /// <inheritdoc />
         public Task DownloadSubtitles(Video video, string subtitleId, CancellationToken cancellationToken)
         {
-            var libraryOptions = BaseItem.LibraryManager.GetLibraryOptions(video);
+            var libraryOptions = _itemOptions.GetLibraryOptions(video);
 
             return DownloadSubtitles(video, libraryOptions, subtitleId, cancellationToken);
         }
@@ -189,7 +199,7 @@ namespace Tesserafin.Providers.Subtitles
                 throw new ArgumentException($"Unsupported subtitle format: '{format}'");
             }
 
-            var libraryOptions = BaseItem.LibraryManager.GetLibraryOptions(video);
+            var libraryOptions = _itemOptions.GetLibraryOptions(video);
             return TrySaveSubtitle(video, libraryOptions, response);
         }
 
@@ -236,7 +246,7 @@ namespace Tesserafin.Providers.Subtitles
                 }
                 else
                 {
-                    var internalPath = Path.GetFullPath(Path.Combine(video.GetInternalMetadataPath(), saveFileName));
+                    var internalPath = Path.GetFullPath(Path.Combine(video.GetInternalMetadataPath(_applicationPaths.InternalMetadataPath), saveFileName));
                     savePaths.Add(internalPath);
                 }
 
@@ -259,7 +269,7 @@ namespace Tesserafin.Providers.Subtitles
                 try
                 {
                     var containingFolder = video.ContainingFolderPath + Path.DirectorySeparatorChar;
-                    var metadataFolder = video.GetInternalMetadataPath() + Path.DirectorySeparatorChar;
+                    var metadataFolder = video.GetInternalMetadataPath(_applicationPaths.InternalMetadataPath) + Path.DirectorySeparatorChar;
                     if (path.StartsWith(containingFolder, StringComparison.Ordinal)
                             || path.StartsWith(metadataFolder, StringComparison.Ordinal))
                     {
@@ -401,7 +411,7 @@ namespace Tesserafin.Providers.Subtitles
                 _monitor.ReportFileSystemChangeComplete(path, false);
             }
 
-            return item.RefreshMetadata(_deletions, _writes, CancellationToken.None);
+            return item.RefreshMetadata(_deletions, _writes, _providers.Value, CancellationToken.None);
         }
 
         /// <inheritdoc />

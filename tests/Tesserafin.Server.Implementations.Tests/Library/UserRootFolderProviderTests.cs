@@ -56,7 +56,6 @@ public sealed class UserRootFolderProviderTests : IDisposable
         // BaseItem.ItemRepository.GetItemList(...) (Folder.cs GetCachedChildren). Stub it to an empty
         // result: this provider never sets Children itself, so this is purely incidental plumbing the
         // reflection-based copy touches, not something UserRootFolderProvider depends on.
-        BaseItem.ItemRepository = Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>());
 
         _configurationManagerMock = new Mock<IServerConfigurationManager>();
         _configurationManagerMock.Setup(c => c.ApplicationPaths.DefaultUserViewsPath).Returns(_userRootPath);
@@ -94,7 +93,8 @@ public sealed class UserRootFolderProviderTests : IDisposable
             _fileSystemMock.Object,
             _itemStoreMock.Object,
             _itemLookupServiceMock.Object,
-            NullLogger<UserRootFolderProvider>.Instance);
+            NullLogger<UserRootFolderProvider>.Instance,
+            new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings()));
     }
 
     public void Dispose()
@@ -384,6 +384,7 @@ public sealed class UserRootFolderProviderTests : IDisposable
         services.AddSingleton(_itemStoreMock.Object);
         services.AddSingleton(_itemLookupServiceMock.Object);
         services.AddSingleton<Microsoft.Extensions.Logging.ILogger<UserRootFolderProvider>>(NullLogger<UserRootFolderProvider>.Instance);
+        services.AddSingleton(Mock.Of<Tesserafin.Controller.Library.IItemReadServices>());
         services.AddSingleton<IUserRootFolderProvider, UserRootFolderProvider>();
 
         using var provider = services.BuildServiceProvider();
@@ -402,6 +403,7 @@ public sealed class UserRootFolderProviderTests : IDisposable
         services.AddSingleton(_itemStoreMock.Object);
         services.AddSingleton(_itemLookupServiceMock.Object);
         services.AddSingleton<Microsoft.Extensions.Logging.ILogger<UserRootFolderProvider>>(NullLogger<UserRootFolderProvider>.Instance);
+        services.AddSingleton(Mock.Of<Tesserafin.Controller.Library.IItemReadServices>());
         services.AddSingleton<IUserRootFolderProvider, UserRootFolderProvider>();
 
         using var provider = services.BuildServiceProvider();

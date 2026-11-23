@@ -43,10 +43,8 @@ using Tesserafin.Naming.Common;
 using Tesserafin.Naming.Video;
 using Tesserafin.Server.Core.Library.Resolvers;
 using Tesserafin.Server.Core.Library.Validators;
-using Episode = Tesserafin.Controller.Entities.TV.Episode;
 using Genre = Tesserafin.Controller.Entities.Genre;
 using Person = Tesserafin.Controller.Entities.Person;
-using VideoResolver = Tesserafin.Naming.Video.VideoResolver;
 
 namespace Tesserafin.Server.Core.Library
 {
@@ -63,33 +61,23 @@ namespace Tesserafin.Server.Core.Library
     {
         private readonly IItemResolutionService _resolution;
         private readonly ILibraryItemOptions _options;
-        private readonly ILogger<LibraryManager> _logger;
         private readonly IUserManager _userManager;
         private readonly IServerConfigurationManager _configurationManager;
-        private readonly Lazy<IProviderManager> _providerManagerFactory;
-        private readonly IUserViewCatalog _userViewCatalog;
-        private readonly IServerApplicationHost _appHost;
+        private readonly IItemQueryScopeService _queryScope;
         private readonly IFileSystem _fileSystem;
         private readonly IItemRepository _itemRepository;
-        private readonly IItemWriteCommands _writes;
         private readonly INextUpService _nextUpService;
         private readonly IItemCountService _countService;
         private readonly ILinkedChildrenService _linkedChildrenService;
         private readonly IItemSortService _itemSortService;
-        private readonly IItemNamingService _itemNamingService;
         private readonly IItemPeopleService _itemPeopleService;
-        private readonly NamingOptions _namingOptions;
-        private readonly IPeopleRepository _peopleRepository;
-        private readonly ExtraResolver _extraResolver;
         private readonly IItemLookupService _itemLookupService;
-        private readonly IItemCacheStore _itemCacheStore;
         private readonly IItemAccessService _itemAccessService;
         private readonly IUserViewFactory _userViewFactory;
         private readonly IUserRootFolderProvider _userRootFolderProvider;
         private readonly ICollectionFolderResolver _collectionFolderResolver;
         private readonly IMediaStreamLanguageService _mediaStreamLanguageService;
 
-        private readonly DotIgnoreIgnoreRule _dotIgnoreIgnoreRule;
         private readonly ILibraryRootFolderProvider _roots;
 
         /// <summary>
@@ -97,103 +85,64 @@ namespace Tesserafin.Server.Core.Library
         /// </summary>
         /// <param name="resolution">Filesystem resolution.</param>
         /// <param name="options">Library options and content policy.</param>
-        /// <param name="appHost">The application host.</param>
-        /// <param name="loggerFactory">The logger factory.</param>
         /// <param name="userManager">The user manager.</param>
         /// <param name="configurationManager">The configuration manager.</param>
         /// <param name="fileSystem">The file system.</param>
-        /// <param name="providerManagerFactory">The provider manager.</param>
-        /// <param name="userViewCatalog">
-        /// The user-views catalog leaf (sole real implementation of <c>GetUserViews</c>; see PR106-109).
-        /// Replaces the former <c>Lazy&lt;IUserViewManager&gt;</c> - injected directly (not
-        /// <see cref="Lazy{T}"/>), since <see cref="IUserViewCatalog"/>'s implementation
-        /// (<c>UserViewCatalog</c>) never references <see cref="ILibraryManager"/>,
-        /// <see cref="IUserViewManager"/>, <c>IChannelManager</c> or <c>ILiveTvManager</c> in its own
-        /// eager construction graph (RFC <c>docs/rfc-di-query-user-views-v2.md</c> §9/§10.7, PR110) -
-        /// this is the edge whose removal breaks the SCC.
-        /// </param>
+        /// <param name="queryScope">Shared parent and user query scoping policy.</param>
         /// <param name="itemRepository">The item repository.</param>
-        /// <param name="writes">Item graph write ownership.</param>
         /// <param name="nextUpService">The next up service.</param>
         /// <param name="countService">The item count service.</param>
         /// <param name="linkedChildrenService">The linked children service.</param>
         /// <param name="itemSortService">The item sort service.</param>
-        /// <param name="itemNamingService">The item naming service.</param>
         /// <param name="itemPeopleService">The item people service.</param>
-        /// <param name="namingOptions">The naming options.</param>
-        /// <param name="directoryService">The directory service.</param>
-        /// <param name="peopleRepository">The people repository.</param>
         /// <param name="mediaStreamLanguageService">The media stream language service.</param>
         /// <param name="itemLookupService">The item lookup service (read side of the item lookup cache; see PR75/PR76).</param>
-        /// <param name="itemCacheStore">The item cache lifecycle port (register/invalidate side of the same cache; see PR76).</param>
         /// <param name="itemAccessService">The item access service (user visibility on top of the item lookup service; see PR77).</param>
         /// <param name="userViewFactory">The user-view factory leaf (named/shadow view creation; see PR106b). <see cref="GetNamedView(User, string, CollectionType?, string)"/> and the other overloads delegate to it - a leaf dependency, not a cycle: <c>UserViewFactory</c> never references <see cref="ILibraryManager"/>.</param>
         /// <param name="userRootFolderProvider">The user root folder provider leaf (construction/cache of the per-server <see cref="UserRootFolder"/>; see PR107). <see cref="GetUserRootFolder"/> and this class's internal callers delegate to it - a leaf dependency, not a cycle: <c>UserRootFolderProvider</c> never references <see cref="ILibraryManager"/>. <see cref="LibraryManager"/> no longer implements <see cref="IUserRootFolderProvider"/> itself (it used to be aliased onto it via a DI factory cast - RFC <c>docs/rfc-di-query-user-views-v2.md</c> §0/§1's "piège n°1").</param>
         /// <param name="collectionFolderResolver">The library membership leaf (<see cref="GetCollectionFolders(BaseItem)"/> and its overload delegate to it; see DEBT-SERVER-2) - a leaf dependency, not a cycle: <c>CollectionFolderResolver</c> never references <see cref="ILibraryManager"/>.</param>
-        /// <param name="dotIgnoreIgnoreRule">The ignore rules.</param>
         /// <param name="roots">Application aggregate root ownership.</param>
         public LibraryManager(
             IItemResolutionService resolution,
             ILibraryItemOptions options,
-            IServerApplicationHost appHost,
-            ILoggerFactory loggerFactory,
             IUserManager userManager,
             IServerConfigurationManager configurationManager,
             IFileSystem fileSystem,
-            Lazy<IProviderManager> providerManagerFactory,
-            IUserViewCatalog userViewCatalog,
+            IItemQueryScopeService queryScope,
             IItemRepository itemRepository,
-            IItemWriteCommands writes,
             INextUpService nextUpService,
             IItemCountService countService,
             ILinkedChildrenService linkedChildrenService,
             IItemSortService itemSortService,
-            IItemNamingService itemNamingService,
             IItemPeopleService itemPeopleService,
-            NamingOptions namingOptions,
-            IDirectoryService directoryService,
-            IPeopleRepository peopleRepository,
             IMediaStreamLanguageService mediaStreamLanguageService,
             IItemLookupService itemLookupService,
-            IItemCacheStore itemCacheStore,
             IItemAccessService itemAccessService,
             IUserViewFactory userViewFactory,
             IUserRootFolderProvider userRootFolderProvider,
             ICollectionFolderResolver collectionFolderResolver,
-            DotIgnoreIgnoreRule dotIgnoreIgnoreRule,
             ILibraryRootFolderProvider roots)
         {
             _resolution = resolution;
             _options = options;
-            _appHost = appHost;
-            _logger = loggerFactory.CreateLogger<LibraryManager>();
             _userManager = userManager;
             _configurationManager = configurationManager;
             _fileSystem = fileSystem;
-            _providerManagerFactory = providerManagerFactory;
-            _userViewCatalog = userViewCatalog;
+            _queryScope = queryScope;
             _itemRepository = itemRepository;
-            _writes = writes;
             _nextUpService = nextUpService;
             _countService = countService;
             _linkedChildrenService = linkedChildrenService;
             _itemSortService = itemSortService;
-            _itemNamingService = itemNamingService;
             _itemPeopleService = itemPeopleService;
 
             _itemLookupService = itemLookupService;
-            _itemCacheStore = itemCacheStore;
             _itemAccessService = itemAccessService;
 
             _userViewFactory = userViewFactory;
             _userRootFolderProvider = userRootFolderProvider;
             _collectionFolderResolver = collectionFolderResolver;
-            _dotIgnoreIgnoreRule = dotIgnoreIgnoreRule;
             _roots = roots;
-
-            _namingOptions = namingOptions;
-            _peopleRepository = peopleRepository;
-            _extraResolver = new ExtraResolver(loggerFactory.CreateLogger<ExtraResolver>(), namingOptions, directoryService);
 
             _mediaStreamLanguageService = mediaStreamLanguageService;
         }
@@ -203,8 +152,6 @@ namespace Tesserafin.Server.Core.Library
         /// </summary>
         /// <value>The root folder.</value>
         public AggregateFolder RootFolder => _roots.GetRootFolder();
-
-        private IProviderManager ProviderManager => _providerManagerFactory.Value;
 
         /// <summary>
         /// Adds the parts.
@@ -224,20 +171,7 @@ namespace Tesserafin.Server.Core.Library
         public Video? ResolveAlternateVersion(string path, Type expectedVideoType, Folder? parent, CollectionType? collectionType)
             => _resolution.ResolveAlternateVersion(path, expectedVideoType, parent, collectionType);
 
-        public List<FileSystemMetadata> NormalizeRootPathList(IEnumerable<FileSystemMetadata> paths)
-            => _resolution.NormalizeRootPathList(paths);
-
-        private BaseItem? ResolvePath(FileSystemMetadata fileInfo, IDirectoryService directoryService, IItemResolver[]? resolvers, Folder? parent = null, CollectionType? collectionType = null, LibraryOptions? libraryOptions = null)
-            => _resolution.ResolvePath(fileInfo, directoryService, resolvers, parent, collectionType, libraryOptions);
-
         public bool AreEqualPaths(string first, string second) => _fileSystem.AreEqual(first, second);
-
-        public void RegisterItem(BaseItem item)
-        {
-            ArgumentNullException.ThrowIfNull(item);
-
-            _itemCacheStore.Register(item);
-        }
 
         public Guid GetNewItemId(string key, Type type)
         {
@@ -257,18 +191,6 @@ namespace Tesserafin.Server.Core.Library
         public bool IgnoreFile(FileSystemMetadata file, BaseItem? parent)
             => _resolution.IgnoreFile(file, parent);
 
-        public IEnumerable<BaseItem> ResolvePaths(IEnumerable<FileSystemMetadata> files, IDirectoryService directoryService, Folder parent, LibraryOptions libraryOptions, CollectionType? collectionType = null)
-            => _resolution.ResolvePaths(files, directoryService, parent, libraryOptions, collectionType);
-
-        public IEnumerable<BaseItem> ResolvePaths(
-            IEnumerable<FileSystemMetadata> files,
-            IDirectoryService directoryService,
-            Folder parent,
-            LibraryOptions libraryOptions,
-            CollectionType? collectionType,
-            IItemResolver[] resolvers)
-            => _resolution.ResolvePaths(files, directoryService, parent, libraryOptions, collectionType, resolvers);
-
         /// <inheritdoc />
         /// <remarks>
         /// Delegates to <see cref="IUserRootFolderProvider"/> (PR107) - construction, caching and the
@@ -282,239 +204,9 @@ namespace Tesserafin.Server.Core.Library
             return _userRootFolderProvider.GetUserRootFolder();
         }
 
-        /// <inheritdoc />
-        public BaseItem? FindByPath(string path, bool? isFolder)
-        {
-            // If this returns multiple items it could be tricky figuring out which one is correct.
-            // In most cases, the newest one will be and the others obsolete but not yet cleaned up
-            ArgumentException.ThrowIfNullOrEmpty(path);
-
-            return GetItemList(ItemPathQuery.Create(path, isFolder))
-                .FirstOrDefault();
-        }
-
-        /// <inheritdoc />
-        public Person? GetPerson(string name)
-        {
-            var path = Person.GetPath(name);
-            var id = GetItemByNameId<Person>(path);
-            if (GetItemById(id) is Person item)
-            {
-                return item;
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Gets the studio.
-        /// </summary>
-        /// <param name="name">The name.</param>
-        /// <returns>Task{Studio}.</returns>
-        public Studio GetStudio(string name)
-        {
-            return CreateItemByName<Studio>(Studio.GetPath, name, new DtoOptions(true));
-        }
-
-        public Guid GetStudioId(string name)
-        {
-            return GetItemByNameId<Studio>(Studio.GetPath(name));
-        }
-
-        public Guid GetGenreId(string name)
-        {
-            return GetItemByNameId<Genre>(Genre.GetPath(name));
-        }
-
-        public Guid GetMusicGenreId(string name)
-        {
-            return GetItemByNameId<MusicGenre>(MusicGenre.GetPath(name));
-        }
-
-        /// <summary>
-        /// Gets the genre.
-        /// </summary>
-        /// <param name="name">The name.</param>
-        /// <returns>Task{Genre}.</returns>
-        public Genre GetGenre(string name)
-        {
-            return CreateItemByName<Genre>(Genre.GetPath, name, new DtoOptions(true));
-        }
-
-        /// <summary>
-        /// Gets the music genre.
-        /// </summary>
-        /// <param name="name">The name.</param>
-        /// <returns>Task{MusicGenre}.</returns>
-        public MusicGenre GetMusicGenre(string name)
-        {
-            return CreateItemByName<MusicGenre>(MusicGenre.GetPath, name, new DtoOptions(true));
-        }
-
-        /// <summary>
-        /// Gets the year.
-        /// </summary>
-        /// <param name="value">The value.</param>
-        /// <returns>Task{Year}.</returns>
-        public Year GetYear(int value)
-        {
-            if (value <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(value), "Years less than or equal to 0 are invalid.");
-            }
-
-            var name = value.ToString(CultureInfo.InvariantCulture);
-
-            return CreateItemByName<Year>(Year.GetPath, name, new DtoOptions(true));
-        }
-
-        /// <summary>
-        /// Gets a Genre.
-        /// </summary>
-        /// <param name="name">The name.</param>
-        /// <returns>Task{Genre}.</returns>
-        public MusicArtist GetArtist(string name)
-        {
-            return GetArtist(name, new DtoOptions(true));
-        }
-
         public IReadOnlyDictionary<string, MusicArtist[]> GetArtists(IReadOnlyList<string> names)
         {
             return _linkedChildrenService.FindArtists(names);
-        }
-
-        public MusicArtist GetArtist(string name, DtoOptions options)
-        {
-            return CreateItemByName<MusicArtist>(MusicArtist.GetPath, name, options);
-        }
-
-        private T CreateItemByName<T>(Func<string, string> getPathFn, string name, DtoOptions options)
-            where T : BaseItem, new()
-        {
-            if (typeof(T) == typeof(MusicArtist))
-            {
-                var existing = GetItemList(new InternalItemsQuery
-                {
-                    IncludeItemTypes = [BaseItemKind.MusicArtist],
-                    Name = name,
-                    UseRawName = true,
-                    DtoOptions = options
-                }).Cast<MusicArtist>()
-                .OrderBy(i => i.IsAccessedByName ? 1 : 0)
-                .Cast<T>()
-                .FirstOrDefault();
-
-                if (existing is not null)
-                {
-                    return existing;
-                }
-            }
-
-            var path = getPathFn(name);
-            var id = GetItemByNameId<T>(path);
-            var item = GetItemById(id) as T;
-            if (item is null)
-            {
-                var info = Directory.CreateDirectory(path);
-                item = new T
-                {
-                    Name = name,
-                    Id = id,
-                    DateCreated = info.CreationTimeUtc,
-                    DateModified = info.LastWriteTimeUtc,
-                    Path = path
-                };
-
-                _writes.CreateItem(item, null);
-            }
-
-            return item;
-        }
-
-        private Guid GetItemByNameId<T>(string path)
-              where T : BaseItem, new()
-        {
-            var forceCaseInsensitiveId = _configurationManager.Configuration.EnableNormalizedItemByNameIds;
-            return GetNewItemIdInternal(path, typeof(T), forceCaseInsensitiveId);
-        }
-
-        /// <inheritdoc />
-        public Task ValidatePeopleAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, IProgress<double> progress, CancellationToken cancellationToken)
-        {
-            // Ensure the location is available.
-            Directory.CreateDirectory(_configurationManager.ApplicationPaths.PeoplePath);
-
-            return new PeopleValidator(writes, deletions, this, _itemPeopleService, _logger, _fileSystem).ValidatePeople(cancellationToken, progress);
-        }
-
-        /// <summary>
-        /// Gets the default view.
-        /// </summary>
-        /// <returns>IEnumerable{VirtualFolderInfo}.</returns>
-        public List<VirtualFolderInfo> GetVirtualFolders()
-        {
-            return GetVirtualFolders(false);
-        }
-
-        public List<VirtualFolderInfo> GetVirtualFolders(bool includeRefreshState)
-        {
-            _logger.LogDebug("Getting topLibraryFolders");
-            var topLibraryFolders = GetUserRootFolder().Children.ToList();
-
-            _logger.LogDebug("Getting refreshQueue");
-            var refreshQueue = includeRefreshState ? ProviderManager.GetRefreshQueue() : null;
-
-            return _fileSystem.GetDirectoryPaths(_configurationManager.ApplicationPaths.DefaultUserViewsPath)
-                .Select(dir => GetVirtualFolderInfo(dir, topLibraryFolders, refreshQueue))
-                .ToList();
-        }
-
-        private VirtualFolderInfo GetVirtualFolderInfo(string dir, List<BaseItem> allCollectionFolders, HashSet<Guid>? refreshQueue)
-        {
-            var info = new VirtualFolderInfo
-            {
-                Name = Path.GetFileName(dir),
-
-                Locations = LibraryPathReader.ReadLocations(dir, _fileSystem, _appHost, _logger),
-
-                CollectionType = GetCollectionType(dir)
-            };
-
-            var libraryFolder = allCollectionFolders.FirstOrDefault(i => string.Equals(i.Path, dir, StringComparison.OrdinalIgnoreCase));
-            if (libraryFolder is not null)
-            {
-                var libraryFolderId = libraryFolder.Id.ToString("N", CultureInfo.InvariantCulture);
-                info.ItemId = libraryFolderId;
-                if (libraryFolder.HasImage(ImageType.Primary))
-                {
-                    info.PrimaryImageItemId = libraryFolderId;
-                }
-
-                info.LibraryOptions = GetLibraryOptions(libraryFolder);
-
-                if (refreshQueue is not null)
-                {
-                    info.RefreshProgress = libraryFolder.GetRefreshProgress();
-
-                    info.RefreshStatus = info.RefreshProgress.HasValue ? "Active" : refreshQueue.Contains(libraryFolder.Id) ? "Queued" : "Idle";
-                }
-            }
-
-            return info;
-        }
-
-        private CollectionTypeOptions? GetCollectionType(string path)
-        {
-            var files = _fileSystem.GetFilePaths(path, [".collection"], true, false);
-            foreach (ReadOnlySpan<char> file in files)
-            {
-                if (Enum.TryParse<CollectionTypeOptions>(Path.GetFileNameWithoutExtension(file), true, out var res))
-                {
-                    return res;
-                }
-            }
-
-            return null;
         }
 
         /// <inheritdoc />
@@ -567,7 +259,7 @@ namespace Tesserafin.Server.Core.Library
                 var parent = GetItemById(query.ParentId);
                 if (parent is not null)
                 {
-                    SetTopParentIdsOrAncestors(query, [parent]);
+                    _queryScope.SetTopParentIdsOrAncestors(query, [parent]);
                 }
             }
 
@@ -591,7 +283,7 @@ namespace Tesserafin.Server.Core.Library
                 var parent = GetItemById(query.ParentId);
                 if (parent is not null)
                 {
-                    SetTopParentIdsOrAncestors(query, [parent]);
+                    _queryScope.SetTopParentIdsOrAncestors(query, [parent]);
                 }
             }
 
@@ -610,7 +302,7 @@ namespace Tesserafin.Server.Core.Library
                 var parent = GetItemById(query.ParentId);
                 if (parent is not null)
                 {
-                    SetTopParentIdsOrAncestors(query, [parent]);
+                    _queryScope.SetTopParentIdsOrAncestors(query, [parent]);
                 }
             }
 
@@ -647,7 +339,7 @@ namespace Tesserafin.Server.Core.Library
 
         public IReadOnlyList<BaseItem> GetItemList(InternalItemsQuery query, List<BaseItem> parents)
         {
-            SetTopParentIdsOrAncestors(query, parents);
+            _queryScope.SetTopParentIdsOrAncestors(query, parents);
 
             if (query.AncestorIds.Length == 0 && query.TopParentIds.Length == 0)
             {
@@ -662,7 +354,7 @@ namespace Tesserafin.Server.Core.Library
 
         public IReadOnlyList<BaseItem> GetLatestItemList(InternalItemsQuery query, IReadOnlyList<BaseItem> parents, CollectionType collectionType)
         {
-            SetTopParentIdsOrAncestors(query, parents);
+            _queryScope.SetTopParentIdsOrAncestors(query, parents);
 
             if (query.AncestorIds.Length == 0 && query.TopParentIds.Length == 0)
             {
@@ -677,7 +369,7 @@ namespace Tesserafin.Server.Core.Library
 
         public IReadOnlyList<string> GetNextUpSeriesKeys(InternalItemsQuery query, IReadOnlyCollection<BaseItem> parents, DateTime dateCutoff)
         {
-            SetTopParentIdsOrAncestors(query, parents);
+            _queryScope.SetTopParentIdsOrAncestors(query, parents);
 
             if (query.AncestorIds.Length == 0 && query.TopParentIds.Length == 0)
             {
@@ -735,7 +427,7 @@ namespace Tesserafin.Server.Core.Library
                 AddUserToQuery(query, query.User);
             }
 
-            SetTopParentOrAncestorIds(query);
+            _queryScope.SetTopParentOrAncestorIds(query);
             return _itemRepository.GetStudios(query);
         }
 
@@ -746,7 +438,7 @@ namespace Tesserafin.Server.Core.Library
                 AddUserToQuery(query, query.User);
             }
 
-            SetTopParentOrAncestorIds(query);
+            _queryScope.SetTopParentOrAncestorIds(query);
             return _itemRepository.GetGenres(query);
         }
 
@@ -757,7 +449,7 @@ namespace Tesserafin.Server.Core.Library
                 AddUserToQuery(query, query.User);
             }
 
-            SetTopParentOrAncestorIds(query);
+            _queryScope.SetTopParentOrAncestorIds(query);
             return _itemRepository.GetMusicGenres(query);
         }
 
@@ -768,7 +460,7 @@ namespace Tesserafin.Server.Core.Library
                 AddUserToQuery(query, query.User);
             }
 
-            SetTopParentOrAncestorIds(query);
+            _queryScope.SetTopParentOrAncestorIds(query);
             return _itemRepository.GetAllArtists(query);
         }
 
@@ -779,49 +471,8 @@ namespace Tesserafin.Server.Core.Library
                 AddUserToQuery(query, query.User);
             }
 
-            SetTopParentOrAncestorIds(query);
+            _queryScope.SetTopParentOrAncestorIds(query);
             return _itemRepository.GetArtists(query);
-        }
-
-        private void SetTopParentOrAncestorIds(InternalItemsQuery query)
-        {
-            var ancestorIds = query.AncestorIds;
-            int len = ancestorIds.Length;
-            if (len == 0)
-            {
-                return;
-            }
-
-            var parents = new BaseItem[len];
-            for (int i = 0; i < len; i++)
-            {
-                parents[i] = GetItemById(ancestorIds[i]) ?? throw new ArgumentException($"Failed to find parent with id: {ancestorIds[i]}");
-
-                // As in SetTopParentIdsOrAncestors: an ancestor its user may not see, or the root
-                // of every library, scopes the query to nothing.
-                if (query.User is not null
-                    && (parents[i] is AggregateFolder || _itemAccessService.GetVisibleItemById<BaseItem>(ancestorIds[i], query.User) is null))
-                {
-                    query.TopParentIds = [Guid.NewGuid()];
-                    query.AncestorIds = [];
-                    return;
-                }
-
-                if (parents[i] is not (ICollectionFolder or UserView))
-                {
-                    return;
-                }
-            }
-
-            // Optimize by querying against top level views
-            query.TopParentIds = parents.SelectMany(i => GetTopParentIdsForQuery(i, query.User)).ToArray();
-            query.AncestorIds = [];
-
-            // Prevent searching in all libraries due to empty filter
-            if (query.TopParentIds.Length == 0)
-            {
-                query.TopParentIds = [Guid.NewGuid()];
-            }
         }
 
         public QueryResult<(BaseItem Item, ItemCounts ItemCounts)> GetAlbumArtists(InternalItemsQuery query)
@@ -831,7 +482,7 @@ namespace Tesserafin.Server.Core.Library
                 AddUserToQuery(query, query.User);
             }
 
-            SetTopParentOrAncestorIds(query);
+            _queryScope.SetTopParentOrAncestorIds(query);
             return _itemRepository.GetAlbumArtists(query);
         }
 
@@ -842,7 +493,7 @@ namespace Tesserafin.Server.Core.Library
                 var parent = GetItemById(query.ParentId);
                 if (parent is not null)
                 {
-                    SetTopParentIdsOrAncestors(query, [parent]);
+                    _queryScope.SetTopParentIdsOrAncestors(query, [parent]);
                 }
             }
 
@@ -862,94 +513,9 @@ namespace Tesserafin.Server.Core.Library
                 _itemRepository.GetItemList(query));
         }
 
-        private void SetTopParentIdsOrAncestors(InternalItemsQuery query, IReadOnlyCollection<BaseItem> parents)
-        {
-            // A parent stands in for scoping the query to its user's libraries, so it has to be one
-            // that user may see: with none left, the query is scoped to nothing.
-            if (query.User is not null && parents.Count != 0)
-            {
-                parents = parents.Where(i => _itemAccessService.GetVisibleItemById<BaseItem>(i.Id, query.User) is not null).ToList();
-                if (parents.Count == 0)
-                {
-                    query.TopParentIds = [Guid.NewGuid()];
-                    query.Parent = null;
-                    return;
-                }
-            }
-
-            if (parents.All(i => i is ICollectionFolder || i is UserView))
-            {
-                // Optimize by querying against top level views
-                query.TopParentIds = parents.SelectMany(i => GetTopParentIdsForQuery(i, query.User)).ToArray();
-
-                // Prevent searching in all libraries due to empty filter
-                if (query.TopParentIds.Length == 0)
-                {
-                    query.TopParentIds = [Guid.NewGuid()];
-                }
-            }
-            else if (parents.Count == 1 && parents.First() is Folder folder
-                && (folder is Playlist || folder is BoxSet)
-                && folder.LinkedChildren.Length > 0)
-            {
-                // Playlists and BoxSets store their contents in LinkedChildren and never
-                // populate AncestorIds for those items, so a recursive AncestorIds query
-                // would return zero rows. Resolve to the linked child IDs up front and
-                // route through the existing indexed ItemIds filter.
-                // These ids stand in for the scoping a parent gives, and a query that names ids is
-                // not scoped to its user's libraries afterwards: each child is asked for here.
-                query.ItemIds = folder.LinkedChildren
-                    .Where(lc => lc.ItemId.HasValue && !lc.ItemId.Value.IsEmpty())
-                    .Select(lc => lc.ItemId!.Value)
-                    .Where(id => query.User is null || _itemAccessService.GetVisibleItemById<BaseItem>(id, query.User) is not null)
-                    .ToArray();
-
-                // Empty linked-children should still return empty rather than scanning everything.
-                if (query.ItemIds.Length == 0)
-                {
-                    query.ItemIds = [Guid.NewGuid()];
-                }
-            }
-            else
-            {
-                // We need to be able to query from any arbitrary ancestor up the tree
-                query.AncestorIds = parents.SelectMany(i => i.GetIdsForAncestorQuery()).ToArray();
-
-                // Prevent searching in all libraries due to empty filter
-                if (query.AncestorIds.Length == 0)
-                {
-                    query.AncestorIds = [Guid.NewGuid()];
-                }
-
-                // An ancestor can hold more than its user's libraries - the root holds them all.
-                if (query.User is not null)
-                {
-                    SetTopParentIdsToUserViews(query, query.User, true);
-                }
-            }
-
-            query.Parent = null;
-        }
-
         private void AddUserToQuery(InternalItemsQuery query, User user, bool allowExternalContent = true)
         {
-            if (query.User is null)
-            {
-                query.SetUser(user);
-            }
-
-            if (query.AncestorIds.Length == 0 &&
-                query.ParentId.IsEmpty() &&
-                query.ChannelIds.Count == 0 &&
-                query.TopParentIds.Length == 0 &&
-                string.IsNullOrEmpty(query.AncestorWithPresentationUniqueKey) &&
-                string.IsNullOrEmpty(query.SeriesPresentationUniqueKey) &&
-                query.ItemIds.Length == 0 &&
-                query.OwnerIds.Length == 0)
-            {
-                SetTopParentIdsToUserViews(query, user, allowExternalContent);
-            }
-
+            _queryScope.AddUserToQuery(query, user, allowExternalContent);
             ExcludeBoxSetsAndPlaylistsRefusedToTheUser(query, user);
         }
 
@@ -976,31 +542,13 @@ namespace Tesserafin.Server.Core.Library
                 Recursive = true,
                 DtoOptions = new DtoOptions(false) { EnableImages = false }
             })
-                .Where(i => !i.IsVisibleStandalone(user))
+                .Where(i => !_itemAccessService.IsVisibleStandalone(i, user))
                 .Select(i => i.Id)
                 .ToArray();
 
             if (refused.Length > 0)
             {
                 query.ExcludeItemIds = [.. query.ExcludeItemIds.Except(refused), .. refused];
-            }
-        }
-
-        private void SetTopParentIdsToUserViews(InternalItemsQuery query, User user, bool allowExternalContent)
-        {
-            var userViews = _userViewCatalog.GetUserViews(new UserViewQuery
-            {
-                User = user,
-                IncludeHidden = true,
-                IncludeExternalContent = allowExternalContent
-            });
-
-            query.TopParentIds = userViews.SelectMany(i => GetTopParentIdsForQuery(i, user)).ToArray();
-
-            // Prevent searching in all libraries due to empty filter
-            if (query.TopParentIds.Length == 0)
-            {
-                query.TopParentIds = [Guid.NewGuid()];
             }
         }
 
@@ -1011,67 +559,6 @@ namespace Tesserafin.Server.Core.Library
             ArgumentNullException.ThrowIfNull(user);
 
             AddUserToQuery(query, user);
-        }
-
-        private IEnumerable<Guid> GetTopParentIdsForQuery(BaseItem item, User? user)
-        {
-            if (item is UserView view)
-            {
-                if (view.ViewType == CollectionType.livetv)
-                {
-                    return [view.Id];
-                }
-
-                // Translate view into folders
-                if (!view.DisplayParentId.IsEmpty())
-                {
-                    var displayParent = GetItemById(view.DisplayParentId);
-                    if (displayParent is not null)
-                    {
-                        return GetTopParentIdsForQuery(displayParent, user);
-                    }
-
-                    return [];
-                }
-
-                if (!view.ParentId.IsEmpty())
-                {
-                    var displayParent = GetItemById(view.ParentId);
-                    if (displayParent is not null)
-                    {
-                        return GetTopParentIdsForQuery(displayParent, user);
-                    }
-
-                    return [];
-                }
-
-                // Handle grouping
-                if (user is not null && view.ViewType != CollectionType.unknown && UserView.IsEligibleForGrouping(view.ViewType)
-                    && user.GetPreference(PreferenceKind.GroupedFolders).Length > 0)
-                {
-                    return GetUserRootFolder()
-                        .GetChildren(user, true, null, _itemSortService)
-                        .OfType<CollectionFolder>()
-                        .Where(i => i.CollectionType is null || i.CollectionType == view.ViewType)
-                        .Where(i => user.IsFolderGrouped(i.Id))
-                        .SelectMany(i => GetTopParentIdsForQuery(i, user));
-                }
-
-                return [];
-            }
-
-            if (item is CollectionFolder collectionFolder)
-            {
-                return collectionFolder.PhysicalFolderIds;
-            }
-
-            var topParent = item.GetTopParent();
-            if (topParent is not null)
-            {
-                return [topParent.Id];
-            }
-
-            return [];
         }
 
         /// <inheritdoc />
@@ -1142,35 +629,10 @@ namespace Tesserafin.Server.Core.Library
             => _options.GetLibraryOptions(item);
 
         public CollectionType? GetContentType(BaseItem item)
-        {
-            var configuredContentType = GetConfiguredContentType(item, false);
-            if (configuredContentType is not null)
-            {
-                return configuredContentType;
-            }
-
-            configuredContentType = GetConfiguredContentType(item, true);
-            if (configuredContentType is not null)
-            {
-                return configuredContentType;
-            }
-
-            return GetInheritedContentType(item);
-        }
+            => _options.GetContentType(item);
 
         public CollectionType? GetInheritedContentType(BaseItem item)
-        {
-            var type = GetTopFolderContentType(item);
-
-            if (type is not null)
-            {
-                return type;
-            }
-
-            return item.GetParents(this)
-                .Select(GetConfiguredContentType)
-                .LastOrDefault(i => i is not null);
-        }
+            => _options.GetInheritedContentType(item);
 
         public CollectionType? GetConfiguredContentType(BaseItem item)
         {
@@ -1194,9 +656,6 @@ namespace Tesserafin.Server.Core.Library
 
         private CollectionType? GetContentTypeOverride(string path, bool inherit)
             => _options.GetConfiguredContentType(path, inherit);
-
-        private CollectionType? GetTopFolderContentType(BaseItem item)
-            => _options.GetTopFolderContentType(item);
 
         /// <inheritdoc />
         /// <remarks>
@@ -1292,104 +751,6 @@ namespace Tesserafin.Server.Core.Library
             return RootFolder;
         }
 
-        /// <inheritdoc />
-        public int? GetSeasonNumberFromPath(string path, Guid? parentId)
-        {
-            var parentPath = parentId.HasValue ? GetItemById(parentId.Value)?.ContainingFolderPath : null;
-            return _itemNamingService.GetSeasonNumberFromPath(path, parentPath);
-        }
-
-        /// <inheritdoc />
-        public bool FillMissingEpisodeNumbersFromPath(Episode episode, bool forceRefresh)
-        {
-            return _itemNamingService.FillMissingEpisodeNumbersFromPath(episode, forceRefresh);
-        }
-
-        public ItemLookupInfo ParseName(string name)
-        {
-            return _itemNamingService.ParseName(name);
-        }
-
-        public IEnumerable<BaseItem> FindExtras(BaseItem owner, IReadOnlyList<FileSystemMetadata> fileSystemChildren, IDirectoryService directoryService)
-        {
-            // Apply .ignore rules
-            var filtered = fileSystemChildren.Where(c => !_dotIgnoreIgnoreRule.ShouldIgnore(c, owner)).ToList();
-            var isFolder = owner.IsFolder || (owner is Video video && (video.VideoType == VideoType.BluRay || video.VideoType == VideoType.Dvd));
-            var ownerVideoInfo = VideoResolver.Resolve(owner.Path, isFolder, _namingOptions, libraryRoot: owner.ContainingFolderPath);
-            if (ownerVideoInfo is null)
-            {
-                yield break;
-            }
-
-            var count = filtered.Count;
-            for (var i = 0; i < count; i++)
-            {
-                var current = filtered[i];
-                if (current.IsDirectory && _namingOptions.AllExtrasTypesFolderNames.ContainsKey(current.Name))
-                {
-                    var filesInSubFolder = _fileSystem.GetFiles(current.FullName, null, false, false);
-                    var filesInSubFolderList = filesInSubFolder.ToList();
-
-                    bool subFolderIsMixedFolder = filesInSubFolderList.Count > 1;
-
-                    foreach (var file in filesInSubFolderList)
-                    {
-                        if (!_extraResolver.TryGetExtraTypeForOwner(file.FullName, ownerVideoInfo, out var extraType))
-                        {
-                            continue;
-                        }
-
-                        var extra = GetExtra(file, extraType.Value, subFolderIsMixedFolder);
-                        if (extra is not null)
-                        {
-                            yield return extra;
-                        }
-                    }
-                }
-                else if (!current.IsDirectory && _extraResolver.TryGetExtraTypeForOwner(current.FullName, ownerVideoInfo, out var extraType))
-                {
-                    var extra = GetExtra(current, extraType.Value, false);
-                    if (extra is not null)
-                    {
-                        yield return extra;
-                    }
-                }
-            }
-
-            BaseItem? GetExtra(FileSystemMetadata file, ExtraType extraType, bool isInMixedFolder)
-            {
-                var extra = ResolvePath(_fileSystem.GetFileInfo(file.FullName), directoryService, _extraResolver.GetResolversForExtraType(extraType));
-                if (extra is not Video && extra is not Audio)
-                {
-                    return null;
-                }
-
-                // Try to retrieve it from the db. If we don't find it, use the resolved version
-                var itemById = GetItemById(extra.Id);
-                if (itemById is not null)
-                {
-                    extra = itemById;
-                }
-
-                // Only update extra type if it is more specific then the currently known extra type
-                if (extra.ExtraType is null or ExtraType.Unknown || extraType != ExtraType.Unknown)
-                {
-                    extra.ExtraType = extraType;
-                }
-
-                // Only return items that are actual extras (have ExtraType set)
-                // Note: OwnerId and ParentId are set by RefreshExtras, not here,
-                // so that RefreshExtras can detect when they need updating and set ForceSave.
-                if (extra.ExtraType is not null)
-                {
-                    extra.IsInMixedFolder = isInMixedFolder;
-                    return extra;
-                }
-
-                return null;
-            }
-        }
-
         public string GetPathAfterNetworkSubstitution(string path, BaseItem? ownerItem)
         {
             foreach (var map in _configurationManager.Configuration.PathSubstitutions)
@@ -1413,35 +774,6 @@ namespace Tesserafin.Server.Core.Library
             return _itemPeopleService.GetPeople(item);
         }
 
-        public QueryResult<BaseItem> GetPeopleItems(InternalPeopleQuery query)
-        {
-            var queryResult = _peopleRepository.GetPeople(query);
-            var baseItems = queryResult.Items.Select(i =>
-                {
-                    try
-                    {
-                        return GetPerson(i.Name);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "error retrieving BaseItem for person: {0}", i.Name);
-                        return null;
-                    }
-                })
-                .Where(i => i is not null)
-                .Where(i => query.User is null || i!.IsVisible(query.User))
-                .OfType<BaseItem>()
-                .ToList()
-                .AsReadOnly();
-
-            return new QueryResult<BaseItem>
-            {
-                StartIndex = queryResult.StartIndex,
-                TotalRecordCount = queryResult.TotalRecordCount,
-                Items = baseItems,
-            };
-        }
-
         public IReadOnlyList<string> GetPeopleNames(InternalPeopleQuery query)
         {
             return _itemPeopleService.GetPeopleNames(query);
@@ -1461,7 +793,7 @@ namespace Tesserafin.Server.Core.Library
                 AddUserToQuery(query, query.User);
             }
 
-            SetTopParentOrAncestorIds(query);
+            _queryScope.SetTopParentOrAncestorIds(query);
             return _itemRepository.GetQueryFiltersLegacy(query);
         }
 

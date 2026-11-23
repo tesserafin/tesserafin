@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data;
 using Tesserafin.Data.Entities;
@@ -44,7 +45,7 @@ namespace Tesserafin.Controller.Entities.Audio
         public override bool SupportsInheritedParentImages => true;
 
         [JsonIgnore]
-        public MusicArtist MusicArtist => GetMusicArtist(new DtoOptions(true));
+        public MusicArtist MusicArtist => GetMusicArtist();
 
         [JsonIgnore]
         public override bool SupportsPlayedStatus => false;
@@ -65,27 +66,13 @@ namespace Tesserafin.Controller.Entities.Audio
         [JsonIgnore]
         public IEnumerable<Audio> Tracks => GetRecursiveChildren(i => i is Audio).Cast<Audio>();
 
-        public MusicArtist GetMusicArtist(DtoOptions options)
-        {
-            var parents = GetParents();
-            foreach (var parent in parents)
-            {
-                if (parent is MusicArtist artist)
-                {
-                    return artist;
-                }
-            }
+        public IReadOnlyList<BaseItem> GetCatalogueTracks(IItemRepository repository, IItemLookupService lookup, LinkedChildResolver links)
+            => GetRecursiveCatalogueChildren(repository, lookup, links, static item => item is Audio);
 
-            var name = AlbumArtist;
-            if (!string.IsNullOrEmpty(name))
-            {
-                return LibraryManager.GetArtist(name, options);
-            }
+        public MusicArtist GetMusicArtist()
+            => FindMusicArtist(GetParents(), name => LibraryManager.GetArtists([name]));
 
-            return null;
-        }
-
-        protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user)
+        protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user, InternalItemsQuery query)
         {
             return Tracks;
         }
@@ -133,38 +120,23 @@ namespace Tesserafin.Controller.Entities.Audio
         }
 
         public AlbumInfo GetLookupInfo()
+            => BuildLookupInfo(GetMusicArtist(), Tracks.Select(track => track.GetLookupInfo()), null);
+
+        public AlbumInfo GetLookupInfo(
+            IItemRepository repository,
+            IItemLookupService lookup,
+            LinkedChildResolver links,
+            ILinkedChildrenService artists,
+            (string Language, string CountryCode) locale,
+            Func<Audio, SongInfo> getTrackLookupInfo)
+            => BuildLookupInfo(
+                FindMusicArtist(GetParents(lookup), name => artists.FindArtists([name])),
+                GetCatalogueTracks(repository, lookup, links).Cast<Audio>().Select(getTrackLookupInfo),
+                locale);
+
+        public async Task RefreshAllMetadata(IFolderValidationServices services, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
         {
-            var id = GetItemLookupInfo<AlbumInfo>();
-
-            id.AlbumArtists = AlbumArtists;
-
-            var artist = GetMusicArtist(new DtoOptions(false));
-
-            if (artist is not null)
-            {
-                id.ArtistProviderIds = artist.ProviderIds;
-            }
-
-            id.SongInfos = GetRecursiveChildren(i => i is Audio)
-                .Cast<Audio>()
-                .Select(i => i.GetLookupInfo())
-                .ToList();
-
-            var album = id.SongInfos
-                .Select(i => i.Album)
-                .FirstOrDefault(i => !string.IsNullOrEmpty(i));
-
-            if (!string.IsNullOrEmpty(album))
-            {
-                id.Name = album;
-            }
-
-            return id;
-        }
-
-        public async Task RefreshAllMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, MetadataRefreshOptions refreshOptions, IProgress<double> progress, CancellationToken cancellationToken)
-        {
-            var items = GetRecursiveChildren();
+            var items = GetRecursiveCatalogueChildren(services.Repository, services.Lookup, services.Links);
 
             var totalItems = items.Count;
             var numComplete = 0;
@@ -175,7 +147,7 @@ namespace Tesserafin.Controller.Entities.Audio
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var updateType = await item.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                var updateType = await item.RefreshMetadata(services.Deletions, services.Writes, services.Providers, refreshOptions, cancellationToken).ConfigureAwait(false);
                 childUpdateType = childUpdateType | updateType;
 
                 numComplete++;
@@ -194,15 +166,61 @@ namespace Tesserafin.Controller.Entities.Audio
             }
 
             // Refresh current item
-            await RefreshMetadata(deletions, writes, parentRefreshOptions, cancellationToken).ConfigureAwait(false);
+            await RefreshMetadata(services.Deletions, services.Writes, services.Providers, parentRefreshOptions, cancellationToken).ConfigureAwait(false);
 
             if (!refreshOptions.IsAutomated)
             {
-                await RefreshArtists(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                await RefreshArtists(services.Deletions, services.Writes, services.Providers, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        private async Task RefreshArtists(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
+        private MusicArtist FindMusicArtist(IEnumerable<BaseItem> parents, Func<string, IReadOnlyDictionary<string, MusicArtist[]>> findArtists)
+        {
+            foreach (var parent in parents)
+            {
+                if (parent is MusicArtist artist)
+                {
+                    return artist;
+                }
+            }
+
+            var name = AlbumArtist;
+            if (!string.IsNullOrEmpty(name))
+            {
+                return findArtists(name).TryGetValue(name, out var artists)
+                    ? artists.OrderBy(artist => artist.IsAccessedByName ? 1 : 0).ThenBy(artist => artist.Id).FirstOrDefault()
+                    : null;
+            }
+
+            return null;
+        }
+
+        private AlbumInfo BuildLookupInfo(MusicArtist artist, IEnumerable<SongInfo> tracks, (string Language, string CountryCode)? locale)
+        {
+            var id = GetItemLookupInfo<AlbumInfo>(locale);
+
+            id.AlbumArtists = AlbumArtists;
+
+            if (artist is not null)
+            {
+                id.ArtistProviderIds = artist.ProviderIds;
+            }
+
+            id.SongInfos = tracks.ToList();
+
+            var album = id.SongInfos
+                .Select(i => i.Album)
+                .FirstOrDefault(i => !string.IsNullOrEmpty(i));
+
+            if (!string.IsNullOrEmpty(album))
+            {
+                id.Name = album;
+            }
+
+            return id;
+        }
+
+        private async Task RefreshArtists(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
         {
             foreach (var i in this.GetAllArtists())
             {
@@ -212,14 +230,14 @@ namespace Tesserafin.Controller.Entities.Audio
                     continue;
                 }
 
-                var artist = LibraryManager.GetArtist(i);
+                var artist = writes.GetOrCreateNamedItem<MusicArtist>(i, cancellationToken);
 
                 if (!artist.IsAccessedByName)
                 {
                     continue;
                 }
 
-                await artist.RefreshMetadata(deletions, writes, refreshOptions, cancellationToken).ConfigureAwait(false);
+                await artist.RefreshMetadata(deletions, writes, providers, refreshOptions, cancellationToken).ConfigureAwait(false);
             }
         }
     }

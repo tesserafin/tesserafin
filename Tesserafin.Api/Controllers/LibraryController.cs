@@ -18,6 +18,7 @@ using Tesserafin.Api.ModelBinders;
 using Tesserafin.Api.Models.LibraryDtos;
 using Tesserafin.Common.Api;
 using Tesserafin.Common.Extensions;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
@@ -48,6 +49,9 @@ namespace Tesserafin.Api.Controllers;
 [Route("")]
 public class LibraryController : BaseTesserafinApiController
 {
+    private readonly IChannelManager _channelManager;
+    private readonly IItemListingServices _listing;
+    private readonly IStandaloneVisibilityService _visibility;
     private readonly IItemDeletionCommands _deletions;
     private readonly IProviderManager _providerManager;
     private readonly ISimilarItemsManager _similarItemsManager;
@@ -80,6 +84,9 @@ public class LibraryController : BaseTesserafinApiController
     /// <param name="logger">Instance of the <see cref="ILogger{LibraryController}"/> interface.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
+    /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
+    /// <param name="listing">Supplies a folder's own listing logic (user views, channels, collections, next up).</param>
+    /// <param name="channelManager">Decides whether a channel item may be deleted.</param>
     public LibraryController(
         IItemDeletionCommands deletions,
         IProviderManager providerManager,
@@ -94,8 +101,14 @@ public class LibraryController : BaseTesserafinApiController
         ILibraryMonitor libraryMonitor,
         ILogger<LibraryController> logger,
         IServerConfigurationManager serverConfigurationManager,
-        IItemSortService itemSortService)
+        IItemSortService itemSortService,
+        IStandaloneVisibilityService visibility,
+        IItemListingServices listing,
+        IChannelManager channelManager)
     {
+        _channelManager = channelManager;
+        _listing = listing;
+        _visibility = visibility;
         _deletions = deletions;
         _providerManager = providerManager;
         _similarItemsManager = similarItemsManager;
@@ -402,7 +415,7 @@ public class LibraryController : BaseTesserafinApiController
             return NotFound();
         }
 
-        if (user is not null && !item.CanDelete(user))
+        if (user is not null && !item.CanDelete(user, _channelManager))
         {
             return Unauthorized("Unauthorized access");
         }
@@ -448,7 +461,7 @@ public class LibraryController : BaseTesserafinApiController
                 return NotFound();
             }
 
-            if (user is not null && !item.CanDelete(user))
+            if (user is not null && !item.CanDelete(user, _channelManager))
             {
                 return Unauthorized("Unauthorized access");
             }
@@ -1009,7 +1022,7 @@ public class LibraryController : BaseTesserafinApiController
     private BaseItem? TranslateParentItem(BaseItem item, User user)
     {
         return item.GetParent() is AggregateFolder
-            ? _libraryManager.GetUserRootFolder().GetChildren(user, true, null, _itemSortService)
+            ? _libraryManager.GetUserRootFolder().GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility, Listing = _listing }, _itemSortService)
                 .FirstOrDefault(i => i.PhysicalLocations.Contains(item.Path))
             : item;
     }

@@ -1,6 +1,6 @@
 #pragma warning disable CS1591
 
-using Tesserafin.Common.Configuration;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
@@ -12,7 +12,7 @@ namespace Tesserafin.Server.Core.Images
 {
     public class FolderImageProvider : BaseFolderImageProvider<Folder>
     {
-        public FolderImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IApplicationPaths applicationPaths, IImageProcessor imageProcessor, ILibraryManager libraryManager)
+        public FolderImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IServerApplicationPaths applicationPaths, IImageProcessor imageProcessor, ILibraryManager libraryManager)
             : base(fileSystem, providerManager, applicationPaths, imageProcessor, libraryManager)
         {
         }

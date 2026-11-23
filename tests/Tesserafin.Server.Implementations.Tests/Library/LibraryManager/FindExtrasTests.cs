@@ -25,8 +25,9 @@ namespace Tesserafin.Server.Implementations.Tests.Library.LibraryManager;
 
 public class FindExtrasTests
 {
-    private readonly Tesserafin.Server.Core.Library.LibraryManager _libraryManager;
+    private readonly IItemResolutionService _resolution;
     private readonly Mock<IFileSystem> _fileSystemMock;
+    private readonly Mock<IItemRepository> _itemRepositoryMock;
 
     public FindExtrasTests()
     {
@@ -36,6 +37,7 @@ public class FindExtrasTests
         configMock.Setup(c => c.ApplicationPaths.ProgramDataPath).Returns("/data");
         configMock.Setup(c => c.Configuration).Returns(new Tesserafin.Model.Configuration.ServerConfiguration());
         var itemRepository = fixture.Freeze<Mock<IItemRepository>>();
+        _itemRepositoryMock = itemRepository;
         itemRepository.Setup(i => i.RetrieveItem(It.IsAny<Guid>())).Returns<BaseItem>(null);
         _fileSystemMock = fixture.Freeze<Mock<IFileSystem>>();
         _fileSystemMock.Setup(f => f.GetFileInfo(It.IsAny<string>())).Returns<string>(path => new FileSystemMetadata { FullName = path });
@@ -48,15 +50,39 @@ public class FindExtrasTests
         fixture.Register<Tesserafin.Server.Core.Library.IItemCacheStore>(() => itemLookupService);
         Tesserafin.Server.Implementations.Tests.Library.LibraryWriteFixture.Register(fixture);
 
-        _libraryManager = fixture.Build<Tesserafin.Server.Core.Library.LibraryManager>().Do(s => s.AddParts(
-                fixture.Create<IEnumerable<IResolverIgnoreRule>>(),
-                new List<IItemResolver> { new AudioResolver(fixture.Create<NamingOptions>()) },
-                fixture.Create<IEnumerable<IBaseItemComparer>>()))
-            .Create();
+        _resolution = fixture.Create<IItemResolutionService>();
+        _resolution.AddParts(
+            fixture.Create<IEnumerable<IResolverIgnoreRule>>(),
+            new List<IItemResolver> { new AudioResolver(fixture.Create<NamingOptions>()) });
 
         // This is pretty terrible but unavoidable
         BaseItem.FileSystem ??= fixture.Create<IFileSystem>();
-        BaseItem.MediaSourceManager ??= fixture.Create<IMediaSourceManager>();
+    }
+
+    [Fact]
+    public void FindExtras_ReturnsDetachedMetadata_WithoutChangingPublishedTypeOrMixedFolderFlag()
+    {
+        const string path = "/movies/Up/Up - trailer.mkv";
+        var owner = new Movie { Name = "Up", Path = "/movies/Up/Up.mkv" };
+        var saved = new Trailer
+        {
+            Id = _resolution.GetNewItemId(path, typeof(Trailer)),
+            Name = "Saved trailer",
+            Path = path,
+            ExtraType = ExtraType.Unknown,
+            IsInMixedFolder = true
+        };
+        _itemRepositoryMock.Setup(r => r.RetrieveItem(saved.Id)).Returns(saved);
+
+        var result = Assert.Single(_resolution.FindExtras(owner, [new FileSystemMetadata { FullName = path }], new DirectoryService(_fileSystemMock.Object)));
+
+        Assert.NotSame(saved, result);
+        Assert.Equal(saved.Id, result.Id);
+        Assert.Equal("Saved trailer", result.Name);
+        Assert.Equal(ExtraType.Trailer, result.ExtraType);
+        Assert.False(result.IsInMixedFolder);
+        Assert.Equal(ExtraType.Unknown, saved.ExtraType);
+        Assert.True(saved.IsInMixedFolder);
     }
 
     [Fact]
@@ -78,7 +104,7 @@ public class FindExtrasTests
             IsDirectory = false
         }).ToList();
 
-        var extras = _libraryManager.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
+        var extras = _resolution.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
 
         Assert.Equal(3, extras.Count);
         Assert.Equal(ExtraType.Unknown, extras[0].ExtraType);
@@ -105,7 +131,7 @@ public class FindExtrasTests
             IsDirectory = false
         }).ToList();
 
-        var extras = _libraryManager.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
+        var extras = _resolution.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
 
         Assert.Equal(3, extras.Count);
         Assert.Equal(ExtraType.BehindTheScenes, extras[0].ExtraType);
@@ -202,7 +228,7 @@ public class FindExtrasTests
             IsDirectory = !Path.HasExtension(p)
         }).ToList();
 
-        var extras = _libraryManager.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
+        var extras = _resolution.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
 
         _fileSystemMock.Verify();
         Assert.Equal(7, extras.Count);
@@ -237,7 +263,7 @@ public class FindExtrasTests
             IsDirectory = false
         }).ToList();
 
-        var extras = _libraryManager.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
+        var extras = _resolution.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
 
         Assert.Single(extras);
         Assert.Equal(ExtraType.Trailer, extras[0].ExtraType);
@@ -264,7 +290,7 @@ public class FindExtrasTests
             IsDirectory = false
         }).ToList();
 
-        var extras = _libraryManager.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
+        var extras = _resolution.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
 
         Assert.Single(extras);
         Assert.Equal(ExtraType.Trailer, extras[0].ExtraType);
@@ -307,7 +333,7 @@ public class FindExtrasTests
                 }
             }).Verifiable();
 
-        var extras = _libraryManager.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
+        var extras = _resolution.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
 
         _fileSystemMock.Verify();
         Assert.Empty(extras);
@@ -330,7 +356,7 @@ public class FindExtrasTests
             IsDirectory = string.IsNullOrEmpty(Path.GetExtension(p))
         }).ToList();
 
-        var extras = _libraryManager.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
+        var extras = _resolution.FindExtras(owner, files, new DirectoryService(_fileSystemMock.Object)).OrderBy(e => e.ExtraType).ToList();
 
         Assert.Equal(2, extras.Count);
         Assert.Equal(ExtraType.Trailer, extras[0].ExtraType);

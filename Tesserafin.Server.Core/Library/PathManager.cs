@@ -92,7 +92,7 @@ public class PathManager : IPathManager
     /// <inheritdoc/>
     public string GetChapterImageFolderPath(BaseItem item)
     {
-        return Path.Combine(item.GetInternalMetadataPath(), "chapters");
+        return Path.Combine(item.GetInternalMetadataPath(_config.ApplicationPaths.InternalMetadataPath), "chapters");
     }
 
     /// <inheritdoc/>

@@ -49,6 +49,7 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     public class UserViewManager : IUserViewManager
     {
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly ILibraryManager _libraryManager;
         private readonly ILocalizationManager _localizationManager;
         private readonly IChannelManager _channelManager;
@@ -62,8 +63,10 @@ namespace Tesserafin.Server.Core.Library
             IChannelManager channelManager,
             IItemSortService itemSortService,
             IUserViewCatalog userViewCatalog,
-            IUserViewFactory userViewFactory)
+            IUserViewFactory userViewFactory,
+            IStandaloneVisibilityService visibility)
         {
+            _visibility = visibility;
             _libraryManager = libraryManager;
             _localizationManager = localizationManager;
             _channelManager = channelManager;
@@ -168,7 +171,7 @@ namespace Tesserafin.Server.Core.Library
 
             if (parents.Count == 0)
             {
-                parents = _libraryManager.GetUserRootFolder().GetChildren(user, true, null, _itemSortService)
+                parents = _libraryManager.GetUserRootFolder().GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService)
                     .Where(i => i is Folder)
                     .Where(i => !user.GetPreferenceValues<Guid>(PreferenceKind.LatestItemExcludes)
                         .Contains(i.Id))

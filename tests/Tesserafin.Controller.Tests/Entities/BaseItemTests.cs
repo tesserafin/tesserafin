@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using Moq;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
@@ -10,6 +11,7 @@ using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaSegments;
+using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
@@ -21,6 +23,27 @@ namespace Tesserafin.Controller.Tests.Entities;
 [Collection(BaseItemStaticStateFixture.Name)]
 public class BaseItemTests
 {
+    [Fact]
+    public async Task RefreshMetadata_UsesSuppliedProviderManager()
+    {
+        var item = new Movie();
+        var options = new MetadataRefreshOptions(Mock.Of<IDirectoryService>());
+        var providers = new Mock<IProviderManager>(MockBehavior.Strict);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        providers.Setup(manager => manager.RefreshSingleItem(item, options, cancellationToken))
+            .ReturnsAsync(ItemUpdateType.MetadataImport);
+
+        var result = await item.RefreshMetadata(
+            Mock.Of<IItemDeletionCommands>(),
+            Mock.Of<IItemWriteCommands>(),
+            providers.Object,
+            options,
+            cancellationToken);
+
+        Assert.Equal(ItemUpdateType.MetadataImport, result);
+        providers.Verify(manager => manager.RefreshSingleItem(item, options, cancellationToken), Times.Once);
+    }
+
     [Theory]
     [InlineData("", "")]
     [InlineData("1", "0000000001")]
@@ -46,13 +69,9 @@ public class BaseItemTests
             Path = altPath,
         };
 
-        var mediaSourceManager = new Mock<IMediaSourceManager>();
-        mediaSourceManager.Setup(x => x.GetPathProtocol(It.IsAny<string>()))
-                .Returns((string x) => MediaProtocol.File);
         var libraryManager = new Mock<ILibraryManager>();
         libraryManager.Setup(x => x.GetLocalAlternateVersionIds(It.IsAny<Video>()))
                 .Returns([Guid.Empty]);
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
         BaseItem.LibraryManager = libraryManager.Object;
 
         Assert.Equal(name, video.GetMediaSourceName(video));
@@ -114,14 +133,10 @@ public class BaseItemTests
             Path = altPath,
         };
 
-        var mediaSourceManager = new Mock<IMediaSourceManager>();
-        mediaSourceManager.Setup(x => x.GetPathProtocol(It.IsAny<string>()))
-                .Returns((string x) => MediaProtocol.File);
         var libraryManager = new Mock<ILibraryManager>();
         // No local alternate versions: these are linked (separate items), so the folder fallback is unavailable.
         libraryManager.Setup(x => x.GetLocalAlternateVersionIds(It.IsAny<Video>()))
                 .Returns(Array.Empty<Guid>());
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
         BaseItem.LibraryManager = libraryManager.Object;
 
         Assert.Equal(expectedPrimary, video.GetMediaSourceName(video, commonPrefix));
@@ -131,7 +146,7 @@ public class BaseItemTests
     [Fact]
     public void GetAlternateVersion_ReturnsMatchingLocalVersion()
     {
-        var (primary, alt1, alt2) = SetupVersionGroup();
+        var (primary, alt1, alt2, _) = SetupVersionGroup();
 
         Assert.Same(alt1, primary.GetAlternateVersion(alt1.Id));
         Assert.Same(alt2, primary.GetAlternateVersion(alt2.Id));
@@ -142,7 +157,7 @@ public class BaseItemTests
     [Fact]
     public void GetAllVersions_FromAnyVersion_ReturnsEveryVersionOnce()
     {
-        var (primary, alt1, alt2) = SetupVersionGroup();
+        var (primary, alt1, alt2, _) = SetupVersionGroup();
 
         foreach (var source in new[] { primary, alt1, alt2 })
         {
@@ -155,7 +170,7 @@ public class BaseItemTests
         }
     }
 
-    private static (Video Primary, Video Alt1, Video Alt2) SetupVersionGroup()
+    private static (Video Primary, Video Alt1, Video Alt2, IMediaSourceManager MediaSources) SetupVersionGroup()
     {
         var primary = new Video { Id = Guid.NewGuid(), Path = "/Movies/Movie/Movie.mkv" };
         var alt1 = new Video { Id = Guid.NewGuid(), Path = "/Movies/Movie/Movie - 1080p.mkv", PrimaryVersionId = primary.Id };
@@ -170,10 +185,6 @@ public class BaseItemTests
             .Returns((Guid id) => new List<MediaStream> { new MediaStream { Type = MediaStreamType.Video, Width = widths.GetValueOrDefault(id) } });
         mediaSourceManager.Setup(x => x.GetMediaAttachments(It.IsAny<Guid>())).Returns(new List<MediaAttachment>());
 
-        var segmentManager = new Mock<IMediaSegmentManager>();
-        segmentManager.Setup(x => x.IsTypeSupported(It.IsAny<BaseItem>())).Returns(false);
-        BaseItem.MediaSegmentManager = segmentManager.Object;
-
         var libraryManager = new Mock<ILibraryManager>();
         libraryManager.Setup(x => x.GetLinkedAlternateVersions(It.IsAny<Video>())).Returns(Array.Empty<Video>());
         libraryManager.Setup(x => x.GetLocalAlternateVersionIds(primary)).Returns(new[] { alt1.Id, alt2.Id });
@@ -185,31 +196,29 @@ public class BaseItemTests
 
         var recordingsManager = new Mock<IRecordingsManager>();
         recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-        Video.RecordingsManager = recordingsManager.Object;
 
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
         BaseItem.LibraryManager = libraryManager.Object;
 
-        return (primary, alt1, alt2);
+        return (primary, alt1, alt2, mediaSourceManager.Object);
     }
 
     [Fact]
     public void GetMediaSources_DefaultsToTheQueriedVersionsOwnSource()
     {
-        var (primary, alt1, _) = SetupVersionGroup();
+        var (primary, alt1, _, mediaSources) = SetupVersionGroup();
 
         // Resuming the 1080p alternate must default to the 1080p source, not the higher-resolution
         // 2160p primary that the width ordering would otherwise place first.
-        Assert.Equal(alt1.Id.ToString("N"), alt1.GetMediaSources(false, BaseItem.MediaSourceManager, BaseItem.MediaSegmentManager, BaseItem.ChannelManager)[0].Id);
+        Assert.Equal(alt1.Id.ToString("N"), alt1.GetMediaSources(false, mediaSources, Mock.Of<IMediaSegmentManager>(), Mock.Of<IChannelManager>())[0].Id);
 
         // Opening the primary still defaults to the primary's own (here highest-resolution) source.
-        Assert.Equal(primary.Id.ToString("N"), primary.GetMediaSources(false, BaseItem.MediaSourceManager, BaseItem.MediaSegmentManager, BaseItem.ChannelManager)[0].Id);
+        Assert.Equal(primary.Id.ToString("N"), primary.GetMediaSources(false, mediaSources, Mock.Of<IMediaSegmentManager>(), Mock.Of<IChannelManager>())[0].Id);
     }
 
     [Fact]
     public void GetAllItemsForMediaSources_FromAnyVersion_HasNoDuplicates()
     {
-        var (primary, alt1, alt2) = SetupVersionGroup();
+        var (primary, alt1, alt2, _) = SetupVersionGroup();
 
         var method = typeof(Video).GetMethod("GetAllItemsForMediaSources", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
@@ -243,7 +252,6 @@ public class BaseItemTests
         // behind — see BaseItemStaticStateFixture for why leaking statics between tests is fragile.
         var recordingsManager = new Mock<IRecordingsManager>();
         recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-        Video.RecordingsManager = recordingsManager.Object;
 
         Assert.True(movie.GetEnableMediaSourceDisplay(channelManager.Object));
         channelManager.Verify(x => x.EnableMediaSourceDisplay(It.IsAny<BaseItem>()), Times.Never);
@@ -265,7 +273,6 @@ public class BaseItemTests
         // behind — see BaseItemStaticStateFixture for why leaking statics between tests is fragile.
         var recordingsManager = new Mock<IRecordingsManager>();
         recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-        Video.RecordingsManager = recordingsManager.Object;
 
         Assert.Equal(channelManagerResult, channelItem.GetEnableMediaSourceDisplay(channelManager.Object));
     }
@@ -284,7 +291,6 @@ public class BaseItemTests
         var segmentManager = new Mock<IMediaSegmentManager>(MockBehavior.Strict);
 
         // Video.SourceType reads the static Video.RecordingsManager; set it here, as above.
-        Video.RecordingsManager = Mock.Of<IRecordingsManager>();
 
         var result = channelItem.GetMediaSources(false, mediaSourceManager.Object, segmentManager.Object, channelManager.Object);
 
@@ -314,12 +320,6 @@ public class BaseItemTests
         libraryManager.Setup(x => x.GetLocalAlternateVersionIds(It.IsAny<Video>())).Returns(Array.Empty<Guid>());
         BaseItem.LibraryManager = libraryManager.Object;
 
-        // BaseItem.PathProtocol (touched via GetCommonNamePrefix -> IsFileProtocol, on the fallback
-        // path exercised here) reads the static BaseItem.MediaSourceManager rather than the
-        // mediaSourceManager instance passed into GetMediaSources below — so it must be set here too,
-        // for the same static-leak reason as Video.RecordingsManager above.
-        BaseItem.MediaSourceManager = mediaSourceManager.Object;
-
         // Video.SourceType (touched via BaseItem.GetMediaSources' own-version fallback) calls
         // Video.IsActiveRecording(), which reads the static Video.RecordingsManager. That static is
         // only ever assigned in production at startup (see ApplicationHost), so it must be set
@@ -327,7 +327,6 @@ public class BaseItemTests
         // behind — see BaseItemStaticStateFixture for why leaking statics between tests is fragile.
         var recordingsManager = new Mock<IRecordingsManager>();
         recordingsManager.Setup(x => x.GetActiveRecordingInfo(It.IsAny<string>())).Returns((ActiveRecordingInfo?)null);
-        Video.RecordingsManager = recordingsManager.Object;
 
         var result = channelItem.GetMediaSources(false, mediaSourceManager.Object, segmentManager.Object, channelManager.Object);
 

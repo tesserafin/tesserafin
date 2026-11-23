@@ -1143,3 +1143,621 @@ unpersisted and nonvideo candidates, and visibility changes between requests. Un
 ordering with reversed provider completion, request registration snapshots, deferred failures,
 eager resolution and cancellation. No playback byte-serving, episode intro detection, HTTP or
 OpenAPI contract change is included in this slice.
+
+## 31. Entity static access in service consumers (consolidation step 5)
+
+Seven services read entity statics only to dodge DI cycles. They now receive dependencies:
+
+- `LyricManager`, `SubtitleManager`: library options from
+  `ICollectionFolderResolver.GetLibraryOptions`, moved from `LibraryManager` (which delegates).
+  The resolver keeps its leaf rule: no route back to `ILibraryManager`.
+- `DtoService`, `MediaSourceManager`, `TrickplayManager`, `BaseItemManager`: the registered
+  `Lazy<IChannelManager>`, resolved only for channel items. No new deferred registration.
+- `RecordingsManager`: KeepUpTo retention runs an ancestry-scoped catalogue query
+  (`CreateSeriesRecordingsQuery`) through `ILibraryManager`, instead of the obsolete five-argument
+  `Folder.GetItemList` fed by four statics. `Lazy<IItemQueryService>` remains forbidden.
+  Behaviour: every real non-folder item below the series folder, newest first. The former
+  `Series` path matched by series presentation key; ancestry is narrower when two series folders
+  share a key, which suits a per-folder retention rule.
+
+`entityStaticServiceAccessFiles` shrinks from 13 to 6: the entities (`AggregateFolder`,
+`BaseItemExtensions`, `Folder`), `ItemResolveArgs`, `ResolverHelper` (both reached from
+`LibraryManager` scan code) and the `ApplicationHost` assignments. The statics themselves remain.
+
+## 32. Embedded episode tags leave the entity (consolidation step 5)
+
+`Episode.BeforeMetadataRefresh` no longer probes mp4 files. `MetadataService` runs an async
+`BeforeMetadataRefreshAsync` hook just before the entity hook; `EpisodeMetadataService` overrides it
+with injected `IMediaEncoder` and `IMediaSourceManager`. Conditions are unchanged (unlocked library
+or Live TV episode, `EnableEmbeddedEpisodeInfos`, mp4 container), and path parsing still runs after,
+filling only what the tags left missing. Differences: the refresh cancellation token reaches ffprobe
+(cancellation propagates instead of being logged), the call is no longer synchronous over async, and
+a tag that changes a field now marks the refresh as `MetadataImport`.
+
+`Episode.MediaEncoder` and `BaseItem.MediaSegmentManager` are deleted with their `ApplicationHost`
+assignments; `entityStaticServices` shrinks from 19 to 17.
+
+## 33. Folder validation takes its scheduler (consolidation step 5)
+
+`Folder.ValidateChildren` and its `ValidateChildrenInternal` overrides take the
+`ILimitedConcurrencyLibraryScheduler` explicitly, next to the deletion, write and image ports; the private
+child-refresh and sub-folder helpers pass it down to `RunTasks`, now static. `LibraryScanTraversal`
+and `ProviderManager` inject it. The unused `ValidateChildren(deletions, writes, images, progress, token)` overload,
+which also read `BaseItem.FileSystem`, is deleted. `Folder.LimitedConcurrencyLibraryScheduler` and
+its `ApplicationHost` assignment are gone; `entityStaticServices` shrinks from 17 to 16.
+
+`BaseItem.ItemRepository` stays: its two readers are `Folder.LoadChildren` (behind the lazy
+`Children` getter) and `Folder.IsPlayed`, both on entity read paths that need a children/played
+service of their own before the static can go.
+
+## 34. Library options persistence leaves `CollectionFolder` (consolidation step 5)
+
+`ILibraryOptionsStore` (`LibraryOptionsStore`, Server.Core) owns each library's `options.xml`:
+read with virtual media paths expanded, cache, write with paths reversed, `Invalidate` after
+structure changes, and an `Updated` event. It is a leaf (serializer, application paths, logger), so
+`CollectionFolderResolver` and the visibility service may depend on it.
+
+Callers: `LibraryItemOptions` (the item library options policy), `LibraryStructureCommands`, `ProviderManager`
+(cache invalidation on `Updated`) and the two options migrations. `IStandaloneVisibilityService`
+gains `GetLibraryOptions(item)`; `CollectionFolder.IsVisible` and the metadata-country fallback read
+options from their scope, and only a scope-less call falls back to `LibraryManager`.
+`ApplicationHost.ExpandVirtualPath`/`ReverseVirtualPath` share the store's `VirtualPaths` helper.
+
+Removed from `CollectionFolder`: the `XmlSerializer` static, the static cache, `GetLibraryOptions(path)`,
+`SaveLibraryOptions`, `OnCollectionFolderChange`, `UpdateLibraryOptions`, the instance
+`GetLibraryOptions()` and the static `LibraryOptionsUpdated` event. `entityStaticServices` 16 → 15.
+`CollectionFolder.ApplicationHost` stays (file-system child enumeration and shortcut expansion).
+
+## 35. Entity visibility through a mandatory scope; `BaseItem.LocalizationManager` removed (consolidation step 5)
+
+Three stacked PRs (#443, #445 and this one):
+
+1. DI services and controllers that called the scope-less `IsVisible(user)` / `IsVisibleStandalone(user)`
+   pass the injected `IStandaloneVisibilityService`. `LibraryManager` goes through `IItemAccessService`
+   (`IsVisible`, `IsVisibleStandalone`, `GetChildren`), so its constructor is unchanged.
+2. The scope-less overloads and every null-scope fallback to `BaseItem.LibraryManager`,
+   `LocalizationManager` or `ChannelManager` are deleted. `IRatingVisibilityService`,
+   `IBoxSetVisibilityService`, `ILinkedChildVisibilityService` and `IRecordingVisibilityService` are folded
+   into `IStandaloneVisibilityService`, a single scope contract.
+   - Children reads carry the scope on `InternalItemsQuery.Visibility`. `RequireVisibility()` fails a
+     user-filtered read that has no scope.
+   - `ItemQueryService` fills the scope on every query; derived child queries copy it.
+3. `OriginalLanguage` is a plain property. It is normalised to the two-letter code by its writers
+   (`ItemUpdateController`, and `MetadataService` before `OnMetadataChanged`) through
+   `ILocalizationManager.NormalizeLanguage`.
+   - `OnMetadataChanged`, `GetParentalRatingScore` and `UpdateRatingToItems` take the localization.
+   - `MetadataService` and its 26 subclasses receive it, as do `ChannelManager` and `GuideManager`.
+   - `BaseItem.LocalizationManager` and its `ApplicationHost` assignment are deleted;
+     `entityStaticServices` goes from 15 to 14.
+
+Still static on read paths:
+- `BaseItem.LibraryManager`, `ItemRepository` and `ChannelManager`, on the scope-less non-visibility
+  helpers: metadata language and country, linked-child lookup, box-set library ids;
+- the children listing (`UserView`/`Folder` `GetItems` with `ChannelManager`, `CollectionManager`,
+  `UserViewManager` and `TVSeriesManager`), which is Phase B;
+- `Folder.LoadChildren`/`IsPlayed`, and `Video.RecordingsManager`, which are Phase C.
+
+## 36. Folder listing services on the query (consolidation step 5, phase B)
+
+`UserView.GetChildren`/`GetRecursiveChildren` and `Folder.GetChildCount` passed the `ChannelManager`,
+`CollectionManager`, `UserViewManager` and `TVSeriesManager` statics to `GetItemList`/`GetItems`.
+They now read `InternalItemsQuery.Listing` (`IItemListingServices`, owner-chosen design next to
+`Visibility`). A user-view listing without it fails through `RequireListing()`.
+
+- `ItemListingServices` (Server.Core) resolves the four managers lazily, because each of them lists folder
+  children itself. It also carries the item sort service. New `Lazy<ICollectionManager>`,
+  `Lazy<IUserViewManager>` and `Lazy<ITVSeriesManager>` registrations back it.
+- `ItemQueryService` fills `Listing` on every query. The controllers that may list a user view
+  (Items, Years, Library, UserViews) and `DtoService` (child counts) inject it. `UserViewBuilder` passes
+  the entry query's listing services on.
+- The user-view catalog and the visible content probe never take it: `UserViewCatalogDependencyTests`
+  forbids them from reaching those managers, even deferred. They only list library children.
+- `UserRootFolder` uses the `IUserViewManager` its `GetItemsInternal` already receives.
+
+Deleted: `Folder.CollectionManager`, `Folder.UserViewManager`, `UserView.TVSeriesManager` and their
+`ApplicationHost` assignments; `entityStaticServices` goes from 14 to 11.
+
+Still static: `BaseItem.ChannelManager`, behind `CanDelete()` (15 overrides) and the channel branch of
+`Series.GetSeasonEpisodes`, which is reached through the `Season` episode chain without a query.
+
+## 37. `BaseItem.ChannelManager` removed (consolidation step 5, phase B)
+
+- **Folder validation takes one port.** `Folder.ValidateChildren` and every `ValidateChildrenInternal` override take
+  `IFolderValidationServices` instead of four explicit ports (deletions, writes, images, scheduler).
+  - The port also carries the channel manager, resolved lazily because it validates folders itself.
+  - `ProviderManager` and `LibraryScanTraversal` inject it.
+- **`CanDelete` takes the channel manager.** `CanDelete(IChannelManager)` and its 15 overrides, plus
+  `CanDelete(User, IChannelManager)` and `CanDelete(User, folders, IChannelManager)`, receive the channel manager
+  that decides whether a channel item may be removed.
+  - Folder validation passes `services.Channels`.
+  - `DtoService` passes its deferred channel manager; `LibraryController` injects one.
+- **The episode family takes the listing services.** `Season.GetEpisodes` and `Series.GetEpisodes`/`GetSeasonEpisodes`
+  take `IItemListingServices` instead of `IItemSortService`: its sort, and its channels for a channel series.
+  - `Season.GetChildren`/`GetItemsInternal` pass `query.Listing`.
+  - `TvShowsController`, `SessionManager`, `SeriesMetadataService` and `SeasonMetadataService` inject the services.
+  - A channel series listed without them yields no episodes: the channel failure is swallowed as before, and there
+    is no static fallback.
+
+`BaseItem.ChannelManager` and its `ApplicationHost` assignment are deleted, as is the dependency test's locator
+entry. `entityStaticServices` goes from 11 to 10.
+
+## 38. Entities read the catalogue through attached services (consolidation step 5, phase C)
+
+`Folder.LoadChildren`/`IsPlayed` read `BaseItem.ItemRepository`, and `Video.SourceType` read `Video.RecordingsManager`.
+The catalogue now attaches `IItemReadServices` to each item (`BaseItem.ReadServices`); this per-instance design was
+owner-chosen. The services cover children, folder played state and active recording, and are attached:
+
+- by `BaseItemMapper.DeserializeBaseItem`, when the repository loads an item. The repository builds its own
+  `ItemReadServices` from itself and `ActiveRecordings`, so no deferred edge enters the user-view catalog graph;
+- by `ItemPersistenceService.SaveItems`, when an item is saved;
+- by `UserRootFolderProvider`, on the root it creates before the first save and on the intermediate folder that
+  its `DeepCopy` reads by reflection.
+
+A folder without read services fails loudly when its children are loaded. A video not yet loaded from or saved to
+the catalogue is not treated as an active recording; `ItemWriteCommands` and `ItemImageService` still check the
+registry directly.
+
+`BaseItem.ItemRepository` and `Video.RecordingsManager` are deleted with their `ApplicationHost` assignments;
+`entityStaticServices` goes from 10 to 8. Remaining statics: `ChapterManager`, `ConfigurationManager`, `FileSystem`,
+`LibraryManager`, `MediaSourceManager`, `ProviderManager`, `UserDataManager` and `CollectionFolder.ApplicationHost`.
+
+## 39. Named metadata reads and explicit materialization
+
+`LibraryManager.CreateItemByName`, GetArtist/GetStudio/GetGenre/GetMusicGenre/GetYear and their
+named ID helpers are removed, including the manager's last general writer dependency.
+`INamedItemCatalog.Find<T>` returns existing metadata; `GetId<T>` computes an identity without
+creating a directory or row. Artist reads prefer actual folder records over named metadata and
+use an ID tie-break. The existing batch artist read remains available to album entities; their
+getters and lookup-info construction no longer create an artist. Genre views use read queries.
+
+`IItemWriteCommands.GetOrCreateNamedItem<T>` is the explicit materialization boundary used by
+validators and album refresh. A singleton admission lock covers lookup, managed-directory
+preparation and the normal persistence/cache/notification sequence for that command only. A
+failed database write publishes no named item; retrying uses the same identity. Already existing
+names produce no second write or event. The five supported kinds share path helpers with explicit
+filesystem/root inputs, deterministic identity policy and year validation/canonicalization.
+
+HTTP reads and image lookup no longer create missing metadata. Missing names return 404; the
+contract declares that response for artist/studio/genre/music-genre detail operations. Valid
+unknown artist/studio filters use the missing deterministic identity, keeping the filter
+restrictive instead of clearing it. DTO references compute IDs without materialization. Named
+metadata becomes available through explicit writes/post-scan validation; it is not created by a
+read while a scan or validation is still incomplete. Years previously had only read-time creation;
+a dedicated post-scan task now materializes distinct positive production years projected in SQL,
+without loading every complete media item. No unused PostgreSQL/plugin abstraction is added.
+
+Three required real-host journeys cover HTTP no-write behavior and explicit visibility, SQL
+failure/retry with concurrent creation, album read isolation/folder precedence and year task
+discovery/materialization. Unit tests cover all supported kinds, ID and path policy, cancellation,
+unsupported kinds, publication and absence of manager/write dependencies on the read side.
+Directory creation is outside the SQL transaction: an empty managed directory may remain after a
+failed save. No global general-write/deletion serialization or cross-process guarantee is made.
+
+## 40. Configured library read ownership
+
+`ILibraryStructureReader` replaces both `LibraryManager.GetVirtualFolders` overloads, with no
+forwarders. It reads definition directories, `.mblink` source locations, collection-type markers
+and existing library metadata through explicit filesystem, path-mapping, root, lookup and options
+ports. Invalid shortcut files remain isolated; locations retain their sorted order. Definitions
+not yet present in the catalogue remain visible with no item metadata. Cached user-root IDs use
+`GetLibraries(lookup)` rather than the static manager lookup.
+
+Refresh state belongs to the HTTP composition: the controller gets one provider queue snapshot
+and projects progress/Active/Queued/Idle only for known item IDs. Non-HTTP consumers receive no
+refresh state and cannot cause provider resolution. The reader never calls the entity's progress
+method. `LibraryManager` drops its final `Lazy<IProviderManager>` and its application-host dependency
+along with 80 lines. Other existing deferred provider edges, including `UserViewFactory`, remain.
+
+API, storage diagnostics, recording maintenance and the three library-reading migrations use the
+reader directly. The existing structure/scan journeys migrate to this port, and a named required
+HTTP read journey checks options, locations, repeated reads and unchanged definition/source bytes.
+Focused tests cover malformed shortcuts, unscanned definitions, refresh-state projection and
+removed manager/provider dependencies. No HTTP/OpenAPI or SDK shape change is intended. There is
+no new snapshot-isolation guarantee across concurrent definition edits, scans or provider updates.
+
+## 41. Person read and validation ownership
+
+`IItemPeopleService.GetPerson` and `GetPeopleItems` replace the manager's person lookup and page
+expansion, without forwarding methods. Person paths and IDs use explicit filesystem/configuration
+ports and the existing identity policy shared with credit writes. Missing records stay missing.
+Expansion preserves credit-page order, start and total metadata, skips absent or malformed records,
+and passes an explicit visibility scope to the same entity rule. HTTP/OpenAPI shapes do not change.
+DTO, person-image, Persons controller and NFO actor lookup use the dedicated read service.
+
+`PeopleValidator` now owns preparation of the managed people directory and queries unreferenced,
+unlocked person items directly through the repository. `PeopleValidationTask` injects the validator
+and an item lookup, rather than the manager. The manager's validation bridge, private named-person
+ID helper, people repository dependency and logger field are deleted: 64 lines removed, 1,206 remain.
+Entity credit-list forwarding members remain for the separate entity-static migration.
+
+Cancellation before admission creates no managed directory; later cancellation propagates between
+entries/batches. Each entry, including a missing or rejected name, advances the first half of the
+progress range. Successful orphan-deletion batches advance the second half by the actual number
+of items, avoiding the old over-100 and asynchronous progress-report ordering problems. Completed
+refreshes/deletions and directory creation are not rolled back by later cancellation or failure.
+
+Focused tests cover lookup without materialization, page isolation/order/visibility, cancellation,
+601 orphan records split 500/101, progress bounds and removed manager dependencies. A named required
+real-host HTTP/maintenance journey covers missing person reads, credit creation, paging, repeated
+reads, unlocked orphan deletion, locked-person retention and unchanged source-media bytes.
+
+## 42. Shared parent and user query scopes
+
+The manager's temporary copies of parent/user scope logic are removed. It now injects the existing
+`IItemQueryScopeService`, replacing its direct `IUserViewCatalog` dependency, and delegates parent,
+recursive, latest, next-up, count and named-metadata aggregate scoping to it. The former named-read
+ancestor projection joins the same service, whose constructor dependencies remain unchanged.
+
+Unknown ancestors still throw; inaccessible library/aggregate roots and scopes resolving to no
+physical libraries still use a nonempty sentinel. Ordinary ancestor filters remain intact. Linked
+playlist/collection children retain per-child access filtering. User views, external-content flags,
+grouped folders and top-parent traversal use the existing shared implementation; top-parent lookup
+there uses the explicit lookup port rather than entity manager statics.
+
+The manager keeps its existing compound playlist/collection refusal exclusion verbatim and invokes
+it after shared user scoping. There is no new manager/repository cycle, lazy registration, HTTP or
+OpenAPI shape change. The manager loses 213 lines and is now 993 lines. Existing characterization
+fixtures compose the real scope service over their existing ports instead of an auto-mock.
+
+New tests cover visible view translation, hidden library/aggregate sentinels, mixed ordinary
+ancestors, unknown ancestors, empty libraries and removed manager copies. A named required real-host
+journey compares visible/withheld library lists, totals, counts and filter values, then checks the
+HTTP listing. The broader inherited authorization journeys remain active. No new snapshot isolation
+or per-query compound-filter performance claim is made.
+
+## 43. Owned bonus discovery and refresh ownership
+
+The manager's `FindExtras` entry point and private resolver overload are deleted. Its bonus resolver,
+naming, directory-service and ignore-rule constructor dependencies move into the existing filesystem
+resolution service. The latter exposes `FindExtras` for trailers, special features and theme media;
+existing naming cases migrate to that port. Persisted bonus records are copied before classification,
+so merely discovering an extra cannot change its published type or mixed-folder flag.
+
+`IItemWriteCommands.RefreshExtrasAsync` owns catalogue reconciliation and calls its new shared
+`RefreshOwnedMetadataAsync` for inherited title metadata and refresh. `BaseItem` loses its private
+extra lifecycle and owned-metadata helper; its and `Video`'s remaining owned-video paths call the
+explicit writer directly. The manager loses 99 lines (894 remain), and BaseItem loses 128 net lines.
+No new entity static, metadata-provider constructor edge or manager compatibility bridge is added.
+
+Reconciliation compares only actual extras; non-extra owned versions do not trigger a spurious save
+and are never candidates for removal. Repeated discovery IDs are refreshed once. Staging completes
+before asynchronous refresh admission; all started tasks are awaited even when a later refresh
+observes cancellation. Catalogue-only removal preserves original sources. Inherited metadata arrays
+are copied, caller options stay unchanged, and owned-refresh cancellation propagates instead of being
+logged as a successful owner refresh. Previously completed deletes/refreshes and sidecar writes are
+not rolled back after later failure. There is no new global refresh lock or snapshot-isolation claim.
+
+Focused tests cover detached discovery, unchanged extra sets with alternate versions, inheritance,
+failed refresh publication, cancellation/admission/draining and ownership removals. A named required
+real-host journey rejects a new trailer row with SQLite, proves retry, verifies LocalTrailers and
+SpecialFeatures over HTTP, replaces catalogue extras, preserves alternate metadata and checks every
+source byte. Metadata fetches are disabled in that deterministic lifecycle journey. HTTP/OpenAPI and
+SDK shapes are unchanged; the .NET interface additions/removals are intentional.
+
+## 44. Owned multipart and local-version refresh
+
+`Video` no longer prepares, creates, cleans up or refreshes its additional parts and local alternate
+versions. Its owned-item hook calls `IItemWriteCommands.RefreshOwnedVideosAsync` after bonus refresh.
+The obsolete protected `BaseItem.RefreshMetadataForOwnedVideo` helper is also removed. Multipart
+items keep generic `Video` identity; alternate items keep their primary's concrete type and existing
+stack-discovery policy. Effective collection-type policy moves into `ILibraryItemOptions` and the
+manager's existing read methods use that same policy. No new manager or provider dependency is added.
+
+Admission deduplicates identities before asynchronous work starts. Persisted candidates and caller
+options are copied before ownership, primary-version or inherited-metadata edits. Existing foreign
+owner/primary relationships and self-ownership are rejected. New records are saved through the
+existing graph writer; refresh uses a fresh copy of that published creation. The local-version link
+is written only after its refresh succeeds. Nonexistent local paths are pruned only after all
+admitted work completes; missing owned multipart rows use metadata-only deletion. All started tasks
+are awaited on failure or cancellation. These are distinct operations, not a cross-item transaction:
+initial creation, completed provider saves and obsolete-generic cleanup can survive a later failure.
+
+Focused tests exercise type/identity, deduplication, title inheritance, option isolation, failed
+ownership refresh/retry, foreign-owner refusal, missing parts and cancellation. A named required
+real-host journey rejects a typed alternate insert, retries through the entity refresh entry point,
+checks generic-obsolete removal, multipart metadata and HTTP sources, and compares every source byte.
+Metadata downloads are disabled for the lifecycle proof. HTTP/OpenAPI/SDK shapes are unchanged.
+
+## 45. Scan-time primary-version transfer
+
+Folder validation retains discovery, accessibility and primary-change detection, but no longer
+rewrites alternate ownership, clears version arrays or reroutes references itself. Explicit
+`DemotePrimaryVersionAsync` and `ReplacePrimaryVersionAsync` commands use the existing graph planner
+and bulk writer. They read the saved primaries and typed links through lookup/persistence ports,
+without manager or provider dependencies. The scan no longer detaches a deferred old primary early.
+
+Local alternates move to the new owner; linked alternates retain empty ownership. Duplicate IDs are
+processed once and unrelated ownership/primary relationships are refused before export or save.
+The new primary keeps both sets of version relationships; the old primary's outgoing lists clear in
+the same graph save that moves ownership, preventing orphan cleanup from deleting transferred rows.
+Selection includes already-saved valid primaries, so a scan retries a transfer after the replacement's
+initial creation survived a failed graph update; the catalogue read path remains real in the journey.
+Caller snapshots and published cache entries stay unchanged on failed graph persistence. Bulk graph
+updates do not propagate one version's descriptive metadata over the others.
+
+Manual playlist/collection references are rerouted before the graph save. A reroute failure leaves
+the old primary discoverable by a later full scan; a graph failure can leave references pointing to
+the already-saved replacement while the old version graph stays intact. Both cases retry against
+saved valid primaries. Catalogue-only deletion follows the graph save and preserves source media.
+Initial scan creation, sidecar export, graph persistence, reroute and deletion are distinct
+operations; no whole-scan transaction, global serialization or snapshot isolation is introduced.
+
+Focused tests cover one-batch publication, failure/retry, local versus linked ownership, captured
+parent, reroute failure, invalid identities and cancelled admission. A required real-host journey
+controls only discovery inputs: it runs the actual folder validation and application services,
+rejects a graph update with SQLite, retries demotion, rejects reference rerouting, retries the full
+replacement scan, checks HTTP media sources/playlist references and compares all original bytes.
+HTTP/OpenAPI/SDK shapes are unchanged.
+
+## 46. Completed discovery and folder-child reconciliation
+
+`Folder` no longer compares catalogue children, writes resolved metadata, removes stale/retyped
+entries, creates new items, selects primary transfers or reattaches detached user data. The existing
+writer delegates that workflow to the internal `FolderChildReconciler`, whose constructor depends
+only on lookup, filesystem and logging. Commands, deletion and image lifecycle ports are supplied
+explicitly to the operation, avoiding a writer/reconciler constructor cycle or entity service static.
+Folder retains discovery, recursion, progression and child metadata refresh.
+
+Discovery is materialized inside the exception boundary. Partial enumeration, denied access and
+I/O failure skip reconciliation rather than becoming an empty directory; cancellation is rethrown.
+A genuinely empty successful discovery still removes stale catalogue rows, preserving source files.
+Admission deduplicates equivalent IDs and refuses conflicting identity/path/type input before writes.
+Inaccessible libraries skip all mutations, and inaccessible retyped paths retain their old identities
+without entering the refreshable subset. Accessibility resolves parents through the lookup port.
+
+`BaseItem.CopyWithResolvedMetadata` applies the existing typed resolved-field policy to a detached
+copy, including copied video part/version arrays. Updates keep the catalogue item's captured parent;
+new candidates receive the scan parent on a copy. Deletion also receives a copy and captured parent,
+so a failed port cannot prematurely detach the published source item. Unchanged items still prepare,
+commit and dispose image updates. The prior primary-transfer workflows remain required CI journeys.
+
+Focused cases cover staging/failure/retry, images/disposal, duplicate and conflicting discovery,
+inaccessible roots and retyped paths, deletion failure, history ordering, existing-primary demotion
+and cancelled admission. A named required real-host journey controls discovery only and uses real
+catalogue reads/services. It rejects lazy I/O/security/cancellation discovery, rejects a resolved-field
+SQL update and retries, replaces Movie with Video at the same path, verifies user-history/favorite
+reattachment and HTTP identity, then removes the catalogue entry while checking both media files.
+Initial creates, metadata sidecars, image commits, deletions and user-data operations remain separate;
+there is no whole-folder rollback, new global serialization or snapshot-isolation guarantee.
+HTTP/OpenAPI/SDK shapes are unchanged; the .NET command/helper/result additions are intentional.
+
+## 47. Shortcut discovery and link publication
+
+Folder's protected refresh hook is asynchronous and delegates shortcut work to the existing writer.
+Its inline shortcut reader and app-host/file-system static calls are deleted. CollectionFolder's
+physical-membership refresh remains its separate override, with cancellation admission. General
+linked-child reads and their existing lazy target lookup remain outside this write tranche.
+
+`IItemResolutionService.ResolveShortcutTargets` reads a completed file snapshot, expands virtual and
+relative paths through injected services and returns source/target pairs in stable source order.
+An unreadable, denied or empty shortcut aborts preparation rather than silently removing a link;
+cancellation is checked around discovery. The resolver never saves or materializes targets.
+
+`RefreshShortcutLinksAsync` reads canonical stored links, preserves non-shortcut relationships and
+resolves target identities with the existing newest-at-path catalogue query. Alias targets are
+refreshed once and an existing manual relationship wins a duplicate shortcut. Self-links are refused.
+Unscanned targets retain discovery paths, without creating catalogue items. The writer compares SQL,
+so a later scanned target is persisted even if the lazy reader already cached its identity. Equivalent
+link sets do not resave the folder; a stale caller can be repaired from already-committed links.
+
+Changed links are staged on a copy and saved through the existing writer before caller publication.
+The normal metadata refresh can then continue through its explicit lifecycle. Initial graph saves,
+sidecar exports and later provider saves remain separate; there is no cross-operation rollback or
+new serialization against other manual edits. Pending paths have the existing in-memory discovery
+semantics until a target exists in SQL; no new unresolved-target table is introduced.
+
+Focused cases cover virtual/relative expansion, read failure/cancellation, save failure/retry,
+canonical manual-link retention, duplicates, self-links, pending/backfilled targets and no-op repair.
+A required real-host journey uses actual mblink files and UserRootFolder refresh, rejects a link insert
+with SQLite, retries, checks domain/HTTP reads, aborts a partial retarget, fills a later-scanned target,
+then removes shortcuts while preserving manual links and every media/source-note byte.
+HTTP/OpenAPI/SDK shapes are unchanged; .NET resolution/command DTO and protected-hook changes are
+intentional.
+
+## 48. Folder scan candidate resolution
+
+Full scans and provider-triggered folder refreshes pass the same
+`IItemResolutionService` through folder validation and recursion. The resolver
+applies the folder's effective library options, collection type, ignore rules
+and registered resolver order. Folder-specific discovery hooks still supply
+entries or virtual children. The scan materializes the result and checks
+cancellation before reconciliation. `LibraryManager.ResolvePaths` is removed.
+
+## 49. Physical root and library directory discovery
+
+`FileData.ReadLibraryDirectory` supplies both the entries to scan and the
+configured physical locations to the physical root, collection folders and
+item resolver. The physical root flattens definition directories and removes
+nested scan targets already covered by a parent. Configured shortcut locations
+are retained separately. Unavailable directories are distinguished from
+completed empty scans so folder reconciliation cannot treat them as removals.
+Root path normalization no longer goes through `LibraryManager`.
+
+## 50. Physical folder membership of configured libraries
+
+Collection-folder refresh asks the membership resolver to read the library
+definition and resolve its physical folders through the catalogue. Direct
+physical root children take precedence, with a folder lookup for paths
+covered by a scanned ancestor. The item writer stages the locations, folder
+identities and inherited links together and publishes them after persistence.
+Unavailable library definition directories do not produce a membership write.
+The existing metadata refresh follows the committed membership.
+
+## 51. Library refresh reads and progress notifications
+
+Targeted refresh and visible-content checks resolve committed physical folder
+IDs through the catalogue lookup port. The refresh notifier uses the same
+lookup and the provider's active progress, averaging the available active
+physical folders. It obtains library membership and the user root through
+their dedicated services. Progress calculation and notification no longer
+belong to item entities.
+
+## 52. Provider catalogue reads
+
+`ProviderManager` now uses effective library options, catalogue identity and
+hierarchy lookup, and a library-wide album query directly. Remote metadata
+search selects providers using the referenced item's library policy and
+retains per-path provider ordering in the cache. The refresh queue resolves
+items through the same catalogue lookup.
+
+## 53. Metadata refresh library options and season identities
+
+The metadata service hierarchy reads effective library settings through
+`ILibraryItemOptions`. Series grouping and special-season naming use the
+same policy. When a series creates a missing season, `IItemStore` computes
+its deterministic identity from the existing series, number and name key.
+
+## 54. Audio and video probe options
+
+The audio and video probers use `ILibraryItemOptions` for the effective settings
+of the media item. A video probe resolves those settings once and uses them
+for subtitle download and filtering, embedded metadata, and chapter images.
+
+## 55. Subtitle and lyric sidecar policy
+
+Subtitle and lyric managers resolve manual requests through
+`ILibraryItemOptions` and build internal metadata paths from the injected
+application paths. Automated subtitle downloads pass the options used for
+search into storage. Embedded lyric extraction passes the audio probe's
+options into storage as well.
+
+## 56. Scheduled subtitle and lyric catalogue reads
+
+Both scheduled downloads enumerate the physical root through
+`ILibraryRootFolderProvider` and read candidates through `IItemQueryService`.
+Subtitle selection reads per-folder filters and resolves the effective
+settings of each distinct video through `ILibraryItemOptions`. Lyric
+downloads use the folder's options for each page and count the unscoped
+audio candidates through `IItemCountService` to report progress.
+
+## 57. Trickplay catalogue and media source reads
+
+The scan provider uses `ILibraryItemOptions` for generation policy. The
+generation and storage-move tasks use `IItemQueryService` for candidate
+pages and `IItemCountService` for progress. Each passes the effective settings
+of the selected video to the Trickplay manager.
+
+The manager obtains static media sources through `IMediaSourceManager` with
+path substitution disabled. Generation selects the source belonging to the
+video being processed. The video manifest keeps a separate set of widths for
+each local source, including alternate versions.
+
+## 58. Playlist import roots and path lookup
+
+The local playlist provider reads root folders through `IUserRootFolderProvider`
+and resolves eligible files through `IItemPathLookupService`. It keeps playlist
+order and repeated entries. The path lookup shares the existing newest-match
+query with the library, visibility, membership and shortcut consumers.
+
+## 59. Filesystem and recording path lookup
+
+The filesystem monitor reads the physical root and effective monitoring options
+through their dedicated services. Its refreshers walk changed paths through
+`IItemPathLookupService`. Live TV uses the same service for recording folders,
+refresh targets and retention, applying the folder filter at each call site.
+
+The shared stored-path query lives with the catalogue repository contract.
+Path-based saved links use that query too, with the supplied visibility scope
+when one is available. `FindByPath` has been removed from `ILibraryManager`.
+
+## 60. Saved playlist and collection links
+
+`LinkedChildResolver` batches catalogue reads by item ID and resolves
+remaining saved paths or legacy IDs. It preserves link order, repeated
+entries, and the association between a resolved item and its original link.
+Playlist API reads and file exports, collection management, and the metadata
+and image providers use the injected resolver. Entity queries use the same
+resolution rules. Scoped collection visibility still resolves through its
+scope. The stored-path fallback no longer reads `BaseItem.ItemRepository`.
+
+## 61. Live TV recording retention reads
+
+The recording retention reader queries the catalogue through the repository
+and the existing scope service. Ordinary folders retain their parent scope,
+and series retain episode and season selection by presentation key. It skips
+missing files before counting the newest files to keep. Aggregate roots and
+missing series keys yield no candidates. Timer retention and deletion
+execution stay in the recordings manager.
+
+## 62. Filesystem change refresh queue
+
+The filesystem refresher resolves removed items through the injected identity
+lookup, trying the owner before the parent. It queues a high-priority metadata
+refresh with a directory service built from the monitor's filesystem. The
+provider manager is resolved when the callback needs the queue, after monitor
+construction. The entity's filesystem change hook is removed.
+
+## 63. Recursive library refresh progress
+
+`LibraryRefreshProgress` owns the active-scan state and its start, progress
+and completion events. Scan traversal and provider-initiated scans pass it
+through recursive folder validation. The library notifier and the virtual
+folders endpoint read the same active state. Pending work still comes from
+the metadata refresh queue.
+
+## 64. Shared scheduler for recursive library work
+
+Full scans and provider-initiated refreshes pass the shared
+`ILimitedConcurrencyLibraryScheduler` through folder validation. Both
+subfolder scans and child metadata work use the same scheduler, including
+nested work. The folder entity no longer holds a static scheduler.
+
+## 65. Shared services for folder validation
+
+Full scans and provider refreshes pass the same `LibraryScanContext` through
+validation, subfolder scans and child metadata refresh. The context holds
+the catalogue and scheduling services. Each call supplies its own refresh
+options and progress. Validation reads the parent chain through the
+catalogue lookup and rejects cycles anywhere in that chain. A rejected
+recursive scan still clears its active progress entry.
+
+## 66. Catalogue children and library cache refresh
+
+Folder reconciliation, nested metadata refresh and top-folder scans read
+direct children through the scan context's repository and identity lookup.
+Collection folders still delegate reads and cache invalidation to their
+physical folders. The user root reloads its library definitions after
+validation and registers them through `IItemStore`. The library manager
+facade no longer exposes a cache registration method.
+
+## 67. Metadata dispatch during library scans
+
+Scan traversal, provider-initiated scans and recursive refresh pass an
+`IItemMetadataDispatcher` into the shared item refresh routine. Series,
+albums, extras and owned video parts or versions use the same dispatch.
+The scan context resolves it when metadata work begins so the provider
+manager can initiate a scan without a construction cycle. Top-folder
+refreshes build their directory service from the traversal's filesystem.
+
+## 68. Explicit metadata dispatch at refresh entry points
+
+Metadata refreshes for playback probing, sidecars, people and named items,
+playlists, and Live TV pass the registered dispatcher into the item refresh
+method. Callers create default directory services from their injected
+filesystem. Services also used by the provider manager resolve the dispatcher
+when refresh work starts. The static provider property and implicit item
+refresh overloads are removed.
+
+## 69. Embedded episode metadata probing
+
+The episode metadata service reads embedded MP4 tags through its injected
+media encoder and media source services. For eligible episodes it reads the
+tags before the filename fallback and before provider lookup. Cancellation
+of the refresh stops the probe and filename fallback. The episode encoder
+and base item media segment statics are removed.
+
+## 70. Chapter thumbnail lookup
+
+The image controller resolves chapter thumbnails through the chapter
+repository. Serving an image, deleting its file, and swapping thumbnail
+files use the same lookup and the controller's filesystem. The base item
+image collection continues to own the images stored directly on the item.
+The static chapter manager is removed from the entity and from startup.
+
+## 71. Catalogue traversal for container metadata
+
+Series and album metadata refresh use the scan context to read direct
+catalogue children and resolve saved links. The shared traversal keeps
+physical traversal order, loads links only from the starting folder and
+deduplicates by item ID. Metadata refresh keeps its existing season and
+episode order and existing album rules.

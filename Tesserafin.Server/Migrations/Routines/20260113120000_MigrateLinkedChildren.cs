@@ -28,6 +28,7 @@ internal class MigrateLinkedChildren : IAsyncMigrationRoutine
     private readonly ILogger<MigrateLinkedChildren> _logger;
     private readonly IDbContextFactory<TesserafinDbContext> _dbProvider;
     private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryStructureReader _libraryStructure;
     private readonly IServerApplicationHost _appHost;
     private readonly IServerApplicationPaths _appPaths;
 
@@ -36,6 +37,7 @@ internal class MigrateLinkedChildren : IAsyncMigrationRoutine
         ILoggerFactory loggerFactory,
         IDbContextFactory<TesserafinDbContext> dbProvider,
         ILibraryManager libraryManager,
+        ILibraryStructureReader libraryStructure,
         IServerApplicationHost appHost,
         IServerApplicationPaths appPaths)
     {
@@ -43,6 +45,7 @@ internal class MigrateLinkedChildren : IAsyncMigrationRoutine
         _logger = loggerFactory.CreateLogger<MigrateLinkedChildren>();
         _dbProvider = dbProvider;
         _libraryManager = libraryManager;
+        _libraryStructure = libraryStructure;
         _appHost = appHost;
         _appPaths = appPaths;
     }
@@ -390,7 +393,7 @@ internal class MigrateLinkedChildren : IAsyncMigrationRoutine
         // Get all library media locations and partition into accessible vs inaccessible.
         // This mirrors the scanner's safeguard: if a library root is inaccessible
         // (e.g. NAS offline), we skip items under it to avoid false deletions.
-        var virtualFolders = _libraryManager.GetVirtualFolders();
+        var virtualFolders = _libraryStructure.GetVirtualFolders();
         var accessiblePaths = new List<string>();
         var inaccessiblePaths = new List<string>();
 

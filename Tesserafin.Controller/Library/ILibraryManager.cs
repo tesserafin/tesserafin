@@ -1,4 +1,3 @@
-using Tesserafin.Controller.Library;
 #pragma warning disable CA1002, CS1591
 
 using System;
@@ -8,6 +7,7 @@ using System.Threading.Tasks;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Resolvers;
 using Tesserafin.Controller.Sorting;
@@ -18,7 +18,6 @@ using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.Querying;
-using Episode = Tesserafin.Controller.Entities.TV.Episode;
 using Genre = Tesserafin.Controller.Entities.Genre;
 using LinkedChildType = Tesserafin.Controller.Entities.LinkedChildType;
 using Person = Tesserafin.Controller.Entities.Person;
@@ -62,94 +61,6 @@ namespace Tesserafin.Controller.Library
             Type expectedVideoType,
             Folder? parent,
             CollectionType? collectionType);
-
-        /// <summary>
-        /// Resolves a set of files into a list of BaseItem.
-        /// </summary>
-        /// <param name="files">The list of tiles.</param>
-        /// <param name="directoryService">Instance of the <see cref="IDirectoryService"/> interface.</param>
-        /// <param name="parent">The parent folder.</param>
-        /// <param name="libraryOptions">The library options.</param>
-        /// <param name="collectionType">The collection type.</param>
-        /// <returns>The items resolved from the paths.</returns>
-        IEnumerable<BaseItem> ResolvePaths(
-            IEnumerable<FileSystemMetadata> files,
-            IDirectoryService directoryService,
-            Folder parent,
-            LibraryOptions libraryOptions,
-            CollectionType? collectionType = null);
-
-        /// <summary>
-        /// Gets a Person.
-        /// </summary>
-        /// <param name="name">The name of the person.</param>
-        /// <returns>Task{Person}.</returns>
-        Person? GetPerson(string name);
-
-        /// <summary>
-        /// Finds the by path.
-        /// </summary>
-        /// <param name="path">The path.</param>
-        /// <param name="isFolder"><c>true</c> is the path is a directory; otherwise <c>false</c>.</param>
-        /// <returns>BaseItem.</returns>
-        BaseItem? FindByPath(string path, bool? isFolder);
-
-        /// <summary>
-        /// Gets the artist.
-        /// </summary>
-        /// <param name="name">The name of the artist.</param>
-        /// <returns>Task{Artist}.</returns>
-        MusicArtist GetArtist(string name);
-
-        MusicArtist GetArtist(string name, DtoOptions options);
-
-        /// <summary>
-        /// Gets a Studio.
-        /// </summary>
-        /// <param name="name">The name of the studio.</param>
-        /// <returns>Task{Studio}.</returns>
-        Studio GetStudio(string name);
-
-        /// <summary>
-        /// Gets a Genre.
-        /// </summary>
-        /// <param name="name">The name of the genre.</param>
-        /// <returns>Task{Genre}.</returns>
-        Genre GetGenre(string name);
-
-        /// <summary>
-        /// Gets the genre.
-        /// </summary>
-        /// <param name="name">The name of the music genre.</param>
-        /// <returns>Task{MusicGenre}.</returns>
-        MusicGenre GetMusicGenre(string name);
-
-        /// <summary>
-        /// Gets a Year.
-        /// </summary>
-        /// <param name="value">The value.</param>
-        /// <returns>Task{Year}.</returns>
-        /// <exception cref="ArgumentOutOfRangeException">Throws if year is invalid.</exception>
-        Year GetYear(int value);
-
-        /// <summary>
-        /// Validate and refresh the People sub-set of the IBN.
-        /// The items are stored in the db but not loaded into memory until actually requested by an operation.
-        /// </summary>
-        /// <param name="deletions">Deletion operations for validation.</param>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="progress">The progress.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>Task.</returns>
-        Task ValidatePeopleAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, IProgress<double> progress, CancellationToken cancellationToken);
-
-        /// <summary>
-        /// Gets the default view.
-        /// </summary>
-        /// <returns>IEnumerable{VirtualFolderInfo}.</returns>
-        List<VirtualFolderInfo> GetVirtualFolders();
-
-        List<VirtualFolderInfo> GetVirtualFolders(bool includeRefreshState);
 
         /// <summary>
         /// Gets the item by id, as T, and validates user access.
@@ -247,19 +158,6 @@ namespace Tesserafin.Controller.Library
         CollectionType? GetConfiguredContentType(BaseItem item);
 
         /// <summary>
-        /// Normalizes the root path list.
-        /// </summary>
-        /// <param name="paths">The paths.</param>
-        /// <returns>IEnumerable{System.String}.</returns>
-        List<FileSystemMetadata> NormalizeRootPathList(IEnumerable<FileSystemMetadata> paths);
-
-        /// <summary>
-        /// Registers the item.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        void RegisterItem(BaseItem item);
-
-        /// <summary>
         /// Gets the named view.
         /// </summary>
         /// <param name="user">The user.</param>
@@ -330,38 +228,6 @@ namespace Tesserafin.Controller.Library
             string sortName);
 
         /// <summary>
-        /// Gets the season number from path.
-        /// </summary>
-        /// <param name="path">The path.</param>
-        /// <param name="parentId">The parent id.</param>
-        /// <returns>System.Nullable&lt;System.Int32&gt;.</returns>
-        int? GetSeasonNumberFromPath(string path, Guid? parentId);
-
-        /// <summary>
-        /// Fills the missing episode numbers from path.
-        /// </summary>
-        /// <param name="episode">Episode to use.</param>
-        /// <param name="forceRefresh">Option to force refresh of episode numbers.</param>
-        /// <returns>True if successful.</returns>
-        bool FillMissingEpisodeNumbersFromPath(Episode episode, bool forceRefresh);
-
-        /// <summary>
-        /// Parses the name.
-        /// </summary>
-        /// <param name="name">The name.</param>
-        /// <returns>ItemInfo.</returns>
-        ItemLookupInfo ParseName(string name);
-
-        /// <summary>
-        /// Finds the extras.
-        /// </summary>
-        /// <param name="owner">The owner.</param>
-        /// <param name="fileSystemChildren">The file system children.</param>
-        /// <param name="directoryService">An instance of <see cref="IDirectoryService"/>.</param>
-        /// <returns>IEnumerable&lt;BaseItem&gt;.</returns>
-        IEnumerable<BaseItem> FindExtras(BaseItem owner, IReadOnlyList<FileSystemMetadata> fileSystemChildren, IDirectoryService directoryService);
-
-        /// <summary>
         /// Gets the collection folders.
         /// </summary>
         /// <param name="item">The item.</param>
@@ -389,13 +255,6 @@ namespace Tesserafin.Controller.Library
         /// <param name="query">The query.</param>
         /// <returns>List&lt;PersonInfo&gt;.</returns>
         IReadOnlyList<PersonInfo> GetPeople(InternalPeopleQuery query);
-
-        /// <summary>
-        /// Gets the people items.
-        /// </summary>
-        /// <param name="query">The query.</param>
-        /// <returns>List&lt;Person&gt;.</returns>
-        QueryResult<BaseItem> GetPeopleItems(InternalPeopleQuery query);
 
         /// <summary>
         /// Gets the item ids.
@@ -483,12 +342,6 @@ namespace Tesserafin.Controller.Library
         /// <param name="query">The query.</param>
         /// <returns>QueryResult&lt;BaseItem&gt;.</returns>
         QueryResult<BaseItem> GetItemsResult(InternalItemsQuery query);
-
-        Guid GetStudioId(string name);
-
-        Guid GetGenreId(string name);
-
-        Guid GetMusicGenreId(string name);
 
         QueryResult<(BaseItem Item, ItemCounts ItemCounts)> GetGenres(InternalItemsQuery query);
 

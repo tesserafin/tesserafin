@@ -15,7 +15,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Channels;
-using Tesserafin.Controller.Chapters;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities.TV;
@@ -27,6 +26,7 @@ using Tesserafin.Data;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
@@ -93,8 +93,6 @@ namespace Tesserafin.Controller.Entities
         private string _forcedSortName;
 
         private string _name;
-
-        private string _originalLanguage;
 
         public const char SlugChar = '-';
 
@@ -219,11 +217,7 @@ namespace Tesserafin.Controller.Entities
         public string OriginalTitle { get; set; }
 
         [JsonIgnore]
-        public string OriginalLanguage
-        {
-            get => _originalLanguage;
-            set => _originalLanguage = LocalizationManager?.FindLanguageInfo(value)?.TwoLetterISOLanguageName ?? value;
-        }
+        public string OriginalLanguage { get; set; }
 
         /// <summary>
         /// Gets or sets the id.
@@ -354,7 +348,7 @@ namespace Tesserafin.Controller.Entities
                     return null;
                 }
 
-                return MediaSourceManager.GetPathProtocol(path);
+                return MediaPath.GetProtocol(path);
             }
         }
 
@@ -477,23 +471,14 @@ namespace Tesserafin.Controller.Entities
 
         public static IServerConfigurationManager ConfigurationManager { get; set; }
 
-        public static IProviderManager ProviderManager { get; set; }
-
-        public static ILocalizationManager LocalizationManager { get; set; }
-
-        public static IItemRepository ItemRepository { get; set; }
-
-        public static IChapterManager ChapterManager { get; set; }
-
         public static IFileSystem FileSystem { get; set; }
 
-        public static IUserDataManager UserDataManager { get; set; }
-
-        public static IChannelManager ChannelManager { get; set; }
-
-        public static IMediaSourceManager MediaSourceManager { get; set; }
-
-        public static IMediaSegmentManager MediaSegmentManager { get; set; }
+        /// <summary>
+        /// Gets or sets the catalogue reads this item performs on itself (children, played state, active recording).
+        /// The catalogue attaches them when it loads or saves the item.
+        /// </summary>
+        [JsonIgnore]
+        public IItemReadServices ReadServices { get; set; }
 
         /// <summary>
         /// Gets or sets the name of the forced sort.
@@ -506,7 +491,6 @@ namespace Tesserafin.Controller.Entities
             set
             {
                 _forcedSortName = value;
-                _sortName = null;
             }
         }
 
@@ -844,11 +828,19 @@ namespace Tesserafin.Controller.Entities
             return Id.ToString("N", CultureInfo.InvariantCulture);
         }
 
-        public virtual bool CanDelete()
+        /// <summary>
+        /// Gets the attached catalogue reads.
+        /// </summary>
+        /// <returns>The read services.</returns>
+        /// <exception cref="InvalidOperationException">The item was neither loaded from nor saved to the catalogue.</exception>
+        protected IItemReadServices RequireReadServices()
+            => ReadServices ?? throw new InvalidOperationException($"{GetType().Name} {Id} has no catalogue read services: it was neither loaded from nor saved to the catalogue.");
+
+        public virtual bool CanDelete(IChannelManager channels)
         {
             if (SourceType == SourceType.Channel)
             {
-                return ChannelManager.CanDelete(this);
+                return channels.CanDelete(this);
             }
 
             return IsFileProtocol;
@@ -901,16 +893,16 @@ namespace Tesserafin.Controller.Entities
             return ownerId.IsEmpty() ? null : lookup.GetItemById(ownerId);
         }
 
-        public bool CanDelete(User user, List<Folder> allCollectionFolders)
+        public bool CanDelete(User user, List<Folder> allCollectionFolders, IChannelManager channels)
         {
-            return CanDelete() && IsAuthorizedToDelete(user, allCollectionFolders);
+            return CanDelete(channels) && IsAuthorizedToDelete(user, allCollectionFolders);
         }
 
-        public virtual bool CanDelete(User user)
+        public virtual bool CanDelete(User user, IChannelManager channels)
         {
             var allCollectionFolders = LibraryManager.GetUserRootFolder().Children.OfType<Folder>().ToList();
 
-            return CanDelete(user, allCollectionFolders);
+            return CanDelete(user, allCollectionFolders, channels);
         }
 
         public virtual bool CanDownload()
@@ -932,13 +924,6 @@ namespace Tesserafin.Controller.Entities
         public override string ToString()
         {
             return Name;
-        }
-
-        public virtual string GetInternalMetadataPath()
-        {
-            var basePath = ConfigurationManager.ApplicationPaths.InternalMetadataPath;
-
-            return GetInternalMetadataPath(basePath);
         }
 
         /// <summary>Builds the item's stable metadata path using an explicitly supplied root.</summary>
@@ -1520,9 +1505,9 @@ namespace Tesserafin.Controller.Entities
             return prefix;
         }
 
-        public Task RefreshMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, CancellationToken cancellationToken)
+        public Task RefreshMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, CancellationToken cancellationToken)
         {
-            return RefreshMetadata(deletions, writes, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken);
+            return RefreshMetadata(deletions, writes, providers, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken);
         }
 
         /// <summary>
@@ -1530,10 +1515,11 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
+        /// <param name="providers">The provider manager executing this refresh.</param>
         /// <param name="options">The options.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>true if a provider reports we changed.</returns>
-        public async Task<ItemUpdateType> RefreshMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, CancellationToken cancellationToken)
+        public async Task<ItemUpdateType> RefreshMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
             var requiresSave = false;
 
@@ -1543,8 +1529,12 @@ namespace Tesserafin.Controller.Entities
                 {
                     if (IsFileProtocol)
                     {
-                        requiresSave = await RefreshedOwnedItems(deletions, writes, options, GetFileSystemChildren(options.DirectoryService), cancellationToken).ConfigureAwait(false);
+                        requiresSave = await RefreshOwnedItemsAsync(deletions, writes, providers, options, cancellationToken).ConfigureAwait(false);
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -1559,27 +1549,18 @@ namespace Tesserafin.Controller.Entities
                 }
                 : options;
 
-            return await ProviderManager.RefreshSingleItem(this, refreshOptions, cancellationToken).ConfigureAwait(false);
+            return await providers.RefreshSingleItem(this, refreshOptions, cancellationToken).ConfigureAwait(false);
         }
 
-        protected bool IsVisibleStandaloneInternal(User user, bool checkFolders)
+        protected bool IsVisibleStandaloneInternal(User user, bool checkFolders, IStandaloneVisibilityService scope)
         {
-            return IsVisibleStandaloneInternal(user, checkFolders, null);
-        }
-
-        protected bool IsVisibleStandaloneInternal(User user, bool checkFolders, ITagVisibilityService tagVisibility)
-        {
-            // An IStandaloneVisibilityService also supplies the parents and libraries; otherwise they
-            // come through the static LibraryManager (DEBT-SERVER-4).
-            var scope = tagVisibility as IStandaloneVisibilityService;
-
-            if (!IsVisible(user, false, tagVisibility))
+            if (!IsVisible(user, false, scope))
             {
                 return false;
             }
 
-            var parents = scope?.GetParents(this) ?? GetParents().ToList();
-            if (parents.Any(i => !i.IsVisible(user, true, tagVisibility)))
+            var parents = scope.GetParents(this);
+            if (parents.Any(i => !i.IsVisible(user, true, scope)))
             {
                 return false;
             }
@@ -1593,7 +1574,7 @@ namespace Tesserafin.Controller.Entities
                     return true;
                 }
 
-                var itemCollectionFolders = (scope?.GetCollectionFolders(this) ?? LibraryManager.GetCollectionFolders(this)).Select(i => i.Id).ToList();
+                var itemCollectionFolders = scope.GetCollectionFolders(this).Select(i => i.Id).ToList();
 
                 if (itemCollectionFolders.Count > 0)
                 {
@@ -1602,7 +1583,7 @@ namespace Tesserafin.Controller.Entities
                     if (blockedMediaFolders.Length > 0)
                     {
                         // User has blocked folders - get all library folders and exclude blocked ones
-                        userCollectionFolderIds = (scope?.GetLibraryIds() ?? LibraryManager.GetUserRootFolder().Children.Select(i => i.Id))
+                        userCollectionFolderIds = scope.GetLibraryIds()
                             .Where(id => !blockedMediaFolders.Contains(id));
                     }
                     else if (user.HasPermission(PermissionKind.EnableAllFolders))
@@ -1631,90 +1612,40 @@ namespace Tesserafin.Controller.Entities
             ParentId = parent is null ? Guid.Empty : parent.Id;
         }
 
+        /// <summary>Discovers and refreshes relationships owned by this item.</summary>
+        /// <param name="deletions">Explicit deletion operations for this refresh.</param>
+        /// <param name="writes">Explicit catalogue write operations.</param>
+        /// <param name="providers">The provider manager executing this refresh.</param>
+        /// <param name="options">The metadata refresh options.</param>
+        /// <param name="cancellationToken">Cancellation for discovery and writes.</param>
+        /// <returns>Whether the metadata provider should save after refreshing owned items.</returns>
+        protected virtual Task<bool> RefreshOwnedItemsAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, MetadataRefreshOptions options, CancellationToken cancellationToken)
+            => RefreshedOwnedItems(deletions, writes, providers, options, GetFileSystemChildren(options.DirectoryService), cancellationToken);
+
         /// <summary>
         /// Refreshes owned items such as trailers, theme videos, special features, etc.
         /// Returns true or false indicating if changes were found.
         /// </summary>
         /// <param name="deletions">Explicit deletion operations for this refresh.</param>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
+        /// <param name="providers">The provider manager executing this refresh.</param>
         /// <param name="options">The metadata refresh options.</param>
         /// <param name="fileSystemChildren">The list of filesystem children.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns><c>true</c> if any items have changed, else <c>false</c>.</returns>
-        protected virtual async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
+        protected virtual async Task<bool> RefreshedOwnedItems(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
             if (!IsFileProtocol || !SupportsOwnedItems || IsInMixedFolder || this is ICollectionFolder or UserRootFolder or AggregateFolder || this.GetType() == typeof(Folder))
             {
                 return false;
             }
 
-            return await RefreshExtras(deletions, writes, this, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
+            return await writes.RefreshExtrasAsync(this, providers, deletions, options, fileSystemChildren, cancellationToken).ConfigureAwait(false);
         }
 
         protected virtual FileSystemMetadata[] GetFileSystemChildren(IDirectoryService directoryService)
         {
             return directoryService.GetFileSystemEntries(ContainingFolderPath);
-        }
-
-        private async Task<bool> RefreshExtras(IItemDeletionCommands deletions, IItemWriteCommands writes, BaseItem item, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
-        {
-            var extras = LibraryManager.FindExtras(item, fileSystemChildren, options.DirectoryService).ToArray();
-            var newExtraIds = Array.ConvertAll(extras, x => x.Id);
-
-            var currentExtraIds = LibraryManager.GetItemList(new InternalItemsQuery()
-            {
-                OwnerIds = [item.Id]
-            }).Select(e => e.Id).ToArray();
-
-            var extrasChanged = !currentExtraIds.OrderBy(x => x).SequenceEqual(newExtraIds.OrderBy(x => x));
-
-            if (!extrasChanged && !options.ReplaceAllMetadata && options.MetadataRefreshMode != MetadataRefreshMode.FullRefresh)
-            {
-                return false;
-            }
-
-            var ownerId = item.Id;
-
-            var tasks = extras.Select(i =>
-            {
-                var subOptions = new MetadataRefreshOptions(options);
-                if (!i.OwnerId.Equals(ownerId) || !i.ParentId.IsEmpty())
-                {
-                    subOptions.ForceSave = true;
-                }
-
-                i.OwnerId = ownerId;
-                i.ParentId = Guid.Empty;
-                return RefreshMetadataForOwnedItem(deletions, writes, i, true, subOptions, cancellationToken);
-            });
-
-            var removedExtraIds = currentExtraIds.Where(e => !newExtraIds.Contains(e)).ToArray();
-            if (removedExtraIds.Length > 0)
-            {
-                var removedExtras = LibraryManager.GetItemList(new InternalItemsQuery()
-                {
-                    ItemIds = removedExtraIds
-                });
-                foreach (var removedExtra in removedExtras)
-                {
-                    // Only delete items that are actual extras (have ExtraType set)
-                    // Items with OwnerId but no ExtraType might be alternate versions, not extras
-                    if (removedExtra.ExtraType.HasValue)
-                    {
-                        await deletions.DeleteAsync(
-                            removedExtra,
-                            new DeleteOptions()
-                            {
-                                DeleteFileLocation = false
-                            },
-                            cancellationToken).ConfigureAwait(false);
-                    }
-                }
-            }
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-
-            return true;
         }
 
         public string GetPresentationUniqueKey()
@@ -1750,6 +1681,23 @@ namespace Tesserafin.Controller.Entities
             return list;
         }
 
+        /// <summary>Copies this item and applies resolved file metadata without changing this instance.</summary>
+        /// <param name="resolved">The same identity and concrete item type after discovery.</param>
+        /// <param name="changes">The metadata changes applied to the copy.</param>
+        /// <returns>A detached item carrying the resolved changes.</returns>
+        public BaseItem CopyWithResolvedMetadata(BaseItem resolved, out ItemUpdateType changes)
+        {
+            ArgumentNullException.ThrowIfNull(resolved);
+            if (!Id.Equals(resolved.Id) || GetType() != resolved.GetType())
+            {
+                throw new ArgumentException("Resolved metadata must have the same identity and concrete type.", nameof(resolved));
+            }
+
+            var staged = CopyForWrite();
+            changes = staged.UpdateFromResolvedItem(resolved);
+            return staged;
+        }
+
         internal virtual ItemUpdateType UpdateFromResolvedItem(BaseItem newItem)
         {
             var updateType = ItemUpdateType.None;
@@ -1765,7 +1713,6 @@ namespace Tesserafin.Controller.Entities
 
         public void AfterMetadataRefresh()
         {
-            _sortName = null;
         }
 
         /// <summary>
@@ -1773,81 +1720,124 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <returns>System.String.</returns>
         public string GetPreferredMetadataLanguage()
-        {
-            string lang = PreferredMetadataLanguage;
+            => GetPreferredMetadataLanguage(
+                GetParents,
+                () => LibraryManager.GetCollectionFolders(this),
+                () => LibraryManager.GetLibraryOptions(this).PreferredMetadataLanguage,
+                () => ConfigurationManager.Configuration.PreferredMetadataLanguage);
 
-            if (string.IsNullOrEmpty(lang))
-            {
-                lang = GetParents()
-                    .Select(i => i.PreferredMetadataLanguage)
-                    .FirstOrDefault(i => !string.IsNullOrEmpty(i));
-            }
+        /// <summary>Resolves the item's language followed by the parent, library and server defaults.</summary>
+        /// <param name="getParents">Reads the item's parents in nearest-first order.</param>
+        /// <param name="getLibraries">Resolves the item's libraries in catalogue order.</param>
+        /// <param name="getLibraryLanguage">Reads the language in the effective library options.</param>
+        /// <param name="getServerLanguage">Reads the server's default language.</param>
+        /// <returns>The preferred metadata language.</returns>
+        protected string GetPreferredMetadataLanguage(
+            Func<IEnumerable<BaseItem>> getParents,
+            Func<IEnumerable<Folder>> getLibraries,
+            Func<string> getLibraryLanguage,
+            Func<string> getServerLanguage)
+            => ResolveMetadataPreference(
+                PreferredMetadataLanguage,
+                getParents,
+                getLibraries,
+                static item => item.PreferredMetadataLanguage,
+                getLibraryLanguage,
+                getServerLanguage);
 
-            if (string.IsNullOrEmpty(lang))
-            {
-                lang = LibraryManager.GetCollectionFolders(this)
-                    .Select(i => i.PreferredMetadataLanguage)
-                    .FirstOrDefault(i => !string.IsNullOrEmpty(i));
-            }
-
-            if (string.IsNullOrEmpty(lang))
-            {
-                lang = LibraryManager.GetLibraryOptions(this).PreferredMetadataLanguage;
-            }
-
-            if (string.IsNullOrEmpty(lang))
-            {
-                lang = ConfigurationManager.Configuration.PreferredMetadataLanguage;
-            }
-
-            return lang;
-        }
-
-        /// <summary>
-        /// Gets the preferred metadata country code.
-        /// </summary>
-        /// <returns>System.String.</returns>
+        /// <summary>Gets the preferred metadata country code.</summary>
+        /// <returns>The country code.</returns>
         public string GetPreferredMetadataCountryCode()
-        {
-            return GetPreferredMetadataCountryCode(null);
-        }
+            => GetPreferredMetadataCountryCode(null);
 
         private string GetPreferredMetadataCountryCode(IStandaloneVisibilityService scope)
+            => ResolveMetadataPreference(
+                PreferredMetadataCountryCode,
+                () => scope?.GetParents(this) ?? GetParents(),
+                () => scope?.GetCollectionFolders(this) ?? LibraryManager.GetCollectionFolders(this),
+                static item => item.PreferredMetadataCountryCode,
+                () => (scope is null ? LibraryManager.GetLibraryOptions(this) : scope.GetLibraryOptions(this))?.MetadataCountryCode,
+                () => scope is null
+                    ? ConfigurationManager.Configuration.MetadataCountryCode
+                    : scope.GetServerMetadataCountryCode());
+
+        /// <summary>Resolves inherited metadata preferences from the supplied catalogue and settings.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <param name="collections">The library membership resolver.</param>
+        /// <param name="options">The effective library options.</param>
+        /// <param name="configuration">The server-wide metadata defaults.</param>
+        /// <returns>The preferred metadata language and country code.</returns>
+        public (string Language, string CountryCode) GetMetadataLocale(
+            IItemLookupService lookup,
+            ICollectionFolderResolver collections,
+            LibraryOptions options,
+            ServerConfiguration configuration)
+            => ResolveMetadataLocale(lookup, collections, () => options, configuration);
+
+        /// <summary>Resolves inherited preferences, reading effective library options only if needed.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <param name="collections">The library membership resolver.</param>
+        /// <param name="itemOptions">The effective library options service.</param>
+        /// <param name="configuration">The server-wide metadata defaults.</param>
+        /// <returns>The preferred metadata language and country code.</returns>
+        public (string Language, string CountryCode) GetMetadataLocale(
+            IItemLookupService lookup,
+            ICollectionFolderResolver collections,
+            ILibraryItemOptions itemOptions,
+            ServerConfiguration configuration)
+            => ResolveMetadataLocale(lookup, collections, () => itemOptions.GetLibraryOptions(this), configuration);
+
+        private (string Language, string CountryCode) ResolveMetadataLocale(
+            IItemLookupService lookup,
+            ICollectionFolderResolver collections,
+            Func<LibraryOptions> getOptions,
+            ServerConfiguration configuration)
         {
-            string lang = PreferredMetadataCountryCode;
+            List<Folder> libraries = null;
+            LibraryOptions options = null;
+            IEnumerable<BaseItem> ReadParents() => GetParents(lookup);
+            IEnumerable<Folder> ReadLibraries() => libraries ??= collections.GetCollectionFolders(this);
+            LibraryOptions ReadOptions() => options ??= getOptions();
 
-            if (string.IsNullOrEmpty(lang))
+            var language = GetPreferredMetadataLanguage(
+                ReadParents,
+                ReadLibraries,
+                () => ReadOptions().PreferredMetadataLanguage,
+                () => configuration.PreferredMetadataLanguage);
+            var country = ResolveMetadataPreference(
+                PreferredMetadataCountryCode,
+                ReadParents,
+                ReadLibraries,
+                static item => item.PreferredMetadataCountryCode,
+                () => ReadOptions()?.MetadataCountryCode,
+                () => configuration.MetadataCountryCode);
+            return (language, country);
+        }
+
+        private static string ResolveMetadataPreference(
+            string value,
+            Func<IEnumerable<BaseItem>> getParents,
+            Func<IEnumerable<Folder>> getLibraries,
+            Func<BaseItem, string> getPreference,
+            Func<string> getLibraryDefault,
+            Func<string> getServerDefault)
+        {
+            if (string.IsNullOrEmpty(value))
             {
-                lang = (scope?.GetParents(this) ?? GetParents())
-                    .Select(i => i.PreferredMetadataCountryCode)
-                    .FirstOrDefault(i => !string.IsNullOrEmpty(i));
+                value = getParents().Select(getPreference).FirstOrDefault(preference => !string.IsNullOrEmpty(preference));
             }
 
-            if (string.IsNullOrEmpty(lang))
+            if (string.IsNullOrEmpty(value))
             {
-                lang = (scope?.GetCollectionFolders(this) ?? LibraryManager.GetCollectionFolders(this))
-                    .Select(i => i.PreferredMetadataCountryCode)
-                    .FirstOrDefault(i => !string.IsNullOrEmpty(i));
+                value = getLibraries().Select(getPreference).FirstOrDefault(preference => !string.IsNullOrEmpty(preference));
             }
 
-            if (string.IsNullOrEmpty(lang))
+            if (string.IsNullOrEmpty(value))
             {
-                // The options of the item itself when it is a library, else of its first library (DEBT-SERVER-7).
-                var options = scope is null
-                    ? LibraryManager.GetLibraryOptions(this)
-                    : (this as CollectionFolder ?? scope.GetCollectionFolders(this).OfType<CollectionFolder>().FirstOrDefault())?.GetLibraryOptions();
-                lang = options?.MetadataCountryCode;
+                value = getLibraryDefault();
             }
 
-            if (string.IsNullOrEmpty(lang))
-            {
-                // The server's, through the service when it supplies it (DEBT-SERVER-8).
-                lang = scope is IRatingVisibilityService ratings
-                    ? ratings.GetServerMetadataCountryCode()
-                    : ConfigurationManager.Configuration.MetadataCountryCode;
-            }
-
-            return lang;
+            return string.IsNullOrEmpty(value) ? getServerDefault() : value;
         }
 
         /// <summary>
@@ -1872,37 +1862,23 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>
-        /// Determines if a given user has access to this item, reading tags through the static <see cref="LibraryManager"/>.
-        /// </summary>
-        /// <param name="user">The user.</param>
-        /// <param name="skipAllowedTagsCheck">Don't check for allowed tags.</param>
-        /// <returns><c>true</c> if [is parental allowed] [the specified user]; otherwise, <c>false</c>.</returns>
-        /// <exception cref="ArgumentNullException">If user is null.</exception>
-        public bool IsParentalAllowed(User user, bool skipAllowedTagsCheck)
-        {
-            return IsParentalAllowed(user, skipAllowedTagsCheck, null);
-        }
-
-        /// <summary>
         /// Determines if a given user has access to this item.
         /// </summary>
         /// <param name="user">The user.</param>
         /// <param name="skipAllowedTagsCheck">Don't check for allowed tags.</param>
-        /// <param name="tagVisibility">Where the tags come from; <c>null</c> reads them through the static <see cref="LibraryManager"/>.</param>
+        /// <param name="scope">Supplies tags, parents, libraries and rating scores.</param>
         /// <returns><c>true</c> if [is parental allowed] [the specified user]; otherwise, <c>false</c>.</returns>
-        /// <exception cref="ArgumentNullException">If user is null.</exception>
-        public bool IsParentalAllowed(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
+        /// <exception cref="ArgumentNullException">If user or scope is null.</exception>
+        public bool IsParentalAllowed(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService scope)
         {
             ArgumentNullException.ThrowIfNull(user);
+            ArgumentNullException.ThrowIfNull(scope);
 
-            if (!(tagVisibility?.IsVisibleViaTags(this, user, skipAllowedTagsCheck) ?? IsVisibleViaTags(user, skipAllowedTagsCheck)))
+            if (!scope.IsVisibleViaTags(this, user, skipAllowedTagsCheck))
             {
                 return false;
             }
 
-            // The parents and libraries the rating reads come from the service when it supplies them
-            // (DEBT-SERVER-4).
-            var scope = tagVisibility as IStandaloneVisibilityService;
             var maxAllowedRating = user.MaxParentalRatingScore;
             var maxAllowedSubRating = user.MaxParentalRatingSubScore;
             var rating = GetCustomRatingForComparision(scope);
@@ -1918,9 +1894,7 @@ namespace Tesserafin.Controller.Entities
             }
 
             var countryCode = GetPreferredMetadataCountryCode(scope);
-            var ratingScore = scope is IRatingVisibilityService ratings
-                ? ratings.GetRatingScore(rating, countryCode)
-                : LocalizationManager.GetRatingScore(rating, countryCode);
+            var ratingScore = scope.GetRatingScore(rating, countryCode);
 
             // Could not determine rating level
             if (ratingScore is null)
@@ -1948,7 +1922,7 @@ namespace Tesserafin.Controller.Entities
             return !maxAllowedSubRating.HasValue || (ratingScore.SubScore ?? 0) <= maxAllowedSubRating.Value;
         }
 
-        public ParentalRatingScore GetParentalRatingScore()
+        public ParentalRatingScore GetParentalRatingScore(ILocalizationManager localization)
         {
             var rating = CustomRatingForComparison;
 
@@ -1962,7 +1936,7 @@ namespace Tesserafin.Controller.Entities
                 return null;
             }
 
-            return LocalizationManager.GetRatingScore(rating, GetPreferredMetadataCountryCode());
+            return localization.GetRatingScore(rating, GetPreferredMetadataCountryCode());
         }
 
         public List<string> GetInheritedTags()
@@ -2114,27 +2088,15 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>
-        /// Determines if this item should be visible to a given user, reading tags through the static <see cref="LibraryManager"/>.
-        /// Kept for the published surface; overrides belong on the overload that takes an <see cref="ITagVisibilityService"/>.
-        /// </summary>
-        /// <param name="user">The user.</param>
-        /// <param name="skipAllowedTagsCheck">Don't check for allowed tags.</param>
-        /// <returns><c>true</c> if the specified user is visible; otherwise, <c>false</c>.</returns>
-        public virtual bool IsVisible(User user, bool skipAllowedTagsCheck = false)
-        {
-            return IsVisible(user, skipAllowedTagsCheck, null);
-        }
-
-        /// <summary>
         /// Determines if this folder should be visible to a given user.
         /// Default is just parental allowed. Can be overridden for more functionality.
         /// </summary>
         /// <param name="user">The user.</param>
         /// <param name="skipAllowedTagsCheck">Don't check for allowed tags.</param>
-        /// <param name="tagVisibility">Where the tags come from; <c>null</c> reads them through the static <see cref="LibraryManager"/>. Overrides pass it on.</param>
+        /// <param name="tagVisibility">Supplies tags, parents, libraries and rating scores. Overrides pass it on.</param>
         /// <returns><c>true</c> if the specified user is visible; otherwise, <c>false</c>.</returns>
         /// <exception cref="ArgumentNullException"><paramref name="user" /> is <c>null</c>.</exception>
-        public virtual bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
+        public virtual bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
             ArgumentNullException.ThrowIfNull(user);
 
@@ -2142,25 +2104,14 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>
-        /// Determines if this item, its parents and its libraries admit a given user, reading tags through the static <see cref="LibraryManager"/>.
-        /// Kept for the published surface; overrides belong on the overload that takes an <see cref="ITagVisibilityService"/>.
-        /// </summary>
-        /// <param name="user">The user.</param>
-        /// <returns><c>true</c> if the item is visible to the user.</returns>
-        public virtual bool IsVisibleStandalone(User user)
-        {
-            return IsVisibleStandalone(user, null);
-        }
-
-        /// <summary>
         /// Determines if this item, its parents and its libraries admit a given user.
         /// </summary>
         /// <param name="user">The user.</param>
-        /// <param name="tagVisibility">Where the tags come from; <c>null</c> reads them through the static <see cref="LibraryManager"/>. Overrides pass it on.</param>
+        /// <param name="tagVisibility">Supplies tags, parents, libraries and rating scores. Overrides pass it on.</param>
         /// <returns><c>true</c> if the item is visible to the user.</returns>
-        public virtual bool IsVisibleStandalone(User user, ITagVisibilityService tagVisibility)
+        public virtual bool IsVisibleStandalone(User user, IStandaloneVisibilityService tagVisibility)
         {
-            if (GetSourceType(tagVisibility as IStandaloneVisibilityService) == SourceType.Channel)
+            if (GetSourceType(tagVisibility) == SourceType.Channel)
             {
                 return IsVisibleStandaloneInternal(user, false, tagVisibility) && Channel.IsChannelVisible(this, user, tagVisibility);
             }
@@ -2181,113 +2132,6 @@ namespace Tesserafin.Controller.Entities
         public BaseItemKind GetBaseItemKind()
         {
             return _baseItemKind ??= Enum.Parse<BaseItemKind>(GetClientTypeName());
-        }
-
-        /// <summary>
-        /// Gets the linked child.
-        /// </summary>
-        /// <param name="info">The info.</param>
-        /// <returns>BaseItem.</returns>
-        protected BaseItem GetLinkedChild(LinkedChild info)
-        {
-            return GetLinkedChild(info, null);
-        }
-
-        /// <summary>
-        /// Gets the linked child.
-        /// </summary>
-        /// <param name="info">The info.</param>
-        /// <param name="scope">Where the items come from: by id from it, and by path when it is an
-        /// <see cref="ILinkedChildVisibilityService"/>; <c>null</c> reads them through the static <see cref="LibraryManager"/>.</param>
-        /// <returns>BaseItem.</returns>
-        protected BaseItem GetLinkedChild(LinkedChild info, IBoxSetVisibilityService scope)
-        {
-            // First get using the cached Id
-            if (info.ItemId.HasValue)
-            {
-                if (info.ItemId.Value.IsEmpty())
-                {
-                    return null;
-                }
-
-                var itemById = GetLinkedItemById(info.ItemId.Value, scope);
-
-                if (itemById is not null)
-                {
-                    return itemById;
-                }
-            }
-
-            var item = FindLinkedChild(info, scope);
-
-            // If still null, log
-            if (item is null)
-            {
-                // Don't keep searching over and over
-                info.ItemId = Guid.Empty;
-            }
-            else
-            {
-                // Cache the id for next time
-                info.ItemId = item.Id;
-            }
-
-            return item;
-        }
-
-#pragma warning disable CS0618 // Type or member is obsolete - fallback for legacy LinkedChild data
-        private BaseItem FindLinkedChild(LinkedChild info, IBoxSetVisibilityService scope)
-        {
-            // First try to find by ItemId (new preferred method)
-            if (info.ItemId.HasValue && !info.ItemId.Value.Equals(Guid.Empty))
-            {
-                var item = GetLinkedItemById(info.ItemId.Value, scope);
-                if (item is not null)
-                {
-                    return item;
-                }
-
-                Logger.LogWarning("Unable to find linked item by ItemId {0}", info.ItemId);
-            }
-
-            // Fall back to Path (legacy method)
-            var path = info.Path;
-            if (!string.IsNullOrEmpty(path))
-            {
-                path = FileSystem.MakeAbsolutePath(ContainingFolderPath, path);
-
-                var itemByPath = scope is ILinkedChildVisibilityService paths
-                    ? paths.FindByPath(path)
-                    : LibraryManager.FindByPath(path, null);
-
-                if (itemByPath is null)
-                {
-                    Logger.LogWarning("Unable to find linked item at path {0}", info.Path);
-                }
-
-                return itemByPath;
-            }
-
-            // Fall back to LibraryItemId (legacy method)
-            if (!string.IsNullOrEmpty(info.LibraryItemId))
-            {
-                var item = GetLinkedItemById(new Guid(info.LibraryItemId), scope);
-
-                if (item is null)
-                {
-                    Logger.LogWarning("Unable to find linked item by LibraryItemId {0}", info.LibraryItemId);
-                }
-
-                return item;
-            }
-
-            return null;
-        }
-#pragma warning restore CS0618
-
-        private static BaseItem GetLinkedItemById(Guid id, IBoxSetVisibilityService scope)
-        {
-            return scope is null ? LibraryManager.GetItemById(id) : scope.GetItemById(id);
         }
 
         /// <summary>
@@ -2333,14 +2177,6 @@ namespace Tesserafin.Controller.Entities
             {
                 Genres = [.. genres, name];
             }
-        }
-
-        /// <summary>
-        /// Do whatever refreshing is necessary when the filesystem pertaining to this item has changed.
-        /// </summary>
-        public virtual void ChangedExternally()
-        {
-            ProviderManager.QueueRefresh(Id, new MetadataRefreshOptions(new DirectoryService(FileSystem)), RefreshPriority.High);
         }
 
         /// <summary>
@@ -2507,71 +2343,7 @@ namespace Tesserafin.Controller.Entities
         /// <param name="imageIndex">Index of the image.</param>
         /// <returns>ItemImageInfo.</returns>
         public ItemImageInfo GetImageInfo(ImageType imageType, int imageIndex)
-        {
-            if (imageType == ImageType.Chapter)
-            {
-                var chapter = ChapterManager.GetChapter(Id, imageIndex);
-
-                if (chapter is null)
-                {
-                    return null;
-                }
-
-                var path = chapter.ImagePath;
-
-                if (string.IsNullOrEmpty(path))
-                {
-                    return null;
-                }
-
-                return new ItemImageInfo
-                {
-                    Path = path,
-                    DateModified = chapter.ImageDateModified,
-                    Type = imageType
-                };
-            }
-
-            return GetImages(imageType)
-                .ElementAtOrDefault(imageIndex);
-        }
-
-        /// <summary>
-        /// Computes image index for given image or raises if no matching image found.
-        /// </summary>
-        /// <param name="image">Image to compute index for.</param>
-        /// <exception cref="ArgumentException">Image index cannot be computed as no matching image found.
-        /// </exception>
-        /// <returns>Image index.</returns>
-        public int GetImageIndex(ItemImageInfo image)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-
-            if (image.Type == ImageType.Chapter)
-            {
-                var chapters = ChapterManager.GetChapters(Id);
-                for (var i = 0; i < chapters.Count; i++)
-                {
-                    if (chapters[i].ImagePath == image.Path)
-                    {
-                        return i;
-                    }
-                }
-
-                throw new ArgumentException("No chapter index found for image path", image.Path);
-            }
-
-            var images = GetImages(image.Type).ToArray();
-            for (var i = 0; i < images.Length; i++)
-            {
-                if (images[i].Path == image.Path)
-                {
-                    return i;
-                }
-            }
-
-            throw new ArgumentException("No image index found for image path", image.Path);
-        }
+            => GetImages(imageType).ElementAtOrDefault(imageIndex);
 
         public IEnumerable<ItemImageInfo> GetImages(ImageType imageType)
         {
@@ -2732,25 +2504,25 @@ namespace Tesserafin.Controller.Entities
             return UpdateToRepositoryAsync(writes, ItemUpdateType.ImageUpdate, CancellationToken.None);
         }
 
-        public virtual bool IsPlayed(User user, UserItemData userItemData)
+        public virtual bool IsPlayed(User user, IUserDataManager userDataManager, UserItemData userItemData = null)
         {
-            userItemData ??= UserDataManager.GetUserData(user, this);
+            userItemData ??= userDataManager.GetUserData(user, this);
 
             return userItemData is not null && userItemData.Played;
         }
 
-        public bool IsFavoriteOrLiked(User user, UserItemData userItemData)
+        public bool IsFavoriteOrLiked(User user, IUserDataManager userDataManager, UserItemData userItemData = null)
         {
-            userItemData ??= UserDataManager.GetUserData(user, this);
+            userItemData ??= userDataManager.GetUserData(user, this);
 
             return userItemData is not null && (userItemData.IsFavorite || (userItemData.Likes ?? false));
         }
 
-        public virtual bool IsUnplayed(User user, UserItemData userItemData)
+        public virtual bool IsUnplayed(User user, IUserDataManager userDataManager, UserItemData userItemData = null)
         {
             ArgumentNullException.ThrowIfNull(user);
 
-            userItemData ??= UserDataManager.GetUserData(user, this);
+            userItemData ??= userDataManager.GetUserData(user, this);
 
             return userItemData is null || !userItemData.Played;
         }
@@ -2760,14 +2532,14 @@ namespace Tesserafin.Controller.Entities
             return GetItemLookupInfo<ItemLookupInfo>();
         }
 
-        protected T GetItemLookupInfo<T>()
+        protected T GetItemLookupInfo<T>((string Language, string CountryCode)? locale = null)
             where T : ItemLookupInfo, new()
         {
             return new T
             {
                 Path = Path,
-                MetadataCountryCode = GetPreferredMetadataCountryCode(),
-                MetadataLanguage = GetPreferredMetadataLanguage(),
+                MetadataCountryCode = locale.HasValue ? locale.Value.CountryCode : GetPreferredMetadataCountryCode(),
+                MetadataLanguage = locale.HasValue ? locale.Value.Language : GetPreferredMetadataLanguage(),
                 Name = GetNameForMetadataLookup(),
                 OriginalTitle = OriginalTitle,
                 ProviderIds = ProviderIds,
@@ -2791,8 +2563,6 @@ namespace Tesserafin.Controller.Entities
         /// <returns>true if the item has change, else false.</returns>
         public virtual bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
         {
-            _sortName = null;
-
             var hasChanges = false;
 
             if (string.IsNullOrEmpty(Name) && !string.IsNullOrEmpty(Path))
@@ -2839,100 +2609,6 @@ namespace Tesserafin.Controller.Entities
             }
         }
 
-        protected async Task RefreshMetadataForOwnedItem(IItemDeletionCommands deletions, IItemWriteCommands writes, BaseItem ownedItem, bool copyTitleMetadata, MetadataRefreshOptions options, CancellationToken cancellationToken)
-        {
-            var newOptions = new MetadataRefreshOptions(options)
-            {
-                SearchResult = null
-            };
-
-            var item = this;
-
-            if (copyTitleMetadata)
-            {
-                // Take some data from the main item, for querying purposes
-                if (!item.Genres.SequenceEqual(ownedItem.Genres, StringComparer.Ordinal))
-                {
-                    newOptions.ForceSave = true;
-                    ownedItem.Genres = item.Genres;
-                }
-
-                if (!item.Studios.SequenceEqual(ownedItem.Studios, StringComparer.Ordinal))
-                {
-                    newOptions.ForceSave = true;
-                    ownedItem.Studios = item.Studios;
-                }
-
-                if (!item.ProductionLocations.SequenceEqual(ownedItem.ProductionLocations, StringComparer.Ordinal))
-                {
-                    newOptions.ForceSave = true;
-                    ownedItem.ProductionLocations = item.ProductionLocations;
-                }
-
-                if (item.CommunityRating != ownedItem.CommunityRating)
-                {
-                    ownedItem.CommunityRating = item.CommunityRating;
-                    newOptions.ForceSave = true;
-                }
-
-                if (item.CriticRating != ownedItem.CriticRating)
-                {
-                    ownedItem.CriticRating = item.CriticRating;
-                    newOptions.ForceSave = true;
-                }
-
-                if (!string.Equals(item.Overview, ownedItem.Overview, StringComparison.Ordinal))
-                {
-                    ownedItem.Overview = item.Overview;
-                    newOptions.ForceSave = true;
-                }
-
-                if (!string.Equals(item.OfficialRating, ownedItem.OfficialRating, StringComparison.Ordinal))
-                {
-                    ownedItem.OfficialRating = item.OfficialRating;
-                    newOptions.ForceSave = true;
-                }
-
-                if (!string.Equals(item.CustomRating, ownedItem.CustomRating, StringComparison.Ordinal))
-                {
-                    ownedItem.CustomRating = item.CustomRating;
-                    newOptions.ForceSave = true;
-                }
-            }
-
-            await ownedItem.RefreshMetadata(deletions, writes, newOptions, cancellationToken).ConfigureAwait(false);
-        }
-
-        protected async Task RefreshMetadataForOwnedVideo(IItemDeletionCommands deletions, IItemWriteCommands writes, MetadataRefreshOptions options, bool copyTitleMetadata, string path, CancellationToken cancellationToken)
-        {
-            var newOptions = new MetadataRefreshOptions(options)
-            {
-                SearchResult = null
-            };
-
-            var id = LibraryManager.GetNewItemId(path, typeof(Video));
-
-            // Try to retrieve it from the db. If we don't find it, use the resolved version
-            if (LibraryManager.GetItemById(id) is not Video video)
-            {
-                video = LibraryManager.ResolvePath(FileSystem.GetFileSystemInfo(path)) as Video;
-
-                newOptions.ForceSave = true;
-            }
-
-            if (video is null)
-            {
-                return;
-            }
-
-            if (video.OwnerId.IsEmpty())
-            {
-                video.OwnerId = Id;
-            }
-
-            await RefreshMetadataForOwnedItem(deletions, writes, video, copyTitleMetadata, newOptions, cancellationToken).ConfigureAwait(false);
-        }
-
         public string GetEtag(User user)
         {
             var list = GetEtagValues(user);
@@ -2968,18 +2644,13 @@ namespace Tesserafin.Controller.Entities
             return [Id];
         }
 
-        public virtual double? GetRefreshProgress()
-        {
-            return null;
-        }
-
-        public virtual ItemUpdateType OnMetadataChanged()
+        public virtual ItemUpdateType OnMetadataChanged(ILocalizationManager localization)
         {
             var updateType = ItemUpdateType.None;
 
             var item = this;
 
-            var rating = item.GetParentalRatingScore();
+            var rating = item.GetParentalRatingScore(localization);
             if (rating is not null)
             {
                 if (rating.Score != item.InheritedParentalRatingValue)
@@ -3011,8 +2682,9 @@ namespace Tesserafin.Controller.Entities
         /// Updates the official rating based on content and returns true or false indicating if it changed.
         /// </summary>
         /// <param name="children">Media children.</param>
+        /// <param name="localization">Scores the ratings.</param>
         /// <returns><c>true</c> if the rating was updated; otherwise <c>false</c>.</returns>
-        public bool UpdateRatingToItems(IReadOnlyList<BaseItem> children)
+        public bool UpdateRatingToItems(IReadOnlyList<BaseItem> children, ILocalizationManager localization)
         {
             var currentOfficialRating = OfficialRating;
 
@@ -3021,7 +2693,7 @@ namespace Tesserafin.Controller.Entities
                 .Select(i => i.OfficialRating)
                 .Where(i => !string.IsNullOrEmpty(i))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Select(rating => (rating, LocalizationManager.GetRatingScore(rating, GetPreferredMetadataCountryCode())))
+                .Select(rating => (rating, localization.GetRatingScore(rating, GetPreferredMetadataCountryCode())))
                 .OrderBy(i => i.Item2 is null ? 1001 : i.Item2.Score)
                 .ThenBy(i => i.Item2 is null ? 1001 : i.Item2.SubScore)
                 .Select(i => i.rating);

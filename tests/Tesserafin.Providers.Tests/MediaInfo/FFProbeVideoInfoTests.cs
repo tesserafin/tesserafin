@@ -1,12 +1,24 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using AutoFixture;
 using AutoFixture.AutoMoq;
 using Moq;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Library;
+using Tesserafin.Controller.MediaEncoding;
+using Tesserafin.Controller.Persistence;
+using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Configuration;
+using Tesserafin.Model.Entities;
+using Tesserafin.Model.IO;
 using Tesserafin.Providers.MediaInfo;
 using Xunit;
+using ProbeMediaInfo = Tesserafin.Model.MediaInfo.MediaInfo;
 
 namespace Tesserafin.Providers.Tests.MediaInfo;
 
@@ -27,6 +39,70 @@ public class FFProbeVideoInfoTests
         IFixture fixture = new Fixture().Customize(new AutoMoqCustomization { ConfigureMembers = true });
         fixture.Inject(serverConfig);
         _fFProbeVideoInfo = fixture.Create<FFProbeVideoInfo>();
+    }
+
+    [Theory]
+    [InlineData(EmbeddedSubtitleOptions.AllowAll, true, true, true)]
+    [InlineData(EmbeddedSubtitleOptions.AllowText, false, true, false)]
+    [InlineData(EmbeddedSubtitleOptions.AllowImage, true, false, true)]
+    [InlineData(EmbeddedSubtitleOptions.AllowNone, false, false, false)]
+    public async Task ProbeVideo_UsesOneLibraryPolicyForTitleAndPersistedSubtitles(EmbeddedSubtitleOptions subtitles, bool embeddedTitle, bool expectText, bool expectImage)
+    {
+        var video = new Video
+        {
+            Id = Guid.NewGuid(),
+            Name = "File title",
+            Path = Path.Combine(Path.GetTempPath(), "probe-policy", "source.mkv")
+        };
+        var token = TestContext.Current.CancellationToken;
+        var itemOptions = new Mock<ILibraryItemOptions>(MockBehavior.Strict);
+        itemOptions.Setup(o => o.GetLibraryOptions(video)).Returns(new LibraryOptions
+        {
+            AllowEmbeddedSubtitles = subtitles,
+            EnableEmbeddedTitles = embeddedTitle
+        });
+        var encoder = new Mock<IMediaEncoder>(MockBehavior.Strict);
+        encoder.Setup(e => e.GetMediaInfo(It.Is<MediaInfoRequest>(request => request.MediaSource.Path == video.Path), token))
+            .ReturnsAsync(new ProbeMediaInfo
+            {
+                Name = "Embedded title",
+                MediaStreams =
+                [
+                    new MediaStream { Type = MediaStreamType.Video, Codec = "h264" },
+                    new MediaStream { Type = MediaStreamType.Subtitle, Codec = "subrip" },
+                    new MediaStream { Type = MediaStreamType.Subtitle, Codec = "hdmv_pgs_subtitle" }
+                ]
+            });
+        IReadOnlyList<MediaStream> saved = [];
+        var streams = new Mock<IMediaStreamRepository>();
+        streams.Setup(r => r.SaveMediaStreams(video.Id, It.IsAny<IReadOnlyList<MediaStream>>(), token))
+            .Callback<Guid, IReadOnlyList<MediaStream>, CancellationToken>((_, tracks, _) => saved = tracks);
+        IFixture fixture = new Fixture().Customize(new AutoMoqCustomization { ConfigureMembers = true });
+        fixture.Inject(itemOptions.Object);
+        fixture.Inject(encoder.Object);
+        fixture.Inject(streams.Object);
+        fixture.Inject(Mock.Of<IFileSystem>());
+        var prober = fixture.Create<FFProbeVideoInfo>();
+        var refresh = new MetadataRefreshOptions(Mock.Of<IDirectoryService>(MockBehavior.Strict)) { MetadataRefreshMode = MetadataRefreshMode.None };
+
+        await prober.ProbeVideo(video, refresh, token);
+
+        Assert.Equal(embeddedTitle ? "Embedded title" : "File title", video.Name);
+        Assert.Equal(expectText || expectImage, video.HasSubtitles);
+        var expectedCodecs = new List<string> { "h264" };
+        if (expectText)
+        {
+            expectedCodecs.Add("subrip");
+        }
+
+        if (expectImage)
+        {
+            expectedCodecs.Add("hdmv_pgs_subtitle");
+        }
+
+        Assert.Equal(expectedCodecs, saved.Select(stream => stream.Codec));
+        streams.Verify(r => r.SaveMediaStreams(video.Id, It.IsAny<IReadOnlyList<MediaStream>>(), token), Times.Once);
+        itemOptions.Verify(o => o.GetLibraryOptions(video), Times.Once);
     }
 
     [Theory]

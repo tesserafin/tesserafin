@@ -7,7 +7,9 @@ using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.Manager;
 
@@ -18,6 +20,9 @@ namespace Tesserafin.Providers.Music;
 /// </summary>
 public class AudioMetadataService : MetadataService<Audio, SongInfo>
 {
+    private readonly IItemLookupService _lookup;
+    private readonly ICollectionFolderResolver _collections;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="AudioMetadataService"/> class.
     /// </summary>
@@ -27,10 +32,13 @@ public class AudioMetadataService : MetadataService<Audio, SongInfo>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
-    /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="itemOptions">Effective options for the item's library.</param>
     /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
+    /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
+    /// <param name="lookup">The item identity lookup.</param>
+    /// <param name="collections">The library membership resolver.</param>
     public AudioMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -38,13 +46,22 @@ public class AudioMetadataService : MetadataService<Audio, SongInfo>
         ILogger<AudioMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
-        ILibraryManager libraryManager,
+        ILibraryItemOptions itemOptions,
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
-        IItemRepository itemRepository)
-        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        IItemRepository itemRepository,
+        ILocalizationManager localizationManager,
+        IItemLookupService lookup,
+        ICollectionFolderResolver collections)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
+        _lookup = lookup;
+        _collections = collections;
     }
+
+    /// <inheritdoc />
+    protected override SongInfo GetLookupInfo(Audio item, LibraryOptions libraryOptions)
+        => item.GetLookupInfo(item.GetMetadataLocale(_lookup, _collections, libraryOptions, ServerConfigurationManager.Configuration));
 
     private void SetProviderId(Audio sourceItem, Audio targetItem, bool replaceData, MetadataProvider provider)
     {

@@ -7,16 +7,15 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Data.Entities;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
 
 namespace Tesserafin.Server.Core.Library
 {
     /// <summary>
-    /// Sole production implementation of <see cref="ITagVisibilityService"/>,
-    /// <see cref="IStandaloneVisibilityService"/>, <see cref="IBoxSetVisibilityService"/>,
-    /// <see cref="ILinkedChildVisibilityService"/>, <see cref="IRatingVisibilityService"/> and
-    /// <see cref="IRecordingVisibilityService"/>, built on the id lookup (parents), the library membership
+    /// Sole production implementation of <see cref="IStandaloneVisibilityService"/> (and so of
+    /// <see cref="ITagVisibilityService"/>), built on the id lookup (parents), the library membership
     /// resolver, the user root folder (libraries), the item repository (path search), the localization (rating
     /// scores), the server configuration (country code) and the active recordings only.
     /// </summary>
@@ -28,8 +27,9 @@ namespace Tesserafin.Server.Core.Library
     /// and for the box set's library and linked-children checks (DEBT-SERVER-5, DEBT-SERVER-7), and the
     /// rating score (DEBT-SERVER-8) and a video's source type (DEBT-SERVER-9).
     /// </remarks>
-    internal sealed class TagVisibilityService : ILinkedChildVisibilityService, IRatingVisibilityService, IRecordingVisibilityService
+    internal sealed class TagVisibilityService : IStandaloneVisibilityService
     {
+        private readonly ILibraryItemOptions _libraryOptions;
         private readonly IItemLookupService _itemLookupService;
         private readonly ICollectionFolderResolver _collectionFolderResolver;
         private readonly IUserRootFolderProvider _userRootFolderProvider;
@@ -48,8 +48,10 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="localizationManager">The localization (rating scores).</param>
         /// <param name="configurationManager">The server configuration (country code).</param>
         /// <param name="activeRecordings">The recordings in progress.</param>
-        public TagVisibilityService(IItemLookupService itemLookupService, ICollectionFolderResolver collectionFolderResolver, IUserRootFolderProvider userRootFolderProvider, IItemRepository itemRepository, ILocalizationManager localizationManager, IServerConfigurationManager configurationManager, ActiveRecordings activeRecordings)
+        /// <param name="libraryOptions">The options of an item's library.</param>
+        public TagVisibilityService(IItemLookupService itemLookupService, ICollectionFolderResolver collectionFolderResolver, IUserRootFolderProvider userRootFolderProvider, IItemRepository itemRepository, ILocalizationManager localizationManager, IServerConfigurationManager configurationManager, ActiveRecordings activeRecordings, ILibraryItemOptions libraryOptions)
         {
+            _libraryOptions = libraryOptions;
             _itemLookupService = itemLookupService;
             _collectionFolderResolver = collectionFolderResolver;
             _userRootFolderProvider = userRootFolderProvider;
@@ -79,6 +81,9 @@ namespace Tesserafin.Server.Core.Library
         }
 
         /// <inheritdoc />
+        public LibraryOptions GetLibraryOptions(BaseItem item) => _libraryOptions.GetLibraryOptions(item);
+
+        /// <inheritdoc />
         public IReadOnlyList<Guid> GetLibraryIds()
         {
             return CollectionFolderResolver.GetLibraries(_userRootFolderProvider.GetUserRootFolder(), _itemLookupService).Select(i => i.Id).ToList();
@@ -93,7 +98,7 @@ namespace Tesserafin.Server.Core.Library
         /// <inheritdoc />
         public BaseItem? FindByPath(string path)
         {
-            return _itemRepository.GetItemList(ItemPathQuery.Create(path, null)).FirstOrDefault();
+            return ItemPathQuery.Find(_itemRepository, path, null);
         }
 
         /// <inheritdoc />

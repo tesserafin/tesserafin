@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Tesserafin.Controller;
-using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
@@ -25,15 +24,6 @@ public class SubtitleResolverTests
 
     public SubtitleResolverTests()
     {
-        // prep BaseItem and Video for calls made that expect managers
-        Video.RecordingsManager = Mock.Of<IRecordingsManager>();
-
-        var applicationPaths = new Mock<IServerApplicationPaths>().Object;
-        var serverConfig = new Mock<IServerConfigurationManager>();
-        serverConfig.Setup(c => c.ApplicationPaths)
-            .Returns(applicationPaths);
-        BaseItem.ConfigurationManager = serverConfig.Object;
-
         // build resolver to test with
         var localizationManager = Mock.Of<ILocalizationManager>();
 
@@ -56,7 +46,7 @@ public class SubtitleResolverTests
         fileSystem.Setup(fs => fs.DirectoryExists(It.IsRegex(MediaInfoResolverTests.MetadataDirectoryRegex)))
             .Returns(true);
 
-        _subtitleResolver = new SubtitleResolver(Mock.Of<ILogger<SubtitleResolver>>(), localizationManager, mediaEncoder.Object, fileSystem.Object, new NamingOptions());
+        _subtitleResolver = new SubtitleResolver(Mock.Of<ILogger<SubtitleResolver>>(), localizationManager, mediaEncoder.Object, fileSystem.Object, Mock.Of<IServerApplicationPaths>(paths => paths.InternalMetadataPath == MediaInfoResolverTests.MetadataRoot), new NamingOptions());
     }
 
     [Theory]
@@ -66,8 +56,6 @@ public class SubtitleResolverTests
     [InlineData("My.Video.mp3", true, false)]
     public async Task GetExternalStreams_MixedFilenames_PicksSubtitles(string file, bool metadataDirectory, bool matches)
     {
-        BaseItem.MediaSourceManager = Mock.Of<IMediaSourceManager>();
-
         var video = new Movie
         {
             Path = MediaInfoResolverTests.VideoDirectoryPath + "/My.Video.mkv"

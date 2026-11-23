@@ -21,9 +21,11 @@ using Tesserafin.Api.Extensions;
 using Tesserafin.Api.Helpers;
 using Tesserafin.Common.Api;
 using Tesserafin.Common.Configuration;
+using Tesserafin.Controller.Chapters;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Extensions;
@@ -44,8 +46,11 @@ public class ImageController : BaseTesserafinApiController
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemImageService _images;
+    private readonly IChapterManager _chapterManager;
     private readonly IUserManager _userManager;
+    private readonly INamedItemCatalog _namedItems;
     private readonly ILibraryManager _libraryManager;
+    private readonly IItemPeopleService _people;
     private readonly IProviderManager _providerManager;
     private readonly IImageProcessor _imageProcessor;
     private readonly IFileSystem _fileSystem;
@@ -58,7 +63,10 @@ public class ImageController : BaseTesserafinApiController
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+    /// <param name="chapterManager">Instance of the <see cref="IChapterManager"/> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
+    /// <param name="namedItems">Read-only named catalogue.</param>
+    /// <param name="people">Read-only people catalogue.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="imageProcessor">Instance of the <see cref="IImageProcessor"/> interface.</param>
@@ -69,8 +77,11 @@ public class ImageController : BaseTesserafinApiController
     public ImageController(
         IItemWriteCommands writes,
         IItemImageService images,
+        IChapterManager chapterManager,
         IUserManager userManager,
+        INamedItemCatalog namedItems,
         ILibraryManager libraryManager,
+        IItemPeopleService people,
         IProviderManager providerManager,
         IImageProcessor imageProcessor,
         IFileSystem fileSystem,
@@ -80,8 +91,11 @@ public class ImageController : BaseTesserafinApiController
     {
         _writes = writes;
         _images = images;
+        _chapterManager = chapterManager;
         _userManager = userManager;
+        _namedItems = namedItems;
         _libraryManager = libraryManager;
+        _people = people;
         _providerManager = providerManager;
         _imageProcessor = imageProcessor;
         _fileSystem = fileSystem;
@@ -815,7 +829,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? foregroundLayer,
         [FromRoute, Required] int imageIndex)
     {
-        var item = _libraryManager.GetArtist(name);
+        var item = _namedItems.Find<MusicArtist>(name);
         if (item is null)
         {
             return NotFound();
@@ -893,7 +907,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? foregroundLayer,
         [FromQuery] int? imageIndex)
     {
-        var item = _libraryManager.GetGenre(name);
+        var item = _namedItems.Find<Genre>(name);
         if (item is null)
         {
             return NotFound();
@@ -971,7 +985,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? backgroundColor,
         [FromQuery] string? foregroundLayer)
     {
-        var item = _libraryManager.GetGenre(name);
+        var item = _namedItems.Find<Genre>(name);
         if (item is null)
         {
             return NotFound();
@@ -1049,7 +1063,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? foregroundLayer,
         [FromQuery] int? imageIndex)
     {
-        var item = _libraryManager.GetMusicGenre(name);
+        var item = _namedItems.Find<MusicGenre>(name);
         if (item is null)
         {
             return NotFound();
@@ -1127,7 +1141,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? backgroundColor,
         [FromQuery] string? foregroundLayer)
     {
-        var item = _libraryManager.GetMusicGenre(name);
+        var item = _namedItems.Find<MusicGenre>(name);
         if (item is null)
         {
             return NotFound();
@@ -1205,7 +1219,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? foregroundLayer,
         [FromQuery] int? imageIndex)
     {
-        var item = _libraryManager.GetPerson(name);
+        var item = _people.GetPerson(name);
         if (item is null)
         {
             return NotFound();
@@ -1283,7 +1297,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? backgroundColor,
         [FromQuery] string? foregroundLayer)
     {
-        var item = _libraryManager.GetPerson(name);
+        var item = _people.GetPerson(name);
         if (item is null)
         {
             return NotFound();
@@ -1361,7 +1375,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? foregroundLayer,
         [FromQuery] int? imageIndex)
     {
-        var item = _libraryManager.GetStudio(name);
+        var item = _namedItems.Find<Studio>(name);
         if (item is null)
         {
             return NotFound();
@@ -1439,7 +1453,7 @@ public class ImageController : BaseTesserafinApiController
         [FromQuery] string? backgroundColor,
         [FromQuery] string? foregroundLayer)
     {
-        var item = _libraryManager.GetStudio(name);
+        var item = _namedItems.Find<Studio>(name);
         if (item is null)
         {
             return NotFound();
@@ -1877,7 +1891,13 @@ public class ImageController : BaseTesserafinApiController
 
         if (imageInfo is null)
         {
-            imageInfo = item?.GetImageInfo(imageType, imageIndex ?? 0);
+            if (item is not null)
+            {
+                imageInfo = imageType == ImageType.Chapter
+                    ? GetChapterImage(item.Id, imageIndex ?? 0)
+                    : item.GetImageInfo(imageType, imageIndex ?? 0);
+            }
+
             if (imageInfo is null)
             {
                 return NotFound(string.Format(NumberFormatInfo.InvariantInfo, "{0} does not have an image of type {1}", item?.Name, imageType));
@@ -1935,6 +1955,22 @@ public class ImageController : BaseTesserafinApiController
             cacheDuration,
             responseHeaders,
             tag).ConfigureAwait(false);
+    }
+
+    private ItemImageInfo? GetChapterImage(Guid itemId, int imageIndex)
+    {
+        var chapter = _chapterManager.GetChapter(itemId, imageIndex);
+        if (string.IsNullOrEmpty(chapter?.ImagePath))
+        {
+            return null;
+        }
+
+        return new ItemImageInfo
+        {
+            Path = chapter.ImagePath,
+            DateModified = chapter.ImageDateModified,
+            Type = ImageType.Chapter
+        };
     }
 
     private ImageFormat[] GetOutputFormats(ImageFormat? format)

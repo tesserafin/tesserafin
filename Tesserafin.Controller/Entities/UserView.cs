@@ -40,8 +40,6 @@ namespace Tesserafin.Controller.Entities
             Tesserafin.Data.Enums.CollectionType.boxsets
         };
 
-        public static ITVSeriesManager TVSeriesManager { get; set; }
-
         /// <summary>
         /// Gets or sets the view type.
         /// </summary>
@@ -94,9 +92,9 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <inheritdoc />
-        public override int GetChildCount(User user)
+        public override int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
         {
-            return GetChildren(user, true, null).Count;
+            return GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope, Listing = listing }).Count;
         }
 
         /// <inheritdoc />
@@ -113,7 +111,7 @@ namespace Tesserafin.Controller.Entities
                 parent = LibraryManager.GetItemById(ParentId) as Folder ?? parent;
             }
 
-            return new UserViewBuilder(userViewManager, LibraryManager, Logger, UserDataManager, tvSeriesManager, channelManager, collectionManager, null)
+            return new UserViewBuilder(userViewManager, LibraryManager, Logger, tvSeriesManager, channelManager, collectionManager, null, query.RequireVisibility(), query.Listing)
                 .GetUserItems(parent, this, CollectionType, query);
         }
 
@@ -131,7 +129,7 @@ namespace Tesserafin.Controller.Entities
                 parent = LibraryManager.GetItemById(ParentId) as Folder ?? parent;
             }
 
-            return new UserViewBuilder(userViewManager, LibraryManager, Logger, UserDataManager, tvSeriesManager, channelManager, collectionManager, itemSortService)
+            return new UserViewBuilder(userViewManager, LibraryManager, Logger, tvSeriesManager, channelManager, collectionManager, itemSortService, query.RequireVisibility(), query.Listing)
                 .GetUserItems(parent, this, CollectionType, query);
         }
 
@@ -140,13 +138,12 @@ namespace Tesserafin.Controller.Entities
         {
             query = PrepareChildrenQuery(user, query);
 
-            // GetChildren isn't part of the GetItemsInternal/GetItems/GetItemList chain the
-            // channelManager parameter was threaded through (out of scope: GetChildren is a much
-            // wider virtual with many more overrides/callers) — falls back to the statics here.
+            // The listing services come from the query (IItemListingServices), not from statics.
             // Documented legitimate caller of the obsolete 5-parameter overload — see
             // docs/major-rewrite-plan-v13.md § PR28/N.
 #pragma warning disable CS0618
-            var result = GetItemList(query, ChannelManager, CollectionManager, UserViewManager, TVSeriesManager);
+            var listing = query.RequireListing();
+            var result = GetItemList(query, listing.Channels, listing.Collections, listing.UserViews, listing.TVSeries);
 #pragma warning restore CS0618
 
             return result.ToList();
@@ -157,13 +154,15 @@ namespace Tesserafin.Controller.Entities
         {
             query = PrepareChildrenQuery(user, query);
 
-            var result = GetItemList(query, ChannelManager, CollectionManager, UserViewManager, TVSeriesManager, itemSortService);
+            var listing = query.RequireListing();
+
+            var result = GetItemList(query, listing.Channels, listing.Collections, listing.UserViews, listing.TVSeries, itemSortService);
 
             return result.ToList();
         }
 
         /// <inheritdoc />
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             return false;
         }
@@ -179,12 +178,12 @@ namespace Tesserafin.Controller.Entities
         {
             query = PrepareRecursiveChildrenQuery(user, query);
 
-            // Same scope boundary as GetChildren above: GetRecursiveChildren isn't part of the
-            // threaded chain, falls back to the statics.
+            // The listing services come from the query, as in GetChildren above.
             // Documented legitimate caller of the obsolete 5-parameter overload — see
             // docs/major-rewrite-plan-v13.md § PR28/N.
 #pragma warning disable CS0618
-            var data = GetItemList(query, ChannelManager, CollectionManager, UserViewManager, TVSeriesManager);
+            var listing = query.RequireListing();
+            var data = GetItemList(query, listing.Channels, listing.Collections, listing.UserViews, listing.TVSeries);
 #pragma warning restore CS0618
             totalCount = data.Count;
 
@@ -196,7 +195,9 @@ namespace Tesserafin.Controller.Entities
         {
             query = PrepareRecursiveChildrenQuery(user, query);
 
-            var data = GetItemList(query, ChannelManager, CollectionManager, UserViewManager, TVSeriesManager, itemSortService);
+            var listing = query.RequireListing();
+
+            var data = GetItemList(query, listing.Channels, listing.Collections, listing.UserViews, listing.TVSeries, itemSortService);
             totalCount = data.Count;
 
             return data;
@@ -220,9 +221,9 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <inheritdoc />
-        protected override IReadOnlyList<BaseItem> GetEligibleChildrenForRecursiveChildren(User user)
+        protected override IReadOnlyList<BaseItem> GetEligibleChildrenForRecursiveChildren(User user, InternalItemsQuery query)
         {
-            return GetChildren(user, false, null);
+            return GetChildren(user, false, new InternalItemsQuery(user) { Visibility = query.RequireVisibility(), Listing = query.Listing });
         }
 
         public static bool IsUserSpecific(Folder folder)
@@ -257,7 +258,7 @@ namespace Tesserafin.Controller.Entities
             return _originalFolderViewTypes.Contains(viewType);
         }
 
-        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override Task ValidateChildrenInternal(IFolderValidationServices services, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }

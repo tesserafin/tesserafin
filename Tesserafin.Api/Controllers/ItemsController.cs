@@ -13,6 +13,7 @@ using Tesserafin.Api.ModelBinders;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
+using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Playlists;
@@ -36,7 +37,10 @@ namespace Tesserafin.Api.Controllers;
 [Tags("Library")]
 public class ItemsController : BaseTesserafinApiController
 {
+    private readonly IItemListingServices _listing;
+    private readonly IStandaloneVisibilityService _visibility;
     private readonly IUserManager _userManager;
+    private readonly INamedItemCatalog _namedItems;
     private readonly ILibraryManager _libraryManager;
     private readonly ILocalizationManager _localization;
     private readonly IDtoService _dtoService;
@@ -51,6 +55,7 @@ public class ItemsController : BaseTesserafinApiController
     /// Initializes a new instance of the <see cref="ItemsController"/> class.
     /// </summary>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
+    /// <param name="namedItems">Read-only named catalogue.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="localization">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
@@ -60,8 +65,11 @@ public class ItemsController : BaseTesserafinApiController
     /// <param name="searchManager">Instance of the <see cref="ISearchManager"/> interface.</param>
     /// <param name="itemQueryService">Instance of the <see cref="IItemQueryService"/> interface.</param>
     /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
+    /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
+    /// <param name="listing">Supplies a folder's own listing logic (user views, channels, collections, next up).</param>
     public ItemsController(
         IUserManager userManager,
+        INamedItemCatalog namedItems,
         ILibraryManager libraryManager,
         ILocalizationManager localization,
         IDtoService dtoService,
@@ -70,9 +78,14 @@ public class ItemsController : BaseTesserafinApiController
         IUserDataManager userDataRepository,
         ISearchManager searchManager,
         IItemQueryService itemQueryService,
-        IItemSortService itemSortService)
+        IItemSortService itemSortService,
+        IStandaloneVisibilityService visibility,
+        IItemListingServices listing)
     {
+        _listing = listing;
+        _visibility = visibility;
         _userManager = userManager;
+        _namedItems = namedItems;
         _libraryManager = libraryManager;
         _localization = localization;
         _dtoService = dtoService;
@@ -539,13 +552,13 @@ public class ItemsController : BaseTesserafinApiController
             {
                 try
                 {
-                    return _libraryManager.GetArtist(i, new DtoOptions(false));
+                    return _namedItems.GetId<MusicArtist>(i);
                 }
                 catch
                 {
-                    return null;
+                    return Guid.Empty;
                 }
-            }).Where(i => i is not null).Select(i => i!.Id).ToArray();
+            }).Where(i => !i.IsEmpty()).ToArray();
         }
 
         // ExcludeArtistIds
@@ -575,13 +588,13 @@ public class ItemsController : BaseTesserafinApiController
             {
                 try
                 {
-                    return _libraryManager.GetStudio(i);
+                    return _namedItems.GetId<Studio>(i);
                 }
                 catch
                 {
-                    return null;
+                    return Guid.Empty;
                 }
-            }).Where(i => i is not null).Select(i => i!.Id).ToArray();
+            }).Where(i => !i.IsEmpty()).ToArray();
         }
 
         // Apply default sorting if none requested
@@ -627,7 +640,7 @@ public class ItemsController : BaseTesserafinApiController
         }
         else
         {
-            var itemsArray = folder.GetChildren(user, true, null, _itemSortService);
+            var itemsArray = folder.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility, Listing = _listing }, _itemSortService);
             result = new QueryResult<BaseItem>(itemsArray);
         }
 
@@ -961,7 +974,7 @@ public class ItemsController : BaseTesserafinApiController
         var excludeFolderIds = user.GetPreferenceValues<Guid>(PreferenceKind.LatestItemExcludes);
         if (parentIdGuid.IsEmpty() && excludeFolderIds.Length > 0)
         {
-            ancestorIds = _libraryManager.GetUserRootFolder().GetChildren(user, true, null, _itemSortService)
+            ancestorIds = _libraryManager.GetUserRootFolder().GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility, Listing = _listing }, _itemSortService)
                 .Where(i => i is Folder)
                 .Where(i => !excludeFolderIds.Contains(i.Id))
                 .Select(i => i.Id)

@@ -9,13 +9,18 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Providers;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.IO
 {
     public sealed class FileRefresher : IDisposable
     {
         private readonly ILogger _logger;
-        private readonly ILibraryManager _libraryManager;
+        private readonly IItemPathLookupService _itemPaths;
+        private readonly IItemLookupService _items;
+        private readonly Lazy<IProviderManager> _providers;
+        private readonly IFileSystem _fileSystem;
         private readonly IServerConfigurationManager _configurationManager;
 
         private readonly List<string> _affectedPaths = new();
@@ -23,13 +28,23 @@ namespace Tesserafin.Server.Core.IO
         private Timer? _timer;
         private bool _disposed;
 
-        public FileRefresher(string path, IServerConfigurationManager configurationManager, ILibraryManager libraryManager, ILogger logger)
+        public FileRefresher(
+            string path,
+            IServerConfigurationManager configurationManager,
+            IItemPathLookupService itemPaths,
+            IItemLookupService items,
+            Lazy<IProviderManager> providers,
+            IFileSystem fileSystem,
+            ILogger logger)
         {
             logger.LogDebug("New file refresher created for {0}", path);
             Path = path;
 
             _configurationManager = configurationManager;
-            _libraryManager = libraryManager;
+            _fileSystem = fileSystem;
+            _providers = providers;
+            _itemPaths = itemPaths;
+            _items = items;
             _logger = logger;
             AddPath(path);
         }
@@ -146,7 +161,7 @@ namespace Tesserafin.Server.Core.IO
 
                 try
                 {
-                    item.ChangedExternally();
+                    _providers.Value.QueueRefresh(item.Id, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), RefreshPriority.High);
                 }
                 catch (Exception ex)
                 {
@@ -166,7 +181,7 @@ namespace Tesserafin.Server.Core.IO
 
             while (item is null && !string.IsNullOrEmpty(path))
             {
-                item = _libraryManager.FindByPath(path, null);
+                item = _itemPaths.FindByPath(path, null);
 
                 path = System.IO.Path.GetDirectoryName(path) ?? string.Empty;
             }
@@ -176,7 +191,7 @@ namespace Tesserafin.Server.Core.IO
                 // If the item has been deleted find the first valid parent that still exists
                 while (!Directory.Exists(item.Path) && !File.Exists(item.Path))
                 {
-                    item = item.GetOwner() ?? item.GetParent();
+                    item = item.GetOwner(_items) ?? item.GetParent(_items);
 
                     if (item is null)
                     {

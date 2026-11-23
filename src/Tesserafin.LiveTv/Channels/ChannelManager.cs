@@ -27,6 +27,7 @@ using Tesserafin.LiveTv;
 using Tesserafin.Model.Channels;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Model.Querying;
 using Episode = Tesserafin.Controller.Entities.TV.Episode;
@@ -43,7 +44,9 @@ namespace Tesserafin.LiveTv.Channels
     public class ChannelManager : IChannelManager, IDisposable
     {
         private readonly IItemPeopleCommands _peopleCommands;
+        private readonly ILocalizationManager _localization;
         private readonly IItemWriteCommands _writes;
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly IItemDeletionCommands _deletions;
         private readonly IUserManager _userManager;
         private readonly IUserDataManager _userDataManager;
@@ -74,6 +77,8 @@ namespace Tesserafin.LiveTv.Channels
         /// <param name="providerManager">The provider manager.</param>
         /// <param name="memoryCache">The memory cache.</param>
         /// <param name="channels">The channels.</param>
+        /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
+        /// <param name="localization">Scores ratings when item metadata changes.</param>
         public ChannelManager(
             IItemPeopleCommands peopleCommands,
             IItemWriteCommands writes,
@@ -87,10 +92,14 @@ namespace Tesserafin.LiveTv.Channels
             IUserDataManager userDataManager,
             IProviderManager providerManager,
             IMemoryCache memoryCache,
-            IEnumerable<IChannel> channels)
+            IEnumerable<IChannel> channels,
+            IStandaloneVisibilityService visibility,
+            ILocalizationManager localization)
         {
             _peopleCommands = peopleCommands;
+            _localization = localization;
             _writes = writes;
+            _visibility = visibility;
             _deletions = deletions;
             _userManager = userManager;
             _dtoService = dtoService;
@@ -233,7 +242,7 @@ namespace Tesserafin.LiveTv.Channels
                 var userId = user.Id.ToString("N", CultureInfo.InvariantCulture);
                 channels = channels.Where(i =>
                 {
-                    if (!i.IsVisible(user))
+                    if (!i.IsVisible(user, false, _visibility))
                     {
                         return false;
                     }
@@ -339,7 +348,7 @@ namespace Tesserafin.LiveTv.Channels
 
         private MediaSourceInfo[] GetSavedMediaSources(BaseItem item)
         {
-            var path = Path.Combine(item.GetInternalMetadataPath(), "channelmediasourceinfos.json");
+            var path = Path.Combine(item.GetInternalMetadataPath(_config.ApplicationPaths.InternalMetadataPath), "channelmediasourceinfos.json");
 
             try
             {
@@ -355,7 +364,7 @@ namespace Tesserafin.LiveTv.Channels
 
         private async Task SaveMediaSources(BaseItem item, List<MediaSourceInfo> mediaSources)
         {
-            var path = Path.Combine(item.GetInternalMetadataPath(), "channelmediasourceinfos.json");
+            var path = Path.Combine(item.GetInternalMetadataPath(_config.ApplicationPaths.InternalMetadataPath), "channelmediasourceinfos.json");
 
             if (mediaSources is null || mediaSources.Count == 0)
             {
@@ -497,13 +506,14 @@ namespace Tesserafin.LiveTv.Channels
 
             if (isNew)
             {
-                item.OnMetadataChanged();
+                item.OnMetadataChanged(_localization);
                 _writes.CreateItem(item, null);
             }
 
             await item.RefreshMetadata(
                 _deletions,
                 _writes,
+                _providerManager,
                 new MetadataRefreshOptions(new DirectoryService(_fileSystem))
                 {
                     ForceSave = !isNew && forceUpdate
@@ -1148,7 +1158,7 @@ namespace Tesserafin.LiveTv.Channels
                 }
             }
 
-            item.OnMetadataChanged();
+            item.OnMetadataChanged(_localization);
 
             if (isNew)
             {

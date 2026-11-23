@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
+using Tesserafin.Controller.Providers;
 
 namespace Tesserafin.Server.Core.Library.Validators;
 
@@ -14,6 +15,7 @@ public class MusicGenresPostScanTask : ILibraryPostScanTask
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IProviderManager _providers;
 
     /// <summary>
     /// The library manager.
@@ -27,18 +29,21 @@ public class MusicGenresPostScanTask : ILibraryPostScanTask
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="providers">The provider manager for metadata refreshes.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
     public MusicGenresPostScanTask(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
+        IProviderManager providers,
         ILibraryManager libraryManager,
         ILogger<MusicGenresValidator> logger,
         IItemRepository itemRepo)
     {
         _writes = writes;
         _deletions = deletions;
+        _providers = providers;
         _libraryManager = libraryManager;
         _logger = logger;
         _itemRepo = itemRepo;
@@ -52,6 +57,6 @@ public class MusicGenresPostScanTask : ILibraryPostScanTask
     /// <returns>Task.</returns>
     public Task Run(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        return new MusicGenresValidator(_writes, _deletions, _libraryManager, _logger, _itemRepo).Run(progress, cancellationToken);
+        return new MusicGenresValidator(_writes, _deletions, _providers, _libraryManager, _logger, _itemRepo).Run(progress, cancellationToken);
     }
 }

@@ -30,6 +30,7 @@ namespace Tesserafin.Server.Core.Collections
     public class CollectionManager : ICollectionManager
     {
         private readonly IItemWriteCommands _writes;
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly ILibraryManager _libraryManager;
         private readonly ILibraryStructureCommands _structure;
         private readonly IFileSystem _fileSystem;
@@ -37,6 +38,7 @@ namespace Tesserafin.Server.Core.Collections
         private readonly ILogger<CollectionManager> _logger;
         private readonly IProviderManager _providerManager;
         private readonly ILinkedChildrenService _linkedChildrenService;
+        private readonly LinkedChildResolver _linkedChildResolver;
         private readonly ILocalizationManager _localizationManager;
         private readonly IApplicationPaths _appPaths;
         private readonly IItemSortService _itemSortService;
@@ -55,6 +57,8 @@ namespace Tesserafin.Server.Core.Collections
         /// <param name="providerManager">The provider manager.</param>
         /// <param name="linkedChildrenService">The linked children service.</param>
         /// <param name="itemSortService">The item sort service.</param>
+        /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
+        /// <param name="linkedChildResolver">The resolver for saved collection links.</param>
         public CollectionManager(
             IItemWriteCommands writes,
             ILibraryManager libraryManager,
@@ -66,9 +70,12 @@ namespace Tesserafin.Server.Core.Collections
             ILoggerFactory loggerFactory,
             IProviderManager providerManager,
             ILinkedChildrenService linkedChildrenService,
-            IItemSortService itemSortService)
+            IItemSortService itemSortService,
+            IStandaloneVisibilityService visibility,
+            LinkedChildResolver linkedChildResolver)
         {
             _writes = writes;
+            _visibility = visibility;
             _libraryManager = libraryManager;
             _structure = structure;
             _fileSystem = fileSystem;
@@ -76,6 +83,7 @@ namespace Tesserafin.Server.Core.Collections
             _logger = loggerFactory.CreateLogger<CollectionManager>();
             _providerManager = providerManager;
             _linkedChildrenService = linkedChildrenService;
+            _linkedChildResolver = linkedChildResolver;
             _localizationManager = localizationManager;
             _appPaths = appPaths;
             _itemSortService = itemSortService;
@@ -163,7 +171,7 @@ namespace Tesserafin.Server.Core.Collections
 
             return folder is null
                 ? Enumerable.Empty<BoxSet>()
-                : folder.GetChildren(user, true, null, _itemSortService).OfType<BoxSet>();
+                : folder.GetChildren(user, true, new InternalItemsQuery(user) { Visibility = _visibility }, _itemSortService).OfType<BoxSet>();
         }
 
         /// <inheritdoc />
@@ -248,7 +256,7 @@ namespace Tesserafin.Server.Core.Collections
 
             List<BaseItem>? itemList = null;
 
-            var linkedChildrenList = collection.GetLinkedChildren();
+            var linkedChildrenList = _linkedChildResolver.Resolve(collection).Select(entry => entry.Item).ToList();
             var currentLinkedChildrenIds = linkedChildrenList.Select(i => i.Id).ToList();
 
             foreach (var id in ids)
@@ -280,7 +288,7 @@ namespace Tesserafin.Server.Core.Collections
                 }
 
                 collection.LinkedChildren = newChildren;
-                collection.UpdateRatingToItems(linkedChildrenList);
+                collection.UpdateRatingToItems(linkedChildrenList, _localizationManager);
 
                 await collection.UpdateToRepositoryAsync(_writes, ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
@@ -358,7 +366,7 @@ namespace Tesserafin.Server.Core.Collections
                     var itemIsInBoxSet = false;
                     foreach (var boxSet in allBoxSets)
                     {
-                        if (!boxSet.ContainsLinkedChildByItemId(itemId))
+                        if (!_linkedChildResolver.Contains(boxSet, itemId))
                         {
                             continue;
                         }

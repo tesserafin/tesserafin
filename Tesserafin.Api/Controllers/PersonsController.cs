@@ -26,21 +26,25 @@ namespace Tesserafin.Api.Controllers;
 public class PersonsController : BaseTesserafinApiController
 {
     private readonly ILibraryManager _libraryManager;
+    private readonly IItemPeopleService _people;
     private readonly IDtoService _dtoService;
     private readonly IUserManager _userManager;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PersonsController"/> class.
     /// </summary>
+    /// <param name="people">Read-only people catalogue.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     public PersonsController(
         ILibraryManager libraryManager,
+        IItemPeopleService people,
         IDtoService dtoService,
         IUserManager userManager)
     {
         _libraryManager = libraryManager;
+        _people = people;
         _dtoService = dtoService;
         _userManager = userManager;
     }
@@ -106,7 +110,7 @@ public class PersonsController : BaseTesserafinApiController
         }
 
         var isFavoriteInFilters = filters.Any(f => f == ItemFilter.IsFavorite);
-        var peopleItems = _libraryManager.GetPeopleItems(new InternalPeopleQuery(
+        var peopleItems = _people.GetPeopleItems(new InternalPeopleQuery(
             personTypes,
             excludePersonTypes)
         {
@@ -147,7 +151,7 @@ public class PersonsController : BaseTesserafinApiController
         userId = RequestHelpers.GetUserId(User, userId);
         var dtoOptions = new DtoOptions();
 
-        var item = _libraryManager.GetPerson(name);
+        var item = _people.GetPerson(name);
         if (item is null)
         {
             return NotFound();

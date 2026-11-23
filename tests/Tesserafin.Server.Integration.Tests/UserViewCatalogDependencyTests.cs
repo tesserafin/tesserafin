@@ -62,9 +62,6 @@ namespace Tesserafin.Server.Integration.Tests
         private static readonly (Type Type, string Name)[] _staticLocators =
         [
             (typeof(BaseItem), nameof(BaseItem.LibraryManager)),
-            (typeof(BaseItem), nameof(BaseItem.ChannelManager)),
-            (typeof(Folder), nameof(Folder.UserViewManager)),
-            (typeof(Folder), nameof(Folder.CollectionManager)),
         ];
 
         private static readonly Lazy<IServiceCollection> _registrations = new(BuildRegistrations);
@@ -154,22 +151,6 @@ namespace Tesserafin.Server.Integration.Tests
             Assert.Equal(
                 [typeof(IItemLookupService), typeof(IStandaloneVisibilityService)],
                 implementation.GetConstructors().Single().GetParameters().Select(p => p.ParameterType));
-        }
-
-        [Fact]
-        public void StandaloneVisibilityService_AlsoSuppliesTheBoxSetData()
-        {
-            // A box set reads its libraries and linked children (by id, then by path) from the service only
-            // when it is one; otherwise the access path falls back to the static without failing
-            // (DEBT-SERVER-5, DEBT-SERVER-7).
-            var implementation = _registrations.Value.Single(d => d.ServiceType == typeof(IStandaloneVisibilityService)).ImplementationType!;
-
-            Assert.True(typeof(ILinkedChildVisibilityService).IsAssignableFrom(implementation));
-
-            // And the parental check its rating score and the server's country code (DEBT-SERVER-8).
-            Assert.True(typeof(IRatingVisibilityService).IsAssignableFrom(implementation));
-            // And a video's source type whether it is an active recording (DEBT-SERVER-9).
-            Assert.True(typeof(IRecordingVisibilityService).IsAssignableFrom(implementation));
         }
 
         [Theory]

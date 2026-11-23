@@ -27,7 +27,8 @@ public class PlaylistItemsProvider : ILocalMetadataProvider<Playlist>,
     IHasItemChangeMonitor
 {
     private readonly IFileSystem _fileSystem;
-    private readonly ILibraryManager _libraryManager;
+    private readonly IUserRootFolderProvider _userRoots;
+    private readonly IItemPathLookupService _itemPaths;
     private readonly ILogger<PlaylistItemsProvider> _logger;
     private readonly CollectionType[] _ignoredCollections = [CollectionType.livetv, CollectionType.boxsets, CollectionType.playlists];
 
@@ -35,12 +36,18 @@ public class PlaylistItemsProvider : ILocalMetadataProvider<Playlist>,
     /// Initializes a new instance of the <see cref="PlaylistItemsProvider"/> class.
     /// </summary>
     /// <param name="logger">Instance of the <see cref="ILogger{PlaylistItemsProvider}"/> interface.</param>
-    /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="userRoots">The user root folder provider.</param>
+    /// <param name="itemPaths">The catalogue path lookup service.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
-    public PlaylistItemsProvider(ILogger<PlaylistItemsProvider> logger, ILibraryManager libraryManager, IFileSystem fileSystem)
+    public PlaylistItemsProvider(
+        ILogger<PlaylistItemsProvider> logger,
+        IUserRootFolderProvider userRoots,
+        IItemPathLookupService itemPaths,
+        IFileSystem fileSystem)
     {
         _logger = logger;
-        _libraryManager = libraryManager;
+        _userRoots = userRoots;
+        _itemPaths = itemPaths;
         _fileSystem = fileSystem;
     }
 
@@ -95,7 +102,7 @@ public class PlaylistItemsProvider : ILocalMetadataProvider<Playlist>,
 
     private IEnumerable<LinkedChild> GetItems(string path, string extension)
     {
-        var libraryRoots = _libraryManager.GetUserRootFolder().Children
+        var libraryRoots = _userRoots.GetUserRootFolder().Children
                             .OfType<CollectionFolder>()
                             .Where(f => f.CollectionType.HasValue && !_ignoredCollections.Contains(f.CollectionType.Value))
                             .SelectMany(f => f.PhysicalLocations)
@@ -200,7 +207,7 @@ public class PlaylistItemsProvider : ILocalMetadataProvider<Playlist>,
         {
             if (pathToCheck.StartsWith(libraryPath, StringComparison.OrdinalIgnoreCase))
             {
-                item = _libraryManager.FindByPath(pathToCheck, null);
+                item = _itemPaths.FindByPath(pathToCheck, null);
                 return item is not null;
             }
         }

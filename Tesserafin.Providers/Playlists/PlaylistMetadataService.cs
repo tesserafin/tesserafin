@@ -10,6 +10,7 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.Manager;
 
@@ -20,6 +21,8 @@ namespace Tesserafin.Providers.Playlists;
 /// </summary>
 public class PlaylistMetadataService : MetadataService<Playlist, ItemLookupInfo>
 {
+    private readonly LinkedChildResolver _linkedChildren;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="PlaylistMetadataService"/> class.
     /// </summary>
@@ -29,10 +32,12 @@ public class PlaylistMetadataService : MetadataService<Playlist, ItemLookupInfo>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
-    /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="itemOptions">Effective options for the item's library.</param>
     /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
+    /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
+    /// <param name="linkedChildren">The resolver for saved links.</param>
     public PlaylistMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -40,12 +45,15 @@ public class PlaylistMetadataService : MetadataService<Playlist, ItemLookupInfo>
         ILogger<PlaylistMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
-        ILibraryManager libraryManager,
+        ILibraryItemOptions itemOptions,
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
-        IItemRepository itemRepository)
-        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        IItemRepository itemRepository,
+        ILocalizationManager localizationManager,
+        LinkedChildResolver linkedChildren)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
+        _linkedChildren = linkedChildren;
     }
 
     /// <inheritdoc />
@@ -59,7 +67,7 @@ public class PlaylistMetadataService : MetadataService<Playlist, ItemLookupInfo>
 
     /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(Playlist item)
-        => item.GetLinkedChildren();
+        => _linkedChildren.GetItems(item);
 
     /// <inheritdoc />
     protected override void MergeData(MetadataResult<Playlist> source, MetadataResult<Playlist> target, MetadataField[] lockedFields, bool replaceData, bool mergeMetadataSettings)

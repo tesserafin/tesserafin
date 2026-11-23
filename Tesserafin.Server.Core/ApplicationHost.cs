@@ -101,6 +101,7 @@ using Tesserafin.Server.Core.IO;
 using Tesserafin.Server.Core.Library;
 using Tesserafin.Server.Core.Library.Search;
 using Tesserafin.Server.Core.Library.SimilarItems;
+using Tesserafin.Server.Core.Library.Validators;
 using Tesserafin.Server.Core.Localization;
 using Tesserafin.Server.Core.Playlists;
 using Tesserafin.Server.Core.Plugins;
@@ -288,24 +289,11 @@ namespace Tesserafin.Server.Core
         public string RestoreBackupPath { get; set; }
 
         public string ExpandVirtualPath(string path)
-        {
-            if (path is null)
-            {
-                return null;
-            }
-
-            var appPaths = ApplicationPaths;
-
-            return path.Replace(appPaths.VirtualDataPath, appPaths.DataPath, StringComparison.OrdinalIgnoreCase)
-                .Replace(appPaths.VirtualInternalMetadataPath, appPaths.InternalMetadataPath, StringComparison.OrdinalIgnoreCase);
-        }
+            => VirtualPaths.Expand(ApplicationPaths, path);
 
         public string ReverseVirtualPath(string path)
         {
-            var appPaths = ApplicationPaths;
-
-            return path.Replace(appPaths.DataPath, appPaths.VirtualDataPath, StringComparison.OrdinalIgnoreCase)
-                .Replace(appPaths.InternalMetadataPath, appPaths.VirtualInternalMetadataPath, StringComparison.OrdinalIgnoreCase);
+            return VirtualPaths.Reverse(ApplicationPaths, path);
         }
 
         /// <summary>
@@ -538,12 +526,14 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemRepository>(sp => sp.GetRequiredService<BaseItemRepository>());
             serviceCollection.AddSingleton<IItemQueryHelpers>(sp => sp.GetRequiredService<BaseItemRepository>());
             serviceCollection.AddSingleton<IItemPersistenceService, ItemPersistenceService>();
+            serviceCollection.AddSingleton<IItemReadServices, ItemReadServices>();
             serviceCollection.AddSingleton<INextUpService, NextUpService>();
             serviceCollection.AddSingleton<IItemCountService, ItemCountService>();
             serviceCollection.AddSingleton<ILinkedChildrenService, LinkedChildrenService>();
             serviceCollection.AddSingleton<IItemSortService, ItemSortService>();
             serviceCollection.AddSingleton<IItemNamingService, ItemNamingService>();
             serviceCollection.AddSingleton<IItemPeopleService, ItemPeopleService>();
+            serviceCollection.AddSingleton<PeopleValidator>();
             serviceCollection.AddSingleton<IPeopleRepository, PeopleRepository>();
             serviceCollection.AddSingleton<IChapterRepository, ChapterRepository>();
             serviceCollection.AddSingleton<IMediaAttachmentRepository, MediaAttachmentRepository>();
@@ -561,12 +551,20 @@ namespace Tesserafin.Server.Core
             // TODO: Refactor to eliminate the circular dependencies here so that Lazy<T> isn't required
             serviceCollection.AddTransient(provider => new Lazy<ILibraryMonitor>(provider.GetRequiredService<ILibraryMonitor>));
             serviceCollection.AddTransient(provider => new Lazy<IProviderManager>(provider.GetRequiredService<IProviderManager>));
+            // The provider manager also initiates folder validation, which consumes the scan context.
+            serviceCollection.AddTransient(provider => new Lazy<IItemMetadataDispatcher>(provider.GetRequiredService<IProviderManager>));
             serviceCollection.AddTransient(provider => new Lazy<IExternalDataManager>(provider.GetRequiredService<IExternalDataManager>));
             // Deletion can refresh metadata and remove channel data; these services themselves
             // consume the deletion port. Defer their construction, never their command completion.
             serviceCollection.AddTransient(provider => new Lazy<IMediaSourceManager>(provider.GetRequiredService<IMediaSourceManager>));
             serviceCollection.AddTransient(provider => new Lazy<IMediaSegmentManager>(provider.GetRequiredService<IMediaSegmentManager>));
             serviceCollection.AddTransient(provider => new Lazy<IChannelManager>(provider.GetRequiredService<IChannelManager>));
+            // Folder listing hands these to the entities on their query; each of them lists children itself.
+            serviceCollection.AddTransient(provider => new Lazy<ICollectionManager>(provider.GetRequiredService<ICollectionManager>));
+            serviceCollection.AddTransient(provider => new Lazy<IUserViewManager>(provider.GetRequiredService<IUserViewManager>));
+            serviceCollection.AddTransient(provider => new Lazy<ITVSeriesManager>(provider.GetRequiredService<ITVSeriesManager>));
+            serviceCollection.AddSingleton<IItemListingServices, ItemListingServices>();
+            serviceCollection.AddSingleton<IFolderValidationServices, FolderValidationServices>();
 
             // LiveTvPresenceProvider (PR108) needs the registered ILiveTvService count to reproduce
             // LiveTvManager.IsLiveTvEnabled, but the in-tree DefaultLiveTvService implementation
@@ -577,6 +575,8 @@ namespace Tesserafin.Server.Core
 
             serviceCollection.AddSingleton<ItemLookupService>();
             serviceCollection.AddSingleton<IItemLookupService>(sp => sp.GetRequiredService<ItemLookupService>());
+            serviceCollection.AddSingleton<IItemPathLookupService>(sp => sp.GetRequiredService<ItemLookupService>());
+            serviceCollection.AddSingleton<LinkedChildResolver>();
             serviceCollection.AddSingleton<IItemCacheStore>(sp => sp.GetRequiredService<ItemLookupService>());
             serviceCollection.AddSingleton<IItemAccessService, ItemAccessService>();
             serviceCollection.AddSingleton<ItemChangeEvents>();
@@ -587,11 +587,16 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IItemResolutionService, ItemResolutionService>();
             serviceCollection.AddSingleton<IPlaybackIntroService, PlaybackIntroService>();
             serviceCollection.AddSingleton<IItemMetadataExporter, ItemMetadataExporter>();
+            serviceCollection.AddSingleton<NamedItemIdentity>();
+            serviceCollection.AddSingleton<INamedItemCatalog, NamedItemCatalog>();
             serviceCollection.AddSingleton<ItemVersionGraphPlanner>();
+            serviceCollection.AddSingleton<FolderChildReconciler>();
+            serviceCollection.AddSingleton<CollectionFolderMembershipResolver>();
             serviceCollection.AddSingleton<IItemWriteCommands, ItemWriteCommands>();
             serviceCollection.AddSingleton<IItemPeopleCommands, ItemPeopleCommands>();
             serviceCollection.AddSingleton<IUserViewFactory, UserViewFactory>();
             serviceCollection.AddSingleton<IUserRootFolderProvider, UserRootFolderProvider>();
+            serviceCollection.AddSingleton<ILibraryOptionsStore, LibraryOptionsStore>();
             serviceCollection.AddSingleton<ICollectionFolderResolver, CollectionFolderResolver>();
             serviceCollection.AddSingleton<ActiveRecordings>();
             serviceCollection.AddSingleton<ITagVisibilityService, TagVisibilityService>();
@@ -602,7 +607,9 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IUserViewCatalog, UserViewCatalog>();
             serviceCollection.AddSingleton<ILibraryRootFolderProvider, LibraryRootFolderProvider>();
             serviceCollection.AddSingleton<ILibraryScanTraversal, LibraryScanTraversal>();
+            serviceCollection.AddSingleton<ILibraryRefreshProgress, LibraryRefreshProgress>();
             serviceCollection.AddSingleton<ILibraryStructureCommands, LibraryStructureCommands>();
+            serviceCollection.AddSingleton<ILibraryStructureReader, LibraryStructureReader>();
             serviceCollection.AddSingleton<IItemDeletionCommands, ItemDeletionCommands>();
             serviceCollection.AddSingleton<IItemImageService, ItemImageService>();
             serviceCollection.AddSingleton<IRemoteImageSource, RemoteImageSource>();
@@ -826,26 +833,10 @@ namespace Tesserafin.Server.Core
         private void SetStaticProperties()
         {
             // For now there's no real way to inject these properly
-            BaseItem.ChapterManager = Resolve<IChapterManager>();
-            BaseItem.ChannelManager = Resolve<IChannelManager>();
             BaseItem.ConfigurationManager = ConfigurationManager;
             BaseItem.FileSystem = Resolve<IFileSystem>();
-            BaseItem.ItemRepository = Resolve<IItemRepository>();
             BaseItem.LibraryManager = Resolve<ILibraryManager>();
-            BaseItem.LocalizationManager = Resolve<ILocalizationManager>();
             BaseItem.Logger = Resolve<ILogger<BaseItem>>();
-            BaseItem.MediaSegmentManager = Resolve<IMediaSegmentManager>();
-            BaseItem.MediaSourceManager = Resolve<IMediaSourceManager>();
-            BaseItem.ProviderManager = Resolve<IProviderManager>();
-            BaseItem.UserDataManager = Resolve<IUserDataManager>();
-            CollectionFolder.XmlSerializer = _xmlSerializer;
-            CollectionFolder.ApplicationHost = this;
-            Folder.UserViewManager = Resolve<IUserViewManager>();
-            Folder.CollectionManager = Resolve<ICollectionManager>();
-            Folder.LimitedConcurrencyLibraryScheduler = Resolve<ILimitedConcurrencyLibraryScheduler>();
-            Episode.MediaEncoder = Resolve<IMediaEncoder>();
-            UserView.TVSeriesManager = Resolve<ITVSeriesManager>();
-            Video.RecordingsManager = Resolve<IRecordingsManager>();
         }
 
         /// <summary>

@@ -7,6 +7,7 @@ using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
@@ -349,7 +350,7 @@ public class SeriesGetSeasonEpisodesTests
 
         var sortService = new RecordingItemSortService();
 
-        var result = series.GetSeasonEpisodes(season1, null, new BaseItem[] { e2, e1 }, new DtoOptions(true), true, sortService);
+        var result = series.GetSeasonEpisodes(season1, null, new BaseItem[] { e2, e1 }, new DtoOptions(true), true, Mock.Of<IItemListingServices>(l => l.Sort == sortService));
 
         Assert.Single(sortService.Calls);
         Assert.Equal(new BaseItem[] { e1, e2 }, result);
@@ -387,7 +388,7 @@ public class SeriesGetSeasonEpisodesTests
         BaseItem.LibraryManager = libraryManager.Object;
 
         var beforeResult = series.GetSeasonEpisodes(season1, null, allEpisodes, new DtoOptions(true), true);
-        var afterResult = series.GetSeasonEpisodes(season1, null, allEpisodes, new DtoOptions(true), true, sharedSortService);
+        var afterResult = series.GetSeasonEpisodes(season1, null, allEpisodes, new DtoOptions(true), true, Mock.Of<IItemListingServices>(l => l.Sort == sharedSortService));
 
         Assert.Equal(beforeResult, afterResult);
         Assert.Equal(2, sharedSortService.Calls.Count);
@@ -497,6 +498,57 @@ public class SeriesGetSeasonEpisodesTests
             Times.Once);
     }
 
+    [Fact]
+    public void SeriesGetCatalogueEpisodes_ReadsPresentationGroupAndDeduplicatesSpecials()
+    {
+        SetDisplaySpecialsWithinSeasons(true);
+        BaseItem.LibraryManager = Mock.Of<ILibraryManager>(MockBehavior.Strict);
+        var series = CreateSeries();
+        var specials = CreateSeason(0);
+        var season = CreateSeason(1);
+        var special = CreateEpisode("Special", 0, 1, airsAfterSeasonNumber: 1);
+        var missing = CreateEpisode("Missing", 1, 2);
+        missing.IsVirtualItem = true;
+        var episode = CreateEpisode("S01E01", 1, 1);
+        var repository = new Mock<IItemRepository>(MockBehavior.Strict);
+        repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q =>
+                q.User == null && q.SeriesPresentationUniqueKey == "series-key" && q.IsMissing == null
+                && q.IncludeItemTypes.SequenceEqual(new[] { BaseItemKind.Episode, BaseItemKind.Season }))))
+            .Returns([specials, season, missing, special, episode]);
+
+        var result = series.GetCatalogueEpisodes(new DtoOptions(), repository.Object, Mock.Of<IItemListingServices>(l => l.Sort == new RecordingItemSortService()));
+
+        Assert.Equal(new BaseItem[] { special, episode, missing }, result);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SeasonGetCatalogueEpisodes_ResolvesSeriesAndReadsConfiguredGroup(bool includeSpecials)
+    {
+        SetDisplaySpecialsWithinSeasons(includeSpecials);
+        BaseItem.LibraryManager = Mock.Of<ILibraryManager>(MockBehavior.Strict);
+        var series = CreateSeries();
+        var season = CreateSeason(1);
+        season.SeriesId = series.Id;
+        var episode = CreateEpisode("S01E01", 1, 1);
+        var special = CreateEpisode("Special", 0, 1, airsAfterSeasonNumber: 1);
+        var lookup = new Mock<IItemLookupService>(MockBehavior.Strict);
+        lookup.Setup(l => l.GetItemById(series.Id)).Returns(series);
+        var repository = new Mock<IItemRepository>(MockBehavior.Strict);
+        repository.Setup(r => r.GetItemList(It.Is<InternalItemsQuery>(q =>
+                q.User == null && q.IsMissing == null
+                && q.IncludeItemTypes.SequenceEqual(new[] { BaseItemKind.Episode })
+                && q.SeriesPresentationUniqueKey == (includeSpecials ? "series-key" : null)
+                && q.AncestorWithPresentationUniqueKey == (includeSpecials ? null : "season-key"))))
+            .Returns([episode, special]);
+
+        var result = season.GetCatalogueEpisodes(new DtoOptions(true), repository.Object, lookup.Object, Mock.Of<IItemListingServices>(l => l.Sort == new RecordingItemSortService()));
+
+        BaseItem[] expected = includeSpecials ? [special, episode] : [episode];
+        Assert.Equal(expected, result);
+    }
+
     /// <summary>
     /// Records every <see cref="Sort"/> call and applies a deterministic ordering that actually
     /// depends on the requested <c>sortBy</c>/<c>sortOrder</c>/items (SortName lexical order, or a
@@ -505,6 +557,37 @@ public class SeriesGetSeasonEpisodesTests
     /// <c>AiredEpisodeOrderComparerTests</c> in Tesserafin.Server.Implementations.Tests), but enough to
     /// catch a wiring bug (wrong sortBy, wrong sortOrder, unfiltered items) in either call path.
     /// </summary>
+    [Fact]
+    public void ChannelSeries_ListsItsEpisodesThroughTheListingChannels()
+    {
+        SetDisplaySpecialsWithinSeasons(false);
+        var series = CreateSeries();
+        series.ChannelId = Guid.NewGuid();
+        var season = CreateSeason(1);
+        var episode = CreateEpisode("E1", 1, 1);
+        var channels = new Mock<Tesserafin.Controller.Channels.IChannelManager>(MockBehavior.Strict);
+        channels
+            .Setup(c => c.GetChannelItemsInternal(It.Is<InternalItemsQuery>(q => q.ChannelIds.Contains(series.ChannelId) && q.ParentId.Equals(season.Id)), It.IsAny<IProgress<double>>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new Tesserafin.Model.Querying.QueryResult<BaseItem>(new BaseItem[] { episode }));
+        var listing = Mock.Of<IItemListingServices>(l => l.Channels == channels.Object && l.Sort == new RecordingItemSortService());
+
+        var result = series.GetSeasonEpisodes(season, null, new DtoOptions(true), true, listing);
+
+        Assert.Equal(new BaseItem[] { episode }, result);
+        channels.VerifyAll();
+    }
+
+    [Fact]
+    public void ChannelSeries_WithoutListingServices_ReturnsNothing()
+    {
+        // The channel lookup failure is swallowed (as channel errors always were): no static fallback exists.
+        SetDisplaySpecialsWithinSeasons(false);
+        var series = CreateSeries();
+        series.ChannelId = Guid.NewGuid();
+
+        Assert.Empty(series.GetSeasonEpisodes(CreateSeason(1), null, new DtoOptions(true), true, null));
+    }
+
     private sealed class RecordingItemSortService : IItemSortService
     {
         public List<(IReadOnlyList<BaseItem> Items, User? User, IReadOnlyList<ItemSortBy> SortBy, SortOrder SortOrder)> Calls { get; } = [];
@@ -537,4 +620,3 @@ public class SeriesGetSeasonEpisodesTests
                 : item.SortName;
     }
 }
-#pragma warning restore CS0618

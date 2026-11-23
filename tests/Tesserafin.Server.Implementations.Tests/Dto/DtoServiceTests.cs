@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Common;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Chapters;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Dto;
@@ -39,10 +40,10 @@ public class DtoServiceTests
         appHost.Setup(x => x.SystemId).Returns("test-server");
 
         // Video.SourceType probes the active-recording manager; provide one so it doesn't NRE.
-        Video.RecordingsManager = new Mock<IRecordingsManager>().Object;
 
         _dtoService = new DtoService(
             NullLogger<DtoService>.Instance,
+            Mock.Of<INamedItemCatalog>(),
             _libraryManagerMock.Object,
             _itemPeopleServiceMock.Object,
             new Mock<IUserDataManager>().Object,
@@ -52,9 +53,12 @@ public class DtoServiceTests
             appHost.Object,
             new Mock<IMediaSourceManager>().Object,
             new Lazy<ILiveTvManager>(() => new Mock<ILiveTvManager>().Object),
+            new Lazy<IChannelManager>(Mock.Of<IChannelManager>),
             new Mock<ITrickplayManager>().Object,
             new Mock<IChapterManager>().Object,
-            new Mock<IItemCountService>().Object);
+            new Mock<IItemCountService>().Object,
+            Mock.Of<IStandaloneVisibilityService>(),
+            Mock.Of<IItemListingServices>());
 
         // Episode.Series / Episode.Season resolve through the static BaseItem.LibraryManager.
         BaseItem.LibraryManager = _libraryManagerMock.Object;

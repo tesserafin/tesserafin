@@ -39,9 +39,9 @@ namespace Tesserafin.Server.Core.Playlists
         [JsonIgnore]
         public override bool SupportsRawQueryItems => false;
 
-        protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user)
+        protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user, InternalItemsQuery query)
         {
-            return base.GetEligibleChildrenForRecursiveChildren(user).OfType<Playlist>();
+            return base.GetEligibleChildrenForRecursiveChildren(user, query).OfType<Playlist>();
         }
 
         protected override QueryResult<BaseItem> GetItemsInternal(InternalItemsQuery query, IChannelManager channelManager, ICollectionManager collectionManager, IUserViewManager userViewManager, ITVSeriesManager tvSeriesManager)

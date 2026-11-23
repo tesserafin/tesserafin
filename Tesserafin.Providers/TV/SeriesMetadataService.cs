@@ -15,6 +15,7 @@ using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Extensions;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
@@ -27,9 +28,13 @@ namespace Tesserafin.Providers.TV;
 /// </summary>
 public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 {
+    private readonly IItemListingServices _listing;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IItemStore _itemStore;
     private readonly ILocalizationManager _localizationManager;
-    private readonly IItemSortService _itemSortService;
+    private readonly IItemLookupService _lookup;
+    private readonly LinkedChildResolver _links;
+    private readonly ICollectionFolderResolver _collections;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SeriesMetadataService"/> class.
@@ -41,12 +46,16 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
-    /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="itemOptions">Effective options for the item's library.</param>
+    /// <param name="itemStore">Computes stable identities for synthesized seasons.</param>
     /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
     /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
-    /// <param name="itemSortService">Instance of the <see cref="IItemSortService"/> interface.</param>
+    /// <param name="listing">Sort and channel services for episode listing.</param>
+    /// <param name="lookup">The item identity lookup.</param>
+    /// <param name="links">The saved link resolver.</param>
+    /// <param name="collections">The library membership resolver.</param>
     public SeriesMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -55,17 +64,25 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         ILogger<SeriesMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
-        ILibraryManager libraryManager,
+        ILibraryItemOptions itemOptions,
+        IItemStore itemStore,
         IItemNamingService itemNamingService,
         ILocalizationManager localizationManager,
         IExternalDataManager externalDataManager,
         IItemRepository itemRepository,
-        IItemSortService itemSortService)
-        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        IItemListingServices listing,
+        IItemLookupService lookup,
+        LinkedChildResolver links,
+        ICollectionFolderResolver collections)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
+        _listing = listing;
         _deletions = deletions;
+        _itemStore = itemStore;
         _localizationManager = localizationManager;
-        _itemSortService = itemSortService;
+        _lookup = lookup;
+        _links = links;
+        _collections = collections;
     }
 
     /// <inheritdoc />
@@ -73,11 +90,11 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     {
         if (item is Series series)
         {
-            var seasons = series.GetRecursiveChildren(i => i is Season).ToList();
+            var seasons = series.GetRecursiveCatalogueChildren(ItemRepository, _lookup, _links, static child => child is Season).Cast<Season>();
 
             foreach (var season in seasons)
             {
-                var hasUpdate = refreshOptions is not null && season.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, ItemNamingService);
+                var hasUpdate = refreshOptions is not null && season.BeforeMetadataRefresh(refreshOptions.ReplaceAllMetadata, ItemNamingService, _lookup);
                 if (hasUpdate)
                 {
                     await season.UpdateToRepositoryAsync(Writes, ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
@@ -89,12 +106,31 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     }
 
     /// <inheritdoc />
+    protected override SeriesInfo GetLookupInfo(Series item, LibraryOptions libraryOptions)
+    {
+        var locale = item.GetMetadataLocale(_lookup, _collections, libraryOptions, ServerConfigurationManager.Configuration);
+        return item.GetLookupInfo(locale);
+    }
+
+    /// <inheritdoc />
+    protected override string CreatePresentationUniqueKey(Series item)
+        => item.CreatePresentationUniqueKey(
+            ItemOptions.GetLibraryOptions(item),
+            _lookup,
+            _collections,
+            ServerConfigurationManager.Configuration);
+
+    /// <inheritdoc />
+    protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(Series item)
+        => item.GetRecursiveCatalogueChildren(ItemRepository, _lookup, _links);
+
+    /// <inheritdoc />
     protected override async Task AfterMetadataRefresh(Series item, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)
     {
         await base.AfterMetadataRefresh(item, refreshOptions, cancellationToken).ConfigureAwait(false);
 
         // Note that this only updates the children's SeriesPresentationUniqueKey and SeasonId, not the ParentIndexNumber
-        if (LibraryManager.GetLibraryOptions(item).EnableAutomaticSeriesGrouping)
+        if (ItemOptions.GetLibraryOptions(item).EnableAutomaticSeriesGrouping)
         {
             await UpdateSeriesChildrenInfoAsync(item, cancellationToken).ConfigureAwait(false);
         }
@@ -122,9 +158,9 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     private async Task UpdateSeriesChildrenInfoAsync(Series series, CancellationToken cancellationToken)
     {
         // Reload children so episode numbers / seasons persisted earlier in the refresh are seen.
-        series.Children = null;
-        var seriesKey = series.GetPresentationUniqueKey();
-        var children = series.GetRecursiveChildren(i => i is Season || i is Episode);
+        series.InvalidateCatalogueChildren(_lookup);
+        var seriesKey = series.PresentationUniqueKey ?? CreatePresentationUniqueKey(series);
+        var children = series.GetRecursiveCatalogueChildren(ItemRepository, _lookup, _links, static child => child is Season or Episode);
         var seasons = children.OfType<Season>().ToList();
 
         foreach (var child in children)
@@ -140,7 +176,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 
             if (child is Episode episode)
             {
-                var seasonId = episode.FindSeasonId();
+                var seasonId = episode.FindSeasonId(_lookup, ItemRepository);
                 if (seasonId.IsEmpty() && episode.ParentIndexNumber.HasValue)
                 {
                     seasonId = seasons.Find(s => s.IndexNumber == episode.ParentIndexNumber)?.Id ?? Guid.Empty;
@@ -189,7 +225,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         // TODO Legacy. It's not really "physical" seasons as any virtual seasons are always converted to non-virtual in CreateSeasonsAsync.
         var physicalSeasonNumbers = new HashSet<int>();
         var virtualSeasons = new List<Season>();
-        foreach (var existingSeason in series.Children.OfType<Season>())
+        foreach (var existingSeason in series.GetCatalogueChildren(ItemRepository, _lookup).OfType<Season>())
         {
             if (existingSeason.LocationType != LocationType.Virtual && existingSeason.IndexNumber.HasValue)
             {
@@ -206,7 +242,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             var seasonNumber = virtualSeason.IndexNumber;
             // If there's a physical season with the same number or no episodes in the season, delete it
             if ((seasonNumber.HasValue && physicalSeasonNumbers.Contains(seasonNumber.Value))
-                || virtualSeason.GetEpisodes(null, new DtoOptions(true), true, _itemSortService).Count == 0)
+                || virtualSeason.GetCatalogueEpisodes(new DtoOptions(true), ItemRepository, _lookup, _listing).Count == 0)
             {
                 Logger.LogInformation("Removing virtual season {SeasonNumber} in series {SeriesName}", virtualSeason.IndexNumber, series.Name);
 
@@ -224,7 +260,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
 
     private async Task RemoveObsoleteEpisodes(Series series, CancellationToken cancellationToken)
     {
-        var episodesBySeason = series.GetEpisodes(null, new DtoOptions(), true, _itemSortService)
+        var episodesBySeason = series.GetCatalogueEpisodes(new DtoOptions(), ItemRepository, _listing)
                         .OfType<Episode>()
                         .GroupBy(e => e.ParentIndexNumber)
                         .ToList();
@@ -311,7 +347,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
     /// <returns>The async task.</returns>
     private async Task CreateSeasonsAsync(Series series, CancellationToken cancellationToken)
     {
-        var seriesChildren = series.GetRecursiveChildren(i => i is Episode || i is Season);
+        var seriesChildren = series.GetRecursiveCatalogueChildren(ItemRepository, _lookup, _links, static child => child is Season or Episode);
 
         // CreateSeasonsAsync can run before the episodes themselves have been refreshed during an
         // initial scan, so their ParentIndexNumber may still be unset. Resolve the season number
@@ -411,17 +447,17 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
         {
             Name = seasonName,
             IndexNumber = seasonNumber,
-            Id = LibraryManager.GetNewItemId(
+            Id = _itemStore.GetNewItemId(
                 series.Id + (seasonNumber ?? -1).ToString(CultureInfo.InvariantCulture) + seasonName,
                 typeof(Season)),
             IsVirtualItem = false,
             SeriesId = series.Id,
             SeriesName = series.Name,
-            SeriesPresentationUniqueKey = series.GetPresentationUniqueKey()
+            SeriesPresentationUniqueKey = series.PresentationUniqueKey ?? CreatePresentationUniqueKey(series)
         };
 
         series.AddChild(Writes, season);
-        await season.RefreshMetadata(_deletions, Writes, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken).ConfigureAwait(false);
+        await season.RefreshMetadata(_deletions, Writes, ProviderManager, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken).ConfigureAwait(false);
 
         return season;
     }
@@ -433,7 +469,7 @@ public class SeriesMetadataService : MetadataService<Series, SeriesInfo>
             seasonName = seasonNumber switch
             {
                 null => _localizationManager.GetLocalizedString("NameSeasonUnknown"),
-                0 => LibraryManager.GetLibraryOptions(series).SeasonZeroDisplayName,
+                0 => ItemOptions.GetLibraryOptions(series).SeasonZeroDisplayName,
                 _ => string.Format(CultureInfo.InvariantCulture, _localizationManager.GetLocalizedString("NameSeasonNumber"), seasonNumber.Value)
             };
         }

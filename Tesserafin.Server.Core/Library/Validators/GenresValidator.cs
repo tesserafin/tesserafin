@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
+using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
 
 namespace Tesserafin.Server.Core.Library.Validators;
@@ -18,6 +19,7 @@ public class GenresValidator
 {
     private readonly IItemWriteCommands _writes;
     private readonly IItemDeletionCommands _deletions;
+    private readonly IProviderManager _providers;
 
     /// <summary>
     /// The library manager.
@@ -35,13 +37,15 @@ public class GenresValidator
     /// </summary>
     /// <param name="writes">Explicit item write/resolution ownership.</param>
     /// <param name="deletions">Item deletion operations.</param>
+    /// <param name="providers">The provider manager for metadata refreshes.</param>
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
-    public GenresValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, ILibraryManager libraryManager, ILogger<GenresValidator> logger, IItemRepository itemRepo)
+    public GenresValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, IProviderManager providers, ILibraryManager libraryManager, ILogger<GenresValidator> logger, IItemRepository itemRepo)
     {
         _writes = writes;
         _deletions = deletions;
+        _providers = providers;
         _libraryManager = libraryManager;
         _logger = logger;
         _itemRepo = itemRepo;
@@ -83,11 +87,11 @@ public class GenresValidator
                 }
 
                 // Fall back to GetGenre if not found (creates new item if needed)
-                item ??= _libraryManager.GetGenre(name);
+                item ??= _writes.GetOrCreateNamedItem<Genre>(name, cancellationToken);
 
                 if (!existingGenreIds.Contains(item.Id))
                 {
-                    await item.RefreshMetadata(_deletions, _writes, cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(_deletions, _writes, _providers, cancellationToken).ConfigureAwait(false);
                     refreshed++;
                 }
             }

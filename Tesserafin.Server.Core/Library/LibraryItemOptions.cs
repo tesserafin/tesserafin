@@ -16,21 +16,36 @@ internal sealed class LibraryItemOptions(
     IItemLookupService lookup,
     IUserRootFolderProvider roots,
     IServerConfigurationManager configuration,
-    IFileSystem files) : ILibraryItemOptions
+    IFileSystem files,
+    ILibraryOptionsStore store) : ILibraryItemOptions
 {
     public LibraryOptions GetLibraryOptions(BaseItem item)
     {
         if (item is CollectionFolder collectionFolder)
         {
-            return collectionFolder.GetLibraryOptions();
+            return store.Get(collectionFolder.Path);
         }
 
         // List.Find is more performant than FirstOrDefault due to enumerator allocation
         return collections.GetCollectionFolders(item)
             .Find(folder => folder is CollectionFolder) is CollectionFolder collectionFolder2
-            ? collectionFolder2.GetLibraryOptions()
+            ? store.Get(collectionFolder2.Path)
             : new LibraryOptions();
     }
+
+    public CollectionType? GetContentType(BaseItem item)
+        => GetConfiguredContentType(item, false)
+            ?? GetConfiguredContentType(item, true)
+            ?? GetInheritedContentType(item);
+
+    public CollectionType? GetInheritedContentType(BaseItem item)
+        => GetTopFolderContentType(item)
+            ?? item.GetParents(lookup).Select(parent => GetConfiguredContentType(parent, false)).LastOrDefault(type => type is not null);
+
+    private CollectionType? GetConfiguredContentType(BaseItem item, bool inherit)
+        => item is ICollectionFolder collection
+            ? collection.CollectionType
+            : GetConfiguredContentType(item.ContainingFolderPath, inherit);
 
     public CollectionType? GetConfiguredContentType(string path, bool inherit = false)
     {

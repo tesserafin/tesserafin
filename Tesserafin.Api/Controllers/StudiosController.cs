@@ -25,6 +25,7 @@ namespace Tesserafin.Api.Controllers;
 [Tags("Studio")]
 public class StudiosController : BaseTesserafinApiController
 {
+    private readonly INamedItemCatalog _namedItems;
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
     private readonly IDtoService _dtoService;
@@ -32,14 +33,17 @@ public class StudiosController : BaseTesserafinApiController
     /// <summary>
     /// Initializes a new instance of the <see cref="StudiosController"/> class.
     /// </summary>
+    /// <param name="namedItems">Read-only named catalogue.</param>
     /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="dtoService">Instance of the <see cref="IDtoService"/> interface.</param>
     public StudiosController(
+        INamedItemCatalog namedItems,
         ILibraryManager libraryManager,
         IUserManager userManager,
         IDtoService dtoService)
     {
+        _namedItems = namedItems;
         _libraryManager = libraryManager;
         _userManager = userManager;
         _dtoService = dtoService;
@@ -139,12 +143,18 @@ public class StudiosController : BaseTesserafinApiController
     /// <returns>An <see cref="OkResult"/> containing the studio.</returns>
     [HttpGet("{name}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult<BaseItemDto> GetStudio([FromRoute, Required] string name, [FromQuery] Guid? userId)
     {
         userId = RequestHelpers.GetUserId(User, userId);
         var dtoOptions = new DtoOptions();
 
-        var item = _libraryManager.GetStudio(name);
+        var item = _namedItems.Find<Studio>(name);
+        if (item is null)
+        {
+            return NotFound();
+        }
+
         if (!userId.IsNullOrEmpty())
         {
             var user = _userManager.GetUserById(userId.Value);

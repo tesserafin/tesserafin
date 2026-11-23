@@ -12,7 +12,9 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
+using Tesserafin.Model.Globalization;
 using Tesserafin.Model.IO;
 using Tesserafin.Providers.Manager;
 
@@ -23,6 +25,11 @@ namespace Tesserafin.Providers.Music;
 /// </summary>
 public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
 {
+    private readonly IItemLookupService _lookup;
+    private readonly LinkedChildResolver _links;
+    private readonly ILinkedChildrenService _artists;
+    private readonly ICollectionFolderResolver _collections;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="AlbumMetadataService"/> class.
     /// </summary>
@@ -32,10 +39,15 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
     /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager"/> interface.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
-    /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+    /// <param name="itemOptions">Effective options for the item's library.</param>
     /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
     /// <param name="externalDataManager">Instance of the <see cref="IExternalDataManager"/> interface.</param>
     /// <param name="itemRepository">Instance of the <see cref="IItemRepository"/> interface.</param>
+    /// <param name="localizationManager">Instance of the <see cref="ILocalizationManager"/> interface.</param>
+    /// <param name="lookup">The item identity lookup.</param>
+    /// <param name="links">The saved link resolver.</param>
+    /// <param name="artists">The catalogue service for finding artists by name.</param>
+    /// <param name="collections">The library membership resolver.</param>
     public AlbumMetadataService(
         IItemWriteCommands writes,
         IItemPeopleCommands peopleCommands,
@@ -43,12 +55,21 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
         ILogger<AlbumMetadataService> logger,
         IProviderManager providerManager,
         IFileSystem fileSystem,
-        ILibraryManager libraryManager,
+        ILibraryItemOptions itemOptions,
         IItemNamingService itemNamingService,
         IExternalDataManager externalDataManager,
-        IItemRepository itemRepository)
-        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, libraryManager, itemNamingService, externalDataManager, itemRepository)
+        IItemRepository itemRepository,
+        ILocalizationManager localizationManager,
+        IItemLookupService lookup,
+        LinkedChildResolver links,
+        ILinkedChildrenService artists,
+        ICollectionFolderResolver collections)
+        : base(writes, peopleCommands, serverConfigurationManager, logger, providerManager, fileSystem, itemOptions, itemNamingService, externalDataManager, itemRepository, localizationManager)
     {
+        _lookup = lookup;
+        _links = links;
+        _artists = artists;
+        _collections = collections;
     }
 
     /// <inheritdoc />
@@ -61,8 +82,19 @@ public class AlbumMetadataService : MetadataService<MusicAlbum, AlbumInfo>
     protected override bool EnableUpdatingStudiosFromChildren => true;
 
     /// <inheritdoc />
+    protected override AlbumInfo GetLookupInfo(MusicAlbum item, LibraryOptions libraryOptions)
+    {
+        var configuration = ServerConfigurationManager.Configuration;
+        var locale = item.GetMetadataLocale(_lookup, _collections, libraryOptions, configuration);
+        SongInfo ReadTrack(Audio track)
+            => track.GetLookupInfo(track.GetMetadataLocale(_lookup, _collections, ItemOptions, configuration));
+
+        return item.GetLookupInfo(ItemRepository, _lookup, _links, _artists, locale, ReadTrack);
+    }
+
+    /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(MusicAlbum item)
-        => item.GetRecursiveChildren(i => i is Audio);
+        => item.GetCatalogueTracks(ItemRepository, _lookup, _links);
 
     /// <inheritdoc />
     protected override async Task AfterMetadataRefresh(MusicAlbum item, MetadataRefreshOptions refreshOptions, CancellationToken cancellationToken)

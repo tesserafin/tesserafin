@@ -112,7 +112,12 @@ namespace Tesserafin.Server.Core.Dto
             }
         }.ToFrozenDictionary();
 
+        private readonly IItemListingServices _listing;
+
+        private readonly IStandaloneVisibilityService _visibility;
+
         private readonly ILogger<DtoService> _logger;
+        private readonly INamedItemCatalog _namedItems;
         private readonly ILibraryManager _libraryManager;
         private readonly IItemPeopleService _itemPeopleService;
         private readonly IUserDataManager _userDataRepository;
@@ -124,6 +129,7 @@ namespace Tesserafin.Server.Core.Dto
         private readonly IApplicationHost _appHost;
         private readonly IMediaSourceManager _mediaSourceManager;
         private readonly Lazy<ILiveTvManager> _livetvManagerFactory;
+        private readonly Lazy<IChannelManager> _channelManagerFactory;
 
         private readonly ITrickplayManager _trickplayManager;
         private readonly IChapterManager _chapterManager;
@@ -131,6 +137,7 @@ namespace Tesserafin.Server.Core.Dto
 
         public DtoService(
             ILogger<DtoService> logger,
+            INamedItemCatalog namedItems,
             ILibraryManager libraryManager,
             IItemPeopleService itemPeopleService,
             IUserDataManager userDataRepository,
@@ -140,11 +147,17 @@ namespace Tesserafin.Server.Core.Dto
             IApplicationHost appHost,
             IMediaSourceManager mediaSourceManager,
             Lazy<ILiveTvManager> livetvManagerFactory,
+            Lazy<IChannelManager> channelManagerFactory,
             ITrickplayManager trickplayManager,
             IChapterManager chapterManager,
-            IItemCountService itemCountService)
+            IItemCountService itemCountService,
+            IStandaloneVisibilityService visibility,
+            IItemListingServices listing)
         {
+            _listing = listing;
+            _visibility = visibility;
             _logger = logger;
+            _namedItems = namedItems;
             _libraryManager = libraryManager;
             _itemPeopleService = itemPeopleService;
             _userDataRepository = userDataRepository;
@@ -154,6 +167,7 @@ namespace Tesserafin.Server.Core.Dto
             _appHost = appHost;
             _mediaSourceManager = mediaSourceManager;
             _livetvManagerFactory = livetvManagerFactory;
+            _channelManagerFactory = channelManagerFactory;
             _trickplayManager = trickplayManager;
             _chapterManager = chapterManager;
             _itemCountService = itemCountService;
@@ -169,7 +183,7 @@ namespace Tesserafin.Server.Core.Dto
             BaseItem? owner = null,
             bool skipVisibilityCheck = false)
         {
-            var accessibleItems = skipVisibilityCheck || user is null ? items : items.Where(x => x.IsVisible(user)).ToList();
+            var accessibleItems = skipVisibilityCheck || user is null ? items : items.Where(x => x.IsVisible(user, false, _visibility)).ToList();
             var returnItems = new BaseItemDto[accessibleItems.Count];
             List<(BaseItem, BaseItemDto)>? programTuples = null;
             List<(BaseItemDto, LiveTvChannel)>? channelTuples = null;
@@ -390,10 +404,10 @@ namespace Tesserafin.Server.Core.Dto
             if (options.ContainsField(ItemFields.CanDelete))
             {
                 dto.CanDelete = user is null
-                    ? item.CanDelete()
+                    ? item.CanDelete(_channelManagerFactory.Value)
                     : allCollectionFolders is not null
-                        ? item.CanDelete(user, allCollectionFolders)
-                        : item.CanDelete(user);
+                        ? item.CanDelete(user, allCollectionFolders, _channelManagerFactory.Value)
+                        : item.CanDelete(user, _channelManagerFactory.Value);
             }
 
             if (options.ContainsField(ItemFields.CanDownload))
@@ -594,7 +608,7 @@ namespace Tesserafin.Server.Core.Dto
 
                     if (options.ContainsField(ItemFields.ChildCount))
                     {
-                        dto.ChildCount ??= GetChildCount(folder, user, childCountBatch);
+                        dto.ChildCount ??= GetChildCount(folder, user, childCountBatch, _visibility, _listing);
                     }
                 }
 
@@ -653,7 +667,7 @@ namespace Tesserafin.Server.Core.Dto
             };
         }
 
-        private static int GetChildCount(Folder folder, User user, Dictionary<Guid, int>? childCountBatch)
+        private static int GetChildCount(Folder folder, User user, Dictionary<Guid, int>? childCountBatch, IStandaloneVisibilityService visibility, IItemListingServices listing)
         {
             // Right now this is too slow to calculate for top level folders on a per-user basis
             // Just return something so that apps that are expecting a value won't think the folders are empty
@@ -669,7 +683,7 @@ namespace Tesserafin.Server.Core.Dto
             }
 
             // Fall back to individual query for special cases (Series, Season, etc.)
-            return folder.GetChildCount(user);
+            return folder.GetChildCount(user, visibility, listing);
         }
 
         private static void SetBookProperties(BaseItemDto dto, Book item)
@@ -798,7 +812,7 @@ namespace Tesserafin.Server.Core.Dto
                 {
                     try
                     {
-                        return _libraryManager.GetPerson(c);
+                        return _itemPeopleService.GetPerson(c);
                     }
                     catch (Exception ex)
                     {
@@ -806,7 +820,7 @@ namespace Tesserafin.Server.Core.Dto
                         return null;
                     }
                 }).Where(i => i is not null)
-                .Where(i => user is null || i!.IsVisible(user))
+                .Where(i => user is null || i!.IsVisible(user, false, _visibility))
                 .DistinctBy(x => x!.Name, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(i => i!.Name, StringComparer.OrdinalIgnoreCase)!; // null values got filtered out
 
@@ -864,7 +878,7 @@ namespace Tesserafin.Server.Core.Dto
                 .Select(i => new NameGuidPair
                 {
                     Name = i,
-                    Id = _libraryManager.GetStudioId(i)
+                    Id = _namedItems.GetId<Studio>(i)
                 })
                 .ToArray();
         }
@@ -885,10 +899,10 @@ namespace Tesserafin.Server.Core.Dto
         {
             if (owner is IHasMusicGenres)
             {
-                return _libraryManager.GetMusicGenreId(name);
+                return _namedItems.GetId<MusicGenre>(name);
             }
 
-            return _libraryManager.GetGenreId(name);
+            return _namedItems.GetId<Genre>(name);
         }
 
         private string? GetTagAndFillBlurhash(BaseItemDto dto, BaseItem item, ImageType imageType, int imageIndex = 0)
@@ -1104,9 +1118,8 @@ namespace Tesserafin.Server.Core.Dto
 
             if (options.ContainsField(ItemFields.EnableMediaSourceDisplay))
             {
-                // channelManager not injectable here: IChannelManager already depends on
-                // IDtoService, so IDtoService -> IChannelManager would be circular.
-                dto.EnableMediaSourceDisplay = item.GetEnableMediaSourceDisplay(BaseItem.ChannelManager);
+                // Deferred: IChannelManager depends on IDtoService.
+                dto.EnableMediaSourceDisplay = item.GetEnableMediaSourceDisplay(_channelManagerFactory.Value);
             }
 
             dto.PremiereDate = item.PremiereDate;
@@ -1285,7 +1298,7 @@ namespace Tesserafin.Server.Core.Dto
                     var mediaSourceCount = user is null
                         || (!video.PrimaryVersionId.HasValue && video.LinkedAlternateVersions.Length == 0 && !video.HasLocalAlternateVersions)
                             ? video.MediaSourceCount
-                            : video.GetAllVersions().Count(v => v.Id.Equals(video.Id) || v.IsVisibleStandalone(user));
+                            : video.GetAllVersions().Count(v => v.Id.Equals(video.Id) || v.IsVisibleStandalone(user, _visibility));
                     if (mediaSourceCount != 1)
                     {
                         dto.MediaSourceCount = mediaSourceCount;
@@ -1294,7 +1307,7 @@ namespace Tesserafin.Server.Core.Dto
 
                 if (options.ContainsField(ItemFields.Trickplay))
                 {
-                    var trickplay = _trickplayManager.GetTrickplayManifest(item).GetAwaiter().GetResult();
+                    var trickplay = _trickplayManager.GetTrickplayManifest(video).GetAwaiter().GetResult();
                     dto.Trickplay = trickplay.ToDictionary(
                         mediaStream => mediaStream.Key,
                         mediaStream => mediaStream.Value.ToDictionary(
@@ -1548,7 +1561,7 @@ namespace Tesserafin.Server.Core.Dto
         {
             if (currentItem is MusicAlbum musicAlbum)
             {
-                var artist = musicAlbum.GetMusicArtist(new DtoOptions(false));
+                var artist = musicAlbum.GetMusicArtist();
                 if (artist is not null)
                 {
                     return artist;

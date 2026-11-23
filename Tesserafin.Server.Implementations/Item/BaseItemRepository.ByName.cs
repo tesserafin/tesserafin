@@ -3,6 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Data.Entities;
@@ -15,6 +17,21 @@ namespace Tesserafin.Server.Implementations.Item;
 
 public sealed partial class BaseItemRepository
 {
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<int>> GetProductionYearsAsync(CancellationToken cancellationToken)
+    {
+        var context = await _dbProvider.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await using (context.ConfigureAwait(false))
+        {
+            return await context.BaseItems.AsNoTracking()
+                .Where(item => item.ProductionYear.HasValue && item.ProductionYear > 0)
+                .Select(item => item.ProductionYear!.Value)
+                .Distinct()
+                .Order()
+                .ToArrayAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     /// <inheritdoc />
     public QueryResult<(BaseItemDto Item, ItemCounts? ItemCounts)> GetAllArtists(InternalItemsQuery filter)
     {

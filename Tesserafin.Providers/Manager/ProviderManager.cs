@@ -24,10 +24,10 @@ using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Lyrics;
 using Tesserafin.Controller.MediaSegments;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Controller.Subtitles;
 using Tesserafin.Data.Enums;
-using Tesserafin.Data.Events;
 using Tesserafin.Extensions;
 using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Configuration;
@@ -51,23 +51,26 @@ namespace Tesserafin.Providers.Manager
     /// </summary>
     public class ProviderManager : IProviderManager, IDisposable
     {
+        private readonly IFolderValidationServices _validation;
         private readonly IItemWriteCommands _writes;
         private readonly IItemMetadataExporter _metadataExporter;
         private readonly IItemImageService _images;
         private readonly IRemoteImageSource _remoteImages;
         private readonly IItemDeletionCommands _deletions;
+        private readonly ILibraryOptionsStore _libraryOptions;
         private readonly Lock _refreshQueueLock = new();
         private readonly ILogger<ProviderManager> _logger;
         private readonly ILibraryMonitor _libraryMonitor;
         private readonly IFileSystem _fileSystem;
         private readonly IServerApplicationPaths _appPaths;
-        private readonly ILibraryManager _libraryManager;
+        private readonly ILibraryItemOptions _itemOptions;
+        private readonly IItemRepository _itemRepository;
+        private readonly IItemLookupService _itemLookup;
         private readonly ILibraryScanCoordinator _scans;
         private readonly ISubtitleManager _subtitleManager;
         private readonly ILyricManager _lyricManager;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly IBaseItemManager _baseItemManager;
-        private readonly ConcurrentDictionary<Guid, double> _activeRefreshes = new();
         private readonly CancellationTokenSource _disposeCancellationTokenSource = new();
         private readonly PriorityQueue<(Guid ItemId, MetadataRefreshOptions RefreshOptions), RefreshPriority> _refreshQueue = new();
         private readonly IMediaSegmentManager _mediaSegmentManager;
@@ -95,6 +98,9 @@ namespace Tesserafin.Providers.Manager
         /// <param name="metadataExporter">Metadata saver selection and execution.</param>
         /// <param name="images">Explicit image preparation and commit lifecycle.</param>
         /// <param name="deletions">Item deletion operations.</param>
+        /// <param name="validation">The services folder validation runs with.</param>
+        /// <param name="libraryOptions">The persisted library options, whose updates invalidate cached provider choices.</param>
+        /// <param name="httpClientFactory">The Http client factory.</param>
         /// <param name="subtitleManager">The subtitle manager.</param>
         /// <param name="configurationManager">The configuration manager.</param>
         /// <param name="libraryMonitor">The library monitor.</param>
@@ -102,7 +108,9 @@ namespace Tesserafin.Providers.Manager
         /// <param name="fileSystem">The filesystem.</param>
         /// <param name="appPaths">The server application paths.</param>
         /// <param name="scans">Library scan scheduling and state.</param>
-        /// <param name="libraryManager">The library manager.</param>
+        /// <param name="itemOptions">Effective library options for provider selection.</param>
+        /// <param name="itemRepository">Catalogue reads for album refresh.</param>
+        /// <param name="itemLookup">Catalogue identity and hierarchy lookup.</param>
         /// <param name="baseItemManager">The BaseItem manager.</param>
         /// <param name="lyricManager">The lyric manager.</param>
         /// <param name="remoteImages">The image-only HTTP source.</param>
@@ -113,13 +121,18 @@ namespace Tesserafin.Providers.Manager
             IItemMetadataExporter metadataExporter,
             IItemImageService images,
             IItemDeletionCommands deletions,
+            IFolderValidationServices validation,
+            ILibraryOptionsStore libraryOptions,
+            IHttpClientFactory httpClientFactory,
             ISubtitleManager subtitleManager,
             IServerConfigurationManager configurationManager,
             ILibraryMonitor libraryMonitor,
             ILogger<ProviderManager> logger,
             IFileSystem fileSystem,
             IServerApplicationPaths appPaths,
-            ILibraryManager libraryManager,
+            ILibraryItemOptions itemOptions,
+            IItemRepository itemRepository,
+            IItemLookupService itemLookup,
             ILibraryScanCoordinator scans,
             IBaseItemManager baseItemManager,
             ILyricManager lyricManager,
@@ -127,16 +140,20 @@ namespace Tesserafin.Providers.Manager
             IMediaSegmentManager mediaSegmentManager,
             ISimilarItemsManager similarItemsManager)
         {
+            _validation = validation;
             _writes = writes;
             _metadataExporter = metadataExporter;
             _images = images;
             _deletions = deletions;
+            _libraryOptions = libraryOptions;
             _logger = logger;
             _configurationManager = configurationManager;
             _libraryMonitor = libraryMonitor;
             _fileSystem = fileSystem;
             _appPaths = appPaths;
-            _libraryManager = libraryManager;
+            _itemOptions = itemOptions;
+            _itemRepository = itemRepository;
+            _itemLookup = itemLookup;
             _scans = scans;
             _subtitleManager = subtitleManager;
             _baseItemManager = baseItemManager;
@@ -145,17 +162,8 @@ namespace Tesserafin.Providers.Manager
             _mediaSegmentManager = mediaSegmentManager;
             _similarItemsManager = similarItemsManager;
 
-            CollectionFolder.LibraryOptionsUpdated += OnLibraryOptionsUpdated;
+            _libraryOptions.Updated += OnLibraryOptionsUpdated;
         }
-
-        /// <inheritdoc/>
-        public event EventHandler<GenericEventArgs<BaseItem>>? RefreshStarted;
-
-        /// <inheritdoc/>
-        public event EventHandler<GenericEventArgs<BaseItem>>? RefreshCompleted;
-
-        /// <inheritdoc/>
-        public event EventHandler<GenericEventArgs<Tuple<BaseItem, double>>>? RefreshProgress;
 
         /// <inheritdoc/>
         public void AddParts(
@@ -334,7 +342,7 @@ namespace Tesserafin.Providers.Manager
         private IEnumerable<IRemoteImageProvider> GetRemoteImageProviders(BaseItem item, bool includeDisabled)
         {
             var options = GetMetadataOptions(item);
-            var libraryOptions = _libraryManager.GetLibraryOptions(item);
+            var libraryOptions = _itemOptions.GetLibraryOptions(item);
 
             return GetImageProvidersInternal(
                 item,
@@ -347,7 +355,7 @@ namespace Tesserafin.Providers.Manager
         /// <inheritdoc/>
         public IEnumerable<IImageProvider> GetImageProviders(BaseItem item, ImageRefreshOptions refreshOptions)
         {
-            return GetImageProvidersInternal(item, _libraryManager.GetLibraryOptions(item), GetMetadataOptions(item), refreshOptions, false);
+            return GetImageProvidersInternal(item, _itemOptions.GetLibraryOptions(item), GetMetadataOptions(item), refreshOptions, false);
         }
 
         private IEnumerable<IImageProvider> GetImageProvidersInternal(BaseItem item, LibraryOptions libraryOptions, MetadataOptions options, ImageRefreshOptions refreshOptions, bool includeDisabled)
@@ -420,14 +428,16 @@ namespace Tesserafin.Providers.Manager
             return GetMetadataProvidersInternal<T>(item, libraryOptions, globalMetadataOptions, includeDisabled, false, libraryPath);
         }
 
-        private static string GetLibraryPathForItem(BaseItem item)
+        private string GetLibraryPathForItem(BaseItem item)
         {
             if (item is CollectionFolder collectionFolder)
             {
                 return collectionFolder.Path ?? string.Empty;
             }
 
-            var topParent = item.GetTopParent();
+            var topParent = item.IsTopParentVia(_itemLookup)
+                ? item
+                : item.GetParents(_itemLookup).FirstOrDefault(parent => parent.IsTopParentVia(_itemLookup));
             return topParent?.Path ?? string.Empty;
         }
 
@@ -728,7 +738,7 @@ namespace Tesserafin.Providers.Manager
 
             if (!searchInfo.ItemId.IsEmpty())
             {
-                referenceItem = _libraryManager.GetItemById(searchInfo.ItemId);
+                referenceItem = _itemLookup.GetItemById(searchInfo.ItemId);
             }
 
             return GetRemoteSearchResults<TItemType, TLookupType>(searchInfo, referenceItem, cancellationToken);
@@ -756,7 +766,7 @@ namespace Tesserafin.Providers.Manager
             }
             else
             {
-                libraryOptions = _libraryManager.GetLibraryOptions(referenceItem);
+                libraryOptions = _itemOptions.GetLibraryOptions(referenceItem);
             }
 
             var options = GetMetadataOptions(referenceItem);
@@ -867,75 +877,6 @@ namespace Tesserafin.Providers.Manager
         }
 
         /// <inheritdoc/>
-        public void OnRefreshStart(BaseItem item)
-        {
-            _logger.LogDebug("OnRefreshStart {Item:N}", item.Id);
-            _activeRefreshes[item.Id] = 0;
-            try
-            {
-                RefreshStarted?.Invoke(this, new GenericEventArgs<BaseItem>(item));
-            }
-            catch (Exception ex)
-            {
-                // EventHandlers should never propagate exceptions, but we have little control over plugins...
-                _logger.LogError(ex, "Invoking {RefreshEvent} event handlers failed", nameof(RefreshStarted));
-            }
-        }
-
-        /// <inheritdoc/>
-        public void OnRefreshComplete(BaseItem item)
-        {
-            _logger.LogDebug("OnRefreshComplete {Item:N}", item.Id);
-            _activeRefreshes.TryRemove(item.Id, out _);
-
-            try
-            {
-                RefreshCompleted?.Invoke(this, new GenericEventArgs<BaseItem>(item));
-            }
-            catch (Exception ex)
-            {
-                // EventHandlers should never propagate exceptions, but we have little control over plugins...
-                _logger.LogError(ex, "Invoking {RefreshEvent} event handlers failed", nameof(RefreshCompleted));
-            }
-        }
-
-        /// <inheritdoc/>
-        public double? GetRefreshProgress(Guid id)
-        {
-            if (_activeRefreshes.TryGetValue(id, out double value))
-            {
-                return value;
-            }
-
-            return null;
-        }
-
-        /// <inheritdoc/>
-        public void OnRefreshProgress(BaseItem item, double progress)
-        {
-            var id = item.Id;
-            _logger.LogDebug("OnRefreshProgress {Id:N} {Progress}", id, progress);
-
-            if (!_activeRefreshes.TryGetValue(id, out var current)
-                || progress <= current
-                || !_activeRefreshes.TryUpdate(id, progress, current))
-            {
-                // Item isn't currently refreshing, or update was received out-of-order, so don't trigger event.
-                return;
-            }
-
-            try
-            {
-                RefreshProgress?.Invoke(this, new GenericEventArgs<Tuple<BaseItem, double>>(new Tuple<BaseItem, double>(item, progress)));
-            }
-            catch (Exception ex)
-            {
-                // EventHandlers should never propagate exceptions, but we have little control over plugins...
-                _logger.LogError(ex, "Invoking {RefreshEvent} event handlers failed", nameof(RefreshProgress));
-            }
-        }
-
-        /// <inheritdoc/>
         public void QueueRefresh(Guid itemId, MetadataRefreshOptions options, RefreshPriority priority)
         {
             if (itemId.IsEmpty())
@@ -962,8 +903,6 @@ namespace Tesserafin.Providers.Manager
 
         private async Task StartProcessingRefreshQueue()
         {
-            var libraryManager = _libraryManager;
-
             if (_disposed)
             {
                 return;
@@ -981,7 +920,7 @@ namespace Tesserafin.Providers.Manager
 
                 try
                 {
-                    var item = libraryManager.GetItemById(refreshItem.ItemId);
+                    var item = _itemLookup.GetItemById(refreshItem.ItemId);
                     if (item is null)
                     {
                         continue;
@@ -1012,7 +951,7 @@ namespace Tesserafin.Providers.Manager
 
         private async Task RefreshItem(BaseItem item, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
-            await item.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
+            await item.RefreshMetadata(_deletions, _writes, this, options, cancellationToken).ConfigureAwait(false);
 
             // Collection folders don't validate their children so we'll have to simulate that here
             switch (item)
@@ -1021,24 +960,24 @@ namespace Tesserafin.Providers.Manager
                     await RefreshCollectionFolderChildren(options, collectionFolder, cancellationToken).ConfigureAwait(false);
                     break;
                 case Folder folder:
-                    await folder.ValidateChildren(_deletions, _writes, _images, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await folder.ValidateChildren(_validation, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
                     break;
             }
         }
 
         private async Task RefreshCollectionFolderChildren(MetadataRefreshOptions options, CollectionFolder collectionFolder, CancellationToken cancellationToken)
         {
-            foreach (var child in collectionFolder.GetPhysicalFolders())
+            foreach (var child in collectionFolder.GetPhysicalFolders(_itemLookup))
             {
-                await child.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
+                await child.RefreshMetadata(_deletions, _writes, this, options, cancellationToken).ConfigureAwait(false);
 
-                await child.ValidateChildren(_deletions, _writes, _images, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
+                await child.ValidateChildren(_validation, new Progress<double>(), options, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
         }
 
         private async Task RefreshArtist(MusicArtist item, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
-            var albums = _libraryManager
+            var albums = _itemRepository
                 .GetItemList(new InternalItemsQuery
                 {
                     IncludeItemTypes = new[] { BaseItemKind.MusicAlbum },
@@ -1055,13 +994,13 @@ namespace Tesserafin.Providers.Manager
                 .Where(i => i is not null)
                 .Distinct();
 
-            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_deletions, _writes, _images, new Progress<double>(), options, true, false, cancellationToken));
+            var musicArtistRefreshTasks = musicArtists.Select(i => i.ValidateChildren(_validation, new Progress<double>(), options, true, false, cancellationToken));
 
             await Task.WhenAll(musicArtistRefreshTasks).ConfigureAwait(false);
 
             try
             {
-                await item.RefreshMetadata(_deletions, _writes, options, cancellationToken).ConfigureAwait(false);
+                await item.RefreshMetadata(_deletions, _writes, this, options, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -1095,7 +1034,7 @@ namespace Tesserafin.Providers.Manager
 
             if (disposing)
             {
-                CollectionFolder.LibraryOptionsUpdated -= OnLibraryOptionsUpdated;
+                _libraryOptions.Updated -= OnLibraryOptionsUpdated;
 
                 if (!_disposeCancellationTokenSource.IsCancellationRequested)
                 {

@@ -25,6 +25,7 @@ namespace Tesserafin.Controller.Library
 
         private readonly IItemResolutionPolicy _policy;
         private LibraryOptions _libraryOptions;
+        private string[] _physicalLocations;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ItemResolveArgs" /> class.
@@ -102,23 +103,11 @@ namespace Tesserafin.Controller.Library
         /// <value><c>true</c> if this instance is physical root; otherwise, <c>false</c>.</value>
         public bool IsPhysicalRoot => IsDirectory && _policy.AreEqualPaths(Path, _appPaths.RootFolderPath);
 
-        /// <summary>
-        /// Gets or sets the additional locations.
-        /// </summary>
-        /// <value>The additional locations.</value>
-        private List<string> AdditionalLocations { get; set; }
-
-        /// <summary>
-        /// Gets the physical locations.
-        /// </summary>
-        /// <value>The physical locations.</value>
+        /// <summary>Gets or sets the directory path and discovered shortcut locations.</summary>
         public string[] PhysicalLocations
         {
-            get
-            {
-                var paths = string.IsNullOrEmpty(Path) ? Array.Empty<string>() : [Path];
-                return AdditionalLocations is null ? paths : [.. paths, .. AdditionalLocations];
-            }
+            get => _physicalLocations ?? (string.IsNullOrEmpty(Path) ? [] : [Path]);
+            set => _physicalLocations = value;
         }
 
         public CollectionType? CollectionType { get; set; }
@@ -160,19 +149,6 @@ namespace Tesserafin.Controller.Library
         public override bool Equals(object obj)
         {
             return Equals(obj as ItemResolveArgs);
-        }
-
-        /// <summary>
-        /// Adds the additional location.
-        /// </summary>
-        /// <param name="path">The path.</param>
-        /// <exception cref="ArgumentNullException"><paramref name="path"/> is <c>null</c> or empty.</exception>
-        public void AddAdditionalLocation(string path)
-        {
-            ArgumentException.ThrowIfNullOrEmpty(path);
-
-            AdditionalLocations ??= new List<string>();
-            AdditionalLocations.Add(path);
         }
 
         // REVIEW: @bond

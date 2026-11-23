@@ -63,7 +63,7 @@ public sealed class ChannelCatalogTests
     // ---------------------------------------------------------------
     // Lookup-only behavior: a channel plugin with no matching materialized item is silently
     // omitted (see ChannelCatalog's type-level remarks - materialization stays ChannelManager's
-    // job, since it reaches into the SCC via BaseItem.ProviderManager).
+    // job, since it reaches into the SCC via its provider manager).
     // ---------------------------------------------------------------
 
     [Fact]
@@ -79,7 +79,8 @@ public sealed class ChannelCatalogTests
             new[] { MakeChannel("Alpha") },
             itemLookupServiceMock.Object,
             itemStoreMock.Object,
-            Mock.Of<IUserManager>());
+            Mock.Of<IUserManager>(),
+            Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())));
 
         var result = await catalog.GetChannelsAsync(new ChannelQuery());
 
@@ -101,7 +102,8 @@ public sealed class ChannelCatalogTests
             new[] { MakeChannel("Alpha") },
             itemLookupServiceMock.Object,
             itemStoreMock.Object,
-            Mock.Of<IUserManager>());
+            Mock.Of<IUserManager>(),
+            Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())));
 
         var result = await catalog.GetChannelsAsync(new ChannelQuery());
 
@@ -141,7 +143,7 @@ public sealed class ChannelCatalogTests
             MakeChannel("Disabled", enabledForAllUsers: false)
         };
 
-        var catalog = new ChannelCatalog(channels, itemLookupServiceMock.Object, itemStoreMock.Object, userManagerMock.Object);
+        var catalog = new ChannelCatalog(channels, itemLookupServiceMock.Object, itemStoreMock.Object, userManagerMock.Object, Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())));
 
         var result = await catalog.GetChannelsAsync(new ChannelQuery { UserId = user.Id });
 
@@ -175,7 +177,7 @@ public sealed class ChannelCatalogTests
         var userManagerMock = new Mock<IUserManager>();
         userManagerMock.Setup(u => u.GetUserById(user.Id)).Returns(user);
 
-        var catalog = new ChannelCatalog(new[] { MakeChannel("Kept"), MakeChannel("Blocked") }, itemLookupServiceMock.Object, itemStoreMock.Object, userManagerMock.Object);
+        var catalog = new ChannelCatalog(new[] { MakeChannel("Kept"), MakeChannel("Blocked") }, itemLookupServiceMock.Object, itemStoreMock.Object, userManagerMock.Object, Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())));
 
         async Task<BaseItem[]> VisibleAsync() => (await catalog.GetChannelsAsync(new ChannelQuery { UserId = user.Id })).Items.ToArray();
 
@@ -201,7 +203,7 @@ public sealed class ChannelCatalogTests
         itemLookupServiceMock.Setup(l => l.GetItemById<Channel>(id)).Returns(item);
         var userManagerMock = new Mock<IUserManager>();
 
-        var catalog = new ChannelCatalog(new[] { MakeChannel("Alpha") }, itemLookupServiceMock.Object, itemStoreMock.Object, userManagerMock.Object);
+        var catalog = new ChannelCatalog(new[] { MakeChannel("Alpha") }, itemLookupServiceMock.Object, itemStoreMock.Object, userManagerMock.Object, Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())));
 
         var result = await catalog.GetChannelsAsync(new ChannelQuery());
 
@@ -229,7 +231,7 @@ public sealed class ChannelCatalogTests
             channels.Add(MakeChannel(name));
         }
 
-        var catalog = new ChannelCatalog(channels, itemLookupServiceMock.Object, itemStoreMock.Object, Mock.Of<IUserManager>());
+        var catalog = new ChannelCatalog(channels, itemLookupServiceMock.Object, itemStoreMock.Object, Mock.Of<IUserManager>(), Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())));
 
         var result = await catalog.GetChannelsAsync(new ChannelQuery { StartIndex = 1, Limit = 2 });
 
@@ -245,7 +247,7 @@ public sealed class ChannelCatalogTests
     [Fact]
     public async Task GetChannelsAsync_IsFavoriteSet_Throws()
     {
-        var catalog = new ChannelCatalog(Array.Empty<IChannel>(), Mock.Of<IItemLookupService>(), Mock.Of<IItemStore>(), Mock.Of<IUserManager>());
+        var catalog = new ChannelCatalog(Array.Empty<IChannel>(), Mock.Of<IItemLookupService>(), Mock.Of<IItemStore>(), Mock.Of<IUserManager>(), Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())));
 
         await Assert.ThrowsAsync<NotSupportedException>(() => catalog.GetChannelsAsync(new ChannelQuery { IsFavorite = true }));
     }
@@ -253,7 +255,7 @@ public sealed class ChannelCatalogTests
     [Fact]
     public async Task GetChannelsAsync_RefreshLatestChannelItemsSet_Throws()
     {
-        var catalog = new ChannelCatalog(Array.Empty<IChannel>(), Mock.Of<IItemLookupService>(), Mock.Of<IItemStore>(), Mock.Of<IUserManager>());
+        var catalog = new ChannelCatalog(Array.Empty<IChannel>(), Mock.Of<IItemLookupService>(), Mock.Of<IItemStore>(), Mock.Of<IUserManager>(), Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())));
 
         await Assert.ThrowsAsync<NotSupportedException>(() => catalog.GetChannelsAsync(new ChannelQuery { RefreshLatestChannelItems = true }));
     }
@@ -261,7 +263,7 @@ public sealed class ChannelCatalogTests
     [Fact]
     public async Task GetChannelsAsync_NullQuery_Throws()
     {
-        var catalog = new ChannelCatalog(Array.Empty<IChannel>(), Mock.Of<IItemLookupService>(), Mock.Of<IItemStore>(), Mock.Of<IUserManager>());
+        var catalog = new ChannelCatalog(Array.Empty<IChannel>(), Mock.Of<IItemLookupService>(), Mock.Of<IItemStore>(), Mock.Of<IUserManager>(), Mock.Of<IStandaloneVisibilityService>(v => v.IsVisibleViaTags(It.IsAny<BaseItem>(), It.IsAny<User>(), It.IsAny<bool>())));
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => catalog.GetChannelsAsync(null!));
     }
@@ -319,6 +321,7 @@ public sealed class ChannelCatalogTests
         services.AddSingleton(Mock.Of<IItemLookupService>());
         services.AddSingleton(Mock.Of<IItemStore>());
         services.AddSingleton(Mock.Of<IUserManager>());
+        services.AddSingleton(Mock.Of<IStandaloneVisibilityService>());
         services.AddSingleton<IChannelCatalog, ChannelCatalog>();
 
         using var provider = services.BuildServiceProvider();
@@ -336,6 +339,7 @@ public sealed class ChannelCatalogTests
         services.AddSingleton(Mock.Of<IItemLookupService>());
         services.AddSingleton(Mock.Of<IItemStore>());
         services.AddSingleton(Mock.Of<IUserManager>());
+        services.AddSingleton(Mock.Of<IStandaloneVisibilityService>());
         services.AddSingleton<IChannelCatalog, ChannelCatalog>();
 
         using var provider = services.BuildServiceProvider();

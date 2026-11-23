@@ -10,7 +10,7 @@ using System.Linq;
 using System.Net.Mime;
 using System.Threading;
 using System.Threading.Tasks;
-using Tesserafin.Common.Configuration;
+using Tesserafin.Controller;
 using Tesserafin.Controller.Drawing;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
@@ -26,7 +26,7 @@ namespace Tesserafin.Server.Core.Images
     public abstract class BaseDynamicImageProvider<T> : IHasItemChangeMonitor, IForcedProvider, ICustomMetadataProvider<T>, IHasOrder
         where T : BaseItem
     {
-        protected BaseDynamicImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IApplicationPaths applicationPaths, IImageProcessor imageProcessor)
+        protected BaseDynamicImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IServerApplicationPaths applicationPaths, IImageProcessor imageProcessor)
         {
             ApplicationPaths = applicationPaths;
             ProviderManager = providerManager;
@@ -38,7 +38,7 @@ namespace Tesserafin.Server.Core.Images
 
         protected IProviderManager ProviderManager { get; }
 
-        protected IApplicationPaths ApplicationPaths { get; }
+        protected IServerApplicationPaths ApplicationPaths { get; }
 
         protected IImageProcessor ImageProcessor { get; set; }
 
@@ -87,7 +87,7 @@ namespace Tesserafin.Server.Core.Images
                     return Task.FromResult(ItemUpdateType.None);
                 }
 
-                if (!FileSystem.ContainsSubPath(item.GetInternalMetadataPath(), image.Path))
+                if (!FileSystem.ContainsSubPath(item.GetInternalMetadataPath(ApplicationPaths.InternalMetadataPath), image.Path))
                 {
                     return Task.FromResult(ItemUpdateType.None);
                 }
@@ -277,7 +277,7 @@ namespace Tesserafin.Server.Core.Images
                 return false;
             }
 
-            if (!FileSystem.ContainsSubPath(item.GetInternalMetadataPath(), image.Path))
+            if (!FileSystem.ContainsSubPath(item.GetInternalMetadataPath(ApplicationPaths.InternalMetadataPath), image.Path))
             {
                 return false;
             }

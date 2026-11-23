@@ -10,16 +10,13 @@ using System.Threading.Tasks;
 using AsyncKeyedLock;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Configuration;
-using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
-using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LiveTv;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Providers;
-using Tesserafin.Data.Enums;
 using Tesserafin.LiveTv.Configuration;
 using Tesserafin.LiveTv.IO;
 using Tesserafin.LiveTv.Timers;
@@ -41,7 +38,8 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     private readonly IServerConfigurationManager _config;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IFileSystem _fileSystem;
-    private readonly ILibraryManager _libraryManager;
+    private readonly IItemPathLookupService _itemPaths;
+    private readonly ILibraryStructureReader _libraryStructure;
     private readonly ILibraryStructureCommands _structure;
     private readonly ILibraryScanCoordinator _scans;
     private readonly ILibraryMonitor _libraryMonitor;
@@ -52,6 +50,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     private readonly TimerManager _timerManager;
     private readonly SeriesTimerManager _seriesTimerManager;
     private readonly RecordingsMetadataManager _recordingsMetadataManager;
+    private readonly RecordingRetentionReader _retention;
 
     private readonly ActiveRecordings _activeRecordings;
     private readonly AsyncNonKeyedLocker _recordingDeleteSemaphore = new();
@@ -67,7 +66,8 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     /// <param name="fileSystem">The <see cref="IFileSystem"/>.</param>
     /// <param name="scans">Library scan scheduling and state.</param>
     /// <param name="structure">Library structure commands.</param>
-    /// <param name="libraryManager">The <see cref="ILibraryManager"/>.</param>
+    /// <param name="libraryStructure">Configured library reader.</param>
+    /// <param name="itemPaths">The catalogue path lookup service.</param>
     /// <param name="libraryMonitor">The <see cref="ILibraryMonitor"/>.</param>
     /// <param name="providerManager">The <see cref="IProviderManager"/>.</param>
     /// <param name="mediaEncoder">The <see cref="IMediaEncoder"/>.</param>
@@ -77,13 +77,15 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
     /// <param name="seriesTimerManager">The <see cref="SeriesTimerManager"/>.</param>
     /// <param name="recordingsMetadataManager">The <see cref="RecordingsMetadataManager"/>.</param>
     /// <param name="activeRecordings">The <see cref="ActiveRecordings"/>.</param>
+    /// <param name="retention">The reader for catalogue retention candidates.</param>
     public RecordingsManager(
         IItemDeletionCommands deletions,
         ILogger<RecordingsManager> logger,
         IServerConfigurationManager config,
         IHttpClientFactory httpClientFactory,
         IFileSystem fileSystem,
-        ILibraryManager libraryManager,
+        IItemPathLookupService itemPaths,
+        ILibraryStructureReader libraryStructure,
         ILibraryStructureCommands structure,
         ILibraryScanCoordinator scans,
         ILibraryMonitor libraryMonitor,
@@ -94,14 +96,16 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         TimerManager timerManager,
         SeriesTimerManager seriesTimerManager,
         RecordingsMetadataManager recordingsMetadataManager,
-        ActiveRecordings activeRecordings)
+        ActiveRecordings activeRecordings,
+        RecordingRetentionReader retention)
     {
         _deletions = deletions;
         _logger = logger;
         _config = config;
         _httpClientFactory = httpClientFactory;
         _fileSystem = fileSystem;
-        _libraryManager = libraryManager;
+        _itemPaths = itemPaths;
+        _libraryStructure = libraryStructure;
         _structure = structure;
         _scans = scans;
         _libraryMonitor = libraryMonitor;
@@ -112,6 +116,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         _timerManager = timerManager;
         _seriesTimerManager = seriesTimerManager;
         _recordingsMetadataManager = recordingsMetadataManager;
+        _retention = retention;
         _activeRecordings = activeRecordings;
 
         _config.NamedConfigurationUpdated += OnNamedConfigurationUpdated;
@@ -182,7 +187,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         try
         {
             var recordingFolders = GetRecordingFolders().ToArray();
-            var virtualFolders = _libraryManager.GetVirtualFolders();
+            var virtualFolders = _libraryStructure.GetVirtualFolders();
 
             var allExistingPaths = virtualFolders.SelectMany(i => i.Locations).ToList();
 
@@ -248,7 +253,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         _logger.LogDebug("Removing path from library: {0}", path);
 
         var requiresRefresh = false;
-        var virtualFolders = _libraryManager.GetVirtualFolders();
+        var virtualFolders = _libraryStructure.GetVirtualFolders();
 
         foreach (var virtualFolder in virtualFolders)
         {
@@ -630,7 +635,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
         var parentPath = Path.GetDirectoryName(path);
         while (item is null && !string.IsNullOrEmpty(path))
         {
-            item = _libraryManager.FindByPath(path, null);
+            item = _itemPaths.FindByPath(path, null);
             path = Path.GetDirectoryName(path);
         }
 
@@ -688,38 +693,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
 
             await DeleteLibraryItemsForTimers(timersToDelete).ConfigureAwait(false);
 
-            if (_libraryManager.FindByPath(seriesPath, true) is not Folder librarySeries)
-            {
-                return;
-            }
-
-            // None of these are injectable here: IChannelManager -> IDtoService -> IRecordingsManager
-            // is an existing DI edge (and IUserViewManager itself depends on IChannelManager), so
-            // IRecordingsManager -> any of them would be circular. Fine to fall back to the statics:
-            // librarySeries is a real library Series (SourceType never Channel), so none of the
-            // branches these feed are reachable in this call path.
-            // Documented legitimate caller of the obsolete 5-parameter overload (the same DI cycle
-            // blocks IItemQueryService too, via its IChannelManager/IUserViewManager dependencies)
-            // — see docs/major-rewrite-plan-v13.md § PR28/N.
-#pragma warning disable CS0618
-            var episodesToDelete = librarySeries.GetItemList(
-                    new InternalItemsQuery
-                    {
-                        OrderBy = [(ItemSortBy.DateCreated, SortOrder.Descending)],
-                        IsVirtualItem = false,
-                        IsFolder = false,
-                        Recursive = true,
-                        DtoOptions = new DtoOptions(true)
-                    },
-                    BaseItem.ChannelManager,
-                    Folder.CollectionManager,
-                    Folder.UserViewManager,
-                    UserView.TVSeriesManager)
-#pragma warning restore CS0618
-                .Where(i => i.IsFileProtocol && File.Exists(i.Path))
-                .Skip(seriesTimer.KeepUpTo - 1);
-
-            foreach (var item in episodesToDelete)
+            foreach (var item in _retention.GetExcessFiles(seriesPath, seriesTimer.KeepUpTo - 1))
             {
                 try
                 {
@@ -761,7 +735,7 @@ public sealed class RecordingsManager : IRecordingsManager, IDisposable
 
     private async Task DeleteLibraryItemForTimer(TimerInfo timer)
     {
-        var libraryItem = _libraryManager.FindByPath(timer.RecordingPath, false);
+        var libraryItem = _itemPaths.FindByPath(timer.RecordingPath, false);
         if (libraryItem is not null)
         {
             await _deletions.DeleteAsync(

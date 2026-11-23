@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Data.Entities;
@@ -26,6 +27,7 @@ namespace Tesserafin.Server.Implementations.Item;
 /// </summary>
 public class ItemPersistenceService : IItemPersistenceService
 {
+    private readonly IItemReadServices _readServices;
     private readonly IDbContextFactory<TesserafinDbContext> _dbProvider;
     private readonly IServerApplicationHost _appHost;
     private readonly ILogger<ItemPersistenceService> _logger;
@@ -36,11 +38,14 @@ public class ItemPersistenceService : IItemPersistenceService
     /// <param name="dbProvider">The database context factory.</param>
     /// <param name="appHost">The application host.</param>
     /// <param name="logger">The logger.</param>
+    /// <param name="readServices">The catalogue reads attached to every saved item.</param>
     public ItemPersistenceService(
         IDbContextFactory<TesserafinDbContext> dbProvider,
         IServerApplicationHost appHost,
-        ILogger<ItemPersistenceService> logger)
+        ILogger<ItemPersistenceService> logger,
+        IItemReadServices readServices)
     {
+        _readServices = readServices;
         _dbProvider = dbProvider;
         _appHost = appHost;
         _logger = logger;
@@ -78,6 +83,10 @@ public class ItemPersistenceService : IItemPersistenceService
     public void SaveItems(IReadOnlyList<BaseItemDto> items, CancellationToken cancellationToken)
     {
         UpdateOrInsertItems(items, cancellationToken);
+        foreach (var item in items)
+        {
+            item.ReadServices ??= _readServices;
+        }
     }
 
     /// <inheritdoc />

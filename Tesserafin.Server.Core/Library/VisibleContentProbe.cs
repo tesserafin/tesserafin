@@ -12,7 +12,7 @@ namespace Tesserafin.Server.Core.Library
 {
     /// <summary>
     /// Sole production implementation of <see cref="IVisibleContentProbe"/>, built on the item
-    /// repository and the id lookup only.
+    /// repository, the id lookup and the standalone visibility service only.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -36,6 +36,7 @@ namespace Tesserafin.Server.Core.Library
     /// </remarks>
     internal sealed class VisibleContentProbe : IVisibleContentProbe
     {
+        private readonly IStandaloneVisibilityService _visibility;
         private readonly IItemLookupService _itemLookupService;
         private readonly IItemRepository _itemRepository;
 
@@ -44,8 +45,10 @@ namespace Tesserafin.Server.Core.Library
         /// </summary>
         /// <param name="itemLookupService">The cached id lookup.</param>
         /// <param name="itemRepository">The item repository (child ids by parent).</param>
-        public VisibleContentProbe(IItemLookupService itemLookupService, IItemRepository itemRepository)
+        /// <param name="visibility">Decides item visibility through the services, never the entity statics.</param>
+        public VisibleContentProbe(IItemLookupService itemLookupService, IItemRepository itemRepository, IStandaloneVisibilityService visibility)
         {
+            _visibility = visibility;
             _itemLookupService = itemLookupService;
             _itemRepository = itemRepository;
         }
@@ -55,9 +58,7 @@ namespace Tesserafin.Server.Core.Library
         {
             IEnumerable<BaseItem> children = library switch
             {
-                CollectionFolder collectionFolder => collectionFolder.PhysicalFolderIds
-                    .Select(_itemLookupService.GetItemById)
-                    .OfType<Folder>()
+                CollectionFolder collectionFolder => collectionFolder.GetPhysicalFolders(_itemLookupService)
                     .SelectMany(GetChildren),
                 PlaylistsFolder => GetChildren(library).OfType<Playlist>(),
                 _ => []
@@ -65,7 +66,7 @@ namespace Tesserafin.Server.Core.Library
 
             return children
                 .Concat(GetLinkedChildren(library))
-                .Any(item => item.IsVisible(user));
+                .Any(item => item.IsVisible(user, false, _visibility));
         }
 
         private IEnumerable<BaseItem> GetChildren(Folder folder)

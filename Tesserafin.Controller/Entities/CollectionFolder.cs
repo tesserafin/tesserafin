@@ -3,24 +3,21 @@
 #pragma warning disable CS1591
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.IO;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
-using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.IO;
-using Tesserafin.Model.Serialization;
 
 namespace Tesserafin.Controller.Entities
 {
@@ -30,10 +27,6 @@ namespace Tesserafin.Controller.Entities
     /// </summary>
     public class CollectionFolder : Folder, ICollectionFolder
     {
-        private static readonly JsonSerializerOptions _jsonOptions = JsonDefaults.Options;
-        private static readonly ConcurrentDictionary<string, LibraryOptions> _libraryOptions = new ConcurrentDictionary<string, LibraryOptions>();
-        private bool _requiresRefresh;
-
         /// <summary>
         /// Initializes a new instance of the <see cref="CollectionFolder"/> class.
         /// </summary>
@@ -42,11 +35,6 @@ namespace Tesserafin.Controller.Entities
             PhysicalLocationsList = Array.Empty<string>();
             PhysicalFolderIds = Array.Empty<Guid>();
         }
-
-        /// <summary>
-        /// Event raised when library options are updated for any collection folder.
-        /// </summary>
-        public static event EventHandler<LibraryOptionsUpdatedEventArgs> LibraryOptionsUpdated;
 
         /// <summary>
         /// Gets the display preferences id.
@@ -65,10 +53,6 @@ namespace Tesserafin.Controller.Entities
 
         public Guid[] PhysicalFolderIds { get; set; }
 
-        public static IXmlSerializer XmlSerializer { get; set; }
-
-        public static IServerApplicationHost ApplicationHost { get; set; }
-
         [JsonIgnore]
         public override bool SupportsPlayedStatus => false;
 
@@ -83,39 +67,41 @@ namespace Tesserafin.Controller.Entities
         /// <remarks>
         /// Our children are actually just references to the ones in the physical root...
         /// Setting to null propagates invalidation to physical folders since the getter
-        /// always delegates to <see cref="GetActualChildren"/> and never reads the backing field.
+        /// reads from the physical folders and never uses the backing field.
         /// </remarks>
         /// <value>The actual children.</value>
         [JsonIgnore]
         public override IEnumerable<BaseItem> Children
         {
-            get => GetActualChildren();
-            set
-            {
-                // The getter delegates to physical folders, so invalidate their caches.
-                foreach (var folder in GetPhysicalFolders(true))
-                {
-                    folder.Children = null;
-                }
-            }
+            get => GetCatalogueChildren(null, LibraryManager);
+            set => InvalidateCatalogueChildren(LibraryManager);
         }
 
         [JsonIgnore]
         public override bool SupportsPeople => false;
 
-        public override bool CanDelete()
+        /// <inheritdoc />
+        public override IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
+            => GetPhysicalFolders(lookup).SelectMany(folder => folder.GetCatalogueChildren(repository, lookup));
+
+        /// <inheritdoc />
+        public override void InvalidateCatalogueChildren(IItemLookupService lookup)
+        {
+            foreach (var folder in GetPhysicalFolders(lookup))
+            {
+                folder.InvalidateCatalogueChildren(lookup);
+            }
+        }
+
+        public override bool CanDelete(IChannelManager channels)
         {
             return false;
         }
 
-        public LibraryOptions GetLibraryOptions()
+        public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
-            return GetLibraryOptions(Path);
-        }
-
-        public override bool IsVisible(User user, bool skipAllowedTagsCheck, ITagVisibilityService tagVisibility)
-        {
-            if (GetLibraryOptions().Enabled)
+            var options = tagVisibility.GetLibraryOptions(this);
+            if (options.Enabled)
             {
                 return base.IsVisible(user, skipAllowedTagsCheck, tagVisibility);
             }
@@ -123,217 +109,19 @@ namespace Tesserafin.Controller.Entities
             return false;
         }
 
-        private static LibraryOptions LoadLibraryOptions(string path)
-        {
-            try
-            {
-                if (XmlSerializer.DeserializeFromFile(typeof(LibraryOptions), GetLibraryOptionsPath(path)) is not LibraryOptions result)
-                {
-                    return new LibraryOptions();
-                }
-
-                foreach (var mediaPath in result.PathInfos)
-                {
-                    if (!string.IsNullOrEmpty(mediaPath.Path))
-                    {
-                        mediaPath.Path = ApplicationHost.ExpandVirtualPath(mediaPath.Path);
-                    }
-                }
-
-                return result;
-            }
-            catch (FileNotFoundException)
-            {
-                return new LibraryOptions();
-            }
-            catch (IOException)
-            {
-                return new LibraryOptions();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error loading library options");
-
-                return new LibraryOptions();
-            }
-        }
-
-        private static string GetLibraryOptionsPath(string path)
-        {
-            return System.IO.Path.Combine(path, "options.xml");
-        }
-
-        public void UpdateLibraryOptions(LibraryOptions options)
-        {
-            SaveLibraryOptions(Path, options);
-        }
-
-        public static LibraryOptions GetLibraryOptions(string path)
-            => _libraryOptions.GetOrAdd(path, LoadLibraryOptions);
-
-        public static void SaveLibraryOptions(string path, LibraryOptions options)
-        {
-            var clone = JsonSerializer.Deserialize<LibraryOptions>(JsonSerializer.SerializeToUtf8Bytes(options, _jsonOptions), _jsonOptions);
-            foreach (var mediaPath in clone.PathInfos)
-            {
-                if (!string.IsNullOrEmpty(mediaPath.Path))
-                {
-                    mediaPath.Path = ApplicationHost.ReverseVirtualPath(mediaPath.Path);
-                }
-            }
-
-            XmlSerializer.SerializeToFile(clone, GetLibraryOptionsPath(path));
-            _libraryOptions[path] = options;
-
-            LibraryOptionsUpdated?.Invoke(null, new LibraryOptionsUpdatedEventArgs(path, options));
-        }
-
-        public static void OnCollectionFolderChange()
-            => _libraryOptions.Clear();
-
         public override bool IsSaveLocalMetadataEnabled()
         {
             return true;
         }
 
-        protected override FileSystemMetadata[] GetFileSystemChildren(IDirectoryService directoryService)
-        {
-            return CreateResolveArgs(directoryService, true).FileSystemChildren;
-        }
-
-        public override bool RequiresRefresh()
-        {
-            var changed = base.RequiresRefresh() || _requiresRefresh;
-
-            if (!changed)
-            {
-                var locations = PhysicalLocations;
-
-                var newLocations = CreateResolveArgs(new DirectoryService(FileSystem), false).PhysicalLocations;
-
-                if (!locations.SequenceEqual(newLocations))
-                {
-                    changed = true;
-                }
-            }
-
-            if (!changed)
-            {
-                var folderIds = PhysicalFolderIds;
-
-                var newFolderIds = GetPhysicalFolders(false).Select(i => i.Id).ToList();
-
-                if (!folderIds.SequenceEqual(newFolderIds))
-                {
-                    changed = true;
-                }
-            }
-
-            return changed;
-        }
-
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
-        {
-            var changed = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService) || _requiresRefresh;
-            _requiresRefresh = false;
-            return changed;
-        }
-
-        public override double? GetRefreshProgress()
-        {
-            var folders = GetPhysicalFolders(true).ToList();
-            double totalProgresses = 0;
-            var foldersWithProgress = 0;
-
-            foreach (var folder in folders)
-            {
-                var progress = ProviderManager.GetRefreshProgress(folder.Id);
-                if (progress.HasValue)
-                {
-                    totalProgresses += progress.Value;
-                    foldersWithProgress++;
-                }
-            }
-
-            if (foldersWithProgress == 0)
-            {
-                return null;
-            }
-
-            return totalProgresses / foldersWithProgress;
-        }
-
-        protected override bool RefreshLinkedChildren(IEnumerable<FileSystemMetadata> fileSystemChildren)
-        {
-            return RefreshLinkedChildrenInternal(true);
-        }
-
-        private bool RefreshLinkedChildrenInternal(bool setFolders)
-        {
-            var physicalFolders = GetPhysicalFolders(false)
-                .ToList();
-
-            var linkedChildren = physicalFolders
-                .SelectMany(c => c.LinkedChildren)
-                .ToList();
-
-            var changed = !linkedChildren.SequenceEqual(LinkedChildren, new LinkedChildComparer(FileSystem));
-
-            LinkedChildren = linkedChildren.ToArray();
-
-            var folderIds = PhysicalFolderIds;
-            var newFolderIds = physicalFolders.Select(i => i.Id).ToArray();
-
-            if (!folderIds.SequenceEqual(newFolderIds))
-            {
-                changed = true;
-                if (setFolders)
-                {
-                    PhysicalFolderIds = newFolderIds;
-                }
-            }
-
-            return changed;
-        }
-
-        private ItemResolveArgs CreateResolveArgs(IDirectoryService directoryService, bool setPhysicalLocations)
-        {
-            var path = ContainingFolderPath;
-
-            var args = new ItemResolveArgs(ConfigurationManager.ApplicationPaths, LibraryManager)
-            {
-                FileInfo = FileSystem.GetDirectoryInfo(path),
-                Parent = GetParent() as Folder,
-                CollectionType = CollectionType
-            };
-
-            // Gather child folder and files
-            if (args.IsDirectory)
-            {
-                var flattenFolderDepth = 0;
-
-                var files = FileData.GetFilteredFileSystemEntries(directoryService, args.Path, FileSystem, ApplicationHost, Logger, args, flattenFolderDepth: flattenFolderDepth, resolveShortcuts: true);
-
-                args.FileSystemChildren = files;
-            }
-
-            _requiresRefresh = _requiresRefresh || !args.PhysicalLocations.SequenceEqual(PhysicalLocations);
-
-            if (setPhysicalLocations)
-            {
-                PhysicalLocationsList = args.PhysicalLocations;
-            }
-
-            return args;
-        }
+        protected override Task<bool> RefreshOwnedItemsAsync(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, MetadataRefreshOptions options, CancellationToken cancellationToken)
+            => writes.RefreshCollectionFolderMembershipAsync(this, options.DirectoryService, cancellationToken);
 
         /// <summary>
         /// Compare our current children (presumably just read from the repo) with the current state of the file system and adjust for any changes
         /// ***Currently does not contain logic to maintain items that are unavailable in the file system***.
         /// </summary>
-        /// <param name="deletions">Explicit deletion operations for this refresh.</param>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="images">Explicit image preparation and commit lifecycle.</param>
+        /// <param name="services">Deletion, write, image, scheduling and channel services for this validation.</param>
         /// <param name="progress">The progress.</param>
         /// <param name="recursive">if set to <c>true</c> [recursive].</param>
         /// <param name="refreshChildMetadata">if set to <c>true</c> [refresh child metadata].</param>
@@ -342,53 +130,15 @@ namespace Tesserafin.Controller.Entities
         /// <param name="directoryService">The directory service.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        protected override Task ValidateChildrenInternal(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemImageService images, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
+        protected override Task ValidateChildrenInternal(IFolderValidationServices services, IProgress<double> progress, bool recursive, bool refreshChildMetadata, bool allowRemoveRoot, MetadataRefreshOptions refreshOptions, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
 
-        public IEnumerable<BaseItem> GetActualChildren()
-        {
-            return GetPhysicalFolders(true).SelectMany(c => c.Children);
-        }
-
-        public IEnumerable<Folder> GetPhysicalFolders()
-        {
-            return GetPhysicalFolders(true);
-        }
-
-        private IEnumerable<Folder> GetPhysicalFolders(bool enableCache)
-        {
-            if (enableCache)
-            {
-                return PhysicalFolderIds.Select(i => LibraryManager.GetItemById(i)).OfType<Folder>();
-            }
-
-            var rootChildren = LibraryManager.RootFolder.Children
-                .OfType<Folder>()
-                .ToList();
-
-            return PhysicalLocations
-                    .Where(i => !FileSystem.AreEqual(i, Path))
-                    .SelectMany(i => GetPhysicalParents(i, rootChildren))
-                    .DistinctBy(x => x.Id);
-        }
-
-        private IEnumerable<Folder> GetPhysicalParents(string path, List<Folder> rootChildren)
-        {
-            var result = rootChildren
-                .Where(i => FileSystem.AreEqual(i.Path, path))
-                .ToList();
-
-            if (result.Count == 0)
-            {
-                if (LibraryManager.FindByPath(path, true) is Folder folder)
-                {
-                    result.Add(folder);
-                }
-            }
-
-            return result;
-        }
+        /// <summary>Resolves the currently committed physical folder identities through a catalogue lookup.</summary>
+        /// <param name="lookup">The item lookup used for physical folder resolution.</param>
+        /// <returns>The available folders in membership order.</returns>
+        public IEnumerable<Folder> GetPhysicalFolders(IItemLookupService lookup)
+            => PhysicalFolderIds.Select(id => lookup.GetItemById(id)).OfType<Folder>();
     }
 }

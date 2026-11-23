@@ -12,17 +12,20 @@ namespace Tesserafin.Controller.Library
     /// responsibility of the query service/<see cref="ILibraryManager"/>.
     /// </summary>
     /// <remarks>
-    /// Introduced in PR85b by lifting the scoping helpers out of <c>LibraryManager</c>
-    /// (<c>SetTopParentIdsOrAncestors</c>, <c>AddUserToQuery</c>) into a cycle-free leaf service.
-    /// This exists in preparation for PR86, which will let <c>IItemQueryService</c> build global
-    /// queries without depending on <see cref="ILibraryManager"/>. <c>LibraryManager</c> keeps its
-    /// own copies of the same logic during the transition (temporary duplication; see
-    /// <c>docs/pr85b-item-query-scope-service.md</c>) - this interface is not yet consumed by
-    /// <c>LibraryManager</c> itself, to avoid re-forming the DI cycle this extraction exists to
-    /// avoid.
+    /// The single parent/user scoping policy used by both the query service and manager.
+    /// It depends on explicit leaf ports and does not hold a manager or deferred query dependency.
+    /// Query-specific playlist/collection refusal filtering remains with manager orchestration.
     /// </remarks>
     public interface IItemQueryScopeService
     {
+        /// <summary>
+        /// Converts named-metadata ancestor filters to physical library scopes when all ancestors
+        /// are libraries or user views. Unknown ancestors are rejected; inaccessible or empty scopes
+        /// use a sentinel rather than broadening to every library. Ordinary ancestors remain intact.
+        /// </summary>
+        /// <param name="query">The query whose ancestor/top-parent filters are mutated.</param>
+        void SetTopParentOrAncestorIds(InternalItemsQuery query);
+
         /// <summary>
         /// Scopes <paramref name="query"/> to <paramref name="parents"/>, choosing the most
         /// efficient available filter: top-parent ids when every parent is a collection/user view,

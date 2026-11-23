@@ -1,6 +1,7 @@
 #pragma warning disable CS1591
 
 using System.Text.Json.Serialization;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Data.Enums;
 
 namespace Tesserafin.Controller.Entities
@@ -20,7 +21,7 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public override bool SupportsPeople => false;
 
-        public override bool CanDelete()
+        public override bool CanDelete(IChannelManager channels)
         {
             return false;
         }

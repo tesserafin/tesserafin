@@ -11,6 +11,7 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
@@ -25,8 +26,6 @@ namespace Tesserafin.Controller.Entities.TV
     /// </summary>
     public class Episode : Video, IHasTrailers, IHasLookupInfo<EpisodeInfo>, IHasSeries
     {
-        public static IMediaEncoder MediaEncoder { get; set; }
-
         /// <inheritdoc />
         [JsonIgnore]
         public IReadOnlyList<BaseItem> LocalTrailers => GetExtras([Tesserafin.Model.Entities.ExtraType.Trailer]).ToArray();
@@ -191,9 +190,9 @@ namespace Tesserafin.Controller.Entities.TV
         public string FindSeriesPresentationUniqueKey()
             => Series?.PresentationUniqueKey;
 
-        public string FindSeasonName()
+        public string FindSeasonName(IItemLookupService lookup, IItemRepository repository)
         {
-            var season = Season;
+            var season = GetSeason(lookup, repository);
 
             if (season is null)
             {
@@ -214,26 +213,34 @@ namespace Tesserafin.Controller.Entities.TV
             return series is null ? SeriesName : series.Name;
         }
 
-        public Guid FindSeasonId()
+        /// <summary>Resolves the stored season or finds the episode's season through the catalogue.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <param name="repository">The item repository.</param>
+        /// <returns>The season, or <c>null</c> if it could not be resolved.</returns>
+        public Season GetSeason(IItemLookupService lookup, IItemRepository repository)
         {
-            var season = FindParent<Season>();
+            var seasonId = SeasonId.IsEmpty() ? FindSeasonId(lookup, repository) : SeasonId;
+            return seasonId.IsEmpty() ? null : lookup.GetItemById(seasonId) as Season;
+        }
 
-            // Episodes directly in series folder
-            if (season is null)
+        public Guid FindSeasonId()
+            => ResolveSeasonId(FindParent<Season>(), () => Series?.Children);
+
+        /// <summary>Finds the parent season, or a numbered season for an episode stored in the series folder.</summary>
+        /// <param name="lookup">The item identity lookup.</param>
+        /// <param name="repository">The item repository.</param>
+        /// <returns>The season ID, or <see cref="Guid.Empty"/> if no season matches.</returns>
+        public Guid FindSeasonId(IItemLookupService lookup, IItemRepository repository)
+            => ResolveSeasonId(FindParent<Season>(lookup), () => GetSeries(lookup)?.GetCatalogueChildren(repository, lookup));
+
+        private Guid ResolveSeasonId(Season season, Func<IEnumerable<BaseItem>> getSeriesChildren)
+        {
+            if (season is null && ParentIndexNumber is int seasonNumber)
             {
-                var series = Series;
-
-                if (series is not null && ParentIndexNumber.HasValue)
-                {
-                    var findNumber = ParentIndexNumber.Value;
-
-                    season = series.Children
-                        .OfType<Season>()
-                        .FirstOrDefault(i => i.IndexNumber.HasValue && i.IndexNumber.Value == findNumber);
-                }
+                season = getSeriesChildren()?.OfType<Season>().FirstOrDefault(item => item.IndexNumber == seasonNumber);
             }
 
-            return season is null ? Guid.Empty : season.Id;
+            return season?.Id ?? Guid.Empty;
         }
 
         /// <summary>
@@ -340,10 +347,14 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         public EpisodeInfo GetLookupInfo()
-        {
-            var id = GetItemLookupInfo<EpisodeInfo>();
+            => CreateLookupInfo(Series, Season, null);
 
-            var series = Series;
+        public EpisodeInfo GetLookupInfo(IItemLookupService lookup, IItemRepository repository, (string Language, string CountryCode) locale)
+            => CreateLookupInfo(GetSeries(lookup), GetSeason(lookup, repository), locale);
+
+        private EpisodeInfo CreateLookupInfo(Series series, Season season, (string Language, string CountryCode)? locale)
+        {
+            var id = GetItemLookupInfo<EpisodeInfo>(locale);
 
             if (series is not null)
             {
@@ -351,9 +362,9 @@ namespace Tesserafin.Controller.Entities.TV
                 id.SeriesDisplayOrder = series.DisplayOrder;
             }
 
-            if (Season is not null)
+            if (season is not null)
             {
-                id.SeasonProviderIds = Season.ProviderIds;
+                id.SeasonProviderIds = season.ProviderIds;
             }
 
             id.IsMissingEpisode = IsMissingEpisode;
@@ -370,43 +381,6 @@ namespace Tesserafin.Controller.Entities.TV
             {
                 if (SourceType == SourceType.Library || SourceType == SourceType.LiveTV)
                 {
-                    var libraryOptions = LibraryManager.GetLibraryOptions(this);
-                    if (libraryOptions.EnableEmbeddedEpisodeInfos && string.Equals(Container, "mp4", StringComparison.OrdinalIgnoreCase))
-                    {
-                        try
-                        {
-                            // BeforeMetadataRefresh isn't part of the GetMediaSources/GetMediaStreams
-                            // chain the mediaSourceManager/mediaSegmentManager/channelManager
-                            // parameters were threaded through (out of scope: a much wider virtual
-                            // with 15 overrides/17 callers) — falls back to the statics here.
-                            var mediaInfo = MediaEncoder.GetMediaInfo(
-                                new MediaInfoRequest
-                                {
-                                    MediaSource = GetMediaSources(false, MediaSourceManager, MediaSegmentManager, ChannelManager)[0],
-                                    MediaType = DlnaProfileType.Video
-                                },
-                                CancellationToken.None).GetAwaiter().GetResult();
-                            if (mediaInfo.ParentIndexNumber > 0)
-                            {
-                                ParentIndexNumber = mediaInfo.ParentIndexNumber;
-                            }
-
-                            if (mediaInfo.IndexNumber > 0)
-                            {
-                                IndexNumber = mediaInfo.IndexNumber;
-                            }
-
-                            if (!string.IsNullOrEmpty(mediaInfo.ShowName))
-                            {
-                                SeriesName = mediaInfo.ShowName;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.LogError(ex, "Error reading the episode information with ffprobe. Episode: {EpisodeInfo}", Path);
-                        }
-                    }
-
                     try
                     {
                         if (itemNamingService.FillMissingEpisodeNumbersFromPath(this, replaceAllMetadata))

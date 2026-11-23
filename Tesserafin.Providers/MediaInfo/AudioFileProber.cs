@@ -34,7 +34,7 @@ namespace Tesserafin.Providers.MediaInfo
 
         private readonly IItemPeopleCommands _peopleCommands;
         private readonly IMediaEncoder _mediaEncoder;
-        private readonly ILibraryManager _libraryManager;
+        private readonly ILibraryItemOptions _itemOptions;
         private readonly ILogger<AudioFileProber> _logger;
         private readonly IMediaSourceManager _mediaSourceManager;
         private readonly LyricResolver _lyricResolver;
@@ -49,7 +49,7 @@ namespace Tesserafin.Providers.MediaInfo
         /// <param name="logger">Instance of the <see cref="ILogger"/> interface.</param>
         /// <param name="mediaSourceManager">Instance of the <see cref="IMediaSourceManager"/> interface.</param>
         /// <param name="mediaEncoder">Instance of the <see cref="IMediaEncoder"/> interface.</param>
-        /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+        /// <param name="itemOptions">Effective library options for the probed item.</param>
         /// <param name="lyricResolver">Instance of the <see cref="LyricResolver"/> interface.</param>
         /// <param name="lyricManager">Instance of the <see cref="ILyricManager"/> interface.</param>
         /// <param name="mediaStreamRepository">Instance of the <see cref="IMediaStreamRepository"/>.</param>
@@ -59,7 +59,7 @@ namespace Tesserafin.Providers.MediaInfo
             ILogger<AudioFileProber> logger,
             IMediaSourceManager mediaSourceManager,
             IMediaEncoder mediaEncoder,
-            ILibraryManager libraryManager,
+            ILibraryItemOptions itemOptions,
             LyricResolver lyricResolver,
             ILyricManager lyricManager,
             IMediaStreamRepository mediaStreamRepository,
@@ -67,7 +67,7 @@ namespace Tesserafin.Providers.MediaInfo
         {
             _peopleCommands = peopleCommands;
             _mediaEncoder = mediaEncoder;
-            _libraryManager = libraryManager;
+            _itemOptions = itemOptions;
             _logger = logger;
             _mediaSourceManager = mediaSourceManager;
             _lyricResolver = lyricResolver;
@@ -178,7 +178,7 @@ namespace Tesserafin.Providers.MediaInfo
         /// <param name="cancellationToken">The cancellation token.</param>
         private async Task FetchDataFromTags(Audio audio, Tesserafin.Model.MediaInfo.MediaInfo mediaInfo, MetadataRefreshOptions options, bool tryExtractEmbeddedLyrics, CancellationToken cancellationToken)
         {
-            var libraryOptions = _libraryManager.GetLibraryOptions(audio);
+            var libraryOptions = _itemOptions.GetLibraryOptions(audio);
             Track track = new Track(audio.Path);
 
             if (track.MetadataFormats
@@ -556,7 +556,7 @@ namespace Tesserafin.Providers.MediaInfo
             if (!string.IsNullOrWhiteSpace(lyrics)
                 && (tryExtractEmbeddedLyrics || options.ReplaceAllMetadata))
             {
-                await _lyricManager.SaveLyricAsync(audio, "lrc", lyrics).ConfigureAwait(false);
+                await _lyricManager.SaveLyricAsync(audio, libraryOptions, "lrc", lyrics).ConfigureAwait(false);
             }
         }
 
