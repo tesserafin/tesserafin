@@ -174,7 +174,13 @@ public sealed class NamedItemCatalogEndToEndTests(TesserafinApplicationFactory f
         var repository = factory.Services.GetRequiredService<IItemRepository>();
         var mark = Guid.NewGuid().ToString("N");
         var name = "albumartist" + mark;
-        var album = new MusicAlbum { Id = Guid.NewGuid(), Name = "album", AlbumArtists = [name] };
+        var album = new MusicAlbum
+        {
+            Id = Guid.NewGuid(),
+            Name = "album",
+            AlbumArtists = [name],
+            ReadServices = factory.Services.GetRequiredService<IItemReadServices>()
+        };
 
         Assert.Null(album.MusicArtist);
         Assert.Null(album.GetMusicArtist());
