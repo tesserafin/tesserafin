@@ -654,6 +654,8 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         // ends (PlaybackSessionLiveStreams). The server's FFmpeg reads that stream through its
         // provider (pipe:0), never through the [Authorize]d LiveStreamFiles route.
         string? liveStreamId = null;
+        // A channel-plugin item is read like any other source of its kind (a url, a file); one that
+        // must be opened first is refused by the planner, since no provider opens channel sources.
         if (item is LiveTvChannel && _liveStreams is not null)
         {
             (mediaSources, liveStreamId) = await OpenChannelStream(request, mediaSources, userId, playSessionId, heldLiveStreamId, cancellationToken).ConfigureAwait(false);
@@ -743,21 +745,20 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     }
 
     /// <summary>
-    /// Whether <paramref name="item"/> is a library video the local video journey may decide: any
-    /// <see cref="Video"/> family (film, episode, home video, music video, trailer) that is neither a
-    /// channel-plugin item nor a Live TV recording still being written.
+    /// Whether <paramref name="item"/> is a video the session journey may decide: any
+    /// <see cref="Video"/> family (film, episode, home video, music video, trailer, channel-plugin
+    /// item) that is not a Live TV recording still being written.
     /// </summary>
     private bool IsLibraryVideo(BaseItem item)
         => item is Video video
-            && video.ChannelId.IsEmpty()
             && (string.IsNullOrEmpty(video.Path) || _recordingsManager?.GetActiveRecordingInfo(video.Path) is null);
 
     /// <summary>
-    /// Whether <paramref name="item"/> is a library audio track the local media journey may decide:
-    /// an <see cref="Tesserafin.Controller.Entities.Audio.Audio"/> that is not a channel-plugin item.
+    /// Whether <paramref name="item"/> is an audio track the session journey may decide, a
+    /// channel-plugin track included.
     /// </summary>
     private static bool IsLibraryAudio(BaseItem item)
-        => item is Tesserafin.Controller.Entities.Audio.Audio audio && audio.ChannelId.IsEmpty();
+        => item is Tesserafin.Controller.Entities.Audio.Audio;
 
     private static IDisposable? BeginLocalMediaScope(bool isLocalMedia, PlaybackPlanRequestBase request, string? liveStreamId)
         => isLocalMedia || liveStreamId is not null

@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Api.Models.PlaybackSessionDtos;
+using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
@@ -438,6 +439,11 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
         protected override string ServerFfmpegPath
             => Environment.GetEnvironmentVariable("TESSERAFIN_TONEMAP_FFMPEG") is { Length: > 0 } path ? path : FfmpegPath;
 
+        /// <summary>
+        /// Gets the channel plugin this host serves channel-plugin items from.
+        /// </summary>
+        internal TestChannel Channel { get; } = new();
+
         /// <inheritdoc/>
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -451,6 +457,8 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
                     provider.GetRequiredService<ILogger<LocalMediaPlanner>>(),
                     canTonemap: () => provider.GetRequiredService<IMediaEncoder>().SupportsFilter("tonemapx")));
                 services.AddSingleton<IPlaybackLiveStreamResolver, LegacyChainReached>();
+                services.AddSingleton(Channel);
+                services.AddSingleton<IChannel>(Channel);
             });
         }
     }

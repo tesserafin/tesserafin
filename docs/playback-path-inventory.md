@@ -411,8 +411,7 @@ executor reads it, the planner forbids a direct play (the url is never handed to
 is remuxed or transcoded into a session output; the delivery guard accepts it in place of a local
 file. A non-local source no session provider reads (RTSP, RTMP, UDP, a remote stream with no known
 duration) is refused explicitly (422). A Live TV tuner stream is the opened-stream provider of the
-Live TV slice. Local disc structures (DVD, Blu-ray folders, ISO) are not non-local: they stay with the
-existing chain, as do channel-plugin items (no test channel plugin here; they are listed below).
+Live TV slice. Local disc structures and channel-plugin items have their own slices below.
 Proof: `RemoteSourceEndToEndTests` (a remote MP4 served over loopback HTTP, remuxed into the session's
 HLS output with FFmpeg reading the url; an RTSP source refused with 422), required by name; break
 control: remote provider removed (refused). The kill-switch contract moves to `PlaybackInfo`, the one
@@ -427,6 +426,17 @@ reached). A Blu-ray folder takes the same path but cannot be synthesized here (i
 structure). An ISO image stays with the existing chain: the executor reads only a Blu-ray ISO
 directly, and neither can be proven here.
 
+Channel-plugin items (decided 2026-11-20): an item a channel plugin supplies enters the session
+journey like any library video or track and is read like any other source of its kind - a remote
+file its plugin names is executed from its url, a local file from its path. A channel source that
+must be opened first is refused: no provider opens channel sources
+(`ChannelDynamicMediaSourceProvider.OpenMediaSource` is not implemented), and so is an endless one.
+The delivery guard checks the channel item itself; its sources are named by its plugin, not items.
+Proof: `ChannelItemEndToEndTests` with `TestChannel`, a channel plugin registered on the legacy-free
+host (a remote MP4 named by the plugin, remuxed into the session's HLS output with FFmpeg reading the
+url; an endless and a must-open source refused with 422), required by name; break control: channel
+items excluded again (legacy planner reached, 3/3).
+
 ### Plan to delete `PlaybackInfo` and the legacy planner
 
 The Android client never calls `PlaybackInfo` (its start is `POST Playback/Sessions` only). What
@@ -440,8 +450,9 @@ reaches it), then the deletion is one coordinated change.
    project's FFmpeg on the runner (follow-up).
 3. Targets other than H.264/AAC: done (above).
 4. A client with no HLS output: done (above).
-5. Non-local sources: done for remote HTTP files (above); channel-plugin items and local disc
-   structures remain with the existing chain.
+5. Non-local sources: done - remote HTTP files, channel-plugin items, DVD and Blu-ray folders
+   (above). A local ISO image and a Live TV recording still being written remain with the existing
+   chain.
 6. DLNA: not applicable (decided 2026-11-20). Tesserafin ships no DLNA server; "Dlna" only names
    the legacy `DeviceProfile`/`StreamBuilder` model, which goes with step 7. An external DLNA plugin
    is not supported.
@@ -455,7 +466,7 @@ Remaining consumers by name. Nothing is deleted globally while one of them still
 
 | Legacy path | Still reached by |
 | --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | a session of a channel-plugin item or a local ISO image, Live TV through `PlaybackInfo`, channel-plugin items, `PlaybackInfo` (every native client start that is not Sessions), DLNA; a library video needing tone mapping, a burnt-in subtitle, a target other than H.264/AAC, or with no HLS output profile; a source that is not a local file |
+| `PlaybackSessionPlanner` / `StreamBuilder` | a session of a local ISO image or a Live TV recording still being written; `PlaybackInfo` (every client start that is not Sessions, Live TV included) |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
 | Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio the server does not serve from the session, Live TV, channel-plugin items; a library video the server does not serve from the session |
