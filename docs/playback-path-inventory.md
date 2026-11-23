@@ -423,8 +423,16 @@ play forbidden; the delivery guard accepts the folder while it exists. Proof:
 `DiscSourceEndToEndTests` (a synthesized two-VOB DVD title, `-f concat` in the command, output
 probed as H.264 + AAC), required by name; break control: disc source removed (legacy planner
 reached). A Blu-ray folder takes the same path but cannot be synthesized here (it needs a real BDMV
-structure). An ISO image stays with the existing chain: the executor reads only a Blu-ray ISO
-directly, and neither can be proven here.
+structure). ISO images stay with the existing chain.
+
+**Blu-ray ISO runtime check (2026-11-23).** A synthetic 182-second BDMV ISO built with tsMuxer
+2.7.0 opened through `bluray:` in system FFmpeg 6.1.1. A seek to five seconds produced a sample with
+H.264 video copied and AC-3 audio converted to AAC. FFmpeg's Blu-ray protocol selects playlists of
+at least 180 seconds, so the two-second fixture used for folder playback cannot exercise that path.
+The release F0 runtime excludes `libbluray` and `libudfread` in
+[`ci/ffmpeg/components.json`](../ci/ffmpeg/components.json). Before moving ISO playback to Sessions,
+choose a title reader available in the shipped runtime and prove it on a release build. The existing
+managed UDF reader classifies ISO files during library discovery. DVD ISO execution needs its own proof.
 
 Channel-plugin items (decided 2026-11-20): an item a channel plugin supplies enters the session
 journey like any library video or track and is read like any other source of its kind - a remote
@@ -435,13 +443,15 @@ The delivery guard checks the channel item itself; its sources are named by its 
 Proof: `ChannelItemEndToEndTests` with `TestChannel`, a channel plugin registered on the legacy-free
 host (a remote MP4 named by the plugin, remuxed into the session's HLS output with FFmpeg reading the
 url; an endless and a must-open source refused with 422), required by name; break control: channel
-items excluded again (legacy planner reached, 3/3).
+items excluded again (legacy planner reached, 3/3). Shipped server and Web changes are in
+[#519](https://github.com/tesserafin/tesserafin/pull/519) and
+[Web #316](https://github.com/tesserafin/tesserafin-web/pull/316).
 
 ### Plan to delete `PlaybackInfo` and the legacy planner
 
 The Android client never calls `PlaybackInfo` (its start is `POST Playback/Sessions` only). What
-still reaches the legacy chain is the Web client for the decisions below, DLNA, and, inside a
-session, the same decisions on any client. Each step moves one row under the session and is proved
+still reaches the legacy chain is the Web client for the decisions below and, inside a session,
+those same decisions on any client. Each step moves one row under the session and is proved
 like the slices above (legacy-free host, real FFmpeg, real browser; a phone check where Android
 reaches it), then the deletion is one coordinated change.
 
@@ -469,7 +479,7 @@ Remaining consumers by name. Nothing is deleted globally while one of them still
 | `PlaybackSessionPlanner` / `StreamBuilder` | a session of a local ISO image or a Live TV recording still being written; `PlaybackInfo` (every client start that is not Sessions, Live TV included) |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
-| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | audio the server does not serve from the session, Live TV, channel-plugin items; a library video the server does not serve from the session |
+| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | Web targets outside the local HTML Sessions journey and media for which Sessions returns a legacy descriptor, including recordings still being written and local ISO images |
 
 ## 8. Shared model boundary (consolidation step 4, candidate)
 
