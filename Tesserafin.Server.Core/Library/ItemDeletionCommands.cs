@@ -18,7 +18,6 @@ using Tesserafin.Controller.MediaSegments;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.IO;
-using Tesserafin.Model.MediaInfo;
 
 namespace Tesserafin.Server.Core.Library;
 
@@ -133,7 +132,7 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         var pathMaps = items.Select(e =>
             (Item: e,
             InternalPath: GetInternalMetadataPaths(e),
-            DeletePaths: deleteSourceFiles ? e.GetDeletePaths() : [])).ToArray();
+            DeletePaths: deleteSourceFiles ? e.GetDeletePaths(_fileSystem) : [])).ToArray();
 
         foreach (var (item, internalPaths, pathsToDelete) in pathMaps)
         {
@@ -225,13 +224,13 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
             : [];
 
         var metadataPaths = GetMetadataPaths(item, children).ToArray();
-        if ((deleteSource && IsFileProtocol(item)) || IsInternalItem(item))
+        if ((deleteSource && item.IsFileProtocol) || IsInternalItem(item))
         {
             // Assume only the first is required
             // Add this flag to GetDeletePaths if required in the future
             var isRequiredForDelete = true;
 
-            foreach (var fileSystemInfo in item.GetDeletePaths())
+            foreach (var fileSystemInfo in item.GetDeletePaths(_fileSystem))
             {
                 DeleteItemPath(item, isRequiredForDelete, fileSystemInfo);
 
@@ -437,12 +436,9 @@ internal sealed class ItemDeletionCommands : IItemDeletionCommands, IDisposable
         }
     }
 
-    private bool IsFileProtocol(BaseItem item)
-        => !string.IsNullOrEmpty(item.Path) && _sources.Value.GetPathProtocol(item.Path) == MediaProtocol.File;
-
     private bool IsInternalItem(BaseItem item)
     {
-        if (!IsFileProtocol(item))
+        if (!item.IsFileProtocol)
         {
             return false;
         }

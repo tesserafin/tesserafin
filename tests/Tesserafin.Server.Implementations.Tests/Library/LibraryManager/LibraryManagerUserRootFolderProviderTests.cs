@@ -64,12 +64,6 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
         _configurationManagerMock.Setup(c => c.Configuration).Returns(new ServerConfiguration());
         _configurationManagerMock.Setup(c => c.GetConfiguration("metadata")).Returns(new MetadataConfiguration());
 
-        // ResolverHelper (called from LibraryManager's own resolver pipeline) reads
-        // BaseItem.ConfigurationManager.GetMetadataConfiguration() - the static, not the injected
-        // instance (RFC §3/§8.3's static-fallback trap, out of scope to eliminate here). Point it at
-        // the same mock so the oracle and the provider agree on UseFileCreationTimeForDateAdded.
-        BaseItem.ConfigurationManager = _configurationManagerMock.Object;
-
         // Same DeepCopy-reflection hazard as UserRootFolderProviderTests: Children/SortName getters
         // touched by DeepCopy<Folder, UserRootFolder>() read these process-wide statics.
 
@@ -89,11 +83,6 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
         _fileSystem = new ManagedFileSystem(NullLogger<ManagedFileSystem>.Instance, applicationPathsMock.Object, Array.Empty<IShortcutHandler>());
         fixture.Inject<IFileSystem>(_fileSystem);
 
-        // ItemResolveArgs.IsPhysicalRoot reads the static BaseItem.FileSystem (AreEqual against
-        // IServerApplicationPaths.RootFolderPath) - unrelated to DefaultUserViewsPath, but still
-        // needs a non-null static to avoid an NRE while resolving.
-        BaseItem.FileSystem = _fileSystem;
-
         // Same single-instance double-singleton wiring as LibraryManagerItemStoreTests (PR106a).
         _itemLookupService = new Tesserafin.Server.Core.Library.ItemLookupService(_itemRepositoryMock.Object, _configurationManagerMock.Object);
         fixture.Register(() => _itemLookupService);
@@ -102,7 +91,7 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
 
         var itemAccessService = new Tesserafin.Server.Core.Library.ItemAccessService(
             _itemLookupService,
-            new Tesserafin.Server.Core.Library.TagVisibilityService(_itemLookupService, fixture.Freeze<ICollectionFolderResolver>(), fixture.Freeze<IUserRootFolderProvider>(), _itemRepositoryMock.Object, fixture.Freeze<ILocalizationManager>(), fixture.Freeze<IServerConfigurationManager>(), new Tesserafin.Controller.LiveTv.ActiveRecordings(), Mock.Of<ILibraryItemOptions>()));
+            new Tesserafin.Server.Core.Library.TagVisibilityService(_itemLookupService, fixture.Freeze<ICollectionFolderResolver>(), fixture.Freeze<IUserRootFolderProvider>(), _itemRepositoryMock.Object, fixture.Freeze<ILocalizationManager>(), fixture.Freeze<IServerConfigurationManager>(), new Tesserafin.Controller.LiveTv.ActiveRecordings(), Mock.Of<ILibraryItemOptions>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.TagVisibilityService>.Instance));
         fixture.Register<IItemAccessService>(() => itemAccessService);
 
         _itemStore = new Tesserafin.Server.Core.Library.ItemStore(
@@ -119,7 +108,7 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
             _itemStore,
             _itemLookupService,
             NullLogger<Tesserafin.Server.Core.Library.UserRootFolderProvider>.Instance,
-            new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings()));
+            Mock.Of<IItemReadServices>(r => r.GetChildren(It.IsAny<Folder>()) == Array.Empty<BaseItem>()));
         fixture.Register(() => _provider);
         fixture.Register<IUserRootFolderProvider>(() => _provider);
 
@@ -164,7 +153,7 @@ public sealed class LibraryManagerUserRootFolderProviderTests : IDisposable
     {
         var resolved = _libraryManager.ResolvePath(_fileSystem.GetDirectoryInfo(_userRootPath)) as Folder;
         Assert.NotNull(resolved);
-        resolved!.ReadServices = new Tesserafin.Server.Implementations.Item.ItemReadServices(Mock.Of<IItemRepository>(r => r.GetItemList(It.IsAny<InternalItemsQuery>()) == Array.Empty<BaseItem>()), new Tesserafin.Controller.LiveTv.ActiveRecordings());
+        resolved!.ReadServices = Mock.Of<IItemReadServices>(r => r.GetChildren(It.IsAny<Folder>()) == Array.Empty<BaseItem>());
         return resolved.DeepCopy<Folder, UserRootFolder>();
     }
 

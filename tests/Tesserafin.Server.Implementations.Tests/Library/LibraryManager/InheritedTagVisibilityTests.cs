@@ -28,7 +28,7 @@ namespace Tesserafin.Server.Implementations.Tests.Library.LibraryManager;
 /// kept) and of the tag filter that reads it: blocked tags first, then allowed tags, the
 /// <c>skipAllowedTagsCheck</c> switch and the root-folder exception. Every expectation is
 /// hand-derived and was green on the unmodified entities, read through the static
-/// <see cref="BaseItem.LibraryManager"/>; since DEBT-SERVER-3 the same expectations hold through
+/// <c>BaseItem.LibraryManager</c>; since DEBT-SERVER-3 the same expectations hold through
 /// <see cref="ITagVisibilityService"/>, and the static and the service must agree.
 /// </summary>
 /// <remarks>
@@ -46,7 +46,7 @@ public sealed class InheritedTagVisibilityTests
     private readonly List<Folder> _libraries = [];
     private readonly IItemAccessService _access;
     private readonly IStandaloneVisibilityService _tags;
-    private readonly IItemLookupService _lookup;
+    private readonly IItemReadServices _reads;
 
     public InheritedTagVisibilityTests()
     {
@@ -59,6 +59,9 @@ public sealed class InheritedTagVisibilityTests
         repository.Setup(r => r.RetrieveItem(It.IsAny<Guid>())).Returns((Guid id) => _items.GetValueOrDefault(id)!);
 
         var lookup = new Tesserafin.Server.Core.Library.ItemLookupService(repository.Object, configuration.Object);
+        var reads = new Mock<IItemReadServices>();
+        reads.Setup(r => r.GetItemById(It.IsAny<Guid>())).Returns(lookup.GetItemById);
+        _reads = reads.Object;
         fixture.Register<IItemLookupService>(() => lookup);
         fixture.Register<Tesserafin.Server.Core.Library.IItemCacheStore>(() => lookup);
 
@@ -67,6 +70,8 @@ public sealed class InheritedTagVisibilityTests
         fixture.Register(() => rootProvider);
 
         var resolver = new Tesserafin.Server.Core.Library.CollectionFolderResolver(lookup, rootProvider);
+        reads.Setup(r => r.GetCollectionFolders(It.IsAny<BaseItem>(), null))
+            .Returns((BaseItem item, IEnumerable<Folder>? _) => resolver.GetCollectionFolders(item));
         fixture.Register<ICollectionFolderResolver>(() => resolver);
 
         fixture.Inject<IItemQueryScopeService>(new Tesserafin.Server.Core.Library.ItemQueryScopeService(
@@ -83,12 +88,8 @@ public sealed class InheritedTagVisibilityTests
                 fixture.Create<IEnumerable<IBaseItemComparer>>()))
             .Create();
 
-        _lookup = lookup;
-        _tags = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, Mock.Of<ILocalizationManager>(), configuration.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings(), Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(It.IsAny<BaseItem>()) == new LibraryOptions()));
+        _tags = new Tesserafin.Server.Core.Library.TagVisibilityService(lookup, resolver, rootProvider, repository.Object, Mock.Of<ILocalizationManager>(), configuration.Object, new Tesserafin.Controller.LiveTv.ActiveRecordings(), Mock.Of<ILibraryItemOptions>(o => o.GetLibraryOptions(It.IsAny<BaseItem>()) == new LibraryOptions()), Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.TagVisibilityService>.Instance);
         _access = new Tesserafin.Server.Core.Library.ItemAccessService(lookup, _tags);
-
-        BaseItem.LibraryManager = manager;
-        BaseItem.ConfigurationManager = configuration.Object;
     }
 
     [Fact]
@@ -305,18 +306,9 @@ public sealed class InheritedTagVisibilityTests
     private void AssertServiceDecides(BaseItem item)
     {
         AddLibrary("Movies", ["lib"], "/media/movies");
-        BlindStatic();
 
         Assert.False(IsVisible(item, User(blocked: ["lib"])));
         Assert.True(IsVisible(item, User(allowed: ["lib"])));
-    }
-
-    private void BlindStatic()
-    {
-        var blind = new Mock<ILibraryManager>();
-        blind.Setup(m => m.GetItemById(It.IsAny<Guid>())).Returns((Guid id) => _lookup.GetItemById(id));
-        blind.Setup(m => m.GetCollectionFolders(It.IsAny<BaseItem>())).Returns([]);
-        BaseItem.LibraryManager = blind.Object;
     }
 
     private static User User(string[]? blocked = null, string[]? allowed = null)
@@ -354,6 +346,7 @@ public sealed class InheritedTagVisibilityTests
             item.Id = Guid.NewGuid();
         }
 
+        item.ReadServices = _reads;
         _items[item.Id] = item;
         return item;
     }

@@ -67,11 +67,11 @@ namespace Tesserafin.Controller.Entities
             return value;
         }
 
-        public IReadOnlyList<BaseItem> GetTaggedItems(InternalItemsQuery query)
+        public bool TryApplyTaggedItemsFilter(InternalItemsQuery query)
         {
             query.PersonIds = new[] { Id };
 
-            return LibraryManager.GetItemList(query);
+            return true;
         }
 
         public override bool CanDelete(IChannelManager channels)
@@ -83,14 +83,6 @@ namespace Tesserafin.Controller.Entities
         {
             return true;
         }
-
-        public static string GetPath(string name)
-        {
-            return GetPath(name, true);
-        }
-
-        public static string GetPath(string name, bool normalizeName)
-            => GetPath(name, FileSystem, ConfigurationManager.ApplicationPaths.PeoplePath, normalizeName);
 
         public static string GetPath(string name, IFileSystem fileSystem, string peoplePath, bool normalizeName = true)
         {
@@ -120,34 +112,34 @@ namespace Tesserafin.Controller.Entities
             return SafeDirectoryLeafName.CombineWithRoot(path, validFilename, nameof(name));
         }
 
-        private string GetRebasedPath()
+        private string GetRebasedPath(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            return GetPath(System.IO.Path.GetFileName(Path), false);
+            return GetPath(System.IO.Path.GetFileName(Path), fileSystem, applicationPaths.PeoplePath, normalizeName: false);
         }
 
-        public override bool RequiresRefresh()
+        public override bool RequiresRefresh(MetadataRefreshServices services)
         {
-            var newPath = GetRebasedPath();
+            var newPath = GetRebasedPath(services.FileSystem, services.ApplicationPaths);
             if (!string.Equals(Path, newPath, StringComparison.Ordinal))
             {
-                Logger.LogDebug("{0} path has changed from {1} to {2}", GetType().Name, Path, newPath);
+                services.Logger.LogDebug("{0} path has changed from {1} to {2}", GetType().Name, Path, newPath);
                 return true;
             }
 
-            return base.RequiresRefresh();
+            return base.RequiresRefresh(services);
         }
 
         /// <summary>
         /// This is called before any metadata refresh and returns true or false indicating if changes were made.
         /// </summary>
         /// <param name="replaceAllMetadata"><c>true</c> to replace all metadata, <c>false</c> to not.</param>
-        /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
+        /// <param name="services">The metadata refresh services.</param>
         /// <returns><c>true</c> if changes were made, <c>false</c> if not.</returns>
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, services);
 
-            var newPath = GetRebasedPath();
+            var newPath = GetRebasedPath(services.FileSystem, services.ApplicationPaths);
             if (!string.Equals(Path, newPath, StringComparison.Ordinal))
             {
                 Path = newPath;

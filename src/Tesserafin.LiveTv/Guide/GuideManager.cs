@@ -474,7 +474,7 @@ public class GuideManager : IGuideManager
 
         item.Name = channelInfo.Name;
 
-        if (LiveTvChannelImageHelper.UpdateChannelImageIfNeeded(item, channelInfo.ImagePath, channelInfo.ImageUrl))
+        if (LiveTvChannelImageHelper.UpdateChannelImageIfNeeded(item, channelInfo.ImagePath, channelInfo.ImageUrl, _fileSystem))
         {
             forceUpdate = true;
         }

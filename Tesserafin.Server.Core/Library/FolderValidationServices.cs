@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.LibraryTaskScheduler;
@@ -23,8 +24,12 @@ internal sealed class FolderValidationServices(
     ILimitedConcurrencyLibraryScheduler scheduler,
     ILibraryRefreshProgress refreshProgress,
     Lazy<IChannelManager> channels,
-    Lazy<IProviderManager> providers) : IFolderValidationServices
+    Lazy<IProviderManager> providers,
+    ILogger<FolderValidationServices> logger) : IFolderValidationServices
 {
+    /// <inheritdoc />
+    public ILogger Logger { get; } = logger;
+
     /// <inheritdoc />
     public IItemDeletionCommands Deletions { get; } = deletions;
 

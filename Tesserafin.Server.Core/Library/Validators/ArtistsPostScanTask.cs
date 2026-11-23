@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.Library.Validators;
 
@@ -23,6 +24,7 @@ public class ArtistsPostScanTask : ILibraryPostScanTask
     private readonly ILibraryManager _libraryManager;
     private readonly ILogger<ArtistsValidator> _logger;
     private readonly IItemRepository _itemRepo;
+    private readonly IFileSystem _fileSystem;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ArtistsPostScanTask" /> class.
@@ -33,13 +35,15 @@ public class ArtistsPostScanTask : ILibraryPostScanTask
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
+    /// <param name="fileSystem">The filesystem used to read refresh directories.</param>
     public ArtistsPostScanTask(
         IItemWriteCommands writes,
         IItemDeletionCommands deletions,
         IProviderManager providers,
         ILibraryManager libraryManager,
         ILogger<ArtistsValidator> logger,
-        IItemRepository itemRepo)
+        IItemRepository itemRepo,
+        IFileSystem fileSystem)
     {
         _writes = writes;
         _deletions = deletions;
@@ -47,6 +51,7 @@ public class ArtistsPostScanTask : ILibraryPostScanTask
         _libraryManager = libraryManager;
         _logger = logger;
         _itemRepo = itemRepo;
+        _fileSystem = fileSystem;
     }
 
     /// <summary>
@@ -57,6 +62,6 @@ public class ArtistsPostScanTask : ILibraryPostScanTask
     /// <returns>Task.</returns>
     public Task Run(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        return new ArtistsValidator(_writes, _deletions, _providers, _libraryManager, _logger, _itemRepo).Run(progress, cancellationToken);
+        return new ArtistsValidator(_writes, _deletions, _providers, _libraryManager, _logger, _itemRepo, _fileSystem).Run(progress, cancellationToken);
     }
 }

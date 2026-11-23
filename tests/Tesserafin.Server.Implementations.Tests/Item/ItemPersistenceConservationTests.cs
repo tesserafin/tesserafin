@@ -33,8 +33,7 @@ public sealed class ItemPersistenceConservationTests : IDisposable
 
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<TesserafinDbContext> _options;
-    private readonly ILibraryManager _previousLibraryManager;
-    private readonly Mock<ILibraryManager> _libraryManager = new();
+    private readonly Mock<IItemReadServices> _reads = new();
     private readonly Dictionary<Guid, BaseItem> _items = [];
     private readonly ItemPersistenceService _service;
     private readonly Guid _userId;
@@ -65,12 +64,8 @@ public sealed class ItemPersistenceConservationTests : IDisposable
         });
         context.SaveChanges();
 
-        _previousLibraryManager = BaseItem.LibraryManager;
-        _libraryManager.Setup(value => value.GetItemById(It.IsAny<Guid>()))
-            .Returns((Guid id) => _items.GetValueOrDefault(id)!);
-        _libraryManager.Setup(value => value.GetCollectionFolders(It.IsAny<BaseItem>()))
-            .Returns(() => []);
-        BaseItem.LibraryManager = _libraryManager.Object;
+        _reads.Setup(value => value.GetItemById(It.IsAny<Guid>()))
+            .Returns((Guid id) => _items.GetValueOrDefault(id));
 
         var factory = new Mock<IDbContextFactory<TesserafinDbContext>>();
         factory.Setup(value => value.CreateDbContext()).Returns(CreateContext);
@@ -78,12 +73,11 @@ public sealed class ItemPersistenceConservationTests : IDisposable
             .Returns(() => Task.FromResult(CreateContext()));
         var appHost = new Mock<IServerApplicationHost>();
         appHost.Setup(value => value.ReverseVirtualPath(It.IsAny<string>())).Returns((string path) => path);
-        _service = new ItemPersistenceService(factory.Object, appHost.Object, NullLogger<ItemPersistenceService>.Instance, Mock.Of<Tesserafin.Controller.Library.IItemReadServices>());
+        _service = new ItemPersistenceService(factory.Object, appHost.Object, NullLogger<ItemPersistenceService>.Instance, _reads.Object);
     }
 
     public void Dispose()
     {
-        BaseItem.LibraryManager = _previousLibraryManager;
         _connection.Dispose();
     }
 
@@ -230,7 +224,7 @@ public sealed class ItemPersistenceConservationTests : IDisposable
         var absentLibrary = new Folder { Id = Guid.NewGuid(), Name = "not-persisted" };
         _items[parent.Id] = parent;
         _items[child.Id] = child;
-        _libraryManager.Setup(value => value.GetCollectionFolders(child)).Returns([absentLibrary]);
+        _reads.Setup(value => value.GetCollectionFolders(child, null)).Returns([absentLibrary]);
 
         _service.SaveItems(childFirst ? [child, parent] : [parent, child], CancellationToken.None);
 

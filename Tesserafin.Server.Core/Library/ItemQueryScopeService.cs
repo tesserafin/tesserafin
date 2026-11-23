@@ -3,9 +3,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Playlists;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Data;
@@ -24,7 +26,6 @@ namespace Tesserafin.Server.Core.Library
     /// <remarks>
     /// Shared by the manager and query service. The user-view catalogue and root/lookup ports
     /// keep construction independent of the manager and of deferred query/service factories.
-    /// Compound playlist/collection refusal filtering remains the manager's query concern.
     /// </remarks>
     internal sealed class ItemQueryScopeService : IItemQueryScopeService
     {
@@ -193,6 +194,41 @@ namespace Tesserafin.Server.Core.Library
             }
         }
 
+        /// <summary>
+        /// A query that can hold box sets or playlists (names them, names no type, or groups its items into their
+        /// box sets) excludes, in the query itself, those the user is refused by id: the libraries above scope only
+        /// the folders, so its items, pages, totals, counts and aggregated values stay those access by id admits
+        /// (GHSA-c5pr-6h39-jp86).
+        /// </summary>
+        /// <param name="query">The user-scoped query.</param>
+        /// <param name="user">The requesting user.</param>
+        /// <param name="repository">The catalogue storage.</param>
+        /// <param name="access">The item visibility service.</param>
+        internal static void ExcludeRefusedCollections(InternalItemsQuery query, User user, IItemRepository repository, IItemAccessService access)
+        {
+            if (query.CollapseBoxSetItems != true
+                && query.IncludeItemTypes.Length > 0
+                && !query.IncludeItemTypes.Any(t => t == BaseItemKind.BoxSet || t == BaseItemKind.Playlist))
+            {
+                return;
+            }
+
+            var refused = repository.GetItemList(new InternalItemsQuery
+            {
+                IncludeItemTypes = [BaseItemKind.BoxSet, BaseItemKind.Playlist],
+                Recursive = true,
+                DtoOptions = new DtoOptions(false) { EnableImages = false }
+            })
+                .Where(i => !access.IsVisibleStandalone(i, user))
+                .Select(i => i.Id)
+                .ToArray();
+
+            if (refused.Length > 0)
+            {
+                query.ExcludeItemIds = [.. query.ExcludeItemIds.Except(refused), .. refused];
+            }
+        }
+
         private void SetTopParentIdsToUserViews(InternalItemsQuery query, User user, bool allowExternalContent)
         {
             var userViews = _userViewCatalog.GetUserViews(new UserViewQuery
@@ -272,10 +308,6 @@ namespace Tesserafin.Server.Core.Library
             return [];
         }
 
-        // Walks to the top-level parent using IItemLookupService instead of BaseItem.GetTopParent(),
-        // which would reach the static BaseItem.LibraryManager. Single consumer, so it stays a private
-        // helper here rather than a shared hierarchy service (see docs/pr90-*, and the removed
-        // IItemHierarchyService in PR83).
         private BaseItem? GetTopParentViaLookup(BaseItem item)
         {
             if (item.IsTopParentVia(_itemLookupService))

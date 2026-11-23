@@ -14,17 +14,14 @@ namespace Tesserafin.Server.Core.Sorting;
 /// </summary>
 public class ItemSortService : IItemSortService
 {
-    private readonly IUserManager _userManager;
     private readonly IUserDataManager _userDataManager;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ItemSortService"/> class.
     /// </summary>
-    /// <param name="userManager">The user manager.</param>
     /// <param name="userDataManager">The user data manager.</param>
-    public ItemSortService(IUserManager userManager, IUserDataManager userDataManager)
+    public ItemSortService(IUserDataManager userDataManager)
     {
-        _userManager = userManager;
         _userDataManager = userDataManager;
     }
 
@@ -126,7 +123,6 @@ public class ItemSortService : IItemSortService
             var userComparer = (IUserBaseItemComparer)Activator.CreateInstance(comparer.GetType())!; // only null for Nullable<T> instances
 
             userComparer.User = user;
-            userComparer.UserManager = _userManager;
             userComparer.UserDataManager = _userDataManager;
 
             return userComparer;

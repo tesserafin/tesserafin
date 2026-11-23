@@ -7,14 +7,12 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json.Serialization;
-using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
 using Tesserafin.Extensions;
 using Tesserafin.Model.Entities;
-using Tesserafin.Model.LiveTv;
 using Tesserafin.Model.Providers;
 
 namespace Tesserafin.Controller.LiveTv
@@ -223,35 +221,17 @@ namespace Tesserafin.Controller.LiveTv
             return false;
         }
 
-        private LiveTvOptions GetConfiguration()
-        {
-            return ConfigurationManager.GetConfiguration<LiveTvOptions>("livetv");
-        }
-
-        private ListingsProviderInfo GetListingsProviderInfo()
-        {
-            if (string.Equals(ServiceName, "Emby", StringComparison.OrdinalIgnoreCase))
-            {
-                var config = GetConfiguration();
-
-                return config.ListingProviders.FirstOrDefault(i => !string.IsNullOrEmpty(i.MoviePrefix));
-            }
-
-            return null;
-        }
-
         protected override string GetNameForMetadataLookup()
         {
             var name = base.GetNameForMetadataLookup();
 
-            var listings = GetListingsProviderInfo();
+            var prefix = string.Equals(ServiceName, "Emby", StringComparison.OrdinalIgnoreCase)
+                ? ReadServices?.LiveTvMoviePrefix
+                : null;
 
-            if (listings is not null)
+            if (!string.IsNullOrEmpty(prefix) && name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
-                if (!string.IsNullOrEmpty(listings.MoviePrefix) && name.StartsWith(listings.MoviePrefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    name = name.Substring(listings.MoviePrefix.Length).Trim();
-                }
+                name = name.Substring(prefix.Length).Trim();
             }
 
             return name;

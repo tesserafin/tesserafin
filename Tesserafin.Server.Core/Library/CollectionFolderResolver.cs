@@ -41,7 +41,7 @@ namespace Tesserafin.Server.Core.Library
 
         /// <summary>
         /// Gets the root's children, resolving a <see cref="UserRootFolder"/>'s through the given lookup
-        /// rather than the static <see cref="BaseItem.LibraryManager"/> (DEBT-SERVER-4).
+        /// rather than the static <c>BaseItem.LibraryManager</c> (DEBT-SERVER-4).
         /// </summary>
         /// <param name="root">The user root folder.</param>
         /// <param name="lookup">The id lookup.</param>

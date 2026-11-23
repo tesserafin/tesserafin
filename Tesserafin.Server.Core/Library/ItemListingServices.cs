@@ -2,6 +2,7 @@ using System;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Collections;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
 
@@ -17,6 +18,7 @@ namespace Tesserafin.Server.Core.Library
         private readonly Lazy<ICollectionManager> _collections;
         private readonly Lazy<IUserViewManager> _userViews;
         private readonly Lazy<ITVSeriesManager> _tvSeries;
+        private readonly IItemListingReads _reads;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ItemListingServices"/> class.
@@ -26,21 +28,24 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="userViews">The user view manager, deferred.</param>
         /// <param name="tvSeries">The TV series manager, deferred.</param>
         /// <param name="userData">The user data manager.</param>
-        /// <param name="sort">The item sort service.</param>
+        /// <param name="reads">The catalogue reads used by listings.</param>
+        /// <param name="queries">The catalogue queries for listings.</param>
         public ItemListingServices(
             Lazy<IChannelManager> channels,
             Lazy<ICollectionManager> collections,
             Lazy<IUserViewManager> userViews,
             Lazy<ITVSeriesManager> tvSeries,
             IUserDataManager userData,
-            IItemSortService sort)
+            IItemListingReads reads,
+            IItemCatalogueQuery queries)
         {
             _channels = channels;
             _collections = collections;
             _userViews = userViews;
             _tvSeries = tvSeries;
             UserData = userData;
-            Sort = sort;
+            _reads = reads;
+            Queries = queries;
         }
 
         /// <inheritdoc />
@@ -59,6 +64,21 @@ namespace Tesserafin.Server.Core.Library
         public IUserDataManager UserData { get; }
 
         /// <inheritdoc />
-        public IItemSortService Sort { get; }
+        public IItemSortService Sort => _reads.Sort;
+
+        /// <inheritdoc />
+        public IItemLookupService Lookup => _reads.Lookup;
+
+        /// <inheritdoc />
+        public IItemCountService Counts => _reads.Counts;
+
+        /// <inheritdoc />
+        public IUserRootFolderProvider UserRoot => _reads.UserRoot;
+
+        /// <inheritdoc />
+        public ILibraryRootFolderProvider LibraryRoot => _reads.LibraryRoot;
+
+        /// <inheritdoc />
+        public IItemCatalogueQuery Queries { get; }
     }
 }

@@ -63,7 +63,7 @@ namespace Tesserafin.Controller.Entities.TV
                     seriesId = FindSeriesId();
                 }
 
-                return seriesId.IsEmpty() ? null : (LibraryManager.GetItemById(seriesId) as Series);
+                return GetRelatedItem(seriesId) as Series;
             }
         }
 
@@ -190,7 +190,7 @@ namespace Tesserafin.Controller.Entities.TV
 
             var user = query.User;
 
-            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true), user, query, LibraryManager);
+            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true, query.Listing), user, query, GetListingServices(query));
 
             return PostFilterAndSort(items, query, collectionManager);
         }
@@ -219,7 +219,7 @@ namespace Tesserafin.Controller.Entities.TV
 
             var user = query.User;
 
-            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true, query.Listing), user, query, LibraryManager);
+            var items = UserViewBuilder.Filter(GetEpisodes(user, query.DtoOptions, true, query.Listing), user, query, GetListingServices(query));
 
             return PostFilterAndSort(items, query, collectionManager, itemSortService);
         }
@@ -230,19 +230,7 @@ namespace Tesserafin.Controller.Entities.TV
         /// <param name="user">The user.</param>
         /// <param name="options">The options to use.</param>
         /// <param name="shouldIncludeMissingEpisodes">If missing episodes should be included.</param>
-        /// <returns>Set of episodes.</returns>
-        public List<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes)
-        {
-            return GetEpisodes(user, options, shouldIncludeMissingEpisodes, null);
-        }
-
-        /// <summary>
-        /// Gets the episodes.
-        /// </summary>
-        /// <param name="user">The user.</param>
-        /// <param name="options">The options to use.</param>
-        /// <param name="shouldIncludeMissingEpisodes">If missing episodes should be included.</param>
-        /// <param name="listing">Listing services (sort, channels); the sort falls back to the obsolete static <c>LibraryManager.Sort</c> facade when <c>null</c> (see docs/major-rewrite-plan-v13.md § PR50/N).</param>
+        /// <param name="listing">The listing services for this request.</param>
         /// <returns>Set of episodes.</returns>
         public List<BaseItem> GetEpisodes(User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
@@ -261,11 +249,6 @@ namespace Tesserafin.Controller.Entities.TV
             IItemLookupService lookup,
             IItemListingServices listing)
             => GetSeries(lookup)?.GetCatalogueSeasonEpisodes(this, options, repository, listing) ?? [];
-
-        public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes)
-        {
-            return GetEpisodes(series, user, options, shouldIncludeMissingEpisodes, null);
-        }
 
         public List<BaseItem> GetEpisodes(Series series, User user, DtoOptions options, bool shouldIncludeMissingEpisodes, IItemListingServices listing)
         {
@@ -287,17 +270,9 @@ namespace Tesserafin.Controller.Entities.TV
             return series.GetSeasonEpisodes(this, user, allSeriesEpisodes, options, shouldIncludeMissingEpisodes, listing);
         }
 
-        public List<BaseItem> GetEpisodes()
-        {
-            // No IItemSortService to give here (no DI-resolved caller reaches this no-arg
-            // overload): falls back to the obsolete static LibraryManager.Sort facade via
-            // Series.GetSeasonEpisodes, same as Season.GetChildren below. See PR50/N.
-            return GetEpisodes(Series, null, null, new DtoOptions(true), true);
-        }
-
         public override List<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query)
         {
-            return GetEpisodes(user, new DtoOptions(true), true);
+            return GetEpisodes(user, new DtoOptions(true), true, query.Listing);
         }
 
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query, IItemSortService itemSortService)
@@ -335,12 +310,8 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         /// <summary>
-        /// Gets this season's owning series, resolving every hop through the given lookup service
-        /// instead of the static <see cref="BaseItem.LibraryManager"/>. The <see cref="Series"/>
-        /// property remains as a compatibility wrapper over the static path; new callers that hold
-        /// an <see cref="IItemLookupService"/> should prefer this overload. Both the direct id
-        /// resolution and the empty-id parent fallback (<see cref="FindSeriesId(IItemLookupService)"/>)
-        /// go through <paramref name="lookup"/>, so this path is fully static-free.
+        /// Gets the owning series through the supplied lookup, falling back to the parent chain
+        /// when the series id is missing.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <returns>The series, or <c>null</c> if none can be resolved.</returns>
@@ -358,9 +329,7 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         /// <summary>
-        /// Finds the owning series id by walking the parent chain via the given lookup service,
-        /// without touching the static <see cref="BaseItem.LibraryManager"/>. Used by
-        /// <see cref="GetSeries(IItemLookupService)"/> as its empty-id fallback.
+        /// Finds the owning series id by walking the parent chain via the given lookup service.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <returns>The series id, or <see cref="Guid.Empty"/> if no series ancestor exists.</returns>
@@ -399,19 +368,19 @@ namespace Tesserafin.Controller.Entities.TV
 
         /// <summary>Prepares the season name and infers a missing season number from its path.</summary>
         /// <param name="replaceAllMetadata">Whether to replace all metadata.</param>
-        /// <param name="itemNamingService">The season path parser.</param>
+        /// <param name="services">The metadata refresh services.</param>
         /// <param name="lookup">The catalogue lookup for the season folder's parent.</param>
         /// <returns>Whether the preparation changed the season.</returns>
-        public bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService, IItemLookupService lookup)
+        public bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services, IItemLookupService lookup)
         {
-            var hasChanges = this.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = this.BeforeMetadataRefresh(replaceAllMetadata, services);
             if (IndexNumber.HasValue || string.IsNullOrEmpty(Path))
             {
                 return hasChanges;
             }
 
             var parentPath = GetParent(lookup)?.ContainingFolderPath;
-            IndexNumber = itemNamingService.GetSeasonNumberFromPath(Path, parentPath);
+            IndexNumber = services.ItemNamingService.GetSeasonNumberFromPath(Path, parentPath);
             return hasChanges || IndexNumber.HasValue;
         }
     }

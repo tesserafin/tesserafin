@@ -133,7 +133,7 @@ namespace Tesserafin.Controller.Entities
         [JsonIgnore]
         public virtual IEnumerable<BaseItem> Children
         {
-            get => GetCatalogueChildren(null, LibraryManager);
+            get => GetCatalogueChildren(null, null);
             set => _children = value;
         }
 
@@ -205,9 +205,9 @@ namespace Tesserafin.Controller.Entities
             return base.CanDelete(channels);
         }
 
-        public override bool RequiresRefresh()
+        public override bool RequiresRefresh(MetadataRefreshServices services)
         {
-            var baseResult = base.RequiresRefresh();
+            var baseResult = base.RequiresRefresh(services);
 
             if (SupportsCumulativeRunTimeTicks && !RunTimeTicks.HasValue)
             {
@@ -215,34 +215,6 @@ namespace Tesserafin.Controller.Entities
             }
 
             return baseResult;
-        }
-
-        /// <summary>
-        /// Adds the child.
-        /// </summary>
-        /// <param name="writes">Explicit item write/resolution ownership.</param>
-        /// <param name="item">The item.</param>
-        /// <exception cref="InvalidOperationException">Unable to add  + item.Name.</exception>
-        public void AddChild(IItemWriteCommands writes, BaseItem item)
-        {
-            item.SetParent(this);
-
-            if (item.Id.IsEmpty())
-            {
-                item.Id = LibraryManager.GetNewItemId(item.Path, item.GetType());
-            }
-
-            if (item.DateCreated == DateTime.MinValue)
-            {
-                item.DateCreated = DateTime.UtcNow;
-            }
-
-            if (item.DateModified == DateTime.MinValue)
-            {
-                item.DateModified = DateTime.UtcNow;
-            }
-
-            writes.CreateItem(item, this);
         }
 
         public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
@@ -377,12 +349,12 @@ namespace Tesserafin.Controller.Entities
                 }
                 catch (IOException ex)
                 {
-                    Logger.LogError(ex, "Error retrieving children from file system");
+                    services.Logger.LogError(ex, "Error retrieving children from file system");
                     return;
                 }
                 catch (SecurityException ex)
                 {
-                    Logger.LogError(ex, "Error retrieving children from file system");
+                    services.Logger.LogError(ex, "Error retrieving children from file system");
                     return;
                 }
                 catch (OperationCanceledException)
@@ -391,7 +363,7 @@ namespace Tesserafin.Controller.Entities
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex, "Error retrieving children");
+                    services.Logger.LogError(ex, "Error retrieving children");
                     return;
                 }
 
@@ -623,10 +595,14 @@ namespace Tesserafin.Controller.Entities
 
         public QueryResult<BaseItem> QueryRecursive(InternalItemsQuery query)
         {
-            if (!query.ForceDirect && CollapseBoxSetItems(query, this, query.User, ConfigurationManager))
+            if (!query.ForceDirect)
             {
-                query.CollapseBoxSetItems = true;
-                SetCollapseBoxSetItemTypes(query);
+                var grouping = query.RequireVisibility().GetCollectionGrouping();
+                if (CollapseBoxSetItems(query, this, query.User, grouping))
+                {
+                    query.CollapseBoxSetItems = true;
+                    SetCollapseBoxSetItemTypes(query, grouping);
+                }
             }
 
             if (this is not UserRootFolder
@@ -645,7 +621,7 @@ namespace Tesserafin.Controller.Entities
             }
 
             // LibraryManager excludes the box sets and playlists the user is refused by id (GHSA-c5pr-6h39-jp86).
-            return LibraryManager.GetItemsResult(query);
+            return query.RequireListing().Queries.GetItems(query);
         }
 
         protected QueryResult<BaseItem> QueryWithPostFiltering(InternalItemsQuery query)
@@ -656,7 +632,7 @@ namespace Tesserafin.Controller.Entities
             query.StartIndex = null;
             query.Limit = null;
 
-            IEnumerable<BaseItem> itemsList = LibraryManager.GetItemList(query);
+            IEnumerable<BaseItem> itemsList = query.RequireListing().Queries.GetItemList(query);
             var user = query.User;
 
             if (user is not null)
@@ -733,7 +709,7 @@ namespace Tesserafin.Controller.Entities
         {
             if (query.ItemIds.Length > 0)
             {
-                var result = LibraryManager.GetItemsResult(query);
+                var result = query.RequireListing().Queries.GetItems(query);
 
                 if (query.OrderBy.Count == 0 && query.ItemIds.Length > 1)
                 {
@@ -752,7 +728,7 @@ namespace Tesserafin.Controller.Entities
 
             if (query.ItemIds.Length > 0)
             {
-                var result = LibraryManager.GetItemList(query);
+                var result = query.RequireListing().Queries.GetItemList(query);
 
                 if (query.OrderBy.Count == 0 && query.ItemIds.Length > 1)
                 {
@@ -844,7 +820,7 @@ namespace Tesserafin.Controller.Entities
 
             if (user is null)
             {
-                return UserViewBuilder.Filter(Children, user, query, LibraryManager);
+                return UserViewBuilder.Filter(Children, user, query, GetListingServices(query));
             }
 
             // need to pass this param to the children.
@@ -855,25 +831,19 @@ namespace Tesserafin.Controller.Entities
                 NameStartsWith = query.NameStartsWith,
                 NameStartsWithOrGreater = query.NameStartsWithOrGreater,
                 NameLessThan = query.NameLessThan,
-                Visibility = query.Visibility
+                Visibility = query.Visibility,
+                Listing = query.Listing
             };
 
             return UserViewBuilder.Filter(
                 getChildren(user, true, childQuery),
                 user,
                 query,
-                LibraryManager);
+                GetListingServices(query));
         }
 
         protected QueryResult<BaseItem> PostFilterAndSort(IEnumerable<BaseItem> items, InternalItemsQuery query, ICollectionManager collectionManager)
-        {
-            return PostFilterAndSortCore(items, query, collectionManager, filteredItems =>
-            {
-#pragma warning disable CS0618
-                return UserViewBuilder.SortAndPage(filteredItems, null, query, LibraryManager);
-#pragma warning restore CS0618
-            });
-        }
+            => PostFilterAndSort(items, query, collectionManager, GetListingServices(query)?.Sort);
 
         protected QueryResult<BaseItem> PostFilterAndSort(IEnumerable<BaseItem> items, InternalItemsQuery query, ICollectionManager collectionManager, IItemSortService itemSortService)
         {
@@ -894,7 +864,7 @@ namespace Tesserafin.Controller.Entities
 
             if (user is not null)
             {
-                items = CollapseBoxSetItemsIfNeeded(items, query, this, user, ConfigurationManager, collectionManager);
+                items = CollapseBoxSetItemsIfNeeded(items, query, this, user, query.RequireVisibility().GetCollectionGrouping(), collectionManager);
 
                 // After collapse, BoxSets may have replaced items whose names matched the filter
                 // but the BoxSet's own name may not match. Re-apply name filtering so BoxSets
@@ -938,20 +908,17 @@ namespace Tesserafin.Controller.Entities
             InternalItemsQuery query,
             BaseItem queryParent,
             User user,
-            IServerConfigurationManager configurationManager,
+            (bool Movies, bool Shows) grouping,
             ICollectionManager collectionManager)
         {
             ArgumentNullException.ThrowIfNull(items);
 
-            if (!CollapseBoxSetItems(query, queryParent, user, configurationManager))
+            if (!CollapseBoxSetItems(query, queryParent, user, grouping))
             {
                 return items;
             }
 
-            var config = configurationManager.Configuration;
-
-            bool collapseMovies = config.EnableGroupingMoviesIntoCollections;
-            bool collapseSeries = config.EnableGroupingShowsIntoCollections;
+            var (collapseMovies, collapseSeries) = grouping;
 
             if (user is null || (collapseMovies && collapseSeries))
             {
@@ -992,7 +959,7 @@ namespace Tesserafin.Controller.Entities
             InternalItemsQuery query,
             BaseItem queryParent,
             User user,
-            IServerConfigurationManager configurationManager)
+            (bool Movies, bool Shows) grouping)
         {
             // Could end up stuck in a loop like this
             if (queryParent is BoxSet)
@@ -1021,13 +988,10 @@ namespace Tesserafin.Controller.Entities
                 return param.Value && AllowBoxSetCollapsing(query);
             }
 
-            var config = configurationManager.Configuration;
-
             bool queryHasMovies = query.IncludeItemTypes.Length == 0 || query.IncludeItemTypes.Contains(BaseItemKind.Movie);
             bool queryHasSeries = query.IncludeItemTypes.Length == 0 || query.IncludeItemTypes.Contains(BaseItemKind.Series);
 
-            bool collapseMovies = config.EnableGroupingMoviesIntoCollections;
-            bool collapseSeries = config.EnableGroupingShowsIntoCollections;
+            var (collapseMovies, collapseSeries) = grouping;
 
             if (user is not null)
             {
@@ -1038,11 +1002,9 @@ namespace Tesserafin.Controller.Entities
             return (queryHasMovies || queryHasSeries) && AllowBoxSetCollapsing(query);
         }
 
-        private void SetCollapseBoxSetItemTypes(InternalItemsQuery query)
+        private static void SetCollapseBoxSetItemTypes(InternalItemsQuery query, (bool Movies, bool Shows) grouping)
         {
-            var config = ConfigurationManager.Configuration;
-            bool collapseMovies = config.EnableGroupingMoviesIntoCollections;
-            bool collapseSeries = config.EnableGroupingShowsIntoCollections;
+            var (collapseMovies, collapseSeries) = grouping;
 
             if (collapseMovies && collapseSeries)
             {
@@ -1261,7 +1223,9 @@ namespace Tesserafin.Controller.Entities
             // the true root should return our users root folder children
             if (IsPhysicalRoot)
             {
-                return LibraryManager.GetUserRootFolder().GetChildren(user, includeLinkedChildren, out totalItemCount, new InternalItemsQuery(user) { Visibility = scope });
+                var listing = GetListingServices(query);
+                return listing.UserRoot.GetUserRootFolder()
+                    .GetChildren(user, includeLinkedChildren, out totalItemCount, new InternalItemsQuery(user) { Visibility = scope, Listing = query.Listing });
             }
 
             var result = new Dictionary<Guid, BaseItem>();
@@ -1335,7 +1299,7 @@ namespace Tesserafin.Controller.Entities
                 .Where(e => e.IsVisible(user, false, scope))
                 .ToArray();
 
-            var realChildren = UserViewBuilder.Filter(visibleChildren, query.User, query, LibraryManager)
+            var realChildren = UserViewBuilder.Filter(visibleChildren, query.User, query, GetListingServices(query))
                 .ToArray();
 
             var childCount = realChildren.Length;
@@ -1463,19 +1427,7 @@ namespace Tesserafin.Controller.Entities
         /// </summary>
         /// <returns>IEnumerable{BaseItem}.</returns>
         public List<BaseItem> GetLinkedChildren()
-            => CreateLinkedChildResolver().Resolve(this).Select(entry => entry.Item).ToList();
-
-        protected static LinkedChildResolver CreateLinkedChildResolver(IStandaloneVisibilityService scope = null)
-        {
-            return new LinkedChildResolver(
-                scope is null ? query => LibraryManager.GetItemList(query) : null,
-                scope is null ? id => LibraryManager.GetItemById(id) : scope.GetItemById,
-                scope is null
-                    ? path => LibraryManager.GetItemList(ItemPathQuery.Create(path, null)).FirstOrDefault()
-                    : scope.FindByPath,
-                FileSystem,
-                Logger);
-        }
+            => LinkedChildren.Length == 0 ? [] : RequireReadServices().LinkedChildren.GetItems(this).ToList();
 
         public List<BaseItem> GetLinkedChildren(User user, IStandaloneVisibilityService scope)
         {
@@ -1492,7 +1444,8 @@ namespace Tesserafin.Controller.Entities
                 return list;
             }
 
-            var allUserRootChildren = LibraryManager.GetUserRootFolder()
+            var reads = RequireReadServices();
+            var allUserRootChildren = reads.Listing.UserRoot.GetUserRootFolder()
                 .GetChildren(user, true, new InternalItemsQuery(user) { Visibility = scope })
                 .OfType<Folder>()
                 .ToList();
@@ -1501,7 +1454,7 @@ namespace Tesserafin.Controller.Entities
                 .Select(i => i.Id)
                 .ToList();
 
-            var resolver = CreateLinkedChildResolver();
+            var resolver = reads.LinkedChildren;
             foreach (var i in linkedChildren)
             {
                 var child = resolver.ResolveSingle(this, i);
@@ -1526,7 +1479,7 @@ namespace Tesserafin.Controller.Entities
                     else
                     {
                         var itemCollectionFolderIds =
-                            LibraryManager.GetCollectionFolders(childOwner, allUserRootChildren).Select(f => f.Id);
+                            reads.GetCollectionFolders(childOwner, allUserRootChildren).Select(f => f.Id);
 
                         if (!itemCollectionFolderIds.Any(collectionFolderIds.Contains))
                         {

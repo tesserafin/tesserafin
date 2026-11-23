@@ -24,12 +24,8 @@ namespace Tesserafin.Controller.Entities.TV
     /// <summary>
     /// Class Episode.
     /// </summary>
-    public class Episode : Video, IHasTrailers, IHasLookupInfo<EpisodeInfo>, IHasSeries
+    public class Episode : Video, IHasLookupInfo<EpisodeInfo>, IHasSeries
     {
-        /// <inheritdoc />
-        [JsonIgnore]
-        public IReadOnlyList<BaseItem> LocalTrailers => GetExtras([Tesserafin.Model.Entities.ExtraType.Trailer]).ToArray();
-
         /// <summary>
         /// Gets or sets the season in which it aired.
         /// </summary>
@@ -82,7 +78,7 @@ namespace Tesserafin.Controller.Entities.TV
                     seriesId = FindSeriesId();
                 }
 
-                return seriesId.IsEmpty() ? null : (LibraryManager.GetItemById(seriesId) as Series);
+                return GetRelatedItem(seriesId) as Series;
             }
         }
 
@@ -97,7 +93,7 @@ namespace Tesserafin.Controller.Entities.TV
                     seasonId = FindSeasonId();
                 }
 
-                return seasonId.IsEmpty() ? null : (LibraryManager.GetItemById(seasonId) as Season);
+                return GetRelatedItem(seasonId) as Season;
             }
         }
 
@@ -280,12 +276,8 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         /// <summary>
-        /// Gets the Episode's <see cref="Series"/> via the given lookup service, without touching the
-        /// static <see cref="BaseItem.LibraryManager"/>. The parameterless <see cref="Series"/>
-        /// property remains as a compatibility wrapper over the static path; new callers that hold an
-        /// <see cref="IItemLookupService"/> should prefer this overload. Both the direct id resolution
-        /// and the empty-id parent fallback (<see cref="FindSeriesId(IItemLookupService)"/>) go through
-        /// <paramref name="lookup"/>, so this path is fully static-free.
+        /// Gets the owning series through the supplied lookup, falling back to the parent chain
+        /// when the series id is missing.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <returns>The series, or <c>null</c> if none can be resolved.</returns>
@@ -303,9 +295,7 @@ namespace Tesserafin.Controller.Entities.TV
         }
 
         /// <summary>
-        /// Finds the owning series id by walking the parent chain via the given lookup service,
-        /// without touching the static <see cref="BaseItem.LibraryManager"/>. Used by
-        /// <see cref="GetSeries(IItemLookupService)"/> as its empty-id fallback.
+        /// Finds the owning series id by walking the parent chain via the given lookup service.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <returns>The series id, or <see cref="Guid.Empty"/> if no series ancestor exists.</returns>
@@ -329,7 +319,7 @@ namespace Tesserafin.Controller.Entities.TV
             return list;
         }
 
-        public override IEnumerable<FileSystemMetadata> GetDeletePaths()
+        public override IEnumerable<FileSystemMetadata> GetDeletePaths(IFileSystem fileSystem)
         {
             return new[]
             {
@@ -338,7 +328,7 @@ namespace Tesserafin.Controller.Entities.TV
                     FullName = Path,
                     IsDirectory = IsFolder
                 }
-            }.Concat(GetLocalMetadataFilesToDelete());
+            }.Concat(GetLocalMetadataFilesToDelete(fileSystem));
         }
 
         public override UnratedItem GetBlockUnratedType()
@@ -373,9 +363,9 @@ namespace Tesserafin.Controller.Entities.TV
             return id;
         }
 
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, services);
 
             if (!IsLocked)
             {
@@ -383,14 +373,14 @@ namespace Tesserafin.Controller.Entities.TV
                 {
                     try
                     {
-                        if (itemNamingService.FillMissingEpisodeNumbersFromPath(this, replaceAllMetadata))
+                        if (services.ItemNamingService.FillMissingEpisodeNumbersFromPath(this, replaceAllMetadata))
                         {
                             hasChanges = true;
                         }
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError(ex, "Error in FillMissingEpisodeNumbersFromPath. Episode: {Episode}", Path ?? Name ?? Id.ToString());
+                        services.Logger.LogError(ex, "Error in FillMissingEpisodeNumbersFromPath. Episode: {Episode}", Path ?? Name ?? Id.ToString());
                     }
                 }
             }

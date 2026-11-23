@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using Moq;
 using Tesserafin.Common.Configuration;
-using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Model.IO;
@@ -16,18 +15,14 @@ namespace Tesserafin.Controller.Tests.Entities;
 /// entity's own root; before the leaf-name contract, a name made only of dots or white space was
 /// reduced to the empty string and the composed path became the root itself.
 /// </summary>
-[Collection(BaseItemStaticStateFixture.Name)]
 public sealed class ItemByNamePathContractTests : IDisposable
 {
     private readonly DirectoryInfo _tmp;
-    private readonly IFileSystem? _previousFileSystem;
-    private readonly IServerConfigurationManager? _previousConfigurationManager;
+    private readonly IFileSystem _fileSystem;
+    private readonly IServerApplicationPaths _paths;
 
     public ItemByNamePathContractTests()
     {
-        _previousFileSystem = BaseItem.FileSystem;
-        _previousConfigurationManager = BaseItem.ConfigurationManager;
-
         _tmp = Directory.CreateTempSubdirectory("ibn-contract-");
 
         var paths = new Mock<IServerApplicationPaths>();
@@ -38,15 +33,12 @@ public sealed class ItemByNamePathContractTests : IDisposable
         paths.SetupGet(p => p.YearPath).Returns(CreateRoot("years"));
         paths.SetupGet(p => p.PeoplePath).Returns(CreateRoot("people"));
 
-        var configurationManager = new Mock<IServerConfigurationManager>();
-        configurationManager.SetupGet(c => c.ApplicationPaths).Returns(paths.Object);
-
         var fileSystem = new Mock<IFileSystem>();
         fileSystem.Setup(f => f.GetValidFilename(It.IsAny<string>()))
             .Returns<string>(s => s.Replace('/', ' ').Replace('\\', ' ').Replace(':', ' '));
 
-        BaseItem.ConfigurationManager = configurationManager.Object;
-        BaseItem.FileSystem = fileSystem.Object;
+        _paths = paths.Object;
+        _fileSystem = fileSystem.Object;
     }
 
     public static TheoryData<string> HostileNames { get; } = new()
@@ -72,12 +64,12 @@ public sealed class ItemByNamePathContractTests : IDisposable
     [MemberData(nameof(HostileNames))]
     public void GetPath_HostileName_Rejected(string name)
     {
-        Assert.Throws<ArgumentException>(() => MusicArtist.GetPath(name));
-        Assert.Throws<ArgumentException>(() => Genre.GetPath(name));
-        Assert.Throws<ArgumentException>(() => MusicGenre.GetPath(name));
-        Assert.Throws<ArgumentException>(() => Studio.GetPath(name));
-        Assert.Throws<ArgumentException>(() => Year.GetPath(name));
-        Assert.Throws<ArgumentException>(() => Person.GetPath(name));
+        Assert.Throws<ArgumentException>(() => MusicArtist.GetPath(name, _fileSystem, _paths.ArtistsPath));
+        Assert.Throws<ArgumentException>(() => Genre.GetPath(name, _fileSystem, _paths.GenrePath));
+        Assert.Throws<ArgumentException>(() => MusicGenre.GetPath(name, _fileSystem, _paths.MusicGenrePath));
+        Assert.Throws<ArgumentException>(() => Studio.GetPath(name, _fileSystem, _paths.StudioPath));
+        Assert.Throws<ArgumentException>(() => Year.GetPath(name, _fileSystem, _paths.YearPath));
+        Assert.Throws<ArgumentException>(() => Person.GetPath(name, _fileSystem, _paths.PeoplePath));
     }
 
     [Theory]
@@ -108,18 +100,18 @@ public sealed class ItemByNamePathContractTests : IDisposable
     [MemberData(nameof(LegitimateNames))]
     public void GetPath_LegitimateName_IsPreservedAsDirectChild(string name)
     {
-        Assert.Equal(name, Path.GetFileName(MusicArtist.GetPath(name)));
-        Assert.Equal(name, Path.GetFileName(Genre.GetPath(name)));
-        Assert.Equal(name, Path.GetFileName(MusicGenre.GetPath(name)));
-        Assert.Equal(name, Path.GetFileName(Studio.GetPath(name)));
-        Assert.Equal(name, Path.GetFileName(Year.GetPath(name)));
+        Assert.Equal(name, Path.GetFileName(MusicArtist.GetPath(name, _fileSystem, _paths.ArtistsPath)));
+        Assert.Equal(name, Path.GetFileName(Genre.GetPath(name, _fileSystem, _paths.GenrePath)));
+        Assert.Equal(name, Path.GetFileName(MusicGenre.GetPath(name, _fileSystem, _paths.MusicGenrePath)));
+        Assert.Equal(name, Path.GetFileName(Studio.GetPath(name, _fileSystem, _paths.StudioPath)));
+        Assert.Equal(name, Path.GetFileName(Year.GetPath(name, _fileSystem, _paths.YearPath)));
 
-        var paths = BaseItem.ConfigurationManager.ApplicationPaths;
-        Assert.Equal(Path.Combine(paths.ArtistsPath, name), MusicArtist.GetPath(name));
-        Assert.Equal(Path.Combine(paths.GenrePath, name), Genre.GetPath(name));
-        Assert.Equal(Path.Combine(paths.MusicGenrePath, name), MusicGenre.GetPath(name));
-        Assert.Equal(Path.Combine(paths.StudioPath, name), Studio.GetPath(name));
-        Assert.Equal(Path.Combine(paths.YearPath, name), Year.GetPath(name));
+        var paths = _paths;
+        Assert.Equal(Path.Combine(paths.ArtistsPath, name), MusicArtist.GetPath(name, _fileSystem, _paths.ArtistsPath));
+        Assert.Equal(Path.Combine(paths.GenrePath, name), Genre.GetPath(name, _fileSystem, _paths.GenrePath));
+        Assert.Equal(Path.Combine(paths.MusicGenrePath, name), MusicGenre.GetPath(name, _fileSystem, _paths.MusicGenrePath));
+        Assert.Equal(Path.Combine(paths.StudioPath, name), Studio.GetPath(name, _fileSystem, _paths.StudioPath));
+        Assert.Equal(Path.Combine(paths.YearPath, name), Year.GetPath(name, _fileSystem, _paths.YearPath));
     }
 
     [Theory]
@@ -128,9 +120,9 @@ public sealed class ItemByNamePathContractTests : IDisposable
     [InlineData("a\\..\\..\\b")]
     public void GetPath_TraversalAttempt_StaysUnderRoot(string name)
     {
-        var artistsRoot = Path.GetFullPath(BaseItem.ConfigurationManager.ApplicationPaths.ArtistsPath);
+        var artistsRoot = Path.GetFullPath(_paths.ArtistsPath);
 
-        var path = Path.GetFullPath(MusicArtist.GetPath(name));
+        var path = Path.GetFullPath(MusicArtist.GetPath(name, _fileSystem, _paths.ArtistsPath));
 
         Assert.StartsWith(artistsRoot + Path.DirectorySeparatorChar, path, StringComparison.Ordinal);
         Assert.Equal(
@@ -141,9 +133,9 @@ public sealed class ItemByNamePathContractTests : IDisposable
     [Fact]
     public void GetPath_Person_UsesPrefixSubdirectoryUnderRoot()
     {
-        var peopleRoot = Path.GetFullPath(BaseItem.ConfigurationManager.ApplicationPaths.PeoplePath);
+        var peopleRoot = Path.GetFullPath(_paths.PeoplePath);
 
-        var path = Path.GetFullPath(Person.GetPath("Zoe Saldana"));
+        var path = Path.GetFullPath(Person.GetPath("Zoe Saldana", _fileSystem, _paths.PeoplePath));
 
         Assert.Equal(Path.Combine(peopleRoot, "Z", "Zoe Saldana"), path);
     }
@@ -157,12 +149,12 @@ public sealed class ItemByNamePathContractTests : IDisposable
     [Fact]
     public void Rebase_PersistedPathEqualToTheRoot_ResolvesToADirectChild()
     {
-        var artistsRoot = BaseItem.ConfigurationManager.ApplicationPaths.ArtistsPath;
+        var artistsRoot = _paths.ArtistsPath;
 
         // A row written before the contract existed: Path is the root itself.
         var persisted = new MusicArtist { Name = "..", Path = artistsRoot };
 
-        var rebased = MusicArtist.GetPath(Path.GetFileName(persisted.Path), false);
+        var rebased = MusicArtist.GetPath(Path.GetFileName(persisted.Path), _fileSystem, artistsRoot, normalizeName: false);
 
         Assert.Equal(Path.Combine(artistsRoot, Path.GetFileName(artistsRoot)), rebased);
         Assert.NotEqual(
@@ -173,10 +165,10 @@ public sealed class ItemByNamePathContractTests : IDisposable
     [Fact]
     public void Rebase_PersistedOrdinaryPath_IsUnchanged()
     {
-        var artistsRoot = BaseItem.ConfigurationManager.ApplicationPaths.ArtistsPath;
+        var artistsRoot = _paths.ArtistsPath;
         var persisted = new MusicArtist { Name = "Sigur Rós", Path = Path.Combine(artistsRoot, "Sigur Rós") };
 
-        Assert.Equal(persisted.Path, MusicArtist.GetPath(Path.GetFileName(persisted.Path), false));
+        Assert.Equal(persisted.Path, MusicArtist.GetPath(Path.GetFileName(persisted.Path), _fileSystem, artistsRoot, normalizeName: false));
     }
 
     [Theory]
@@ -187,27 +179,44 @@ public sealed class ItemByNamePathContractTests : IDisposable
         // normalizeName: false is the rebasing overload — it does not run GetValidFilename, so a
         // leaf that a pre-contract server wrote to disk reaches the contract unchanged. Rejection is
         // the documented outcome; the caller (a metadata refresh) logs and continues.
-        Assert.Throws<ArgumentException>(() => MusicArtist.GetPath(persistedLeaf, false));
+        Assert.Throws<ArgumentException>(() => MusicArtist.GetPath(persistedLeaf, _fileSystem, _paths.ArtistsPath, normalizeName: false));
+    }
+
+    [Theory]
+    [InlineData("2024", 2024)]
+    [InlineData("unknown", null)]
+    public void YearFilter_RejectsInvalidYears(string name, int? expected)
+    {
+        var year = new Year { Name = name };
+        var query = new InternalItemsQuery { Years = [] };
+
+        Assert.Equal(expected.HasValue, year.TryApplyTaggedItemsFilter(query));
+        if (expected is int value)
+        {
+            Assert.Equal(value, Assert.Single(query.Years));
+        }
+        else
+        {
+            Assert.Empty(query.Years);
+        }
     }
 
     public void Dispose()
     {
-        BaseItem.FileSystem = _previousFileSystem!;
-        BaseItem.ConfigurationManager = _previousConfigurationManager!;
         _tmp.Delete(true);
     }
 
-    private static (string Root, Func<string, string> Act)[] Routes()
+    private (string Root, Func<string, string> Act)[] Routes()
     {
-        var paths = BaseItem.ConfigurationManager.ApplicationPaths;
+        var paths = _paths;
         return
         [
-            (paths.ArtistsPath, MusicArtist.GetPath),
-            (paths.GenrePath, Genre.GetPath),
-            (paths.MusicGenrePath, MusicGenre.GetPath),
-            (paths.StudioPath, Studio.GetPath),
-            (paths.YearPath, Year.GetPath),
-            (paths.PeoplePath, Person.GetPath),
+            (paths.ArtistsPath, name => MusicArtist.GetPath(name, _fileSystem, paths.ArtistsPath)),
+            (paths.GenrePath, name => Genre.GetPath(name, _fileSystem, paths.GenrePath)),
+            (paths.MusicGenrePath, name => MusicGenre.GetPath(name, _fileSystem, paths.MusicGenrePath)),
+            (paths.StudioPath, name => Studio.GetPath(name, _fileSystem, paths.StudioPath)),
+            (paths.YearPath, name => Year.GetPath(name, _fileSystem, paths.YearPath)),
+            (paths.PeoplePath, name => Person.GetPath(name, _fileSystem, paths.PeoplePath)),
         ];
     }
 

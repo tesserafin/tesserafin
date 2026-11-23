@@ -168,7 +168,7 @@ public sealed class FolderValidationTests
     }
 
     private static LinkedChildResolver CreateLinks(IItemRepository repository, IItemLookupService lookup)
-        => new(repository, lookup, Mock.Of<IItemPathLookupService>(MockBehavior.Strict), Mock.Of<IFileSystem>(MockBehavior.Strict), NullLogger<LinkedChildResolver>.Instance);
+        => new(repository, lookup, Mock.Of<IItemPathLookupService>(MockBehavior.Strict), NullLogger<LinkedChildResolver>.Instance);
 
     private static IFolderValidationServices CreateServices(
         IItemDeletionCommands deletions,

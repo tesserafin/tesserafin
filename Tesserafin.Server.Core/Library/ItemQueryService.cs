@@ -13,7 +13,6 @@ using Tesserafin.Controller.Entities.Audio;
 using Tesserafin.Controller.Entities.Movies;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
-using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Sorting;
 using Tesserafin.Controller.TV;
 using Tesserafin.Data.Entities;
@@ -26,20 +25,28 @@ namespace Tesserafin.Server.Core.Library
     public class ItemQueryService : IItemQueryService
     {
         private readonly IItemListingServices _listing;
+        private readonly IItemCatalogueQuery _catalogue;
         private readonly IChannelManager _channelManager;
         private readonly ICollectionManager _collectionManager;
         private readonly IUserViewManager _userViewManager;
         private readonly ITVSeriesManager _tvSeriesManager;
         private readonly IServerConfigurationManager _configurationManager;
         private readonly IItemSortService _itemSortService;
-        private readonly IItemLookupService _itemLookupService;
-        private readonly IItemRepository _itemRepository;
-        private readonly IItemQueryScopeService _scopeService;
         private readonly IStandaloneVisibilityService _visibility;
 
-        public ItemQueryService(IChannelManager channelManager, ICollectionManager collectionManager, IUserViewManager userViewManager, ITVSeriesManager tvSeriesManager, IServerConfigurationManager configurationManager, IItemSortService itemSortService, IItemLookupService itemLookupService, IItemRepository itemRepository, IItemQueryScopeService scopeService, IStandaloneVisibilityService visibility, IItemListingServices listing)
+        public ItemQueryService(
+            IChannelManager channelManager,
+            ICollectionManager collectionManager,
+            IUserViewManager userViewManager,
+            ITVSeriesManager tvSeriesManager,
+            IServerConfigurationManager configurationManager,
+            IItemSortService itemSortService,
+            IStandaloneVisibilityService visibility,
+            IItemListingServices listing,
+            IItemCatalogueQuery catalogue)
         {
             _listing = listing;
+            _catalogue = catalogue;
             _visibility = visibility;
             _channelManager = channelManager;
             _collectionManager = collectionManager;
@@ -47,9 +54,6 @@ namespace Tesserafin.Server.Core.Library
             _tvSeriesManager = tvSeriesManager;
             _configurationManager = configurationManager;
             _itemSortService = itemSortService;
-            _itemLookupService = itemLookupService;
-            _itemRepository = itemRepository;
-            _scopeService = scopeService;
         }
 
         public QueryResult<BaseItem> GetItems(Folder folder, InternalItemsQuery query)
@@ -82,51 +86,26 @@ namespace Tesserafin.Server.Core.Library
 
         public IReadOnlyList<BaseItem> GetItemList(InternalItemsQuery query)
         {
-            query.Visibility ??= _visibility;
-            query.Listing ??= _listing;
-
-            if (query.Recursive && !query.ParentId.IsEmpty())
-            {
-                var parent = _itemLookupService.GetItemById(query.ParentId);
-                if (parent is not null)
-                {
-                    _scopeService.SetTopParentIdsOrAncestors(query, [parent]);
-                }
-            }
-
-            if (query.User is not null)
-            {
-                _scopeService.AddUserToQuery(query, query.User);
-            }
-
-            return _itemRepository.GetItemList(query);
+            PrepareListing(query);
+            return _catalogue.GetItemList(query);
         }
 
         public QueryResult<BaseItem> GetItems(InternalItemsQuery query)
         {
+            PrepareListing(query);
+            return _catalogue.GetItems(query);
+        }
+
+        public int GetCount(InternalItemsQuery query)
+        {
+            PrepareListing(query);
+            return _catalogue.GetCount(query);
+        }
+
+        private void PrepareListing(InternalItemsQuery query)
+        {
             query.Visibility ??= _visibility;
             query.Listing ??= _listing;
-
-            if (query.Recursive && !query.ParentId.IsEmpty())
-            {
-                var parent = _itemLookupService.GetItemById(query.ParentId);
-                if (parent is not null)
-                {
-                    _scopeService.SetTopParentIdsOrAncestors(query, [parent]);
-                }
-            }
-
-            if (query.User is not null)
-            {
-                _scopeService.AddUserToQuery(query, query.User);
-            }
-
-            if (query.EnableTotalRecordCount)
-            {
-                return _itemRepository.GetItems(query);
-            }
-
-            return new QueryResult<BaseItem>(query.StartIndex, null, _itemRepository.GetItemList(query));
         }
 
         // GetRawQueryItems + PostFilterAndSort is only equivalent to the full GetItems/GetItemList

@@ -18,7 +18,7 @@ using Tesserafin.Controller.IO;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
 using Tesserafin.Database.Implementations;
-using Tesserafin.Model.IO;
+using Tesserafin.Model.MediaInfo;
 using Tesserafin.Server.ServerSetupApp;
 
 namespace Tesserafin.Server.Migrations.Routines;
@@ -33,7 +33,6 @@ public class MoveExtractedFiles : IAsyncMigrationRoutine
     private readonly ILogger _logger;
     private readonly IDbContextFactory<TesserafinDbContext> _dbProvider;
     private readonly IPathManager _pathManager;
-    private readonly IFileSystem _fileSystem;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MoveExtractedFiles"/> class.
@@ -41,7 +40,6 @@ public class MoveExtractedFiles : IAsyncMigrationRoutine
     /// <param name="appPaths">Instance of the <see cref="IApplicationPaths"/> interface.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="startupLogger">The startup logger for Startup UI intigration.</param>
-    /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
     /// <param name="pathManager">Instance of the <see cref="IPathManager"/> interface.</param>
     /// <param name="dbProvider">Instance of the <see cref="IDbContextFactory{TesserafinDbContext}"/> interface.</param>
     public MoveExtractedFiles(
@@ -49,13 +47,11 @@ public class MoveExtractedFiles : IAsyncMigrationRoutine
         ILogger<MoveExtractedFiles> logger,
         IStartupLogger<MoveExtractedFiles> startupLogger,
         IPathManager pathManager,
-        IFileSystem fileSystem,
         IDbContextFactory<TesserafinDbContext> dbProvider)
     {
         _appPaths = appPaths;
         _logger = startupLogger.With(logger);
         _pathManager = pathManager;
-        _fileSystem = fileSystem;
         _dbProvider = dbProvider;
     }
 
@@ -221,7 +217,7 @@ public class MoveExtractedFiles : IAsyncMigrationRoutine
         }
 
         string filename;
-        if (_fileSystem.IsPathFile(mediaPath))
+        if (MediaPath.IsFile(mediaPath))
         {
             DateTime? date;
             try

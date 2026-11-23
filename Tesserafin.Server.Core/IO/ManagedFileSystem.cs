@@ -9,7 +9,6 @@ using Tesserafin.Common.Configuration;
 using Tesserafin.Controller.IO;
 using Tesserafin.Extensions;
 using Tesserafin.Model.IO;
-using Tesserafin.Model.MediaInfo;
 
 namespace Tesserafin.Server.Core.IO
 {
@@ -76,55 +75,6 @@ namespace Tesserafin.Server.Core.IO
             var handler = _shortcutHandlers.Find(i => string.Equals(extension, i.Extension, StringComparison.OrdinalIgnoreCase));
 
             return handler?.Resolve(filename);
-        }
-
-        /// <inheritdoc />
-        public virtual string MakeAbsolutePath(string folderPath, string filePath)
-        {
-            // path is actually a stream
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                return filePath;
-            }
-
-            var isAbsolutePath = Path.IsPathRooted(filePath) && (!OperatingSystem.IsWindows() || filePath[0] != '\\');
-
-            if (isAbsolutePath)
-            {
-                // absolute local path
-                return filePath;
-            }
-
-            // unc path
-            if (filePath.StartsWith(@"\\", StringComparison.Ordinal))
-            {
-                return filePath;
-            }
-
-            var filePathSpan = filePath.AsSpan();
-
-            // relative path on windows
-            if (filePath[0] == '\\')
-            {
-                filePathSpan = filePathSpan.Slice(1);
-            }
-
-            try
-            {
-                return Path.GetFullPath(Path.Join(folderPath, filePathSpan));
-            }
-            catch (ArgumentException)
-            {
-                return filePath;
-            }
-            catch (PathTooLongException)
-            {
-                return filePath;
-            }
-            catch (NotSupportedException)
-            {
-                return filePath;
-            }
         }
 
         /// <summary>
@@ -486,14 +436,7 @@ namespace Tesserafin.Server.Core.IO
 
         /// <inheritdoc />
         public virtual bool ContainsSubPath(string parentPath, string path)
-        {
-            ArgumentException.ThrowIfNullOrEmpty(parentPath);
-            ArgumentException.ThrowIfNullOrEmpty(path);
-
-            return path.Contains(
-                Path.TrimEndingDirectorySeparator(parentPath) + Path.DirectorySeparatorChar,
-                _isEnvironmentCaseInsensitive ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
-        }
+            => FilePath.ContainsSubPath(parentPath, path);
 
         /// <inheritdoc />
         public virtual bool AreEqual(string path1, string path2)
@@ -522,10 +465,6 @@ namespace Tesserafin.Server.Core.IO
 
             return Path.GetFileNameWithoutExtension(info.FullName);
         }
-
-        /// <inheritdoc />
-        public virtual bool IsPathFile(string path)
-            => MediaPath.IsFile(path);
 
         /// <inheritdoc />
         public virtual void DeleteFile(string path)

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
@@ -10,6 +11,7 @@ using Tesserafin.Data.Entities;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Entities;
 using Tesserafin.Model.Globalization;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.Library
 {
@@ -49,8 +51,10 @@ namespace Tesserafin.Server.Core.Library
         /// <param name="configurationManager">The server configuration (country code).</param>
         /// <param name="activeRecordings">The recordings in progress.</param>
         /// <param name="libraryOptions">The options of an item's library.</param>
-        public TagVisibilityService(IItemLookupService itemLookupService, ICollectionFolderResolver collectionFolderResolver, IUserRootFolderProvider userRootFolderProvider, IItemRepository itemRepository, ILocalizationManager localizationManager, IServerConfigurationManager configurationManager, ActiveRecordings activeRecordings, ILibraryItemOptions libraryOptions)
+        /// <param name="logger">The logger for visibility diagnostics.</param>
+        public TagVisibilityService(IItemLookupService itemLookupService, ICollectionFolderResolver collectionFolderResolver, IUserRootFolderProvider userRootFolderProvider, IItemRepository itemRepository, ILocalizationManager localizationManager, IServerConfigurationManager configurationManager, ActiveRecordings activeRecordings, ILibraryItemOptions libraryOptions, ILogger<TagVisibilityService> logger)
         {
+            Logger = logger;
             _libraryOptions = libraryOptions;
             _itemLookupService = itemLookupService;
             _collectionFolderResolver = collectionFolderResolver;
@@ -59,6 +63,20 @@ namespace Tesserafin.Server.Core.Library
             _localizationManager = localizationManager;
             _configurationManager = configurationManager;
             _activeRecordings = activeRecordings;
+        }
+
+        /// <inheritdoc />
+        public ILogger Logger { get; }
+
+        /// <inheritdoc />
+        public bool IsManagedLibraryPath(string path)
+            => FilePath.ContainsSubPath(_configurationManager.ApplicationPaths.DataPath, path);
+
+        /// <inheritdoc />
+        public (bool Movies, bool Shows) GetCollectionGrouping()
+        {
+            var configuration = _configurationManager.Configuration;
+            return (configuration.EnableGroupingMoviesIntoCollections, configuration.EnableGroupingShowsIntoCollections);
         }
 
         /// <inheritdoc />

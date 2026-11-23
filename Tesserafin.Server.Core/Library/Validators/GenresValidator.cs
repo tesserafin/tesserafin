@@ -9,6 +9,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Enums;
+using Tesserafin.Model.IO;
 
 namespace Tesserafin.Server.Core.Library.Validators;
 
@@ -26,6 +27,7 @@ public class GenresValidator
     /// </summary>
     private readonly ILibraryManager _libraryManager;
     private readonly IItemRepository _itemRepo;
+    private readonly IFileSystem _fileSystem;
 
     /// <summary>
     /// The logger.
@@ -41,7 +43,15 @@ public class GenresValidator
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="itemRepo">The item repository.</param>
-    public GenresValidator(IItemWriteCommands writes, IItemDeletionCommands deletions, IProviderManager providers, ILibraryManager libraryManager, ILogger<GenresValidator> logger, IItemRepository itemRepo)
+    /// <param name="fileSystem">The filesystem used to read refresh directories.</param>
+    public GenresValidator(
+        IItemWriteCommands writes,
+        IItemDeletionCommands deletions,
+        IProviderManager providers,
+        ILibraryManager libraryManager,
+        ILogger<GenresValidator> logger,
+        IItemRepository itemRepo,
+        IFileSystem fileSystem)
     {
         _writes = writes;
         _deletions = deletions;
@@ -49,6 +59,7 @@ public class GenresValidator
         _libraryManager = libraryManager;
         _logger = logger;
         _itemRepo = itemRepo;
+        _fileSystem = fileSystem;
     }
 
     /// <summary>
@@ -91,7 +102,7 @@ public class GenresValidator
 
                 if (!existingGenreIds.Contains(item.Id))
                 {
-                    await item.RefreshMetadata(_deletions, _writes, _providers, cancellationToken).ConfigureAwait(false);
+                    await item.RefreshMetadata(_deletions, _writes, _providers, new MetadataRefreshOptions(new DirectoryService(_fileSystem)), cancellationToken).ConfigureAwait(false);
                     refreshed++;
                 }
             }

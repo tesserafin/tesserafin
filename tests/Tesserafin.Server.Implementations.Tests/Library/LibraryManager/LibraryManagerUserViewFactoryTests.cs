@@ -87,7 +87,7 @@ public class LibraryManagerUserViewFactoryTests
 
         var itemAccessService = new Tesserafin.Server.Core.Library.ItemAccessService(
             _itemLookupService,
-            new Tesserafin.Server.Core.Library.TagVisibilityService(_itemLookupService, fixture.Freeze<ICollectionFolderResolver>(), fixture.Freeze<IUserRootFolderProvider>(), _itemRepositoryMock.Object, fixture.Freeze<ILocalizationManager>(), fixture.Freeze<IServerConfigurationManager>(), new Tesserafin.Controller.LiveTv.ActiveRecordings(), Mock.Of<ILibraryItemOptions>()));
+            new Tesserafin.Server.Core.Library.TagVisibilityService(_itemLookupService, fixture.Freeze<ICollectionFolderResolver>(), fixture.Freeze<IUserRootFolderProvider>(), _itemRepositoryMock.Object, fixture.Freeze<ILocalizationManager>(), fixture.Freeze<IServerConfigurationManager>(), new Tesserafin.Controller.LiveTv.ActiveRecordings(), Mock.Of<ILibraryItemOptions>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<Tesserafin.Server.Core.Library.TagVisibilityService>.Instance));
         fixture.Register<IItemAccessService>(() => itemAccessService);
 
         // PR106a: one real ItemStore instance backs both the concrete type and IItemStore.
@@ -239,9 +239,6 @@ public class LibraryManagerUserViewFactoryTests
     [Fact]
     public void GetNamedView_NameViewTypeSortNameOverload_NewView_PersistedAndRefreshed()
     {
-        Tesserafin.Controller.Entities.BaseItem.ConfigurationManager = _configurationManagerMock.Object;
-        Tesserafin.Controller.Entities.BaseItem.LibraryManager = _libraryManager;
-
         var view = _libraryManager.GetNamedView("Movies", CollectionType.movies, "SortName");
 
         Assert.Equal("Movies", view.Name);

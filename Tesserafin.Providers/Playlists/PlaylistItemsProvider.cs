@@ -26,7 +26,6 @@ public class PlaylistItemsProvider : ILocalMetadataProvider<Playlist>,
     IForcedProvider,
     IHasItemChangeMonitor
 {
-    private readonly IFileSystem _fileSystem;
     private readonly IUserRootFolderProvider _userRoots;
     private readonly IItemPathLookupService _itemPaths;
     private readonly ILogger<PlaylistItemsProvider> _logger;
@@ -38,17 +37,14 @@ public class PlaylistItemsProvider : ILocalMetadataProvider<Playlist>,
     /// <param name="logger">Instance of the <see cref="ILogger{PlaylistItemsProvider}"/> interface.</param>
     /// <param name="userRoots">The user root folder provider.</param>
     /// <param name="itemPaths">The catalogue path lookup service.</param>
-    /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
     public PlaylistItemsProvider(
         ILogger<PlaylistItemsProvider> logger,
         IUserRootFolderProvider userRoots,
-        IItemPathLookupService itemPaths,
-        IFileSystem fileSystem)
+        IItemPathLookupService itemPaths)
     {
         _logger = logger;
         _userRoots = userRoots;
         _itemPaths = itemPaths;
-        _fileSystem = fileSystem;
     }
 
     /// <inheritdoc />
@@ -197,7 +193,7 @@ public class PlaylistItemsProvider : ILocalMetadataProvider<Playlist>,
     private bool TryResolvePlaylistItem(string itemPath, string playlistPath, List<string> libraryPaths, out BaseItem item)
     {
         item = null;
-        string pathToCheck = _fileSystem.MakeAbsolutePath(Path.GetDirectoryName(playlistPath), itemPath);
+        string pathToCheck = FilePath.MakeAbsolute(Path.GetDirectoryName(playlistPath), itemPath);
         if (!File.Exists(pathToCheck))
         {
             return false;

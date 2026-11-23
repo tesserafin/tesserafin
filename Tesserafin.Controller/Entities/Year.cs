@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Common.IO;
 using Tesserafin.Controller.Channels;
 using Tesserafin.Controller.Library;
+using Tesserafin.Controller.Providers;
 using Tesserafin.Model.IO;
 
 namespace Tesserafin.Controller.Entities
@@ -60,16 +61,16 @@ namespace Tesserafin.Controller.Entities
             return true;
         }
 
-        public IReadOnlyList<BaseItem> GetTaggedItems(InternalItemsQuery query)
+        public bool TryApplyTaggedItemsFilter(InternalItemsQuery query)
         {
-            if (!int.TryParse(Name, NumberStyles.Integer, CultureInfo.InvariantCulture, out var year))
+            if (GetYearValue() is not int year)
             {
-                return new List<BaseItem>();
+                return false;
             }
 
             query.Years = new[] { year };
 
-            return LibraryManager.GetItemList(query);
+            return true;
         }
 
         public int? GetYearValue()
@@ -82,14 +83,6 @@ namespace Tesserafin.Controller.Entities
             return null;
         }
 
-        public static string GetPath(string name)
-        {
-            return GetPath(name, true);
-        }
-
-        public static string GetPath(string name, bool normalizeName)
-            => GetPath(name, FileSystem, ConfigurationManager.ApplicationPaths.YearPath, normalizeName);
-
         public static string GetPath(string name, IFileSystem fileSystem, string root, bool normalizeName = true)
         {
             // Trim the period at the end because windows will have a hard time with that
@@ -100,34 +93,34 @@ namespace Tesserafin.Controller.Entities
             return SafeDirectoryLeafName.CombineWithRoot(root, validName, nameof(name));
         }
 
-        private string GetRebasedPath()
+        private string GetRebasedPath(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            return GetPath(System.IO.Path.GetFileName(Path), false);
+            return GetPath(System.IO.Path.GetFileName(Path), fileSystem, applicationPaths.YearPath, normalizeName: false);
         }
 
-        public override bool RequiresRefresh()
+        public override bool RequiresRefresh(MetadataRefreshServices services)
         {
-            var newPath = GetRebasedPath();
+            var newPath = GetRebasedPath(services.FileSystem, services.ApplicationPaths);
             if (!string.Equals(Path, newPath, StringComparison.Ordinal))
             {
-                Logger.LogDebug("{0} path has changed from {1} to {2}", GetType().Name, Path, newPath);
+                services.Logger.LogDebug("{0} path has changed from {1} to {2}", GetType().Name, Path, newPath);
                 return true;
             }
 
-            return base.RequiresRefresh();
+            return base.RequiresRefresh(services);
         }
 
         /// <summary>
         /// This is called before any metadata refresh and returns true if changes were made.
         /// </summary>
         /// <param name="replaceAllMetadata">Whether to replace all metadata.</param>
-        /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
+        /// <param name="services">The metadata refresh services.</param>
         /// <returns>true if the item has change, else false.</returns>
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, services);
 
-            var newPath = GetRebasedPath();
+            var newPath = GetRebasedPath(services.FileSystem, services.ApplicationPaths);
             if (!string.Equals(Path, newPath, StringComparison.Ordinal))
             {
                 Path = newPath;

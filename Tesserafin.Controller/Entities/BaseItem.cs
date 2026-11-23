@@ -15,7 +15,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Channels;
-using Tesserafin.Controller.Configuration;
 using Tesserafin.Controller.Dto;
 using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.Library;
@@ -332,7 +331,7 @@ namespace Tesserafin.Controller.Entities
                     return LocationType.Virtual;
                 }
 
-                return FileSystem.IsPathFile(path) ? LocationType.FileSystem : LocationType.Remote;
+                return MediaPath.IsFile(path) ? LocationType.FileSystem : LocationType.Remote;
             }
         }
 
@@ -463,17 +462,6 @@ namespace Tesserafin.Controller.Entities
         public Guid ParentId { get; set; }
 
         /// <summary>
-        /// Gets or sets the logger.
-        /// </summary>
-        public static ILogger<BaseItem> Logger { get; set; }
-
-        public static ILibraryManager LibraryManager { get; set; }
-
-        public static IServerConfigurationManager ConfigurationManager { get; set; }
-
-        public static IFileSystem FileSystem { get; set; }
-
-        /// <summary>
         /// Gets or sets the catalogue reads this item performs on itself (children, played state, active recording).
         /// The catalogue attaches them when it loads or saves the item.
         /// </summary>
@@ -510,6 +498,11 @@ namespace Tesserafin.Controller.Entities
                         // Need the ToLower because that's what CreateSortName does
                         _sortName = ModifySortChunks(ForcedSortName).ToLowerInvariant();
                     }
+                    else if (ReadServices is null)
+                    {
+                        // A detached item may be bound to a catalogue with different sort rules later.
+                        return CreateSortName();
+                    }
                     else
                     {
                         _sortName = CreateSortName();
@@ -526,19 +519,7 @@ namespace Tesserafin.Controller.Entities
         public virtual Guid DisplayParentId => ParentId;
 
         [JsonIgnore]
-        public BaseItem DisplayParent
-        {
-            get
-            {
-                var id = DisplayParentId;
-                if (id.IsEmpty())
-                {
-                    return null;
-                }
-
-                return LibraryManager.GetItemById(id);
-            }
-        }
+        public BaseItem DisplayParent => GetRelatedItem(DisplayParentId);
 
         /// <summary>
         /// Gets or sets the date that the item first debuted. For movies this could be premiere date, episodes would be first aired.
@@ -722,8 +703,7 @@ namespace Tesserafin.Controller.Entities
 #pragma warning disable SA1201 // kept adjacent to IsTopParent for readability; it mirrors that property's logic
         /// <summary>
         /// Gets a value indicating whether this item is a top-level parent, resolving its parent
-        /// via the given lookup service instead of the static <see cref="LibraryManager"/>. Mirrors
-        /// the <see cref="IsTopParent"/> property but keeps the check off the static path.
+        /// via the supplied lookup service.
         /// </summary>
         /// <param name="lookup">The lookup service used to resolve the parent.</param>
         /// <returns><c>true</c> if this item is a top parent; otherwise, <c>false</c>.</returns>
@@ -828,6 +808,27 @@ namespace Tesserafin.Controller.Entities
             return Id.ToString("N", CultureInfo.InvariantCulture);
         }
 
+        /// <summary>Gets listing services from the request or the attached catalogue.</summary>
+        /// <param name="query">The current request, when supplied.</param>
+        /// <returns>The listing services.</returns>
+        protected IItemListingReads GetListingServices(InternalItemsQuery query = null)
+            => query?.Listing ?? ReadServices?.Listing;
+
+        /// <summary>Gets the libraries containing this item.</summary>
+        /// <param name="candidates">The libraries to check, when supplied by the caller.</param>
+        /// <returns>The containing libraries.</returns>
+        protected IReadOnlyList<Folder> GetContainingLibraries(IEnumerable<Folder> candidates = null)
+            => ReadServices?.GetCollectionFolders(this, candidates) ?? [];
+
+        /// <summary>Gets the item's effective library options.</summary>
+        /// <returns>The effective options or library defaults.</returns>
+        protected LibraryOptions GetEffectiveLibraryOptions() => ReadServices?.GetLibraryOptions(this) ?? new LibraryOptions();
+
+        /// <summary>Resolves a saved item reference through the attached catalogue.</summary>
+        /// <param name="id">The referenced item's id.</param>
+        /// <returns>The referenced item, if present.</returns>
+        protected BaseItem GetRelatedItem(Guid id) => id.IsEmpty() ? null : ReadServices?.GetItemById(id);
+
         /// <summary>
         /// Gets the attached catalogue reads.
         /// </summary>
@@ -860,7 +861,7 @@ namespace Tesserafin.Controller.Entities
                 return allowed.Contains(ChannelId);
             }
 
-            var collectionFolders = LibraryManager.GetCollectionFolders(this, allCollectionFolders);
+            var collectionFolders = GetContainingLibraries(allCollectionFolders);
 
             foreach (var folder in collectionFolders)
             {
@@ -873,15 +874,10 @@ namespace Tesserafin.Controller.Entities
             return false;
         }
 
-        public BaseItem GetOwner()
-        {
-            var ownerId = OwnerId;
-            return ownerId.IsEmpty() ? null : LibraryManager.GetItemById(ownerId);
-        }
+        public BaseItem GetOwner() => GetRelatedItem(OwnerId);
 
         /// <summary>
-        /// Gets the owner via the given lookup service, without touching the static
-        /// <see cref="LibraryManager"/>.
+        /// Gets the owner via the given lookup service.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <returns>BaseItem.</returns>
@@ -900,9 +896,7 @@ namespace Tesserafin.Controller.Entities
 
         public virtual bool CanDelete(User user, IChannelManager channels)
         {
-            var allCollectionFolders = LibraryManager.GetUserRootFolder().Children.OfType<Folder>().ToList();
-
-            return CanDelete(user, allCollectionFolders, channels);
+            return CanDelete(user, null, channels);
         }
 
         public virtual bool CanDownload()
@@ -958,8 +952,9 @@ namespace Tesserafin.Controller.Entities
             }
 
             var sortable = Name.Trim().ToLowerInvariant();
+            var defaults = ReadServices?.MetadataDefaults ?? ItemMetadataDefaults.BuiltIn;
 
-            foreach (var search in ConfigurationManager.Configuration.SortRemoveWords)
+            foreach (var search in defaults.SortRemoveWords)
             {
                 // Remove from beginning if a space follows
                 if (sortable.StartsWith(search + " ", StringComparison.Ordinal))
@@ -977,12 +972,12 @@ namespace Tesserafin.Controller.Entities
                 }
             }
 
-            foreach (var removeChar in ConfigurationManager.Configuration.SortRemoveCharacters)
+            foreach (var removeChar in defaults.SortRemoveCharacters)
             {
                 sortable = sortable.Replace(removeChar, string.Empty, StringComparison.Ordinal);
             }
 
-            foreach (var replaceChar in ConfigurationManager.Configuration.SortReplaceCharacters)
+            foreach (var replaceChar in defaults.SortReplaceCharacters)
             {
                 sortable = sortable.Replace(replaceChar, " ", StringComparison.Ordinal);
             }
@@ -1034,20 +1029,10 @@ namespace Tesserafin.Controller.Entities
             return result;
         }
 
-        public BaseItem GetParent()
-        {
-            var parentId = ParentId;
-            if (parentId.IsEmpty())
-            {
-                return null;
-            }
-
-            return LibraryManager.GetItemById(parentId);
-        }
+        public BaseItem GetParent() => GetRelatedItem(ParentId);
 
         /// <summary>
-        /// Gets the parent via the given lookup service, without touching the static
-        /// <see cref="LibraryManager"/>.
+        /// Gets the parent via the given lookup service.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <returns>BaseItem.</returns>
@@ -1077,9 +1062,7 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>
-        /// Gets the parents via the given lookup service, without touching the static
-        /// <see cref="LibraryManager"/>. Each hop up the chain is resolved through
-        /// <paramref name="lookup"/>.
+        /// Gets the parents by resolving each hop through <paramref name="lookup"/>.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <returns>IEnumerable{BaseItem}.</returns>
@@ -1115,8 +1098,7 @@ namespace Tesserafin.Controller.Entities
         }
 
         /// <summary>
-        /// Finds a parent of a given type via the given lookup service, without touching the
-        /// static <see cref="LibraryManager"/>.
+        /// Finds a parent of a given type via the given lookup service.
         /// </summary>
         /// <param name="lookup">The lookup service.</param>
         /// <typeparam name="T">Type of parent.</typeparam>
@@ -1246,7 +1228,7 @@ namespace Tesserafin.Controller.Entities
                 MediaStreams = mediaSourceManager.GetMediaStreams(item.Id),
                 MediaAttachments = mediaSourceManager.GetMediaAttachments(item.Id),
                 Name = GetMediaSourceName(item, commonPrefix),
-                Path = enablePathSubstitution ? GetMappedPath(item, itemPath, protocol) : itemPath,
+                Path = enablePathSubstitution && protocol == MediaProtocol.File ? mediaSourceManager.MapFilePath(itemPath) : itemPath,
                 RunTimeTicks = item.RunTimeTicks,
                 Container = item.Container,
                 Size = item.Size,
@@ -1505,11 +1487,6 @@ namespace Tesserafin.Controller.Entities
             return prefix;
         }
 
-        public Task RefreshMetadata(IItemDeletionCommands deletions, IItemWriteCommands writes, IItemMetadataDispatcher providers, CancellationToken cancellationToken)
-        {
-            return RefreshMetadata(deletions, writes, providers, new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken);
-        }
-
         /// <summary>
         /// The base implementation to refresh metadata.
         /// </summary>
@@ -1523,14 +1500,11 @@ namespace Tesserafin.Controller.Entities
         {
             var requiresSave = false;
 
-            if (SupportsOwnedItems)
+            if (IsFileProtocol && SupportsOwnedItems)
             {
                 try
                 {
-                    if (IsFileProtocol)
-                    {
-                        requiresSave = await RefreshOwnedItemsAsync(deletions, writes, providers, options, cancellationToken).ConfigureAwait(false);
-                    }
+                    requiresSave = await RefreshOwnedItemsAsync(deletions, writes, providers, options, cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -1538,7 +1512,7 @@ namespace Tesserafin.Controller.Entities
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex, "Error refreshing owned items for {Path}", Path ?? Name);
+                    providers.ReportOwnedItemRefreshFailure(this, ex);
                 }
             }
 
@@ -1653,14 +1627,14 @@ namespace Tesserafin.Controller.Entities
             return PresentationUniqueKey ?? CreatePresentationUniqueKey();
         }
 
-        public virtual bool RequiresRefresh()
+        public virtual bool RequiresRefresh(MetadataRefreshServices services)
         {
             if (string.IsNullOrEmpty(Path) || DateModified == DateTime.MinValue)
             {
                 return false;
             }
 
-            var info = FileSystem.GetFileSystemInfo(Path);
+            var info = services.FileSystem.GetFileSystemInfo(Path);
 
             return info.Exists && this.HasChanged(info.LastWriteTimeUtc);
         }
@@ -1722,9 +1696,9 @@ namespace Tesserafin.Controller.Entities
         public string GetPreferredMetadataLanguage()
             => GetPreferredMetadataLanguage(
                 GetParents,
-                () => LibraryManager.GetCollectionFolders(this),
-                () => LibraryManager.GetLibraryOptions(this).PreferredMetadataLanguage,
-                () => ConfigurationManager.Configuration.PreferredMetadataLanguage);
+                () => GetContainingLibraries(),
+                () => GetEffectiveLibraryOptions().PreferredMetadataLanguage,
+                () => (ReadServices?.MetadataDefaults ?? ItemMetadataDefaults.BuiltIn).Language);
 
         /// <summary>Resolves the item's language followed by the parent, library and server defaults.</summary>
         /// <param name="getParents">Reads the item's parents in nearest-first order.</param>
@@ -1754,11 +1728,11 @@ namespace Tesserafin.Controller.Entities
             => ResolveMetadataPreference(
                 PreferredMetadataCountryCode,
                 () => scope?.GetParents(this) ?? GetParents(),
-                () => scope?.GetCollectionFolders(this) ?? LibraryManager.GetCollectionFolders(this),
+                () => scope?.GetCollectionFolders(this) ?? GetContainingLibraries(),
                 static item => item.PreferredMetadataCountryCode,
-                () => (scope is null ? LibraryManager.GetLibraryOptions(this) : scope.GetLibraryOptions(this))?.MetadataCountryCode,
+                () => (scope is null ? GetEffectiveLibraryOptions() : scope.GetLibraryOptions(this))?.MetadataCountryCode,
                 () => scope is null
-                    ? ConfigurationManager.Configuration.MetadataCountryCode
+                    ? (ReadServices?.MetadataDefaults ?? ItemMetadataDefaults.BuiltIn).CountryCode
                     : scope.GetServerMetadataCountryCode());
 
         /// <summary>Resolves inherited metadata preferences from the supplied catalogue and settings.</summary>
@@ -1856,9 +1830,7 @@ namespace Tesserafin.Controller.Entities
                 return false;
             }
 
-            var libraryOptions = LibraryManager.GetLibraryOptions(this);
-
-            return libraryOptions.SaveLocalMetadata;
+            return GetEffectiveLibraryOptions().SaveLocalMetadata;
         }
 
         /// <summary>
@@ -1903,7 +1875,7 @@ namespace Tesserafin.Controller.Entities
 
                 if (!isAllowed)
                 {
-                    Logger.LogDebug("{0} has an unrecognized parental rating of {1}.", Name, rating);
+                    scope.Logger.LogDebug("{0} has an unrecognized parental rating of {1}.", Name, rating);
                 }
 
                 return isAllowed;
@@ -1941,7 +1913,7 @@ namespace Tesserafin.Controller.Entities
 
         public List<string> GetInheritedTags()
         {
-            return CombineInheritedTags(this, GetParents(), LibraryManager.GetCollectionFolders(this)).ToList();
+            return CombineInheritedTags(this, GetParents(), GetContainingLibraries()).ToList();
         }
 
         /// <summary>
@@ -2244,10 +2216,11 @@ namespace Tesserafin.Controller.Entities
         /// Deletes the image.
         /// </summary>
         /// <param name="writes">Explicit item write/resolution ownership.</param>
+        /// <param name="fileSystem">The filesystem used to delete local images.</param>
         /// <param name="type">The type.</param>
         /// <param name="index">The index.</param>
         /// <returns>A task.</returns>
-        public async Task DeleteImageAsync(IItemWriteCommands writes, ImageType type, int index)
+        public async Task DeleteImageAsync(IItemWriteCommands writes, IFileSystem fileSystem, ImageType type, int index)
         {
             var info = GetImageInfo(type, index);
 
@@ -2261,7 +2234,7 @@ namespace Tesserafin.Controller.Entities
             var path = info.Path;
             if (info.IsLocalFile && !string.IsNullOrWhiteSpace(path))
             {
-                FileSystem.DeleteFile(path);
+                fileSystem.DeleteFile(path);
             }
 
             // Remove from item
@@ -2401,7 +2374,7 @@ namespace Tesserafin.Controller.Entities
                 {
                     if (existing.IsLocalFile)
                     {
-                        var newDateModified = FileSystem.GetLastWriteTimeUtc(newImage);
+                        var newDateModified = newImage.LastWriteTimeUtc;
 
                         // If date changed then we need to reset saved image dimensions
                         if (existing.DateModified != newDateModified && (existing.Width > 0 || existing.Height > 0))
@@ -2424,29 +2397,30 @@ namespace Tesserafin.Controller.Entities
             return imageUpdated || newImageList.Count > 0;
         }
 
-        private ItemImageInfo GetImageInfo(FileSystemMetadata file, ImageType type)
+        private static ItemImageInfo GetImageInfo(FileSystemMetadata file, ImageType type)
         {
             return new ItemImageInfo
             {
                 Path = file.FullName,
                 Type = type,
-                DateModified = FileSystem.GetLastWriteTimeUtc(file)
+                DateModified = file.LastWriteTimeUtc
             };
         }
 
         /// <summary>
         /// Gets the file system path to delete when the item is to be deleted.
         /// </summary>
+        /// <param name="fileSystem">The filesystem that supplies source and sidecar metadata.</param>
         /// <returns>The metadata for the deleted paths.</returns>
-        public virtual IEnumerable<FileSystemMetadata> GetDeletePaths()
+        public virtual IEnumerable<FileSystemMetadata> GetDeletePaths(IFileSystem fileSystem)
         {
             return new[]
             {
-                FileSystem.GetFileSystemInfo(Path)
-            }.Concat(GetLocalMetadataFilesToDelete());
+                fileSystem.GetFileSystemInfo(Path)
+            }.Concat(GetLocalMetadataFilesToDelete(fileSystem));
         }
 
-        protected List<FileSystemMetadata> GetLocalMetadataFilesToDelete()
+        protected List<FileSystemMetadata> GetLocalMetadataFilesToDelete(IFileSystem fileSystem)
         {
             if (IsFolder || !IsInMixedFolder)
             {
@@ -2455,7 +2429,7 @@ namespace Tesserafin.Controller.Entities
 
             var filename = System.IO.Path.GetFileNameWithoutExtension(Path);
 
-            return FileSystem.GetFiles(System.IO.Path.GetDirectoryName(Path), _supportedExtensions, false, false)
+            return fileSystem.GetFiles(System.IO.Path.GetDirectoryName(Path), _supportedExtensions, false, false)
                 .Where(i => System.IO.Path.GetFileNameWithoutExtension(i.FullName).StartsWith(filename, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
@@ -2465,7 +2439,7 @@ namespace Tesserafin.Controller.Entities
             return type == ImageType.Backdrop || type == ImageType.Chapter;
         }
 
-        public Task SwapImagesAsync(IItemWriteCommands writes, ImageType type, int index1, int index2)
+        public Task SwapImagesAsync(IItemWriteCommands writes, IFileSystem fileSystem, ImageType type, int index1, int index2)
         {
             if (!AllowsMultipleImages(type))
             {
@@ -2490,11 +2464,11 @@ namespace Tesserafin.Controller.Entities
             var path1 = info1.Path;
             var path2 = info2.Path;
 
-            FileSystem.SwapFiles(path1, path2);
+            fileSystem.SwapFiles(path1, path2);
 
             // Refresh these values
-            info1.DateModified = FileSystem.GetLastWriteTimeUtc(info1.Path);
-            info2.DateModified = FileSystem.GetLastWriteTimeUtc(info2.Path);
+            info1.DateModified = fileSystem.GetLastWriteTimeUtc(info1.Path);
+            info2.DateModified = fileSystem.GetLastWriteTimeUtc(info2.Path);
 
             info1.Width = 0;
             info1.Height = 0;
@@ -2559,9 +2533,9 @@ namespace Tesserafin.Controller.Entities
         /// This is called before any metadata refresh and returns true if changes were made.
         /// </summary>
         /// <param name="replaceAllMetadata">Whether to replace all metadata.</param>
-        /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
+        /// <param name="services">The metadata refresh services.</param>
         /// <returns>true if the item has change, else false.</returns>
-        public virtual bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public virtual bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
             var hasChanges = false;
 
@@ -2572,16 +2546,6 @@ namespace Tesserafin.Controller.Entities
             }
 
             return hasChanges;
-        }
-
-        protected static string GetMappedPath(BaseItem item, string path, MediaProtocol? protocol)
-        {
-            if (protocol == MediaProtocol.File)
-            {
-                return LibraryManager.GetPathAfterNetworkSubstitution(path, item);
-            }
-
-            return path;
         }
 
         public virtual void FillUserDataDtoValues(
@@ -2626,7 +2590,7 @@ namespace Tesserafin.Controller.Entities
 
         public virtual IEnumerable<Guid> GetAncestorIds()
         {
-            return GetParents().Select(i => i.Id).Concat(LibraryManager.GetCollectionFolders(this).Select(i => i.Id));
+            return GetParents().Select(i => i.Id).Concat(GetContainingLibraries().Select(i => i.Id));
         }
 
         public BaseItem GetTopParent()
@@ -2704,77 +2668,6 @@ namespace Tesserafin.Controller.Entities
                 currentOfficialRating ?? string.Empty,
                 OfficialRating ?? string.Empty,
                 StringComparison.OrdinalIgnoreCase);
-        }
-
-        [Obsolete("Use GetExtras plus IItemSortService.Sort instead. Kept for plugin compatibility until Plugin SDK v2.")]
-        public IReadOnlyList<BaseItem> GetThemeSongs(User user = null)
-        {
-#pragma warning disable CS0618
-            return GetThemeSongs(user, Array.Empty<(ItemSortBy, SortOrder)>());
-#pragma warning restore CS0618
-        }
-
-        [Obsolete("Use GetExtras plus IItemSortService.Sort instead. Kept for plugin compatibility until Plugin SDK v2.")]
-        public IReadOnlyList<BaseItem> GetThemeSongs(User user, IEnumerable<(ItemSortBy SortBy, SortOrder SortOrder)> orderBy)
-        {
-#pragma warning disable CS0618 // static LibraryManager.Sort facade left in place pending Folder.GetChildren cascade, see docs/major-rewrite-plan-v13.md § PR49/N
-            return LibraryManager.Sort(GetExtras(user).Where(e => e.ExtraType == Tesserafin.Model.Entities.ExtraType.ThemeSong), user, orderBy).ToArray();
-#pragma warning restore CS0618
-        }
-
-        [Obsolete("Use GetExtras plus IItemSortService.Sort instead. Kept for plugin compatibility until Plugin SDK v2.")]
-        public IReadOnlyList<BaseItem> GetThemeVideos(User user = null)
-        {
-#pragma warning disable CS0618
-            return GetThemeVideos(user, Array.Empty<(ItemSortBy, SortOrder)>());
-#pragma warning restore CS0618
-        }
-
-        [Obsolete("Use GetExtras plus IItemSortService.Sort instead. Kept for plugin compatibility until Plugin SDK v2.")]
-        public IReadOnlyList<BaseItem> GetThemeVideos(User user, IEnumerable<(ItemSortBy SortBy, SortOrder SortOrder)> orderBy)
-        {
-#pragma warning disable CS0618 // static LibraryManager.Sort facade left in place pending Folder.GetChildren cascade, see docs/major-rewrite-plan-v13.md § PR49/N
-            return LibraryManager.Sort(GetExtras(user).Where(e => e.ExtraType == Tesserafin.Model.Entities.ExtraType.ThemeVideo), user, orderBy).ToArray();
-#pragma warning restore CS0618
-        }
-
-        /// <summary>
-        /// Gets the ids of the items whose owned extras belong to this item.
-        /// </summary>
-        /// <returns>An array containing the owner ids.</returns>
-        protected virtual Guid[] GetExtraOwnerIds()
-        {
-            return [Id];
-        }
-
-        /// <summary>
-        /// Get all extras associated with this item, sorted by <see cref="SortName"/>.
-        /// </summary>
-        /// <param name="user">The user to apply parental restrictions for, or <c>null</c> to skip restriction checks.</param>
-        /// <returns>An enumerable containing the items.</returns>
-        public IEnumerable<BaseItem> GetExtras(User user = null)
-        {
-            return LibraryManager.GetItemList(new InternalItemsQuery(user)
-            {
-                OwnerIds = GetExtraOwnerIds(),
-                OrderBy = [(ItemSortBy.SortName, SortOrder.Ascending)]
-            });
-        }
-
-        /// <summary>
-        /// Get all extras with specific types that are associated with this item.
-        /// </summary>
-        /// <param name="extraTypes">The types of extras to retrieve.</param>
-        /// <param name="user">The user to apply parental restrictions for, or <c>null</c> to skip restriction checks.</param>
-        /// <returns>An enumerable containing the extras.</returns>
-        public IEnumerable<BaseItem> GetExtras(IReadOnlyCollection<ExtraType> extraTypes, User user = null)
-        {
-            return LibraryManager.GetItemList(new InternalItemsQuery(user)
-            {
-                OwnerIds = GetExtraOwnerIds(),
-                ExtraTypes = extraTypes.ToArray(),
-                OrderBy = [(ItemSortBy.SortName, SortOrder.Ascending)]
-            });
         }
 
         public virtual long GetRunTimeTicksForPlayState()

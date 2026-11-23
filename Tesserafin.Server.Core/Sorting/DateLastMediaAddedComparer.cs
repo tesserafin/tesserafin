@@ -20,12 +20,6 @@ namespace Tesserafin.Server.Core.Sorting
         public User User { get; set; }
 
         /// <summary>
-        /// Gets or sets the user manager.
-        /// </summary>
-        /// <value>The user manager.</value>
-        public IUserManager UserManager { get; set; }
-
-        /// <summary>
         /// Gets or sets the user data manager.
         /// </summary>
         /// <value>The user data manager.</value>

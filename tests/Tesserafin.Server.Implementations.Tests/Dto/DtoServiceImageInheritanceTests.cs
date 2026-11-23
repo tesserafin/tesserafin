@@ -142,6 +142,7 @@ public class DtoServiceImageInheritanceTests
             chapterManager.Object,
             itemCountService.Object,
             Mock.Of<IStandaloneVisibilityService>(),
-            Mock.Of<IItemListingServices>());
+            Mock.Of<IItemListingServices>(),
+            Mock.Of<IItemExtrasService>());
     }
 }

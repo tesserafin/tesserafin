@@ -25,7 +25,7 @@ namespace Tesserafin.Controller.Entities.Movies
     /// <summary>
     /// Class BoxSet.
     /// </summary>
-    public class BoxSet : Folder, IHasTrailers, IHasDisplayOrder, IHasLookupInfo<BoxSetInfo>
+    public class BoxSet : Folder, IHasDisplayOrder, IHasLookupInfo<BoxSetInfo>
     {
         public BoxSet()
         {
@@ -41,10 +41,6 @@ namespace Tesserafin.Controller.Entities.Movies
         [JsonIgnore]
         public override bool SupportsPeople => true;
 
-        /// <inheritdoc />
-        [JsonIgnore]
-        public IReadOnlyList<BaseItem> LocalTrailers => GetExtras([Tesserafin.Model.Entities.ExtraType.Trailer]).ToArray();
-
         /// <summary>
         /// Gets or sets the display order.
         /// </summary>
@@ -52,30 +48,23 @@ namespace Tesserafin.Controller.Entities.Movies
         public string DisplayOrder { get; set; }
 
         [JsonIgnore]
-        private bool IsLegacyBoxSet
-        {
-            get
-            {
-                if (string.IsNullOrEmpty(Path))
-                {
-                    return false;
-                }
-
-                if (LinkedChildren.Length > 0)
-                {
-                    return false;
-                }
-
-                return !FileSystem.ContainsSubPath(ConfigurationManager.ApplicationPaths.DataPath, Path);
-            }
-        }
-
-        [JsonIgnore]
         public override bool IsPreSorted => true;
 
         public override bool SupportsRawQueryItems => false;
 
         public Guid[] LibraryFolderIds { get; set; }
+
+        private bool IsLegacyBoxSet(IStandaloneVisibilityService scope)
+        {
+            if (string.IsNullOrEmpty(Path) || LinkedChildren.Length > 0)
+            {
+                return false;
+            }
+
+            return scope is null
+                ? !RequireReadServices().IsManagedLibraryPath(Path)
+                : !scope.IsManagedLibraryPath(Path);
+        }
 
         protected override bool GetBlockUnratedValue(User user)
         {
@@ -92,7 +81,7 @@ namespace Tesserafin.Controller.Entities.Movies
 
         protected override IEnumerable<BaseItem> GetNonCachedChildren(IItemResolutionService resolution, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
-            if (IsLegacyBoxSet)
+            if (IsLegacyBoxSet(null))
             {
                 return base.GetNonCachedChildren(resolution, directoryService, cancellationToken);
             }
@@ -102,7 +91,7 @@ namespace Tesserafin.Controller.Entities.Movies
 
         protected override IReadOnlyList<BaseItem> LoadChildren(IItemRepository repository, IItemLookupService lookup)
         {
-            if (IsLegacyBoxSet)
+            if (IsLegacyBoxSet(null))
             {
                 return base.LoadChildren(repository, lookup);
             }
@@ -119,23 +108,6 @@ namespace Tesserafin.Controller.Entities.Movies
         public override bool IsSaveLocalMetadataEnabled()
         {
             return true;
-        }
-
-        private IEnumerable<BaseItem> Sort(IEnumerable<BaseItem> items, User user)
-        {
-            if (!Enum.TryParse<ItemSortBy>(DisplayOrder, out var sortBy))
-            {
-                sortBy = ItemSortBy.PremiereDate;
-            }
-
-            if (sortBy == ItemSortBy.Default)
-            {
-                return items;
-            }
-
-#pragma warning disable CS0618 // static LibraryManager.Sort facade left in place pending Folder.GetChildren cascade, see docs/major-rewrite-plan-v13.md § PR49/N
-            return LibraryManager.Sort(items, user, new[] { sortBy }, SortOrder.Ascending);
-#pragma warning restore CS0618
         }
 
         private IEnumerable<BaseItem> Sort(IEnumerable<BaseItem> items, User user, IItemSortService itemSortService)
@@ -156,7 +128,7 @@ namespace Tesserafin.Controller.Entities.Movies
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query)
         {
             var children = base.GetChildren(user, includeLinkedChildren, query);
-            return Sort(children, user).ToArray();
+            return Sort(children, user, GetListingServices(query)?.Sort).ToArray();
         }
 
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, InternalItemsQuery query, IItemSortService itemSortService)
@@ -168,7 +140,7 @@ namespace Tesserafin.Controller.Entities.Movies
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, out int totalItemCount, InternalItemsQuery query)
         {
             var children = base.GetChildren(user, includeLinkedChildren, out totalItemCount, query);
-            return Sort(children, user).ToArray();
+            return Sort(children, user, GetListingServices(query)?.Sort).ToArray();
         }
 
         public override IReadOnlyList<BaseItem> GetChildren(User user, bool includeLinkedChildren, out int totalItemCount, InternalItemsQuery query, IItemSortService itemSortService)
@@ -180,7 +152,7 @@ namespace Tesserafin.Controller.Entities.Movies
         public override IReadOnlyList<BaseItem> GetRecursiveChildren(User user, InternalItemsQuery query, out int totalCount)
         {
             var children = base.GetRecursiveChildren(user, query, out totalCount);
-            return Sort(children, user).ToArray();
+            return Sort(children, user, GetListingServices(query)?.Sort).ToArray();
         }
 
         public override IReadOnlyList<BaseItem> GetRecursiveChildren(User user, InternalItemsQuery query, out int totalCount, IItemSortService itemSortService)
@@ -210,7 +182,7 @@ namespace Tesserafin.Controller.Entities.Movies
 
         public override bool IsVisible(User user, bool skipAllowedTagsCheck, IStandaloneVisibilityService tagVisibility)
         {
-            if (IsLegacyBoxSet)
+            if (IsLegacyBoxSet(tagVisibility))
             {
                 return base.IsVisible(user, skipAllowedTagsCheck, tagVisibility);
             }
@@ -254,7 +226,7 @@ namespace Tesserafin.Controller.Entities.Movies
 
         public override bool IsVisibleStandalone(User user, IStandaloneVisibilityService tagVisibility)
         {
-            if (IsLegacyBoxSet)
+            if (IsLegacyBoxSet(tagVisibility))
             {
                 return base.IsVisibleStandalone(user, tagVisibility);
             }
@@ -292,7 +264,7 @@ namespace Tesserafin.Controller.Entities.Movies
             var expandedFolders = new List<Guid>();
 
             return FlattenItems(this, expandedFolders, scope)
-                .SelectMany(i => scope?.GetCollectionFolders(i) ?? LibraryManager.GetCollectionFolders(i))
+                .SelectMany(i => scope?.GetCollectionFolders(i) ?? i.ReadServices?.GetCollectionFolders(i) ?? [])
                 .Select(i => i.Id)
                 .Distinct()
                 .ToArray();
@@ -304,7 +276,15 @@ namespace Tesserafin.Controller.Entities.Movies
         /// (DEBT-SERVER-7).
         /// </summary>
         private IReadOnlyList<BaseItem> GetLinkedChildren(IStandaloneVisibilityService scope)
-            => CreateLinkedChildResolver(scope).GetItems(this);
+        {
+            if (LinkedChildren.Length == 0)
+            {
+                return [];
+            }
+
+            var resolver = RequireReadServices().LinkedChildren;
+            return (scope is null ? resolver : resolver.ForScope(scope)).GetItems(this);
+        }
 
         private IEnumerable<BaseItem> FlattenItems(IEnumerable<BaseItem> items, List<Guid> expandedFolders, IStandaloneVisibilityService scope)
         {

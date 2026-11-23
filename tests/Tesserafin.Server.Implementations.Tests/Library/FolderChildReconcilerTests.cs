@@ -234,11 +234,10 @@ public sealed class FolderChildReconcilerTests
         public Context()
         {
             Lookup.Setup(l => l.GetItemById(Parent.Id)).Returns(Parent);
-            Files.Setup(f => f.IsPathFile(It.IsAny<string>())).Returns(true);
             Directory.Setup(d => d.IsAccessible(It.IsAny<string>())).Returns(true);
             ImageUpdate.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
             Images.Setup(i => i.PrepareRefreshAsync(It.IsAny<BaseItem>(), false, true, It.IsAny<CancellationToken>())).ReturnsAsync(ImageUpdate.Object);
-            Service = new FolderChildReconciler(Lookup.Object, Files.Object, NullLogger<FolderChildReconciler>.Instance);
+            Service = new FolderChildReconciler(Lookup.Object, NullLogger<FolderChildReconciler>.Instance);
         }
 
         public Folder Parent { get; } = new() { Id = Guid.NewGuid(), Path = "/library" };

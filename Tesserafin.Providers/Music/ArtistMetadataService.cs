@@ -54,12 +54,12 @@ public class ArtistMetadataService : MetadataService<MusicArtist, ArtistInfo>
     /// <inheritdoc />
     protected override IReadOnlyList<BaseItem> GetChildrenForMetadataUpdates(MusicArtist item)
     {
-        return item.IsAccessedByName
-            ? item.GetTaggedItems(new InternalItemsQuery
-            {
-                Recursive = true,
-                IsFolder = false
-            })
-            : item.GetRecursiveChildren(i => i is IHasArtist && !i.IsFolder);
+        if (!item.IsAccessedByName)
+        {
+            return item.GetRecursiveChildren(i => i is IHasArtist && !i.IsFolder);
+        }
+
+        var query = new InternalItemsQuery { Recursive = true, IsFolder = false };
+        return item.TryApplyTaggedItemsFilter(query) ? ItemRepository.GetItemList(query) : [];
     }
 }

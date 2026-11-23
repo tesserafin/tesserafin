@@ -3,8 +3,6 @@
 #pragma warning disable CS1591
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,19 +17,8 @@ namespace Tesserafin.Controller.Entities.Movies
     /// <summary>
     /// Class Movie.
     /// </summary>
-    public class Movie : Video, IHasSpecialFeatures, IHasTrailers, IHasLookupInfo<MovieInfo>, ISupportsBoxSetGrouping
+    public class Movie : Video, IHasLookupInfo<MovieInfo>, ISupportsBoxSetGrouping
     {
-        /// <inheritdoc />
-        [JsonIgnore]
-        public IReadOnlyList<Guid> SpecialFeatureIds => GetExtras()
-            .Where(extra => extra.ExtraType is not null && extra is Video)
-            .Select(extra => extra.Id)
-            .ToArray();
-
-        /// <inheritdoc />
-        [JsonIgnore]
-        public IReadOnlyList<BaseItem> LocalTrailers => GetExtras([Tesserafin.Model.Entities.ExtraType.Trailer]).ToArray();
-
         /// <summary>
         /// Gets or sets the name of the TMDb collection.
         /// </summary>
@@ -86,13 +73,13 @@ namespace Tesserafin.Controller.Entities.Movies
         }
 
         /// <inheritdoc />
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, services);
 
             if (!ProductionYear.HasValue)
             {
-                var info = itemNamingService.ParseName(Name);
+                var info = services.ItemNamingService.ParseName(Name);
 
                 var yearInName = info.Year;
 
@@ -106,7 +93,7 @@ namespace Tesserafin.Controller.Entities.Movies
                     // Try to get the year from the folder name
                     if (!IsInMixedFolder)
                     {
-                        info = itemNamingService.ParseName(System.IO.Path.GetFileName(ContainingFolderPath));
+                        info = services.ItemNamingService.ParseName(System.IO.Path.GetFileName(ContainingFolderPath));
 
                         yearInName = info.Year;
 

@@ -66,11 +66,6 @@ namespace Tesserafin.Controller.Entities.Audio
         public override IEnumerable<BaseItem> GetCatalogueChildren(IItemRepository repository, IItemLookupService lookup)
             => IsAccessedByName ? [] : base.GetCatalogueChildren(repository, lookup);
 
-        public static string GetPath(string name)
-        {
-            return GetPath(name, true);
-        }
-
         public override double GetDefaultPrimaryImageAspectRatio()
         {
             return 1;
@@ -81,7 +76,7 @@ namespace Tesserafin.Controller.Entities.Audio
             return !IsAccessedByName;
         }
 
-        public IReadOnlyList<BaseItem> GetTaggedItems(InternalItemsQuery query)
+        public bool TryApplyTaggedItemsFilter(InternalItemsQuery query)
         {
             if (query.IncludeItemTypes.Length == 0)
             {
@@ -89,7 +84,7 @@ namespace Tesserafin.Controller.Entities.Audio
                 query.ArtistIds = new[] { Id };
             }
 
-            return LibraryManager.GetItemList(query);
+            return true;
         }
 
         public override int GetChildCount(User user, IStandaloneVisibilityService scope, IItemListingServices listing)
@@ -165,9 +160,6 @@ namespace Tesserafin.Controller.Entities.Audio
             return info;
         }
 
-        public static string GetPath(string name, bool normalizeName)
-            => GetPath(name, FileSystem, ConfigurationManager.ApplicationPaths.ArtistsPath, normalizeName);
-
         public static string GetPath(string name, IFileSystem fileSystem, string root, bool normalizeName = true)
         {
             // Trim the period at the end because windows will have a hard time with that
@@ -178,39 +170,39 @@ namespace Tesserafin.Controller.Entities.Audio
             return SafeDirectoryLeafName.CombineWithRoot(root, validName, nameof(name));
         }
 
-        private string GetRebasedPath()
+        private string GetRebasedPath(IFileSystem fileSystem, IServerApplicationPaths applicationPaths)
         {
-            return GetPath(System.IO.Path.GetFileName(Path), false);
+            return GetPath(System.IO.Path.GetFileName(Path), fileSystem, applicationPaths.ArtistsPath, normalizeName: false);
         }
 
-        public override bool RequiresRefresh()
+        public override bool RequiresRefresh(MetadataRefreshServices services)
         {
             if (IsAccessedByName)
             {
-                var newPath = GetRebasedPath();
+                var newPath = GetRebasedPath(services.FileSystem, services.ApplicationPaths);
                 if (!string.Equals(Path, newPath, StringComparison.Ordinal))
                 {
-                    Logger.LogDebug("{0} path has changed from {1} to {2}", GetType().Name, Path, newPath);
+                    services.Logger.LogDebug("{0} path has changed from {1} to {2}", GetType().Name, Path, newPath);
                     return true;
                 }
             }
 
-            return base.RequiresRefresh();
+            return base.RequiresRefresh(services);
         }
 
         /// <summary>
         /// This is called before any metadata refresh and returns true or false indicating if changes were made.
         /// </summary>
         /// <param name="replaceAllMetadata">Option to replace metadata.</param>
-        /// <param name="itemNamingService">Instance of the <see cref="IItemNamingService"/> interface.</param>
+        /// <param name="services">The metadata refresh services.</param>
         /// <returns>True if metadata changed.</returns>
-        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, IItemNamingService itemNamingService)
+        public override bool BeforeMetadataRefresh(bool replaceAllMetadata, MetadataRefreshServices services)
         {
-            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, itemNamingService);
+            var hasChanges = base.BeforeMetadataRefresh(replaceAllMetadata, services);
 
             if (IsAccessedByName)
             {
-                var newPath = GetRebasedPath();
+                var newPath = GetRebasedPath(services.FileSystem, services.ApplicationPaths);
                 if (!string.Equals(Path, newPath, StringComparison.Ordinal))
                 {
                     Path = newPath;

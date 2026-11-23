@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tesserafin.Controller;
 using Tesserafin.Controller.Configuration;
+using Tesserafin.Controller.Library;
 using Tesserafin.Data.Entities;
 using Tesserafin.Database.Implementations;
 using Tesserafin.Database.Implementations.Locking;
@@ -52,7 +53,7 @@ public sealed class SeriesRecordingsQueryTests : IDisposable
             _types,
             configuration.Object,
             NullLogger<BaseItemRepository>.Instance,
-            new Tesserafin.Controller.LiveTv.ActiveRecordings());
+            Mock.Of<IItemReadServices>());
     }
 
     public void Dispose() => _connection.Dispose();
