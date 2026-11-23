@@ -166,10 +166,8 @@ if step x264; then
 fi
 
 if step x265; then
-    d="$(unpack x265)"; ( cd "${d}/source" && cmake -S . -B build \
-        -DCMAKE_INSTALL_PREFIX="${PREFIX}" -DCMAKE_BUILD_TYPE=Release \
-        -DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_PIC=ON \
-        && cmake --build build -j"${J}" && cmake --install build )
+    d="$(unpack x265)"
+    "${FF_REPO_ROOT}/ci/ffmpeg/build-x265.sh" "${d}" "${PREFIX}" "${J}"
     done_step x265
 fi
 

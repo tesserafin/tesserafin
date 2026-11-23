@@ -11,7 +11,8 @@
 # What is proven per environment:
 #   software H.264 encode and decode, native AAC encode and decode, HLS
 #   segmenting, subtitle burn-in through libass, image extraction, ffprobe JSON,
-#   a server-shaped command line, clean SIGTERM, `-hwaccels` returning rather
+#   software HEVC Main/Main10, HLS/fMP4 random access, a server-shaped command
+#   line, clean SIGTERM, `-hwaccels` returning rather
 #   than aborting, and that no ffmpeg is taken from $PATH.
 
 set -euo pipefail
@@ -151,6 +152,10 @@ try aac-decode "$FF" -hide_banner -loglevel error -i a.m4a -f s16le -frames:a 20
 try mp3-encode  "$FF" -hide_banner -loglevel error -f lavfi -i "sine=frequency=440:duration=1" -c:a libmp3lame -f mp3 a.mp3 -y
 try opus-encode "$FF" -hide_banner -loglevel error -f lavfi -i "sine=frequency=440:duration=1" -c:a libopus -f ogg a.ogg -y
 
+# Run the same real-file depth contract on each declared minimal environment.
+# Mounted separately from the archive so the runtime layout stays unchanged.
+try hevc-main-main10 bash /hevc-depth.sh --ffmpeg "$FF" --ffprobe "$FP"
+
 # HLS segmenting, the shape the server uses for adaptive playback.
 mkdir -p hls
 try hls "$FF" -hide_banner -loglevel error -i v.mp4 -c:v libx264 -preset ultrafast \
@@ -204,7 +209,8 @@ for entry in "${ENVIRONMENTS[@]}"; do
     # bash, not sh: Debian and Ubuntu ship dash as /bin/sh, which rejects
     # `set -o pipefail`. Under sh the suite died on its first line and the
     # environment silently contributed no results at all.
-    output="$(docker run --rm --volume "${ROOT}:/rt:ro" "${image}" \
+    output="$(docker run --rm --volume "${ROOT}:/rt:ro" \
+                 --volume "${FF_REPO_ROOT}/ci/ffmpeg/verify-hevc-depth.sh:/hevc-depth.sh:ro" "${image}" \
                  bash -c "$(printf '%s' "${SUITE}")" 2>&1 || true)"
     # An environment that produced no verdicts has not been tested. Silence is
     # not a pass.

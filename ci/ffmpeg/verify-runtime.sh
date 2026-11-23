@@ -229,6 +229,13 @@ else
     fail "-hwaccels did not return cleanly"
 fi
 
+echo "== software HEVC Main and Main10"
+if "${FF_REPO_ROOT}/ci/ffmpeg/verify-hevc-depth.sh" --ffmpeg "${FFMPEG}" --ffprobe "${FFPROBE}"; then
+    pass "software HEVC preserves both 8-bit and 10-bit output, including HLS/fMP4 seek"
+else
+    fail "software HEVC depth contract failed"
+fi
+
 # --- capability manifest ------------------------------------------------------
 if [[ -n "${MANIFEST}" ]]; then
     python3 - "${FFMPEG}" "${FFPROBE}" "${ARCH}" "${FF_BUILD_REVISION}" \
