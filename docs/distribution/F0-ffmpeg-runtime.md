@@ -187,6 +187,17 @@ owner decision of 2026-11-25 is that ISO images must play.
   no `DT_NEEDED` entry.
 * libdvdread is built without libdvdcss: encrypted discs are not a supported
   source.
+* Built static, the four libraries export their internals under generic names
+  (libbluray's `dec_init`, `str_dup`, `file_open`; libdvdnav's `get_PGCN`).
+  `dec_init` collides with fftools' own and fails the link, and a collision
+  the linker does not report would bind one library's call to the other's
+  code. Each archive is therefore merged into one relocatable object and every
+  symbol outside its public API (`bd_*`, `udfread_*`, `dvdnav_*`, and
+  libdvdread's `DVD*`, `ifo*`, `navRead_*`, `navPrint_*`, `UDF*`, `dvdread_*`)
+  is made local.
+* libbluray 1.3.4's `--with-external-libudfread` reads a misspelt variable, so
+  passing it selects the embedded copy. The build relies on the default
+  (external) and fails if libbluray still defines `udfread_init`.
 
 All four are LGPL-2.1-or-later (libbluray, libudfread) or GPL-2.0-or-later
 (libdvdread, libdvdnav), already in the permitted set. win-x64 has no disc-image

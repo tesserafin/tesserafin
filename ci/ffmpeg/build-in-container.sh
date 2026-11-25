@@ -135,6 +135,24 @@ sys.exit(0)
         || { ff_log "skipping $1 (not built for ${ARCH})"; return 1; }
 }
 
+# Makes every symbol of a static archive local except its public API. The disc
+# libraries export their internals with generic names (libbluray's dec_init,
+# str_dup and file_open; libdvdnav's get_PGCN and play_PGC), which only shared
+# builds hide. Static, dec_init collides with fftools' own and fails the link;
+# worse, a name FFmpeg also defines but the linker never pulls twice would bind
+# one library's call to the other's code without any error. The archive is
+# merged into one relocatable object so its internal references resolve first,
+# then everything outside the public prefixes is made local.
+localize_archive() { # <archive> <public-symbol-glob>...
+    local lib="$1"; shift
+    local obj keep=() g
+    obj="$(dirname "${lib}")/$(basename "${lib}" .a)-merged.o"
+    for g in "$@"; do keep+=("--keep-global-symbol=${g}"); done
+    ld -r --whole-archive "${lib}" -o "${obj}"
+    objcopy -w "${keep[@]}" "${obj}"
+    rm -f "${lib}"; ar rcD "${lib}" "${obj}"; rm -f "${obj}"
+}
+
 # =============================================================================
 # base
 # =============================================================================
@@ -297,6 +315,7 @@ fi
 if arch_allows libudfread && step libudfread; then
     d="$(unpack libudfread)"; ( cd "${d}" && ./configure --prefix="${PREFIX}" --disable-shared --enable-static \
         && make -j"${J}" && make install )
+    localize_archive "${PREFIX}/lib/libudfread.a" 'udfread_*'
     done_step libudfread
 fi
 
@@ -305,8 +324,18 @@ fi
 if arch_allows libbluray && step libbluray; then
     d="$(unpack libbluray)"; ( cd "${d}" && ./configure --prefix="${PREFIX}" --disable-shared --enable-static \
         --disable-bdjava-jar --disable-examples --disable-doxygen-doc \
-        --without-libxml2 --without-freetype --without-fontconfig --with-external-libudfread \
+        --without-libxml2 --without-freetype --without-fontconfig \
         && make -j"${J}" && make install )
+    # The pinned libudfread, not the embedded contrib copy. Not passed as
+    # --with-external-libudfread: 1.3.4's configure assigns that option from a
+    # misspelt variable ($withwal), so naming it SELECTS the embedded copy. The
+    # default is external; prove it took before the symbols are made local.
+    # (Captured first: under pipefail an early grep -q exit would SIGPIPE nm and
+    # make the pipeline fail exactly when the symbol IS found.)
+    bluray_syms="$(nm -g --defined-only "${PREFIX}/lib/libbluray.a")"
+    ! grep -q ' udfread_init$' <<<"${bluray_syms}" \
+        || ff_die "libbluray embedded its own libudfread instead of the pinned one"
+    localize_archive "${PREFIX}/lib/libbluray.a" 'bd_*'
     done_step libbluray
 fi
 
@@ -314,12 +343,16 @@ fi
 if arch_allows libdvdread && step libdvdread; then
     d="$(unpack libdvdread)"; ( cd "${d}" && ./configure --prefix="${PREFIX}" --disable-shared --enable-static \
         --disable-apidoc --without-libdvdcss && make -j"${J}" && make install )
+    # The installed headers: dvd_reader.h, ifo_read.h, nav_read.h, the two print
+    # headers, dvd_udf.h and bitreader.h.
+    localize_archive "${PREFIX}/lib/libdvdread.a" 'DVD*' 'ifo*' 'navRead_*' 'navPrint_*' 'UDF*' 'dvdread_*'
     done_step libdvdread
 fi
 
 if arch_allows libdvdnav && step libdvdnav; then
     d="$(unpack libdvdnav)"; ( cd "${d}" && ./configure --prefix="${PREFIX}" --disable-shared --enable-static \
         && make -j"${J}" && make install )
+    localize_archive "${PREFIX}/lib/libdvdnav.a" 'dvdnav_*'
     done_step libdvdnav
 fi
 
