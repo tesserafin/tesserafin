@@ -166,6 +166,32 @@ runtime does not change here; the linux bytes are identified by
 `ci/package/f0-accepted-digests.txt` and `F0_ACCEPTED_CI_TREE`. win-x64 has no
 Vulkan or libplacebo yet.
 
+### Disc images (linux, #305)
+
+`--enable-libbluray`, `--enable-libdvdnav` and `--enable-libdvdread` are in the
+linux-x64 and linux-arm64 flag files, so the runtime has the `bluray` protocol
+(Blu-ray ISO images, through libbluray 1.3.4 and libudfread 1.1.2) and the
+`dvdvideo` demuxer (DVD ISO images, through libdvdnav 6.1.1 and libdvdread
+6.1.3). Sessions need both to play an ISO image without the legacy chain; the
+owner decision of 2026-11-25 is that ISO images must play.
+`ci/ffmpeg/verify-runtime.sh` fails a runtime that lacks either.
+
+* libudfread is its own pin, not libbluray's embedded `contrib/` copy, so the
+  licence record and the corresponding source name the code that ships.
+  libudfread 1.1.2 and libdvdread 6.1.3 are the last autotools releases; their
+  successors need a meson above the builder's 0.56.
+* libbluray is built without BD-J (no JDK at build time, no JVM at run time),
+  libxml2, freetype or fontconfig: FFmpeg reads titles and streams, never menus.
+  AACS and BD+ are neither linked nor bundled. libbluray `dlopen()`s
+  `libaacs`/`libbdplus` by soname only when the host installed them, which adds
+  no `DT_NEEDED` entry.
+* libdvdread is built without libdvdcss: encrypted discs are not a supported
+  source.
+
+All four are LGPL-2.1-or-later (libbluray, libudfread) or GPL-2.0-or-later
+(libdvdread, libdvdnav), already in the permitted set. win-x64 has no disc-image
+reader yet; its MSYS2 component set does not change here.
+
 Rockchip (`rkmpp`, `rkrga`) is outside the declared `linux-x64`/`linux-arm64`
 matrix. macOS paths (`aac_at`, `*_videotoolbox`, `scale_vt`) do not apply.
 

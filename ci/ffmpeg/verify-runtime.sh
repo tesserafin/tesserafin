@@ -229,6 +229,26 @@ else
     fail "-hwaccels did not return cleanly"
 fi
 
+echo "== disc image readers (#305)"
+# A session plays a Blu-ray ISO through the bluray: protocol and a DVD ISO
+# through the dvdvideo demuxer. Both are configure-time choices, so a flag that
+# silently fails to resolve its library would otherwise ship a runtime that
+# cannot open either and still passes every other check.
+# Captured first: under pipefail, grep -q exiting early would SIGPIPE ffmpeg and
+# turn a present entry into a failure.
+protocols="$("${FFMPEG}" -hide_banner -protocols 2>/dev/null || true)"
+demuxers="$("${FFMPEG}" -hide_banner -demuxers 2>/dev/null || true)"
+if grep -qE '^\s*bluray$' <<<"${protocols}"; then
+    pass "the bluray protocol is compiled in"
+else
+    fail "the bluray protocol is missing: Blu-ray ISO images cannot be opened"
+fi
+if grep -qE '^\s*D\S*\s+dvdvideo\s' <<<"${demuxers}"; then
+    pass "the dvdvideo demuxer is compiled in"
+else
+    fail "the dvdvideo demuxer is missing: DVD ISO images cannot be opened"
+fi
+
 # --- capability manifest ------------------------------------------------------
 if [[ -n "${MANIFEST}" ]]; then
     python3 - "${FFMPEG}" "${FFPROBE}" "${ARCH}" "${FF_BUILD_REVISION}" \

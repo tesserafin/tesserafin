@@ -21,3 +21,10 @@
 --enable-vulkan
 --enable-libshaderc
 --enable-libplacebo
+
+# Disc images (#305): the bluray: protocol (libbluray + libudfread) for Blu-ray
+# ISO images and the dvdvideo demuxer (libdvdnav + libdvdread) for DVD ISO
+# images. Linux only, for the same reason as Vulkan above.
+--enable-libbluray
+--enable-libdvdnav
+--enable-libdvdread

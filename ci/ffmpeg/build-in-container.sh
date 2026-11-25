@@ -289,6 +289,41 @@ if step libass; then
 fi
 
 # =============================================================================
+# disc images (#305): Blu-ray ISO through libbluray + libudfread, DVD ISO through
+# libdvdread + libdvdnav (FFmpeg's dvdvideo demuxer). Linux only, like Vulkan.
+# =============================================================================
+# libudfread is built as its own pin rather than libbluray's embedded contrib
+# copy, so the licence record and the source archive name the code that ships.
+if arch_allows libudfread && step libudfread; then
+    d="$(unpack libudfread)"; ( cd "${d}" && ./configure --prefix="${PREFIX}" --disable-shared --enable-static \
+        && make -j"${J}" && make install )
+    done_step libudfread
+fi
+
+# No BD-J (it would need a JDK at build time and a JVM at run time), and none of
+# the menu/overlay dependencies: FFmpeg reads titles and streams, never menus.
+if arch_allows libbluray && step libbluray; then
+    d="$(unpack libbluray)"; ( cd "${d}" && ./configure --prefix="${PREFIX}" --disable-shared --enable-static \
+        --disable-bdjava-jar --disable-examples --disable-doxygen-doc \
+        --without-libxml2 --without-freetype --without-fontconfig --with-external-libudfread \
+        && make -j"${J}" && make install )
+    done_step libbluray
+fi
+
+# No libdvdcss: encrypted discs are not a supported source.
+if arch_allows libdvdread && step libdvdread; then
+    d="$(unpack libdvdread)"; ( cd "${d}" && ./configure --prefix="${PREFIX}" --disable-shared --enable-static \
+        --disable-apidoc --without-libdvdcss && make -j"${J}" && make install )
+    done_step libdvdread
+fi
+
+if arch_allows libdvdnav && step libdvdnav; then
+    d="$(unpack libdvdnav)"; ( cd "${d}" && ./configure --prefix="${PREFIX}" --disable-shared --enable-static \
+        && make -j"${J}" && make install )
+    done_step libdvdnav
+fi
+
+# =============================================================================
 # hardware: the VAAPI stack and header-only SDKs
 # =============================================================================
 # libva is pinned at the OLDEST release in the declared matrix and linked

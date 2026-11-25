@@ -429,10 +429,11 @@ structure). ISO images stay with the existing chain.
 2.7.0 opened through `bluray:` in system FFmpeg 6.1.1. A seek to five seconds produced a sample with
 H.264 video copied and AC-3 audio converted to AAC. FFmpeg's Blu-ray protocol selects playlists of
 at least 180 seconds, so the two-second fixture used for folder playback cannot exercise that path.
-The release F0 runtime excludes `libbluray` and `libudfread` in
-[`ci/ffmpeg/components.json`](../ci/ffmpeg/components.json). Before moving ISO playback to Sessions,
-choose a title reader available in the shipped runtime and prove it on a release build. The existing
-managed UDF reader classifies ISO files during library discovery. DVD ISO execution needs its own proof.
+ISO images must play (owner decision 2026-11-25). The linux F0 runtime now builds `libbluray` with
+`libudfread` (the `bluray:` protocol) and `libdvdnav` with `libdvdread` (the `dvdvideo` demuxer); see
+[`F0-ffmpeg-runtime.md` §3](distribution/F0-ffmpeg-runtime.md#disc-images-linux-305). Moving ISO
+playback to Sessions still needs a proof on a release build for each kind. The existing managed UDF
+reader classifies ISO files during library discovery. win-x64 has no disc-image reader yet.
 
 Channel-plugin items (decided 2026-11-20): an item a channel plugin supplies enters the session
 journey like any library video or track and is read like any other source of its kind - a remote

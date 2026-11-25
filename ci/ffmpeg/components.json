@@ -128,6 +128,20 @@
       "sizeBytes": 442744
     },
     {
+      "name": "libbluray",
+      "license": "LGPL-2.1-or-later",
+      "requiredBy": "the bluray: protocol \u2014 Blu-ray ISO images played from a session (#305). Built without BD-J, libxml2, freetype or fontconfig; AACS and BD+ are neither linked nor bundled (libbluray dlopen()s them only if the host installed them)",
+      "sourceType": "tar",
+      "url": "https://download.videolan.org/pub/videolan/libbluray/1.3.4/libbluray-1.3.4.tar.bz2",
+      "sha256": "478ffd68a0f5dde8ef6ca989b7f035b5a0a22c599142e5cd3ff7b03bbebe5f2b",
+      "sizeBytes": 756323,
+      "architectures": [
+        "linux-x64",
+        "linux-arm64"
+      ],
+      "architectureComment": "Disc-image reading is added to the linux runtimes first; win-x64 keeps its own MSYS2 component set (ci/windows/ffmpeg), where disc images are a recorded residual."
+    },
+    {
       "name": "libdrm",
       "license": "MIT",
       "requiredBy": "DRM ioctls beneath libva",
@@ -143,6 +157,34 @@
         "linux-arm64"
       ],
       "architectureComment": "DRM is a Linux kernel interface. Stated explicitly rather than left unrestricted so that declaring win-x64 in 'platforms' cannot silently make it Windows-applicable."
+    },
+    {
+      "name": "libdvdnav",
+      "license": "GPL-2.0-or-later",
+      "requiredBy": "the dvdvideo demuxer \u2014 DVD ISO images played from a session (#305); FFmpeg 7.1 requires >= 6.1.1",
+      "sourceType": "tar",
+      "url": "https://download.videolan.org/pub/videolan/libdvdnav/6.1.1/libdvdnav-6.1.1.tar.bz2",
+      "sha256": "c191a7475947d323ff7680cf92c0fb1be8237701885f37656c64d04e98d18d48",
+      "sizeBytes": 367606,
+      "architectures": [
+        "linux-x64",
+        "linux-arm64"
+      ],
+      "architectureComment": "Disc-image reading is added to the linux runtimes first; win-x64 keeps its own MSYS2 component set (ci/windows/ffmpeg), where disc images are a recorded residual."
+    },
+    {
+      "name": "libdvdread",
+      "license": "GPL-2.0-or-later",
+      "requiredBy": "the dvdvideo demuxer and libdvdnav \u2014 reads DVD ISO images directly (6.1.3: the last autotools release; FFmpeg 7.1 requires >= 6.1.2). Built without libdvdcss: encrypted discs are not a supported source",
+      "sourceType": "tar",
+      "url": "https://download.videolan.org/pub/videolan/libdvdread/6.1.3/libdvdread-6.1.3.tar.bz2",
+      "sha256": "ce35454997a208cbe50e91232f0e73fb1ac3471965813a13b8730a8f18a15369",
+      "sizeBytes": 395439,
+      "architectures": [
+        "linux-x64",
+        "linux-arm64"
+      ],
+      "architectureComment": "Disc-image reading is added to the linux runtimes first; win-x64 keeps its own MSYS2 component set (ci/windows/ffmpeg), where disc images are a recorded residual."
     },
     {
       "name": "libogg",
@@ -170,6 +212,20 @@
         "linux-arm64"
       ],
       "architectureComment": "Vulkan is a linux runtime capability here; win-x64 keeps its own MSYS2 component set (ci/windows/ffmpeg) and the Vulkan gap there is a recorded residual."
+    },
+    {
+      "name": "libudfread",
+      "license": "LGPL-2.1-or-later",
+      "requiredBy": "UDF file system reader beneath libbluray \u2014 opens Blu-ray ISO images (1.1.2: the last autotools release; 1.2.0 needs meson above the pinned builder's 0.56)",
+      "sourceType": "tar",
+      "url": "https://download.videolan.org/pub/videolan/libudfread/libudfread-1.1.2.tar.bz2",
+      "sha256": "d5946f19b27288ce0911eb11fe583c136767421220ece3bafc96245efd208915",
+      "sizeBytes": 268559,
+      "architectures": [
+        "linux-x64",
+        "linux-arm64"
+      ],
+      "architectureComment": "Disc-image reading is added to the linux runtimes first; win-x64 keeps its own MSYS2 component set (ci/windows/ffmpeg), where disc images are a recorded residual."
     },
     {
       "name": "libunibreak",
@@ -418,12 +474,10 @@
     "fdk-aac-stripped": "libfdk_aac is classified nonfree by FFmpeg; FFmpeg's native AAC encoder covers the requirement",
     "libzvbi": "GPL-2.0-or-later teletext decoding; not referenced by any Tesserafin capability",
     "libsrt": "SRT transport; the 'srt' entry in _requiredEncoders is the SubRip SUBTITLE encoder, which is native",
-    "libbluray": "Tesserafin parses BDMV with its own managed BdInfo; no libbluray call site",
     "libopenmpt": "tracker-module playback; no Tesserafin call site",
     "chromaprint": "audio fingerprinting; no Tesserafin call site",
     "libtheora": "no Tesserafin call site",
     "libwebp": "no Tesserafin encoder/decoder requirement",
-    "libudfread": "only reachable through libbluray",
     "fftw3f": "only reachable through chromaprint",
     "gmp": "only reachable through the excluded components",
     "libxml2": "DASH/IMF demuxing; not a Tesserafin capability requirement",
