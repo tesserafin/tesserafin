@@ -249,6 +249,32 @@ else
     fail "the dvdvideo demuxer is missing: DVD ISO images cannot be opened"
 fi
 
+echo "== HLS segments after a seek in MPEG-TS (backport a327bc0561, #305)"
+# A session remuxes an MPEG-TS source (a .ts/.m2ts file, a Blu-ray folder or image)
+# into HLS with the video copied. After an input seek the first packet is audio;
+# without the backport hlsenc measured segments against a start time in the audio
+# time base and split on every keyframe, so a segment number no longer named the
+# time it holds. With a 1 s GOP and 6 s segments, every segment but the last must
+# last about 6 s.
+hls_check="$(mktemp -d)"
+if "${FFMPEG}" -hide_banner -loglevel error -nostdin \
+        -f lavfi -i testsrc=size=320x240:rate=24:duration=30 -f lavfi -i sine=frequency=440:duration=30 \
+        -c:v libx264 -preset ultrafast -g 24 -keyint_min 24 -c:a aac -f mpegts "${hls_check}/in.ts" \
+    && "${FFMPEG}" -hide_banner -loglevel error -nostdin -ss 12.5 -i "${hls_check}/in.ts" \
+        -map 0:v:0 -map 0:a:0 -c:v copy -c:a aac -copyts -start_at_zero -avoid_negative_ts disabled \
+        -f hls -hls_time 6 -hls_segment_type fmp4 -hls_playlist_type vod \
+        -hls_segment_filename "${hls_check}/s%d.mp4" "${hls_check}/main.m3u8"; then
+    durations="$(sed -n 's/^#EXTINF:\([0-9.]*\),.*/\1/p' "${hls_check}/main.m3u8" | tr '\n' ' ')"
+    if LC_ALL=C awk -v d="${durations}" 'BEGIN { n = split(d, s, " "); if (n < 2) exit 1; for (i = 1; i < n; i++) if (s[i] < 4) exit 1 }'; then
+        pass "segments after a seek keep their length (${durations% })"
+    else
+        fail "segments after a seek are split early (${durations% }): the hlsenc backport is not in this runtime"
+    fi
+else
+    fail "could not run the HLS-after-seek check"
+fi
+rm -rf "${hls_check}"
+
 # --- capability manifest ------------------------------------------------------
 if [[ -n "${MANIFEST}" ]]; then
     python3 - "${FFMPEG}" "${FFPROBE}" "${ARCH}" "${FF_BUILD_REVISION}" \

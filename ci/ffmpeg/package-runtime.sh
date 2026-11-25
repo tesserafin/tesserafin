@@ -236,11 +236,30 @@ fi
 "${RT}/bin/ffmpeg" -hide_banner -buildconf 2>/dev/null > "${RT}/build-configuration.txt" || true
 
 python3 - "${FF_COMPONENTS}" "${ARCH}" "${SRC_SHA}" "$(basename "${SRC_ARCHIVE}")" \
-         "${EPOCH}" "${RT}" "${FF_REPO_ROOT}/ci/ffmpeg/fork-patches.json" <<'PY'
+         "${EPOCH}" "${RT}" "${FF_REPO_ROOT}/ci/ffmpeg/fork-patches.json" \
+         "${FF_REPO_ROOT}/ci/ffmpeg/backports" <<'PY'
 import json, os, sys
-manifest, arch, src_sha, src_name, epoch, rt, patch_catalogue = sys.argv[1:8]
+manifest, arch, src_sha, src_name, epoch, rt, patch_catalogue, backport_dir = sys.argv[1:9]
 policy = json.load(open(manifest))
 fork_patches = json.load(open(patch_catalogue))
+
+# Each backport is `git format-patch` output: its first line names the upstream commit and its
+# Subject line what it fixes.
+backports = []
+for line in open(os.path.join(backport_dir, "series")):
+    name = line.strip()
+    if not name or name.startswith("#"):
+        continue
+    text = open(os.path.join(backport_dir, name), encoding="utf-8").read().splitlines()
+    commit = text[0].split()[1]
+    start = next(i for i, l in enumerate(text) if l.startswith("Subject: "))
+    subject = text[start][len("Subject: "):]
+    for continuation in text[start + 1:]:
+        if not continuation.startswith(" "):
+            break
+        subject += continuation
+    subject = subject.removeprefix("[PATCH] ")
+    backports.append({"patch": name, "upstreamCommit": commit, "subject": subject})
 
 source = {
     "buildRevision": policy["buildRevision"],
@@ -274,6 +293,8 @@ source = {
         "classificationCounts": fork_patches["counts"],
         "$comment": "Applied in series order at zero fuzz. Only the 'unsafe' class is skipped.",
     },
+    # Upstream FFmpeg commits applied after the fork's series (ci/ffmpeg/backports/series).
+    "upstreamBackports": backports,
     "$comment": "Engineering redistribution closure. Not a legal ruling.",
 }
 with open(os.path.join(rt, "SOURCE.json"), "w") as h:

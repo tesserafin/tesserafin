@@ -651,6 +651,19 @@ ff_log "win-x64 patch decision: ${WIN_PATCHES_EXPECTED} of ${#WIN_PATCH_PLAN[@]}
         || ff_die "the patch series applied but tonemapx is absent: the fork baseline did not land"
     grep -q 'alphasrc' libavfilter/allfilters.c \
         || ff_die "the patch series applied but alphasrc is absent: the fork baseline did not land"
+
+    # Then the upstream fixes the 7.1 baseline lacks, as on Linux (ci/ffmpeg/backports/series).
+    backports=0
+    while read -r b; do
+        [[ -n "${b}" ]] || continue
+        patch -p1 --binary --forward --no-backup-if-mismatch -F0 -i "${FF_REPO_ROOT}/ci/ffmpeg/backports/${b}" \
+            >> "${OUT}/patches.log" 2>&1 \
+            || { tail -20 "${OUT}/patches.log" >&2; ff_die "backport ${b} did not apply cleanly"; }
+        backports=$((backports + 1))
+    done < <(grep -vE '^\s*(#|$)' "${FF_REPO_ROOT}/ci/ffmpeg/backports/series" | tr -d '\r')
+    ff_log "applied ${backports} upstream backports"
+    grep -q 'vs->start_pts = av_rescale_q(pkt->pts, st->time_base, AV_TIME_BASE_Q);' libavformat/hlsenc.c \
+        || ff_die "the hlsenc start time backport (a327bc0561) is absent from the tree"
     printf '%s\n' "${applied}" > "${OUT}/patches-applied.txt"
     printf '%s\n' "${skipped}" > "${OUT}/patches-skipped.txt"
 )

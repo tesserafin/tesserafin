@@ -1,0 +1,14 @@
+# Upstream FFmpeg fixes applied on top of the jellyfin-ffmpeg series (F0 / #229), in this order,
+# at zero fuzz, by ci/ffmpeg/build-in-container.sh and ci/windows/ffmpeg/build-win-x64.sh.
+#
+# A backport is a commit already merged into FFmpeg's own master, kept verbatim as
+# `git format-patch` output named <upstream sha>-<subject>.patch, for a defect a Tesserafin
+# journey hits on the 7.1 baseline. Each one is dropped when the runtime moves to an FFmpeg that
+# contains it (the 9.1.x fork, #340). The runtime manifest (SOURCE.json) lists what was applied.
+#
+# a327bc0561 (FFmpeg master 2026-05-13): hlsenc compared a start time taken in the first
+# packet's time base with packets of another stream. After an input seek in an MPEG-TS source
+# the first packet is audio, so a video-copy remux into HLS split a segment on every keyframe and
+# the session's segment numbers no longer matched the time they hold (#305: a Blu-ray image
+# served 90-100 s for 126 s). FFmpeg 6.1 did not have it; 7.1.4 and 8.1.2 do.
+a327bc0561-avformat-hlsenc-fix-segment-duration-with-mixed-stream-time-bases.patch

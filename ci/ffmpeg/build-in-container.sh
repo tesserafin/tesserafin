@@ -557,6 +557,21 @@ rm -rf "${FFSRC}"; cp -a "${CACHE}/git/jellyfin-ffmpeg" "${FFSRC}"
     # of libfdk_aac has to survive into the tree the build configures.
     awk '/^EXTERNAL_LIBRARY_NONFREE_LIST=/,/^"/' configure | grep -q 'libfdk_aac' \
         || ff_die "libfdk_aac is no longer in FFmpeg's nonfree list: 0029 was applied"
+
+    # Then the upstream fixes the 7.1 baseline lacks (ci/ffmpeg/backports/series), after
+    # the fork's series and at zero fuzz for the same reason.
+    backports=0
+    while read -r b; do
+        [[ -n "${b}" ]] || continue
+        patch -p1 --forward --no-backup-if-mismatch -F0 -i "${FF_REPO_ROOT}/ci/ffmpeg/backports/${b}" \
+            >> "${OUT}/patches.log" 2>&1 \
+            || { tail -20 "${OUT}/patches.log" >&2; ff_die "backport ${b} did not apply cleanly"; }
+        backports=$((backports + 1))
+    done < <(grep -vE '^\s*(#|$)' "${FF_REPO_ROOT}/ci/ffmpeg/backports/series")
+    ff_log "applied ${backports} upstream backports"
+    # a327bc0561 landed: hlsenc keeps its start time in AV_TIME_BASE_Q.
+    grep -q 'vs->start_pts = av_rescale_q(pkt->pts, st->time_base, AV_TIME_BASE_Q);' libavformat/hlsenc.c \
+        || ff_die "the hlsenc start time backport (a327bc0561) is absent from the tree"
 )
 (
     cd "${FFSRC}"

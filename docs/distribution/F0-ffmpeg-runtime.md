@@ -258,6 +258,21 @@ build asserts after patching that `libfdk_aac` is still in the nonfree list.
 The exclusion set lives in `ci/ffmpeg/excluded-patches.txt` and must equal the
 `unsafe` class exactly; the gate fails if the two disagree.
 
+### Upstream backports
+
+After the fork's series, both builds (Linux and win-x64) apply the patches named
+in `ci/ffmpeg/backports/series`, in order, at zero fuzz. A backport is a commit
+already merged into FFmpeg's own master, kept verbatim as `git format-patch`
+output named `<upstream sha>-<subject>.patch`, for a defect a Tesserafin journey
+hits on the 7.1 baseline. It is dropped when the runtime moves to an FFmpeg that
+contains it (the 9.1.x fork, #340). `SOURCE.json` lists each applied backport
+with its upstream commit, and the corresponding-source archive carries the patch
+files with the rest of `ci/ffmpeg/`.
+
+| Upstream commit | Defect | Proof |
+| --- | --- | --- |
+| `a327bc0561` (2026-05-13) | `hlsenc` measured segments against a start time taken in the first packet's time base. After an input seek in an MPEG-TS source the first packet is audio, so a video-copy remux into HLS split on every keyframe and a session's segment numbers stopped matching the time they hold (#305: a Blu-ray image served 90–100 s for 126 s). FFmpeg 6.1 did not have it; 7.1.4 and 8.1.2 do. | The build asserts the fix is in `libavformat/hlsenc.c`; `verify-runtime.sh` remuxes a seeked MPEG-TS into 6 s HLS segments and fails on a short one. |
+
 ---
 
 ## 4. Architectures and the portability floor
