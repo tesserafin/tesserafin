@@ -89,7 +89,9 @@ FROZEN_PINS = {
     # Re-pinned for #426: the Linux WEB_PAYLOAD_SHA256 moved to Web 0.3.0 and the
     # Windows accepted payload was split out, unchanged, as
     # WINDOWS_WEB_PAYLOAD_SHA256, which P02 reads.
-    "ci/package/pins.env": "8e49c8d876f4ed9ba5eb3b30df5497a3e42984da8d7f5e46a490f10c1882dcda",
+    # Re-pinned for #305 (disc-image readers): only F0_ACCEPTED_CI_TREE moved
+    # (Linux F0 baseline).
+    "ci/package/pins.env": "cee0733f8ae4975880f3bf1cf3030d03d18033770f57a16d21d2d850646a57a6",
     "packaging/windows/msi/Tesserafin.wxs": "097bb7c68f62a3b15d64af0c58d947ce28377810752681407afd99f0d4b983dc",
 }
 
