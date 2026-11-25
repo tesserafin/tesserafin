@@ -514,6 +514,26 @@ public static class EndToEndMediaFixtures
         return File.Exists(sibling) ? sibling : "ffprobe";
     }
 
+    /// <summary>
+    /// Reads, with the REAL ffmpeg, the average colour of the first frame a file decodes to: the
+    /// frame scaled to one pixel, in RGB.
+    /// </summary>
+    /// <param name="path">The media file.</param>
+    /// <returns>The red, green and blue components.</returns>
+    public static async Task<(int R, int G, int B)> ReadFirstFrameColourAsync(string path)
+    {
+        var pixel = path + ".rgb";
+        await RunFfmpegAsync(["-hide_banner", "-loglevel", "error", "-y", "-i", path, "-map", "0:v:0", "-frames:v", "1", "-vf", "scale=1:1", "-pix_fmt", "rgb24", "-f", "rawvideo", pixel]).ConfigureAwait(false);
+        var bytes = await File.ReadAllBytesAsync(pixel).ConfigureAwait(false);
+        File.Delete(pixel);
+        if (bytes.Length != 3)
+        {
+            throw new InvalidOperationException($"expected one RGB pixel from '{path}', got {bytes.Length} bytes");
+        }
+
+        return (bytes[0], bytes[1], bytes[2]);
+    }
+
     private static async Task RunFfmpegAsync(string[] arguments)
     {
         var (exitCode, _, stderr) = await RunAsync(E2eApplicationFactory.FfmpegPath, arguments).ConfigureAwait(false);

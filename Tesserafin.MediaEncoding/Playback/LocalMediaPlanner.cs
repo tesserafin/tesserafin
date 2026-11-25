@@ -48,6 +48,7 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
     private readonly IV2PlanStore _v2PlanStore;
     private readonly ILogger<LocalMediaPlanner> _logger;
     private readonly Func<bool> _canTonemap;
+    private readonly Func<IsoType, bool> _canReadDiscImage;
     private readonly TimeProvider _timeProvider;
 
     /// <summary>
@@ -62,15 +63,22 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
     /// Whether this server's executor tone-maps HDR to SDR (the <c>tonemapx</c> filter, or hardware
     /// tone mapping enabled): a tone-mapping plan is owned only then. Never, when null.
     /// </param>
+    /// <param name="canReadDiscImage">
+    /// Whether this server's FFmpeg opens a disc image of the given kind (libbluray for a Blu-ray
+    /// image, libdvdnav for a DVD image): a disc image is executed by the session only then, and
+    /// refused otherwise. Never, when null.
+    /// </param>
     public LocalMediaPlanner(
         IPlaybackSessionPlanner inner,
         IPlaybackEngine engine,
         IV2PlanStore v2PlanStore,
         ILogger<LocalMediaPlanner> logger,
         TimeProvider? timeProvider = null,
-        Func<bool>? canTonemap = null)
+        Func<bool>? canTonemap = null,
+        Func<IsoType, bool>? canReadDiscImage = null)
     {
         _canTonemap = canTonemap ?? (static () => false);
+        _canReadDiscImage = canReadDiscImage ?? (static _ => false);
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(v2PlanStore);
@@ -123,6 +131,20 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
     /// <returns><see langword="true"/> if the source is a local DVD or Blu-ray folder.</returns>
     public static bool IsLocalDiscSource(MediaSourceInfo? source)
         => source is { Protocol: MediaProtocol.File, IsRemote: false, IsInfiniteStream: false, RequiresOpening: false, IsoType: null, VideoType: VideoType.Dvd or VideoType.BluRay }
+            && string.IsNullOrEmpty(source.LiveStreamId)
+            && !string.IsNullOrEmpty(source.Path);
+
+    /// <summary>
+    /// Determines whether a media source is a local disc image - a DVD or Blu-ray ISO whose kind the
+    /// library scan recognised - that the session's executor opens itself (the <c>dvdvideo</c>
+    /// demuxer, the <c>bluray</c> protocol). It is remuxed or transcoded into a session output, never
+    /// handed to the client as it is (decided 2026-11-25).
+    /// </summary>
+    /// <param name="source">The media source.</param>
+    /// <returns><see langword="true"/> if the source is a local DVD or Blu-ray image.</returns>
+    public static bool IsLocalDiscImageSource(MediaSourceInfo? source)
+        => source is { Protocol: MediaProtocol.File, IsRemote: false, IsInfiniteStream: false, RequiresOpening: false, IsoType: IsoType.Dvd or IsoType.BluRay }
+            && source.VideoType is null or VideoType.Iso
             && string.IsNullOrEmpty(source.LiveStreamId)
             && !string.IsNullOrEmpty(source.Path);
 
@@ -181,7 +203,7 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             // A transcode to a codec this server does not encode from a session, for a client that
             // declares no H.264/AAC to re-plan to: refused, not handed to the existing chain.
             _logger.LogInformation(
-                "Playback for item {ItemId} refused: no session provider reads its source, or the only transcode the client allows encodes to a target other than H.264/AAC.",
+                "Playback for item {ItemId} refused: no session provider reads its source (or this server's FFmpeg cannot open the disc image), or the only transcode the client allows encodes to a target other than H.264/AAC.",
                 options.ItemId);
             return null;
         }
@@ -355,6 +377,12 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             && plan.Transforms.All(transform => transform is TransformKind.RemuxContainer or TransformKind.CopyVideo or TransformKind.CopyAudio or TransformKind.ExtractSubtitle or TransformKind.ConvertSubtitle)
             && plan.SubtitleDelivery is null or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External;
 
+    private static bool IsDiscImage(MediaSourceInfo source)
+        => source.VideoType == VideoType.Iso || source.IsoType is not null;
+
+    private bool IsReadableDiscImage(MediaSourceInfo source)
+        => IsLocalDiscImageSource(source) && _canReadDiscImage(source.IsoType!.Value);
+
     private V2PlanRecord? TryDecide(LocalMediaRequest request, MediaOptions options, MediaKind kind, out bool refused)
     {
         refused = false;
@@ -367,19 +395,23 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             return null;
         }
 
-        if (!sources.All(source => live ? IsSessionLiveSource(source, request.LiveStreamId) : IsLocalFileSource(source) || IsSeekableRemoteSource(source) || IsLocalDiscSource(source)))
+        if (!sources.All(source => live
+            ? IsSessionLiveSource(source, request.LiveStreamId)
+            : IsLocalFileSource(source) || IsSeekableRemoteSource(source) || IsLocalDiscSource(source) || IsReadableDiscImage(source)))
         {
             // A non-local source no session provider reads (another protocol, a remote stream with
-            // no known duration): refused, not handed to the existing chain (decided 2026-11-20). A
-            // local ISO image is not that: it stays with the existing chain.
-            refused = !live && sources.Any(source => source.Protocol != MediaProtocol.File);
+            // no known duration), and a disc image this server's FFmpeg cannot open or whose kind the
+            // scan did not recognise: refused, not handed to the existing chain (decided 2026-11-20,
+            // 2026-11-25).
+            refused = !live && sources.Any(source => source.Protocol != MediaProtocol.File || IsDiscImage(source));
             return null;
         }
 
-        // An opened tuner stream, a remote file and a disc structure are readable by the server only
-        // (through its provider, its url, or a concatenation of its title files): they are remuxed or
-        // transcoded into a session output, never handed to the client as they are.
-        var serverOnly = live || sources.Any(source => IsSeekableRemoteSource(source) || IsLocalDiscSource(source));
+        // An opened tuner stream, a remote file, a disc structure and a disc image are readable by
+        // the server only (through its provider, its url, a concatenation of its title files, or
+        // FFmpeg's disc reader): they are remuxed or transcoded into a session output, never handed
+        // to the client as they are.
+        var serverOnly = live || sources.Any(source => IsSeekableRemoteSource(source) || IsLocalDiscSource(source) || IsLocalDiscImageSource(source));
         var constraints = serverOnly ? request.Constraints with { AllowDirectPlay = false } : request.Constraints;
 
         var context = DlnaPlaybackAdapter.ToContext(options.ItemId, options.UserId, options.MediaSourceId, kind, PlaybackEngine.EngineVersion);

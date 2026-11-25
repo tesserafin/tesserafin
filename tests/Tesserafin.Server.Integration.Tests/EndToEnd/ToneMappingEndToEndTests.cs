@@ -35,7 +35,7 @@ namespace Tesserafin.Server.Integration.Tests.EndToEnd;
 /// <remarks>
 /// The executor tone-maps with the <c>tonemapx</c> filter, which the project's FFmpeg build (F0)
 /// carries and a distribution FFmpeg does not. The legacy-free host runs the FFmpeg named by
-/// <c>TESSERAFIN_TONEMAP_FFMPEG</c> (the default FFmpeg otherwise); the fixture is encoded with the
+/// <c>TESSERAFIN_PROJECT_FFMPEG</c> (the default FFmpeg otherwise); the fixture is encoded with the
 /// default one, which has 10-bit HEVC. Without <c>tonemapx</c> the planner does not own the plan, so
 /// the test is skipped rather than asserting a refusal of its own design.
 /// </remarks>
@@ -84,7 +84,7 @@ public sealed class ToneMappingEndToEndTests : IClassFixture<DirectPlayFilmEndTo
     {
         Assert.SkipUnless(
             _factory.Services.GetRequiredService<IMediaEncoder>().SupportsFilter("tonemapx"),
-            "The server's FFmpeg has no tonemapx filter; set TESSERAFIN_TONEMAP_FFMPEG to the project's FFmpeg build.");
+            "The server's FFmpeg has no tonemapx filter; set TESSERAFIN_PROJECT_FFMPEG to the project's FFmpeg build.");
 
         const string PlaySession = "tonemap-ps";
         var (client, userId) = await SignInAsync("tonemap");

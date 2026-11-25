@@ -224,6 +224,7 @@ namespace Tesserafin.MediaEncoding.Encoder
                 SetAvailableFiltersWithOption(validator.GetFiltersWithOption());
                 SetAvailableBitStreamFiltersWithOption(validator.GetBitStreamFiltersWithOption());
                 SetAvailableHwaccels(validator.GetHwaccels());
+                SetAvailableDiscImageReaders(validator.GetDiscImageReaders());
                 SetMediaEncoderVersion(validator);
 
                 SupportsHevcMain10 = SupportsEncoder("libx265") && validator.CheckSoftwareHevcMain10();
@@ -437,6 +438,11 @@ namespace Tesserafin.MediaEncoding.Encoder
             _capabilities = _capabilities.WithFfmpeg(_capabilities.Ffmpeg.WithBitStreamFiltersWithOption(dict));
         }
 
+        public void SetAvailableDiscImageReaders(IEnumerable<IsoType> list)
+        {
+            _capabilities = _capabilities.WithFfmpeg(_capabilities.Ffmpeg.WithDiscImageReaders(list));
+        }
+
         public void SetMediaEncoderVersion(EncoderValidator validator)
         {
             _ffmpegVersion = validator.GetFFmpegVersion();
@@ -464,6 +470,12 @@ namespace Tesserafin.MediaEncoding.Encoder
         public bool SupportsFilter(string filter)
         {
             return _capabilities.Ffmpeg.SupportsFilter(filter);
+        }
+
+        /// <inheritdoc />
+        public bool SupportsDiscImage(IsoType isoType)
+        {
+            return _capabilities.Ffmpeg.SupportsDiscImage(isoType);
         }
 
         /// <inheritdoc />
@@ -503,15 +515,15 @@ namespace Tesserafin.MediaEncoding.Encoder
             var reader = request.DirectStreamReader;
             var input = reader is null ? GetInputArgument(request.MediaSource.Path, request.MediaSource) : "pipe:0";
             var args = request.ExtractChapters
-                ? "{0} -i {1} -threads {2} -v warning -print_format json -show_streams -show_chapters -show_format"
-                : "{0} -i {1} -threads {2} -v warning -print_format json -show_streams -show_format";
+                ? "{0} {3} -i {1} -threads {2} -v warning -print_format json -show_streams -show_chapters -show_format"
+                : "{0} {3} -i {1} -threads {2} -v warning -print_format json -show_streams -show_format";
             var audio = request.MediaType == DlnaProfileType.Audio;
             if (request.MediaSource.Protocol == MediaProtocol.File && !audio && _proberSupportsFirstVideoFrame)
             {
                 args += " -show_frames -only_first_vframe";
             }
 
-            args = string.Format(CultureInfo.InvariantCulture, args, GetExtraArguments(request), input, _threads).Trim();
+            args = string.Format(CultureInfo.InvariantCulture, args, GetExtraArguments(request), input, _threads, reader is null ? GetInputFormatArgument(request.MediaSource) : string.Empty).Trim();
             return _probes.ProbeAsync(
                 FfmpegCommand.FromArgumentLine(_ffprobePath, args),
                 request.MediaSource.Path,
@@ -578,14 +590,22 @@ namespace Tesserafin.MediaEncoding.Encoder
         /// <inheritdoc />
         public string GetInputArgument(string inputFile, MediaSourceInfo mediaSource)
         {
-            var prefix = "file";
-            if (mediaSource.IsoType == IsoType.BluRay)
+            if (IsDvdImage(mediaSource))
             {
-                prefix = "bluray";
+                // The dvdvideo demuxer hands its url to libdvdread as a path: no protocol prefix.
+                return string.Format(CultureInfo.InvariantCulture, "\"{0}\"", EncodingUtils.NormalizePath(inputFile));
             }
 
+            var prefix = mediaSource.IsoType == IsoType.BluRay && mediaSource.Protocol == MediaProtocol.File ? "bluray" : "file";
             return EncodingUtils.GetInputArgument(prefix, new[] { inputFile }, mediaSource.Protocol);
         }
+
+        /// <inheritdoc />
+        public string GetInputFormatArgument(MediaSourceInfo mediaSource)
+            => IsDvdImage(mediaSource) ? "-f dvdvideo" : string.Empty;
+
+        private static bool IsDvdImage(MediaSourceInfo mediaSource)
+            => mediaSource.IsoType == IsoType.Dvd && mediaSource.Protocol == MediaProtocol.File;
 
         /// <inheritdoc />
         public string GetExternalSubtitleInputArgument(string inputFile)

@@ -1349,6 +1349,13 @@ namespace Tesserafin.Controller.MediaEncoding
             }
             else
             {
+                // A DVD image names its demuxer: FFmpeg does not detect dvdvideo from a path.
+                var inputFormat = _mediaEncoder.GetInputFormatArgument(state.MediaSource);
+                if (!string.IsNullOrEmpty(inputFormat))
+                {
+                    arg.Append(' ').Append(inputFormat);
+                }
+
                 arg.Append(" -i ")
                     .Append(_mediaEncoder.GetInputPathArgument(state));
             }

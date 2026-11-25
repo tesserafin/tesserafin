@@ -645,6 +645,43 @@ public sealed class LocalMediaPlannerTests
         Assert.True(LocalMediaPlanner.IsLocalDiscSource(disc));
     }
 
+    [Theory]
+    [InlineData(IsoType.Dvd)]
+    [InlineData(IsoType.BluRay)]
+    public void A_disc_image_this_ffmpeg_opens_is_executed_by_the_session_never_played_as_it_is(IsoType isoType)
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object, kind => kind == isoType);
+        var image = DiscImage(isoType);
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(Browser(hlsOutput: true), _declared));
+        var plan = planner.PlanVideo(Options(image));
+
+        Assert.NotNull(plan);
+        Assert.NotEqual(PlayMethod.DirectPlay, plan.PlayMethod);
+        Assert.True(LocalMediaPlanner.IsExecutableSessionOutput(store.TakeCaptured()?.ExecutionPlan));
+        Assert.True(LocalMediaPlanner.IsLocalDiscImageSource(image));
+        Assert.False(LocalMediaPlanner.IsLocalFileSource(image));
+    }
+
+    [Theory]
+    [InlineData(IsoType.Dvd)]
+    [InlineData(IsoType.BluRay)]
+    [InlineData(null)]
+    public void A_disc_image_this_ffmpeg_cannot_open_is_refused_not_handed_to_the_legacy_planner(IsoType? isoType)
+    {
+        // The other kind opens; this one does not (or the scan never recognised it). The strict
+        // inner planner proves the existing chain is not reached.
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object, kind => kind != isoType && isoType is not null);
+        var image = DiscImage(isoType);
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(Browser(hlsOutput: true), _declared));
+
+        Assert.Null(planner.PlanVideo(Options(image)));
+        Assert.Null(store.TakeCaptured());
+    }
+
     [Fact]
     public void Only_an_hls_copy_of_one_audio_stream_is_an_executable_audio_remux()
     {
@@ -725,10 +762,20 @@ public sealed class LocalMediaPlannerTests
         Assert.False(LocalMediaPlanner.IsExecutableRemux(audio));
     }
 
-    private static (LocalMediaPlanner Planner, InMemoryV2PlanStore Store) Planner(IPlaybackSessionPlanner inner)
+    private static (LocalMediaPlanner Planner, InMemoryV2PlanStore Store) Planner(IPlaybackSessionPlanner inner, Func<IsoType, bool>? canReadDiscImage = null)
     {
         var store = new InMemoryV2PlanStore();
-        return (new LocalMediaPlanner(inner, new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance), store);
+        return (new LocalMediaPlanner(inner, new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance, canReadDiscImage: canReadDiscImage), store);
+    }
+
+    private static MediaSourceInfo DiscImage(IsoType? isoType)
+    {
+        var image = Source("image", "h264", 1, -1, "iso");
+        image.Path = "/media/Disc Probe.iso";
+        image.VideoType = VideoType.Iso;
+        image.IsoType = isoType;
+        image.MediaStreams = [.. image.MediaStreams.Where(stream => stream.Type != MediaStreamType.Subtitle)];
+        return image;
     }
 
     private static MediaOptions Options(params MediaSourceInfo[] sources)

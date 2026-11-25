@@ -433,11 +433,11 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
     public sealed class LegacyFreeFactory : E2eApplicationFactory
     {
         /// <summary>
-        /// Gets the FFmpeg the server runs: <c>TESSERAFIN_TONEMAP_FFMPEG</c> when set (the project's
-        /// FFmpeg build, which tone-maps), otherwise the default one.
+        /// Gets the FFmpeg the server runs: <c>TESSERAFIN_PROJECT_FFMPEG</c> when set (the project's
+        /// FFmpeg build, which tone-maps and opens disc images), otherwise the default one.
         /// </summary>
         protected override string ServerFfmpegPath
-            => Environment.GetEnvironmentVariable("TESSERAFIN_TONEMAP_FFMPEG") is { Length: > 0 } path ? path : FfmpegPath;
+            => Environment.GetEnvironmentVariable("TESSERAFIN_PROJECT_FFMPEG") is { Length: > 0 } path ? path : FfmpegPath;
 
         /// <summary>
         /// Gets the channel plugin this host serves channel-plugin items from.
@@ -455,7 +455,8 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
                     provider.GetRequiredService<IPlaybackEngine>(),
                     provider.GetRequiredService<IV2PlanStore>(),
                     provider.GetRequiredService<ILogger<LocalMediaPlanner>>(),
-                    canTonemap: () => provider.GetRequiredService<IMediaEncoder>().SupportsFilter("tonemapx")));
+                    canTonemap: () => provider.GetRequiredService<IMediaEncoder>().SupportsFilter("tonemapx"),
+                    canReadDiscImage: isoType => provider.GetRequiredService<IMediaEncoder>().SupportsDiscImage(isoType)));
                 services.AddSingleton<IPlaybackLiveStreamResolver, LegacyChainReached>();
                 services.AddSingleton(Channel);
                 services.AddSingleton<IChannel>(Channel);

@@ -373,7 +373,7 @@ the existing chain until the deletion, which will refuse it. A plan that keeps H
 Vision is not owned: the executor tone-maps every HDR source it encodes all the way to SDR. Proof:
 `ToneMappingEndToEndTests` (an HDR10 HEVC Main10 fixture for an SDR-only client; `tonemapx` in the
 command, the output 8-bit H.264 without the PQ transfer), run on the project's FFmpeg build through
-`TESSERAFIN_TONEMAP_FFMPEG` and skipped on a distribution FFmpeg, which has no `tonemapx` (the hosted
+`TESSERAFIN_PROJECT_FFMPEG` and skipped on a distribution FFmpeg, which has no `tonemapx` (the hosted
 runner's). Break control: planner without the capability (legacy planner reached). Android declares
 `SDR` only, so every HDR film reaches this path there: checked on a phone.
 
@@ -423,17 +423,29 @@ play forbidden; the delivery guard accepts the folder while it exists. Proof:
 `DiscSourceEndToEndTests` (a synthesized two-VOB DVD title, `-f concat` in the command, output
 probed as H.264 + AAC), required by name; break control: disc source removed (legacy planner
 reached). A Blu-ray folder takes the same path but cannot be synthesized here (it needs a real BDMV
-structure). ISO images stay with the existing chain.
+structure).
 
-**Blu-ray ISO runtime check (2026-11-23).** A synthetic 182-second BDMV ISO built with tsMuxer
-2.7.0 opened through `bluray:` in system FFmpeg 6.1.1. A seek to five seconds produced a sample with
-H.264 video copied and AC-3 audio converted to AAC. FFmpeg's Blu-ray protocol selects playlists of
-at least 180 seconds, so the two-second fixture used for folder playback cannot exercise that path.
-ISO images must play (owner decision 2026-11-25). The linux F0 runtime now builds `libbluray` with
-`libudfread` (the `bluray:` protocol) and `libdvdnav` with `libdvdread` (the `dvdvideo` demuxer); see
-[`F0-ffmpeg-runtime.md` §3](distribution/F0-ffmpeg-runtime.md#disc-images-linux-305). Moving ISO
-playback to Sessions still needs a proof on a release build for each kind. The existing managed UDF
-reader classifies ISO files during library discovery. win-x64 has no disc-image reader yet.
+Local disc images (decided 2026-11-25: ISO images must play): a DVD or Blu-ray ISO whose kind the
+library scan recognised (`IsLocalDiscImageSource`) is executed by the session with FFmpeg's own
+reader - the `dvdvideo` demuxer for a DVD image (`-f dvdvideo -i "<path>"`, no protocol prefix: the
+demuxer hands its url to libdvdread), the `bluray` protocol for a Blu-ray image - with direct play
+forbidden; the delivery guard accepts the image while the file exists. The probe names the demuxer
+too, so a DVD image's streams are read at scan time. The planner owns an image only where this
+server's FFmpeg opens its kind (`IMediaEncoder.SupportsDiscImage`, read off `-protocols` and
+`-demuxers` at startup); an image it cannot open, or whose kind the scan did not recognise, is
+refused (422), never handed to the existing chain. The linux F0 runtime opens both kinds
+([`F0-ffmpeg-runtime.md` §3](distribution/F0-ffmpeg-runtime.md#disc-images-linux-305)); win-x64 and
+a distribution FFmpeg 6.1 (no `dvdvideo`) refuse what they cannot open. Proof:
+`DiscImageEndToEndTests` on images built by `ci/disc-image-fixtures.sh` (200 s, one colour per 10 s
+band): the scan probe, the engine's decision (never a direct play), start, a seek, another user
+refused, the stopped position stored and a resumed session, each position proved by the colour of
+the first frame served for it; the FFmpeg command reads the image through its reader. It runs where
+`TESSERAFIN_DISC_IMAGE_FIXTURES` and `TESSERAFIN_PROJECT_FFMPEG` are set and skips elsewhere, so it is
+not required by name in the hosted job (which has neither). Break controls: planner unit tests with
+the reader removed (refused, legacy planner not reached). The Blu-ray image needs the F0 hlsenc
+backport (`a327bc0561`, see F0 §3a): without it, a video-copy remux of an MPEG-TS source after a seek
+serves the wrong segment. An MPEG-TS input seek also lands up to one GOP after its target, on a plain
+`.m2ts` as well (FFmpeg 6.1 and 7.1); the test keeps two seconds away from band starts.
 
 Channel-plugin items (decided 2026-11-20): an item a channel plugin supplies enters the session
 journey like any library video or track and is read like any other source of its kind - a remote
@@ -461,9 +473,9 @@ reaches it), then the deletion is one coordinated change.
    project's FFmpeg on the runner (follow-up).
 3. Targets other than H.264/AAC: done (above).
 4. A client with no HLS output: done (above).
-5. Non-local sources: done - remote HTTP files, channel-plugin items, DVD and Blu-ray folders
-   (above). A local ISO image and a Live TV recording still being written remain with the existing
-   chain.
+5. Non-local sources: done - remote HTTP files, channel-plugin items, DVD and Blu-ray folders,
+   DVD and Blu-ray images (above). A Live TV recording still being written remains with the
+   existing chain.
 6. DLNA: not applicable (decided 2026-11-20). Tesserafin ships no DLNA server; "Dlna" only names
    the legacy `DeviceProfile`/`StreamBuilder` model, which goes with step 7. An external DLNA plugin
    is not supported.
@@ -477,7 +489,7 @@ Remaining consumers by name. Nothing is deleted globally while one of them still
 
 | Legacy path | Still reached by |
 | --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | a session of a local ISO image or a Live TV recording still being written; `PlaybackInfo` (every client start that is not Sessions, Live TV included) |
+| `PlaybackSessionPlanner` / `StreamBuilder` | a session of a Live TV recording still being written; `PlaybackInfo` (every client start that is not Sessions, Live TV included) |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
 | Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | Web targets outside the local HTML Sessions journey and media for which Sessions returns a legacy descriptor, including recordings still being written and local ISO images |

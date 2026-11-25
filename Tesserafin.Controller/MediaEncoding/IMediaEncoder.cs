@@ -110,6 +110,15 @@ namespace Tesserafin.Controller.MediaEncoding
         bool SupportsFilter(string filter);
 
         /// <summary>
+        /// Whether this server's FFmpeg opens a disc image of the given kind (a Blu-ray image through
+        /// libbluray, a DVD image through libdvdnav).
+        /// </summary>
+        /// <param name="isoType">The disc image kind.</param>
+        /// <returns><c>true</c> if the image can be read, <c>false</c> otherwise.</returns>
+        /// <remarks>An encoder that does not say opens none: the planner then refuses the image.</remarks>
+        bool SupportsDiscImage(IsoType isoType) => false;
+
+        /// <summary>
         /// Whether filter is supported with the given option.
         /// </summary>
         /// <param name="option">The option.</param>
@@ -207,6 +216,14 @@ namespace Tesserafin.Controller.MediaEncoding
         /// <param name="mediaSource">The mediaSource.</param>
         /// <returns>System.String.</returns>
         string GetInputArgument(string inputFile, MediaSourceInfo mediaSource);
+
+        /// <summary>
+        /// Gets the input format option that must precede <c>-i</c> for a media source FFmpeg cannot
+        /// detect from its path - a DVD image, read by the <c>dvdvideo</c> demuxer - or an empty string.
+        /// </summary>
+        /// <param name="mediaSource">The media source.</param>
+        /// <returns>The input format option, or an empty string.</returns>
+        string GetInputFormatArgument(MediaSourceInfo mediaSource) => string.Empty;
 
         /// <summary>
         /// Gets the input argument.

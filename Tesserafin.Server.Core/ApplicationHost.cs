@@ -751,7 +751,9 @@ namespace Tesserafin.Server.Core
                 // A tone-mapping plan is the session's only where the executor can tone-map: the
                 // software tonemapx filter, or hardware tone mapping the operator enabled.
                 () => provider.GetRequiredService<IMediaEncoder>().SupportsFilter("tonemapx")
-                    || provider.GetRequiredService<IServerConfigurationManager>().GetEncodingOptions() is { EnableTonemapping: true, HardwareAccelerationType: not Tesserafin.Model.Entities.HardwareAccelerationType.none }));
+                    || provider.GetRequiredService<IServerConfigurationManager>().GetEncodingOptions() is { EnableTonemapping: true, HardwareAccelerationType: not Tesserafin.Model.Entities.HardwareAccelerationType.none },
+                // A disc image is the session's only where this FFmpeg opens its kind; refused otherwise.
+                isoType => provider.GetRequiredService<IMediaEncoder>().SupportsDiscImage(isoType)));
 
             serviceCollection.AddSingleton<PlaybackSessionLiveStreams>();
 

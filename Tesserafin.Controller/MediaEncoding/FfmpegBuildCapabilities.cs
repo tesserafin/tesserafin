@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using Tesserafin.Model.Entities;
 
 namespace Tesserafin.Controller.MediaEncoding;
 
@@ -50,6 +51,13 @@ public sealed record FfmpegBuildCapabilities
     public ImmutableDictionary<BitStreamFilterOptionType, bool> BitStreamFiltersWithOption { get; init; } = ImmutableDictionary<BitStreamFilterOptionType, bool>.Empty;
 
     /// <summary>
+    /// Gets the disc image kinds this build opens: <see cref="IsoType.BluRay"/> through the
+    /// <c>bluray</c> protocol (libbluray), <see cref="IsoType.Dvd"/> through the <c>dvdvideo</c>
+    /// demuxer (libdvdnav).
+    /// </summary>
+    public ImmutableArray<IsoType> DiscImageReaders { get; init; } = ImmutableArray<IsoType>.Empty;
+
+    /// <summary>
     /// Whether the given encoder is supported by this ffmpeg build.
     /// </summary>
     /// <param name="encoder">The encoder name.</param>
@@ -90,6 +98,13 @@ public sealed record FfmpegBuildCapabilities
     /// <param name="option">The bitstream filter option.</param>
     /// <returns><c>true</c> if supported, <c>false</c> otherwise.</returns>
     public bool SupportsBitStreamFilterWithOption(BitStreamFilterOptionType option) => BitStreamFiltersWithOption.TryGetValue(option, out var value) && value;
+
+    /// <summary>
+    /// Whether this build opens a disc image of the given kind.
+    /// </summary>
+    /// <param name="isoType">The disc image kind.</param>
+    /// <returns><c>true</c> if supported, <c>false</c> otherwise.</returns>
+    public bool SupportsDiscImage(IsoType isoType) => DiscImageReaders.Contains(isoType);
 
     /// <summary>
     /// Returns a copy of this snapshot with <see cref="Encoders"/> replaced.
@@ -134,4 +149,11 @@ public sealed record FfmpegBuildCapabilities
     /// <returns>The updated snapshot.</returns>
     public FfmpegBuildCapabilities WithBitStreamFiltersWithOption(IDictionary<BitStreamFilterOptionType, bool> bitStreamFiltersWithOption)
         => this with { BitStreamFiltersWithOption = bitStreamFiltersWithOption.ToImmutableDictionary() };
+
+    /// <summary>
+    /// Returns a copy of this snapshot with <see cref="DiscImageReaders"/> replaced.
+    /// </summary>
+    /// <param name="discImageReaders">The disc image kinds the build opens.</param>
+    /// <returns>The updated snapshot.</returns>
+    public FfmpegBuildCapabilities WithDiscImageReaders(IEnumerable<IsoType> discImageReaders) => this with { DiscImageReaders = [.. discImageReaders] };
 }

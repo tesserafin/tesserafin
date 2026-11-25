@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Tesserafin.Controller.MediaEncoding;
+using Tesserafin.Model.Entities;
 
 namespace Tesserafin.MediaEncoding.Encoder
 {
@@ -315,6 +316,59 @@ namespace Tesserafin.MediaEncoding.Encoder
         public IEnumerable<string> GetHwaccels() => GetHwaccelTypes();
 
         public IEnumerable<string> GetFilters() => GetFFmpegFilters();
+
+        /// <summary>
+        /// Gets the disc image kinds this build opens: a Blu-ray image through the <c>bluray</c>
+        /// input protocol, a DVD image through the <c>dvdvideo</c> demuxer. Both are configure-time
+        /// choices of the build (libbluray, libdvdnav), so they are read off the build itself.
+        /// </summary>
+        /// <returns>The disc image kinds.</returns>
+        public IEnumerable<IsoType> GetDiscImageReaders()
+        {
+            string protocols;
+            string demuxers;
+            try
+            {
+                protocols = GetProcessOutput(_encoderPath, "-hide_banner -protocols", false, null);
+                demuxers = GetProcessOutput(_encoderPath, "-hide_banner -demuxers", false, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error detecting the disc image readers");
+                return [];
+            }
+
+            var found = GetDiscImageReadersInternal(protocols, demuxers).ToList();
+            _logger.LogInformation("Disc image readers: {DiscImageReaders}", found);
+            return found;
+        }
+
+        /// <summary>
+        /// Reads the disc image kinds off the build's <c>-protocols</c> and <c>-demuxers</c> output.
+        /// </summary>
+        /// <param name="protocols">The <c>-protocols</c> output.</param>
+        /// <param name="demuxers">The <c>-demuxers</c> output.</param>
+        /// <returns>The disc image kinds.</returns>
+        internal static IEnumerable<IsoType> GetDiscImageReadersInternal(string? protocols, string? demuxers)
+        {
+            // The protocol list is "Input:" then "Output:"; only an input protocol reads an image.
+            var input = protocols ?? string.Empty;
+            var output = input.IndexOf("Output:", StringComparison.Ordinal);
+            if (output >= 0)
+            {
+                input = input[..output];
+            }
+
+            if (InputProtocolRegex().Matches(input).Any(match => match.Groups["protocol"].Value == "bluray"))
+            {
+                yield return IsoType.BluRay;
+            }
+
+            if (DemuxerRegex().Matches(demuxers ?? string.Empty).Any(match => match.Groups["demuxer"].Value == "dvdvideo"))
+            {
+                yield return IsoType.Dvd;
+            }
+        }
 
         public IDictionary<FilterOptionType, bool> GetFiltersWithOption() => _filterOptionsDict
             .ToDictionary(item => item.Key, item => CheckFilterWithOption(item.Value.Item1, item.Value.Item2));
@@ -686,5 +740,11 @@ namespace Tesserafin.MediaEncoding.Encoder
 
         [GeneratedRegex("^\\s\\S{2,3}\\s(?<filter>[\\w|-]+)\\s+.+$", RegexOptions.Multiline)]
         private static partial Regex FilterRegex();
+
+        [GeneratedRegex("^\\s+(?<protocol>\\w+)\\s*$", RegexOptions.Multiline)]
+        private static partial Regex InputProtocolRegex();
+
+        [GeneratedRegex("^\\s+D\\S*\\s+(?<demuxer>[\\w,]+)\\s", RegexOptions.Multiline)]
+        private static partial Regex DemuxerRegex();
     }
 }
