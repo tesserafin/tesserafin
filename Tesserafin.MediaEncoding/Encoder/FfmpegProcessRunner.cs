@@ -48,7 +48,10 @@ public sealed class FfmpegProcessRunner : IFfmpegProcessRunner
     private async Task<FfmpegProcessResult> RunAsync(FfmpegCommand command, TimeSpan timeout, string? standardInput, int? outputCaptureLimit, CancellationToken cancellationToken, Func<bool>? hasProgress = null, ProcessPriorityClass? priority = null, Func<Stream>? openInput = null, int? errorCaptureLimit = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using var timeoutCts = new CancellationTokenSource(timeout);
+        // An observed run is timed by its progress windows alone (WaitForObservedExitAsync). A
+        // whole-run deadline here would also be charged to starting the child, and could time the
+        // run out before the first window was ever observed.
+        using var timeoutCts = hasProgress is null ? new CancellationTokenSource(timeout) : new CancellationTokenSource();
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         using var process = CreateProcess(command, redirectOutput: true, redirectInput: standardInput is not null || openInput is not null, raiseEvents: false);
         process.Start();

@@ -30,6 +30,26 @@ public sealed class ImageRunnerTests
     }
 
     [Fact]
+    public async Task ProgressWindow_IsNotSpentStartingTheChild()
+    {
+        // Starting the child takes longer than this window on any host, so a whole-run deadline
+        // charged to the setup expires before the first window is observed. Only the windows may
+        // time out an observed run.
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Uses a POSIX sleeping child");
+        using var context = new ExtractionTestContext();
+        var windows = 0;
+        var result = await context.Runner.RunImageAsync(
+            FfmpegCommand.FromArgumentLine("/bin/sh", "-c \"sleep 30\""),
+            TimeSpan.FromMilliseconds(1),
+            () => ++windows <= 2,
+            ProcessPriorityClass.BelowNormal,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.TimedOut);
+        Assert.Equal(3, windows);
+    }
+
+    [Fact]
     public async Task ObserverFailure_IsPreservedAfterChildIsStopped()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "Uses a POSIX sleeping child");
