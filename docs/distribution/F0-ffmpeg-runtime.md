@@ -260,8 +260,11 @@ The exclusion set lives in `ci/ffmpeg/excluded-patches.txt` and must equal the
 
 ### Upstream backports
 
-After the fork's series, both builds (Linux and win-x64) apply the patches named
-in `ci/ffmpeg/backports/series`, in order, at zero fuzz. A backport is a commit
+After the fork's series, both Linux builds apply the patches named in
+`ci/ffmpeg/backports/series`, in order, at zero fuzz. win-x64 does not take them
+yet: one change does not own the Linux and Windows runtimes together
+(`verify-linux-identity.sh`), so the Windows backport follows in its own change
+and, until then, a remux after a seek on Windows keeps the defect below. A backport is a commit
 already merged into FFmpeg's own master, kept verbatim as `git format-patch`
 output named `<upstream sha>-<subject>.patch`, for a defect a Tesserafin journey
 hits on the 7.1 baseline. It is dropped when the runtime moves to an FFmpeg that

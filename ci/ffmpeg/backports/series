@@ -1,5 +1,7 @@
 # Upstream FFmpeg fixes applied on top of the jellyfin-ffmpeg series (F0 / #229), in this order,
-# at zero fuzz, by ci/ffmpeg/build-in-container.sh and ci/windows/ffmpeg/build-win-x64.sh.
+# at zero fuzz, by ci/ffmpeg/build-in-container.sh (both Linux runtimes). win-x64 does not take
+# them yet: one change does not own the Linux and Windows runtimes together
+# (ci/windows/ffmpeg/verify-linux-identity.sh), so it follows separately.
 #
 # A backport is a commit already merged into FFmpeg's own master, kept verbatim as
 # `git format-patch` output named <upstream sha>-<subject>.patch, for a defect a Tesserafin
