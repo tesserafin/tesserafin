@@ -91,7 +91,9 @@ FROZEN_PINS = {
     # WINDOWS_WEB_PAYLOAD_SHA256, which P02 reads.
     # Re-pinned for #305 (disc-image readers): only F0_ACCEPTED_CI_TREE moved
     # (Linux F0 baseline).
-    "ci/package/pins.env": "cee0733f8ae4975880f3bf1cf3030d03d18033770f57a16d21d2d850646a57a6",
+    # Re-pinned for #305 (hlsenc backport): only F0_ACCEPTED_CI_TREE moved
+    # (Linux F0 baseline).
+    "ci/package/pins.env": "1ef7dec244140ac5c027d522785d668a1210781c22268a455f6477d18dad55ab",
     "packaging/windows/msi/Tesserafin.wxs": "097bb7c68f62a3b15d64af0c58d947ce28377810752681407afd99f0d4b983dc",
 }
 
