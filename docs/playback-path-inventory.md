@@ -350,6 +350,22 @@ refused; the stop closes the tuner stream), required by name. Break controls: pl
 live source (legacy planner reached), request without `LiveStreamId` (422), removal without release
 (tuner stream never closed).
 
+Live TV, recordings still being written (2026-11-27): a library video whose file a recording is
+still writing (`IRecordingsManager.GetActiveRecordingInfo`) is opened by the session as a stream it
+holds, exactly as a channel's tuner stream is: `IMediaSourceManager.OpenRecordingStream` registers
+an `ActiveRecordingStream` (an `ILiveStream` and `IDirectStreamProvider`) that reads the growing file
+from its start through `ProgressiveFileStream`, probes it through that provider, and is released by
+the session's stop. Closing it never stops the recording. The planner, the live playlist, the
+segment route and the delivery guard are the channel slice's, unchanged: no direct play of a
+growing file, an HLS remux or transcode on `Hls/live.m3u8`, ffmpeg reading `pipe:0`. Before this,
+the source named the `[Authorize]`d `LiveTv/LiveRecordings/{id}/stream` route as its encoder path,
+which ffmpeg, holding no credential, could not read. Proof: `LiveRecordingSessionEndToEndTests` (a
+paced writer growing a TS recording on disk; segments probed H.264 + AAC; another user refused; a
+re-plan keeps the held stream; the stop releases it while the recording goes on), required by name.
+Break controls: no recording branch in the controller (legacy planner reached), provider refusing
+every read (probe fails, 500), provider serving the probe only (the live playlist fails, so ffmpeg
+reads through the provider and not the file path).
+
 Audiobooks: an `AudioBook` is an `Audio`, already decided and served by the session journey;
 the Web client now offers it to that journey too (`AudioBook_StartAndSeek_…`, required by name). No
 local audio item of the Web client reaches `/Audio/{id}/universal` any more.
@@ -474,8 +490,7 @@ reaches it), then the deletion is one coordinated change.
 3. Targets other than H.264/AAC: done (above).
 4. A client with no HLS output: done (above).
 5. Non-local sources: done - remote HTTP files, channel-plugin items, DVD and Blu-ray folders,
-   DVD and Blu-ray images (above). A Live TV recording still being written remains with the
-   existing chain.
+   DVD and Blu-ray images, Live TV recordings still being written (above).
 6. DLNA: not applicable (decided 2026-11-20). Tesserafin ships no DLNA server; "Dlna" only names
    the legacy `DeviceProfile`/`StreamBuilder` model, which goes with step 7. An external DLNA plugin
    is not supported.
@@ -489,10 +504,10 @@ Remaining consumers by name. Nothing is deleted globally while one of them still
 
 | Legacy path | Still reached by |
 | --- | --- |
-| `PlaybackSessionPlanner` / `StreamBuilder` | a session of a Live TV recording still being written; `PlaybackInfo` (every client start that is not Sessions, Live TV included) |
+| `PlaybackSessionPlanner` / `StreamBuilder` | `PlaybackInfo` (every client start that is not Sessions, Live TV included) |
 | `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanAdapter.ToStreamInfo`, `PlaybackSessionStreamDescriptorMapper` | every session of the rows above |
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
-| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | Web targets outside the local HTML Sessions journey and media for which Sessions returns a legacy descriptor, including recordings still being written and local ISO images |
+| Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | Web targets outside the local HTML Sessions journey and media for which Sessions returns a legacy descriptor |
 
 ## 8. Shared model boundary (consolidation step 4, candidate)
 

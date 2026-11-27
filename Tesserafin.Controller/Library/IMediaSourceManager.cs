@@ -126,6 +126,16 @@ namespace Tesserafin.Controller.Library
         Task<IReadOnlyList<MediaSourceInfo>> GetRecordingStreamMediaSources(ActiveRecordingInfo info, CancellationToken cancellationToken);
 
         /// <summary>
+        /// Opens a recording still being written as a live stream the caller holds until it closes
+        /// it with <see cref="CloseLiveStream"/>: probed and read through its provider, from the
+        /// start of the file, as it grows. Closing it does not stop the recording.
+        /// </summary>
+        /// <param name="info">The <see cref="ActiveRecordingInfo"/>.</param>
+        /// <param name="cancellationToken">The <see cref="CancellationToken"/>.</param>
+        /// <returns>The opened stream's media source; its <see cref="MediaSourceInfo.LiveStreamId"/> names the stream.</returns>
+        Task<MediaSourceInfo> OpenRecordingStream(ActiveRecordingInfo info, CancellationToken cancellationToken);
+
+        /// <summary>
         /// Closes the media source.
         /// </summary>
         /// <param name="id">The live stream identifier.</param>

@@ -660,6 +660,13 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         {
             (mediaSources, liveStreamId) = await OpenChannelStream(request, mediaSources, userId, playSessionId, heldLiveStreamId, cancellationToken).ConfigureAwait(false);
         }
+        else if (_liveStreams is not null && ActiveRecordingOf(item) is { } recording)
+        {
+            // A recording still being written is held the same way: opened as a stream read from the
+            // start of its growing file, which ffmpeg reads through its provider (pipe:0), never
+            // through the [Authorize]d LiveRecordings route.
+            (mediaSources, liveStreamId) = await OpenRecordingStream(recording, heldLiveStreamId, cancellationToken).ConfigureAwait(false);
+        }
 
         // PR112b: the request now carries ClientCapabilities/PlaybackConstraints (PR91 decision
         // vocabulary), never a raw DeviceProfile - ReverseDlnaAdapter is the TEMPORARY translation
@@ -742,6 +749,31 @@ public class PlaybackSessionsController : BaseTesserafinApiController
 
         var openedSource = opened.MediaSource;
         return ([openedSource], openedSource.LiveStreamId);
+    }
+
+    /// <summary>
+    /// The recording still being written that <paramref name="item"/> is, if any.
+    /// </summary>
+    private ActiveRecordingInfo? ActiveRecordingOf(BaseItem item)
+        => item is Video { Path: { Length: > 0 } path } ? _recordingsManager?.GetActiveRecordingInfo(path) : null;
+
+    /// <summary>
+    /// The recording's opened stream as its one media source: the stream this session already holds
+    /// when it re-plans, otherwise a new open of the recording.
+    /// </summary>
+    private async Task<(IReadOnlyList<MediaSourceInfo> Sources, string LiveStreamId)> OpenRecordingStream(
+        ActiveRecordingInfo recording,
+        string? heldLiveStreamId,
+        CancellationToken cancellationToken)
+    {
+        if (heldLiveStreamId is not null)
+        {
+            var held = await _mediaSourceManager.GetLiveStreamWithDirectStreamProvider(heldLiveStreamId, cancellationToken).ConfigureAwait(false);
+            return ([held.Item1], heldLiveStreamId);
+        }
+
+        var opened = await _mediaSourceManager.OpenRecordingStream(recording, cancellationToken).ConfigureAwait(false);
+        return ([opened], opened.LiveStreamId);
     }
 
     /// <summary>

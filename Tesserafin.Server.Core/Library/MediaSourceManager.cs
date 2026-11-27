@@ -1003,6 +1003,30 @@ namespace Tesserafin.Server.Core.Library
             return [stream];
         }
 
+        /// <inheritdoc />
+        public async Task<MediaSourceInfo> OpenRecordingStream(ActiveRecordingInfo info, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(info);
+
+            var stream = new ActiveRecordingStream(info);
+            var mediaSource = stream.MediaSource;
+
+            // Probed through the provider, as an opened tuner stream is: the recording's own
+            // LiveRecordings route is [Authorize]d and the probe has no credential for it.
+            await new LiveStreamHelper(_mediaEncoder, _logger, _appPaths)
+                .AddMediaInfoWithProbe(mediaSource, false, null, false, stream, cancellationToken)
+                .ConfigureAwait(false);
+            AddMediaInfo(mediaSource);
+
+            using (await _liveStreamLocker.LockAsync(cancellationToken).ConfigureAwait(false))
+            {
+                _openStreams[mediaSource.LiveStreamId] = stream;
+            }
+
+            _logger.LogInformation("Recording {RecordingId} opened as live stream {LiveStreamId}", info.Id, mediaSource.LiveStreamId);
+            return mediaSource;
+        }
+
         public async Task CloseLiveStream(string id)
         {
             ArgumentException.ThrowIfNullOrEmpty(id);
