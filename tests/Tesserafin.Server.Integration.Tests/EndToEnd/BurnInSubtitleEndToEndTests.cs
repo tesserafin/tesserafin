@@ -15,6 +15,7 @@ using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Extensions.Json;
+using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Model.Configuration;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.Entities;
@@ -88,12 +89,56 @@ public sealed class BurnInSubtitleEndToEndTests : IClassFixture<DirectPlayFilmEn
     [Fact]
     public Task BurnIn_SrtSidecar_IsBurntIntoTheEncodedVideoOnTheSessionHlsRoute() => BurnsInAsync(Sidecar, "burn-srt");
 
-    private async Task BurnsInAsync(int subtitleIndex, string name)
+    // Audit row S3 (decided 2026-11-27): a client that wants the subtitle embedded in the output,
+    // which a session does not produce, and renders no external track for it: burnt in - never the
+    // legacy planner.
+    [Fact]
+    public Task Subtitle_WantedEmbedded_IsBurntIntoTheEncodedVideo_NeverTheLegacyPlanner()
+        => BurnsInAsync(Sidecar, "burn-embed", [new SubtitleCapability("subrip", SubtitleDeliveryMethod.Embed)]);
+
+    // Audit row S3: a client that wants the subtitle as an HLS rendition and renders WebVTT beside the
+    // stream: delivered as that external track, not burnt in - never the legacy planner.
+    [Fact]
+    public async Task Subtitle_WantedAsAnHlsRendition_IsDeliveredAsTheExternalTrackTheClientRenders()
+    {
+        var (client, userId) = await SignInAsync("subtitle-hls");
+        var itemId = await SeedFilmAsync();
+        using var response = await PostSessionAsync(client, itemId, userId, "subtitle-hls-ps", Sidecar, [new SubtitleCapability("subrip", SubtitleDeliveryMethod.Hls), new SubtitleCapability("vtt", SubtitleDeliveryMethod.External)], allowTranscoding: true);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.True(response.IsSuccessStatusCode, FormattableString.Invariant($"POST Playback/Sessions: {(int)response.StatusCode} {body}"));
+        var session = JsonSerializer.Deserialize<PlaybackSessionResponse>(body, JsonDefaults.Options)!;
+
+        Assert.Equal(PlaybackEngine.EngineVersion, session.DecisionVersion);
+        Assert.DoesNotContain(TransformKind.BurnInSubtitle, session.Transforms);
+        var descriptor = await GetDescriptorAsync(client, session.Id);
+        Assert.Null(descriptor.FallbackReason);
+        Assert.NotNull(descriptor.SubtitleUrl);
+
+        using var stop = await client.DeleteAsync(FormattableString.Invariant($"Playback/Sessions/{session.Id:N}"), TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, stop.StatusCode);
+    }
+
+    // Audit row S3: the subtitle can only be embedded and the client forbids the transcode a burn-in
+    // needs: refused with its reason - never the legacy planner, which throws on this host.
+    [Fact]
+    public async Task Subtitle_WantedEmbedded_WithTranscodingForbidden_IsRefusedWithItsReason()
+    {
+        var (client, userId) = await SignInAsync("subtitle-refused");
+        var itemId = await SeedFilmAsync();
+        using var response = await PostSessionAsync(client, itemId, userId, "subtitle-refused-ps", Sidecar, [new SubtitleCapability("subrip", SubtitleDeliveryMethod.Embed)], allowTranscoding: false);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(response.StatusCode == HttpStatusCode.UnprocessableEntity, FormattableString.Invariant($"POST Playback/Sessions: {(int)response.StatusCode} {body}"));
+        using var problem = JsonDocument.Parse(body);
+        Assert.Equal(nameof(LocalMediaRefusal.SubtitleDeliveryNotExecuted), problem.RootElement.GetProperty("reason").GetString());
+    }
+
+    private async Task BurnsInAsync(int subtitleIndex, string name, SubtitleCapability[]? subtitles = null)
     {
         var playSession = name + "-ps";
         var (client, userId) = await SignInAsync(name);
         var itemId = await SeedFilmAsync();
-        var session = await CreateSessionAsync(client, itemId, userId, playSession, subtitleIndex);
+        var session = await CreateSessionAsync(client, itemId, userId, playSession, subtitleIndex, subtitles ?? []);
 
         // Decision: the engine's. The client renders no subtitle, so the selected one is burnt in,
         // which means encoding the video even though the client decodes the source's H.264.
@@ -156,14 +201,19 @@ public sealed class BurnInSubtitleEndToEndTests : IClassFixture<DirectPlayFilmEn
             runTimeTicks: TimeSpan.FromSeconds(FixtureSeconds).Ticks);
     }
 
-    private static async Task<PlaybackSessionResponse> CreateSessionAsync(HttpClient client, Guid itemId, Guid userId, string playSessionId, int subtitleIndex)
+    private static Task<HttpResponseMessage> PostSessionAsync(HttpClient client, Guid itemId, Guid userId, string playSessionId, int subtitleIndex, SubtitleCapability[] subtitles, bool allowTranscoding)
     {
-        // A browser-like HLS client that renders no subtitle at all.
         var (capabilities, constraints) = EndToEndCapabilityPresets.BrowserRemuxOverHls();
-        capabilities = capabilities with { Decode = capabilities.Decode with { SubtitleDelivery = [] } };
-        constraints = constraints with { PreferredSubtitleStreamIndex = subtitleIndex };
+        capabilities = capabilities with { Decode = capabilities.Decode with { SubtitleDelivery = subtitles } };
+        constraints = constraints with { PreferredSubtitleStreamIndex = subtitleIndex, AllowTranscoding = allowTranscoding };
         var request = new CreatePlaybackSessionRequest(itemId, userId, capabilities, constraints, PlaySessionId: playSessionId);
-        using var response = await client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, TestContext.Current.CancellationToken);
+        return client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, TestContext.Current.CancellationToken);
+    }
+
+    private static async Task<PlaybackSessionResponse> CreateSessionAsync(HttpClient client, Guid itemId, Guid userId, string playSessionId, int subtitleIndex, SubtitleCapability[] subtitles)
+    {
+        // A browser-like HLS client that renders no subtitle at all, or only the ones it declares.
+        using var response = await PostSessionAsync(client, itemId, userId, playSessionId, subtitleIndex, subtitles, allowTranscoding: true);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.True(response.IsSuccessStatusCode, FormattableString.Invariant($"POST Playback/Sessions: {(int)response.StatusCode} {body}"));
         return JsonSerializer.Deserialize<PlaybackSessionResponse>(body, JsonDefaults.Options)!;

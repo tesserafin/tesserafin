@@ -523,6 +523,87 @@ public sealed class LocalMediaPlannerTests
     }
 
     [Fact]
+    public void A_subtitle_planned_as_an_hls_rendition_is_delivered_as_the_external_track_the_client_renders()
+    {
+        // The strict inner planner proves the existing chain is never reached (decided 2026-11-27).
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var film = Source("film", "h264", 1, 2, "mkv");
+        var client = Browser(hlsOutput: true) with
+        {
+            Decode = Browser(hlsOutput: true).Decode with
+            {
+                SubtitleDelivery = [new SubtitleCapability("srt", Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Hls), new SubtitleCapability("vtt", Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External)],
+            },
+        };
+        var declared = new LocalMediaRequest(client, _declared with { PreferredSubtitleStreamIndex = 2 });
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(declared);
+        var plan = planner.PlanVideo(Options(film));
+        var executed = store.TakeCaptured()?.ExecutionPlan;
+
+        Assert.NotNull(plan);
+        Assert.NotNull(executed);
+        Assert.Equal(Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External, executed.SubtitleDelivery);
+        Assert.Equal(2, executed.SubtitleStreamIndex);
+        Assert.True(LocalMediaPlanner.IsExecutableHlsOutput(executed));
+        Assert.Equal(LocalMediaRefusal.None, declared.Refusal);
+    }
+
+    [Theory]
+    [InlineData(true, PlayMethod.Transcode, LocalMediaRefusal.None)]
+    [InlineData(false, null, LocalMediaRefusal.SubtitleDeliveryNotExecuted)]
+    public void A_subtitle_the_client_wants_embedded_is_burnt_in_where_possible_and_refused_otherwise(bool allowTranscoding, PlayMethod? expected, LocalMediaRefusal refusal)
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var film = Source("film", "h264", 1, 2, "mkv");
+        var client = Browser(hlsOutput: true) with
+        {
+            Decode = Browser(hlsOutput: true).Decode with { SubtitleDelivery = [new SubtitleCapability("srt", Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Embed)] },
+        };
+        var declared = new LocalMediaRequest(client, _declared with { PreferredSubtitleStreamIndex = 2, AllowTranscoding = allowTranscoding });
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(declared);
+        var plan = planner.PlanVideo(Options(film));
+        var executed = store.TakeCaptured()?.ExecutionPlan;
+
+        Assert.Equal(expected, plan?.PlayMethod);
+        Assert.Equal(refusal, declared.Refusal);
+        if (expected is not null)
+        {
+            Assert.NotNull(executed);
+            Assert.Equal(Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Burn, executed.SubtitleDelivery);
+            Assert.True(LocalMediaPlanner.IsExecutableTranscode(executed));
+        }
+        else
+        {
+            Assert.Null(executed);
+        }
+    }
+
+    [Fact]
+    public void An_embedded_subtitle_the_client_reads_in_a_direct_play_stays_embedded()
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var film = Source("film", "h264", 1, 2, "mp4");
+        film.MediaStreams = [.. film.MediaStreams.Where(stream => stream.Type != MediaStreamType.Subtitle),
+            new MediaStream { Index = 2, Type = MediaStreamType.Subtitle, Codec = "srt", IsExternal = false }];
+        var client = Browser(hlsOutput: true) with
+        {
+            Decode = Browser(hlsOutput: true).Decode with { SubtitleDelivery = [new SubtitleCapability("srt", Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Embed)] },
+        };
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(client, _declared with { PreferredSubtitleStreamIndex = 2 }));
+        var plan = planner.PlanVideo(Options(film));
+        var executed = store.TakeCaptured()?.ExecutionPlan;
+
+        Assert.Equal(PlayMethod.DirectPlay, plan?.PlayMethod);
+        Assert.Equal(Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Embed, executed?.SubtitleDelivery);
+    }
+
+    [Fact]
     public void Only_a_tone_mapping_to_sdr_of_an_encoded_video_is_executable()
     {
         var tonemap = new PlaybackExecutionPlan(

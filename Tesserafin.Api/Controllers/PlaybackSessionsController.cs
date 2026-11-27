@@ -632,6 +632,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
                 LocalMediaRefusal.NotTheHeldLiveStream => "The source to plan is not the live stream this session holds.",
                 LocalMediaRefusal.NoSessionProvider => "This server cannot read the item's source for a playback session.",
                 LocalMediaRefusal.ToneMappingUnavailable => "The item is HDR and the client plays SDR only, but this server's FFmpeg cannot convert HDR to SDR.",
+                LocalMediaRefusal.SubtitleDeliveryNotExecuted => "The selected subtitle can be delivered only inside the output, which this server does not produce for a playback session, and it can neither be sent beside the stream nor burnt in.",
                 LocalMediaRefusal.HdrOutputNotExecuted => "The item is HDR in a form the client cannot play, and the client accepts neither SDR nor another output this server produces for a playback session.",
                 LocalMediaRefusal.TranscodeTargetNotExecuted => "The only transcode the client allows encodes to a codec this server does not encode for a playback session.",
                 _ => "No permitted delivery matches the declared capabilities. Declare a compatible output profile, or allow transcoding.",

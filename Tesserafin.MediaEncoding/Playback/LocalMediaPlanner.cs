@@ -435,7 +435,8 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
         var capabilities = WithExecutableTargetsFirst(request.Capabilities);
         foreach (var source in sources)
         {
-            var decision = _engine.Decide(context, capabilities, [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(constraints, source));
+            var sourceCapabilities = capabilities;
+            var decision = _engine.Decide(context, sourceCapabilities, [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(constraints, source));
             if (!decision.IsViable
                 || !PlaybackExecutionPlanBuilder.TryBuild(decision, out var plan, out _)
                 || plan is null)
@@ -443,12 +444,31 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
                 continue;
             }
 
+            if (plan.Method != PlaybackMethod.DirectPlay && IsSubtitleDeliveryNotExecuted(plan))
+            {
+                // A subtitle delivered in the output (embedded, or as an HLS rendition), which a
+                // session does not produce (decided 2026-11-27): an external track when the client
+                // renders one for that subtitle, else burnt in where possible - what the engine
+                // decides once those two are all the client declares. Embedded subtitles a client
+                // reads in a direct play stay as they are.
+                sourceCapabilities = WithoutSubtitleDeliveryInTheOutput(sourceCapabilities);
+                decision = _engine.Decide(context, sourceCapabilities, [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(constraints, source));
+                if (!decision.IsViable
+                    || !PlaybackExecutionPlanBuilder.TryBuild(decision, out plan, out _)
+                    || plan is null
+                    || IsSubtitleDeliveryNotExecuted(plan))
+                {
+                    refusal = LocalMediaRefusal.SubtitleDeliveryNotExecuted;
+                    continue;
+                }
+            }
+
             if (IsHdrOutputNotExecuted(plan))
             {
                 // An HDR output the session does not execute (decided 2026-11-27): SDR instead, when
                 // the client accepts SDR for that codec - executed where this server can tone-map,
                 // refused below where it cannot. Otherwise the session is refused.
-                var sdrOnly = WithSdrTarget(capabilities, plan.VideoCodec);
+                var sdrOnly = WithSdrTarget(sourceCapabilities, plan.VideoCodec);
                 if (sdrOnly is null)
                 {
                     refusal = LocalMediaRefusal.HdrOutputNotExecuted;
@@ -539,6 +559,34 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             && plan.Transforms.Contains(TransformKind.Tonemap)
             && plan.VideoRange is not null
             && !string.Equals(plan.VideoRange, "SDR", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Determines whether a plan delivers its subtitle inside the output - embedded, or as an HLS
+    /// subtitle rendition - which a session does not produce: it delivers a subtitle beside the
+    /// stream or burns it into the video it encodes (<see cref="IsExecutableSubtitle"/>).
+    /// </summary>
+    /// <param name="plan">The execution plan.</param>
+    /// <returns><see langword="true"/> if the plan delivers its subtitle in the output.</returns>
+    public static bool IsSubtitleDeliveryNotExecuted(PlaybackExecutionPlan? plan)
+        => plan?.SubtitleDelivery is Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Embed or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Hls;
+
+    /// <summary>
+    /// The client's capabilities without the subtitle deliveries a session does not produce
+    /// (embedded, HLS rendition): what remains is an external track for the formats the client
+    /// renders as one, and burn-in.
+    /// </summary>
+    /// <param name="declared">The capabilities the engine decided with.</param>
+    /// <returns>The capabilities to decide with again.</returns>
+    internal static Tesserafin.Playback.Decision.ClientCapabilities WithoutSubtitleDeliveryInTheOutput(Tesserafin.Playback.Decision.ClientCapabilities declared)
+        => declared with
+        {
+            Decode = declared.Decode with
+            {
+                SubtitleDelivery = declared.Decode.SubtitleDelivery
+                    .Where(capability => capability.Method is Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External or Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Burn)
+                    .ToList(),
+            },
+        };
 
     /// <summary>
     /// The client's capabilities with <paramref name="videoCodec"/> declared SDR only, when the client

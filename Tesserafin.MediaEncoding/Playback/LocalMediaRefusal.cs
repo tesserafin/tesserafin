@@ -30,6 +30,12 @@ public enum LocalMediaRefusal
     /// </summary>
     HdrOutputNotExecuted,
 
+    /// <summary>
+    /// The selected subtitle can be delivered only inside the output (embedded, HLS rendition), which a
+    /// session does not produce: the client renders it as no external track, and it cannot be burnt in.
+    /// </summary>
+    SubtitleDeliveryNotExecuted,
+
     /// <summary>The only transcode the client allows encodes to a target other than H.264/AAC.</summary>
     TranscodeTargetNotExecuted,
 }
