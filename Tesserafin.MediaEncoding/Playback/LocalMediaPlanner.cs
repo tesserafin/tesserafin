@@ -432,14 +432,38 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
         // its own user defaults.
         V2PlanRecord? remux = null;
         V2PlanRecord? transcode = null;
+        var capabilities = WithExecutableTargetsFirst(request.Capabilities);
         foreach (var source in sources)
         {
-            var decision = _engine.Decide(context, WithExecutableTargetsFirst(request.Capabilities), [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(constraints, source));
+            var decision = _engine.Decide(context, capabilities, [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(constraints, source));
             if (!decision.IsViable
                 || !PlaybackExecutionPlanBuilder.TryBuild(decision, out var plan, out _)
                 || plan is null)
             {
                 continue;
+            }
+
+            if (IsHdrOutputNotExecuted(plan))
+            {
+                // An HDR output the session does not execute (decided 2026-11-27): SDR instead, when
+                // the client accepts SDR for that codec - executed where this server can tone-map,
+                // refused below where it cannot. Otherwise the session is refused.
+                var sdrOnly = WithSdrTarget(capabilities, plan.VideoCodec);
+                if (sdrOnly is null)
+                {
+                    refusal = LocalMediaRefusal.HdrOutputNotExecuted;
+                    continue;
+                }
+
+                decision = _engine.Decide(context, sdrOnly, [DlnaPlaybackAdapter.ToSnapshot(source)], WithUserDefaults(constraints, source));
+                if (!decision.IsViable
+                    || !PlaybackExecutionPlanBuilder.TryBuild(decision, out plan, out _)
+                    || plan is null
+                    || IsHdrOutputNotExecuted(plan))
+                {
+                    refusal = LocalMediaRefusal.HdrOutputNotExecuted;
+                    continue;
+                }
             }
 
             if (plan.Method == PlaybackMethod.DirectPlay && !serverOnly)
@@ -502,6 +526,46 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
                 })
                 .ToList(),
         };
+
+    /// <summary>
+    /// Determines whether a plan encodes to an HDR range the session's executor does not produce: it
+    /// tone-maps only all the way to SDR (<see cref="IsToneMappingToSdr"/>), so an HDR10 output kept
+    /// out of another HDR source (Dolby Vision, for example) is decided but not executed.
+    /// </summary>
+    /// <param name="plan">The execution plan.</param>
+    /// <returns><see langword="true"/> if the plan keeps an HDR range in its encode.</returns>
+    public static bool IsHdrOutputNotExecuted(PlaybackExecutionPlan? plan)
+        => plan is { Method: PlaybackMethod.Transcode }
+            && plan.Transforms.Contains(TransformKind.Tonemap)
+            && plan.VideoRange is not null
+            && !string.Equals(plan.VideoRange, "SDR", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The client's capabilities with <paramref name="videoCodec"/> declared SDR only, when the client
+    /// declares SDR for it: the engine then tone-maps to SDR instead of keeping HDR10. <see langword="null"/>
+    /// when the client does not accept SDR for that codec - it is not given a range it did not declare.
+    /// </summary>
+    /// <param name="declared">The capabilities the engine decided with.</param>
+    /// <param name="videoCodec">The codec the plan encodes to.</param>
+    /// <returns>The capabilities to decide with again, or <see langword="null"/>.</returns>
+    internal static Tesserafin.Playback.Decision.ClientCapabilities? WithSdrTarget(Tesserafin.Playback.Decision.ClientCapabilities declared, string? videoCodec)
+    {
+        var target = declared.Decode.VideoCodecs.FirstOrDefault(codec => string.Equals(codec.Codec, videoCodec, StringComparison.OrdinalIgnoreCase));
+        if (target is null || !target.VideoRangeTypes.Contains("SDR", StringComparer.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return declared with
+        {
+            Decode = declared.Decode with
+            {
+                VideoCodecs = declared.Decode.VideoCodecs
+                    .Select(codec => ReferenceEquals(codec, target) ? codec with { VideoRangeTypes = ["SDR"] } : codec)
+                    .ToList(),
+            },
+        };
+    }
 
     /// <summary>
     /// The executable target first in a profile's codec list. A profile that names codecs of this

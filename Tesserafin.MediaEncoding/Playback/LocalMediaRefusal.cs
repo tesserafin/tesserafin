@@ -24,6 +24,12 @@ public enum LocalMediaRefusal
     /// <summary>The only output the client accepts is an HDR-to-SDR tone mapping this server's FFmpeg cannot perform.</summary>
     ToneMappingUnavailable,
 
+    /// <summary>
+    /// The only output the engine finds keeps an HDR range in its encode, which a session does not
+    /// execute, and the client does not accept SDR for that codec.
+    /// </summary>
+    HdrOutputNotExecuted,
+
     /// <summary>The only transcode the client allows encodes to a target other than H.264/AAC.</summary>
     TranscodeTargetNotExecuted,
 }

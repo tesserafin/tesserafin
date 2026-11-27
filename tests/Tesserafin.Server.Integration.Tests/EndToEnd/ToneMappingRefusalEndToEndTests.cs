@@ -28,7 +28,7 @@ using Xunit;
 namespace Tesserafin.Server.Integration.Tests.EndToEnd;
 
 /// <summary>
-/// Consolidation step 1, audit row S1 (docs/playback-path-inventory.md §7, decided 2026-11-27): an
+/// Consolidation step 1, audit rows S1 and S2 (docs/playback-path-inventory.md §7, decided 2026-11-27): an
 /// HDR10 film for a client that shows SDR only, on a server whose FFmpeg cannot tone-map. The
 /// session is refused with a 422 that names the reason; the legacy planner, which throws on this
 /// host, is never reached. The host declares no tone mapping whatever FFmpeg runs it, so the
@@ -78,6 +78,27 @@ public sealed class ToneMappingRefusalEndToEndTests : IClassFixture<ToneMappingR
         var (client, userId) = await SignInAsync("tonemap-refusal");
         var itemId = await SeedHdrFilmAsync();
 
+        await AssertRefusedAsync(client, itemId, userId, ["SDR"], LocalMediaRefusal.ToneMappingUnavailable);
+    }
+
+    // Audit row S2 (decided 2026-11-27): the engine would keep HDR10 in an H.264 encode, which a
+    // session does not produce. The client accepts SDR for H.264, so the session is re-planned to
+    // SDR - and refused here, where the server cannot tone-map; the client does not accept SDR, so
+    // it is refused outright. Neither reaches the legacy planner.
+    [Theory]
+    [InlineData(new[] { "SDR", "HDR10" }, LocalMediaRefusal.ToneMappingUnavailable)]
+    [InlineData(new[] { "HDR10" }, LocalMediaRefusal.HdrOutputNotExecuted)]
+    public async Task HdrOutput_TheSessionDoesNotExecute_IsReplannedToSdrOrRefused_NeverTheLegacyPlanner(string[] h264Ranges, LocalMediaRefusal expected)
+    {
+        var (client, userId) = await SignInAsync("hdr-output-" + h264Ranges.Length);
+        var itemId = await SeedHdrFilmAsync();
+
+        await AssertRefusedAsync(client, itemId, userId, h264Ranges, expected);
+    }
+
+    private static async Task AssertRefusedAsync(HttpClient client, Guid itemId, Guid userId, string[] h264Ranges, LocalMediaRefusal expected)
+    {
+        // HEVC is decoded in SDR only, so the HDR10 source is encoded, to H.264.
         var (capabilities, constraints) = EndToEndCapabilityPresets.BrowserRemuxOverHls();
         capabilities = capabilities with
         {
@@ -85,19 +106,19 @@ public sealed class ToneMappingRefusalEndToEndTests : IClassFixture<ToneMappingR
             {
                 VideoCodecs =
                 [
-                    new VideoCodecCapability("h264", [], null, null, ["SDR"], null, null),
+                    new VideoCodecCapability("h264", [], null, null, h264Ranges, null, null),
                     new VideoCodecCapability("hevc", [], null, null, ["SDR"], null, null),
                 ],
             },
         };
-        var request = new CreatePlaybackSessionRequest(itemId, userId, capabilities, constraints, PlaySessionId: "tonemap-refusal-ps");
+        var request = new CreatePlaybackSessionRequest(itemId, userId, capabilities, constraints, PlaySessionId: "refusal-" + Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, TestContext.Current.CancellationToken);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         // A legacy planner reached would answer 500 ("The legacy planner (StreamBuilder) was reached.").
         Assert.True(response.StatusCode == HttpStatusCode.UnprocessableEntity, FormattableString.Invariant($"POST Playback/Sessions: {(int)response.StatusCode} {body}"));
         using var problem = JsonDocument.Parse(body);
-        Assert.Equal(nameof(LocalMediaRefusal.ToneMappingUnavailable), problem.RootElement.GetProperty("reason").GetString());
+        Assert.Equal(expected.ToString(), problem.RootElement.GetProperty("reason").GetString());
         Assert.Contains("HDR", problem.RootElement.GetProperty("detail").GetString(), StringComparison.Ordinal);
     }
 

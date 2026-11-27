@@ -475,6 +475,53 @@ public sealed class LocalMediaPlannerTests
         }
     }
 
+    [Theory]
+    [InlineData(new[] { "SDR", "HDR10" }, true, PlayMethod.Transcode, LocalMediaRefusal.None)]
+    [InlineData(new[] { "SDR", "HDR10" }, false, null, LocalMediaRefusal.ToneMappingUnavailable)]
+    [InlineData(new[] { "HDR10" }, true, null, LocalMediaRefusal.HdrOutputNotExecuted)]
+    public void An_hdr_output_the_session_does_not_execute_becomes_sdr_when_the_client_accepts_it_and_is_refused_otherwise(
+        string[] h264Ranges,
+        bool canTonemap,
+        PlayMethod? expected,
+        LocalMediaRefusal refusal)
+    {
+        // The strict inner planner proves the existing chain is never reached (decided 2026-11-27).
+        var store = new InMemoryV2PlanStore();
+        var planner = new LocalMediaPlanner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object, new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance, canTonemap: () => canTonemap);
+        var film = Source("film", "hevc", 1, 2, "mkv");
+        film.MediaStreams = [new MediaStream { Index = 0, Type = MediaStreamType.Video, Codec = "hevc", BitDepth = 10, ColorTransfer = "smpte2084", ColorPrimaries = "bt2020", ColorSpace = "bt2020nc" },
+            .. film.MediaStreams.Where(stream => stream.Type != MediaStreamType.Video)];
+        // HEVC is decoded in SDR only, so the HDR10 source is encoded; H.264, the target, declares HDR10.
+        var client = Browser(hlsOutput: true) with
+        {
+            Decode = Browser(hlsOutput: true).Decode with
+            {
+                DirectPlayProfiles = [new DecodeProfile(MediaKind.Video, ["mp4"], ["h264", "hevc"], ["aac"])],
+                VideoCodecs = [new VideoCodecCapability("h264", [], null, null, h264Ranges, null, null), new VideoCodecCapability("hevc", [], null, null, ["SDR"], null, null)],
+            },
+        };
+        var declared = new LocalMediaRequest(client, _declared);
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(declared);
+        var plan = planner.PlanVideo(Options(film));
+        var executed = store.TakeCaptured()?.ExecutionPlan;
+
+        Assert.Equal(expected, plan?.PlayMethod);
+        Assert.Equal(refusal, declared.Refusal);
+        if (expected is not null)
+        {
+            Assert.NotNull(executed);
+            Assert.True(LocalMediaPlanner.IsToneMappingToSdr(executed));
+            Assert.True(LocalMediaPlanner.IsExecutableTranscode(executed));
+            Assert.False(LocalMediaPlanner.IsHdrOutputNotExecuted(executed));
+        }
+        else
+        {
+            Assert.Null(executed);
+        }
+    }
+
     [Fact]
     public void Only_a_tone_mapping_to_sdr_of_an_encoded_video_is_executable()
     {

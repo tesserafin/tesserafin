@@ -126,6 +126,38 @@ public sealed class ToneMappingEndToEndTests : IClassFixture<DirectPlayFilmEndTo
         Assert.Equal(HttpStatusCode.NoContent, stop.StatusCode);
     }
 
+    // Audit row S2 (decided 2026-11-27): a client that declares HDR10 for H.264 would get an HDR10
+    // H.264 encode, which a session does not produce. It also accepts SDR for H.264, so the session
+    // tone-maps to SDR instead, and is executed on its own HLS route - never the legacy planner.
+    [Fact]
+    public async Task HdrOutput_ForAClientThatAlsoAcceptsSdr_IsToneMappedToSdrOnTheSessionHlsRoute()
+    {
+        Assert.SkipUnless(
+            _factory.Services.GetRequiredService<IMediaEncoder>().SupportsFilter("tonemapx"),
+            "The server's FFmpeg has no tonemapx filter; set TESSERAFIN_PROJECT_FFMPEG to the project's FFmpeg build.");
+
+        var (client, userId) = await SignInAsync("hdr-output-sdr");
+        var itemId = await SeedHdrFilmAsync();
+        var session = await CreateSessionAsync(client, itemId, userId, "hdr-output-sdr-ps", ["SDR", "HDR10"]);
+
+        Assert.Equal(PlaybackMethod.Transcode, session.Method);
+        Assert.Contains(TransformKind.Tonemap, session.Transforms);
+        Assert.Equal("h264", session.Output.VideoCodec);
+
+        var descriptor = await GetDescriptorAsync(client, session.Id);
+        Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/Hls/main.m3u8?"), descriptor.Url, StringComparison.Ordinal);
+        var (init, segments) = await ReadPlaylistAsync(client, descriptor.Url);
+        var produced = Path.Combine(_workDir, $"produced-{Guid.NewGuid():N}.mp4");
+        await File.WriteAllBytesAsync(produced, [.. await GetBytesAsync(client, init), .. await GetBytesAsync(client, segments[0])], TestContext.Current.CancellationToken);
+        var (pixelFormat, transfer) = await EndToEndMediaFixtures.ProbeVideoColourAsync(produced);
+        Assert.Equal("yuv420p", pixelFormat);
+        Assert.NotEqual("smpte2084", transfer);
+        Assert.All(await FfmpegCommandsAsync(itemId), command => Assert.Contains("tonemapx=", command, StringComparison.Ordinal));
+
+        using var stop = await client.DeleteAsync(FormattableString.Invariant($"Playback/Sessions/{session.Id:N}"), TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, stop.StatusCode);
+    }
+
     private async Task<Guid> SeedHdrFilmAsync()
     {
         var directory = Directory.CreateDirectory(Path.Combine(_workDir, "film-" + Guid.NewGuid().ToString("N"))).FullName;
@@ -160,7 +192,7 @@ public sealed class ToneMappingEndToEndTests : IClassFixture<DirectPlayFilmEndTo
             runTimeTicks: TimeSpan.FromSeconds(FixtureSeconds).Ticks);
     }
 
-    private static async Task<PlaybackSessionResponse> CreateSessionAsync(HttpClient client, Guid itemId, Guid userId, string playSessionId)
+    private static async Task<PlaybackSessionResponse> CreateSessionAsync(HttpClient client, Guid itemId, Guid userId, string playSessionId, string[]? h264Ranges = null)
     {
         // A browser-like HLS client that decodes H.264 and HEVC but shows SDR only.
         var (capabilities, constraints) = EndToEndCapabilityPresets.BrowserRemuxOverHls();
@@ -170,7 +202,7 @@ public sealed class ToneMappingEndToEndTests : IClassFixture<DirectPlayFilmEndTo
             {
                 VideoCodecs =
                 [
-                    new VideoCodecCapability("h264", [], null, null, ["SDR"], null, null),
+                    new VideoCodecCapability("h264", [], null, null, h264Ranges ?? ["SDR"], null, null),
                     new VideoCodecCapability("hevc", [], null, null, ["SDR"], null, null),
                 ],
             },
