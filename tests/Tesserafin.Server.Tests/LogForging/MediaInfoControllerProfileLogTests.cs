@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // The endpoint is deprecated by tesserafin#129 step 7 and this test goes with it.
 using System;
 using System.Security.Claims;
 using System.Threading.Tasks;

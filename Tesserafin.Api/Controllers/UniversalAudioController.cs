@@ -97,6 +97,7 @@ public class UniversalAudioController : BaseTesserafinApiController
     /// <returns>A <see cref="Task"/> containing the audio file.</returns>
     [HttpGet("Audio/{itemId}/universal")]
     [HttpHead("Audio/{itemId}/universal", Name = "HeadUniversalAudioStream")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): plan playback through Playback/Sessions.")]
     [Authorize(Policy = Policies.MediaDelivery)]
     [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, "itemId", "mediaSourceId")]
     [ProducesResponseType(StatusCodes.Status200OK)]

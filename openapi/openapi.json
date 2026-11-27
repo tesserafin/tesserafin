@@ -23593,6 +23593,7 @@
     },
     "/Audio/{itemId}/universal": {
       "get": {
+        "deprecated": true,
         "operationId": "GetUniversalAudioStream",
         "parameters": [
           {
@@ -23845,6 +23846,7 @@
         ]
       },
       "head": {
+        "deprecated": true,
         "operationId": "HeadUniversalAudioStream",
         "parameters": [
           {
@@ -36804,6 +36806,7 @@
     },
     "/Items/{itemId}/PlaybackInfo": {
       "get": {
+        "deprecated": true,
         "operationId": "GetPlaybackInfo",
         "parameters": [
           {
@@ -36911,6 +36914,7 @@
         ]
       },
       "post": {
+        "deprecated": true,
         "description": "For backwards compatibility parameters can be sent via Query or Body, with Query having higher precedence.\nQuery parameters are obsolete.",
         "operationId": "GetPostedPlaybackInfo",
         "parameters": [
@@ -39998,6 +40002,7 @@
     },
     "/LiveStreams/Close": {
       "post": {
+        "deprecated": true,
         "operationId": "CloseLiveStream",
         "parameters": [
           {
@@ -40060,6 +40065,7 @@
     },
     "/LiveStreams/Open": {
       "post": {
+        "deprecated": true,
         "operationId": "OpenLiveStream",
         "parameters": [
           {

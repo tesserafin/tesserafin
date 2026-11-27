@@ -78,6 +78,7 @@ public class MediaInfoController : BaseTesserafinApiController
     /// <response code="404">Item not found.</response>
     /// <returns>A <see cref="Task"/> containing a <see cref="PlaybackInfoResponse"/> with the playback information.</returns>
     [HttpGet("Items/{itemId}/PlaybackInfo")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): plan playback through Playback/Sessions.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PlaybackInfoResponse>> GetPlaybackInfo([FromRoute, Required] Guid itemId, [FromQuery] Guid? userId)
@@ -124,6 +125,7 @@ public class MediaInfoController : BaseTesserafinApiController
     /// <response code="404">Item not found.</response>
     /// <returns>A <see cref="Task"/> containing a <see cref="PlaybackInfoResponse"/> with the playback info.</returns>
     [HttpPost("Items/{itemId}/PlaybackInfo")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): plan playback through Playback/Sessions.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PlaybackInfoResponse>> GetPostedPlaybackInfo(
@@ -304,6 +306,7 @@ public class MediaInfoController : BaseTesserafinApiController
     /// <response code="200">Media source opened.</response>
     /// <returns>A <see cref="Task"/> containing a <see cref="LiveStreamResponse"/>.</returns>
     [HttpPost("LiveStreams/Open")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): plan playback through Playback/Sessions.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<LiveStreamResponse>> OpenLiveStream(
         [FromQuery] string? openToken,
@@ -349,6 +352,7 @@ public class MediaInfoController : BaseTesserafinApiController
     /// <response code="204">Livestream closed.</response>
     /// <returns>A <see cref="NoContentResult"/> indicating success.</returns>
     [HttpPost("LiveStreams/Close")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): plan playback through Playback/Sessions.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<ActionResult> CloseLiveStream([FromQuery, Required] string liveStreamId)
     {
