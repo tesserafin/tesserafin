@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,12 +14,6 @@ namespace Tesserafin.Server.Core.ScheduledTasks;
 /// </summary>
 public class TaskManager : ITaskManager
 {
-    /// <summary>
-    /// The _task queue.
-    /// </summary>
-    private readonly ConcurrentQueue<Tuple<Type, TaskOptions>> _taskQueue =
-        new ConcurrentQueue<Tuple<Type, TaskOptions>>();
-
     private readonly IApplicationPaths _applicationPaths;
     private readonly ILogger<TaskManager> _logger;
 
@@ -53,9 +46,7 @@ public class TaskManager : ITaskManager
         where T : IScheduledTask
     {
         var task = ScheduledTasks.First(t => t.ScheduledTask.GetType() == typeof(T));
-        ((ScheduledTaskWorker)task).CancelIfRunning();
-
-        QueueScheduledTask<T>(options);
+        ((ScheduledTaskWorker)task).Queue(options, cancelRunning: true);
     }
 
     /// <inheritdoc />
@@ -85,7 +76,7 @@ public class TaskManager : ITaskManager
         }
         else
         {
-            QueueScheduledTask(scheduledTask, options);
+            ((ScheduledTaskWorker)scheduledTask).Queue(options);
         }
     }
 
@@ -102,10 +93,7 @@ public class TaskManager : ITaskManager
     {
         var task = ScheduledTasks.First(t => t.ScheduledTask.GetType() == typeof(T));
 
-        if (task.State != TaskState.Running)
-        {
-            QueueScheduledTask<T>(new TaskOptions());
-        }
+        ((ScheduledTaskWorker)task).QueueIfNotRunning();
     }
 
     /// <inheritdoc />
@@ -120,17 +108,7 @@ public class TaskManager : ITaskManager
         }
         else
         {
-            var type = scheduledTask.ScheduledTask.GetType();
-
-            _logger.LogDebug("Queuing task {Name}", type.Name);
-
-            lock (_taskQueue)
-            {
-                if (scheduledTask.State == TaskState.Idle)
-                {
-                    Execute(scheduledTask, new TaskOptions());
-                }
-            }
+            _ = Execute(scheduledTask, new TaskOptions());
         }
     }
 
@@ -145,30 +123,7 @@ public class TaskManager : ITaskManager
         }
         else
         {
-            QueueScheduledTask(scheduledTask, options);
-        }
-    }
-
-    /// <summary>
-    /// Queues the scheduled task.
-    /// </summary>
-    /// <param name="task">The task.</param>
-    /// <param name="options">The task options.</param>
-    private void QueueScheduledTask(IScheduledTaskWorker task, TaskOptions options)
-    {
-        var type = task.ScheduledTask.GetType();
-
-        _logger.LogDebug("Queuing task {Name}", type.Name);
-
-        lock (_taskQueue)
-        {
-            if (task.State == TaskState.Idle)
-            {
-                Execute(task, options);
-                return;
-            }
-
-            _taskQueue.Enqueue(new Tuple<Type, TaskOptions>(type, options));
+            ((ScheduledTaskWorker)scheduledTask).Queue(options);
         }
     }
 
@@ -228,36 +183,5 @@ public class TaskManager : ITaskManager
     internal void OnTaskCompleted(IScheduledTaskWorker task, TaskResult result)
     {
         TaskCompleted?.Invoke(task, new TaskCompletionEventArgs(task, result));
-
-        ExecuteQueuedTasks();
-    }
-
-    /// <summary>
-    /// Executes the queued tasks.
-    /// </summary>
-    private void ExecuteQueuedTasks()
-    {
-        lock (_taskQueue)
-        {
-            var list = new List<Tuple<Type, TaskOptions>>();
-
-            while (_taskQueue.TryDequeue(out var item))
-            {
-                if (list.All(i => i.Item1 != item.Item1))
-                {
-                    list.Add(item);
-                }
-            }
-
-            foreach (var enqueuedType in list)
-            {
-                var scheduledTask = ScheduledTasks.First(t => t.ScheduledTask.GetType() == enqueuedType.Item1);
-
-                if (scheduledTask.State == TaskState.Idle)
-                {
-                    Execute(scheduledTask, enqueuedType.Item2);
-                }
-            }
-        }
     }
 }
