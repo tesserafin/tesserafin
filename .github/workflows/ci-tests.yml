@@ -284,7 +284,10 @@ jobs:
     # native dependencies as run-tests: the end-to-end tests are the ones that
     # need ffmpeg (run 30230606313).
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
-    timeout-minutes: 30
+    # 45, not 30: the suite alone took 29:04 and 29:18 on 2026-11-27 (runs 45995755581,
+    # 46046458927) as consolidation slices added required end-to-end tests, and the
+    # second run was cancelled by the job ceiling after its test step had passed.
+    timeout-minutes: 45
     strategy:
       matrix:
         os: >-
