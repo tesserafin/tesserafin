@@ -49,15 +49,15 @@ namespace Tesserafin.Model.Tasks
             where T : IScheduledTask;
 
         /// <summary>
-        /// Queues the scheduled task.
+        /// Starts an idle task or requests one rerun after its active execution.
         /// </summary>
         /// <typeparam name="T">An implementation of <see cref="IScheduledTask" />.</typeparam>
-        /// <param name="options">Task options.</param>
+        /// <param name="options">Options for the run. The first pending request supplies the rerun options.</param>
         void QueueScheduledTask<T>(TaskOptions options)
             where T : IScheduledTask;
 
         /// <summary>
-        /// Queues the scheduled task.
+        /// Starts an idle task or requests one rerun after its active execution.
         /// </summary>
         /// <typeparam name="T">An implementation of <see cref="IScheduledTask" />.</typeparam>
         void QueueScheduledTask<T>()
@@ -71,7 +71,7 @@ namespace Tesserafin.Model.Tasks
             where T : IScheduledTask;
 
         /// <summary>
-        /// Queues the scheduled task.
+        /// Starts an idle task or requests one rerun after its active execution.
         /// </summary>
         /// <param name="task">The <see cref="IScheduledTask" /> to queue.</param>
         /// <param name="options">The <see cref="TaskOptions" /> to use.</param>
@@ -90,11 +90,11 @@ namespace Tesserafin.Model.Tasks
         void Cancel(IScheduledTaskWorker task);
 
         /// <summary>
-        /// Executes the tasks.
+        /// Starts the worker if idle, or joins its active execution.
         /// </summary>
-        /// <param name="task">The tasks.</param>
-        /// <param name="options">The options.</param>
-        /// <returns>The executed tasks.</returns>
+        /// <param name="task">The worker to start.</param>
+        /// <param name="options">Options used when starting a new execution.</param>
+        /// <returns>The task for that execution, including its completion notification.</returns>
         Task Execute(IScheduledTaskWorker task, TaskOptions options);
 
         /// <summary>

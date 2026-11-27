@@ -28,9 +28,16 @@ public class ScheduledTaskWorker : IScheduledTaskWorker
     private readonly ILogger _logger;
     private readonly ITaskManager _taskManager;
     private readonly Lock _lastExecutionResultSyncLock = new();
+    private readonly Lock _executionLock = new();
     private bool _readFromFile;
     private TaskResult _lastExecutionResult;
-    private Task _currentTask;
+    private Task _lastRun = Task.CompletedTask;
+    private CancellationTokenSource _cancellation;
+    private Task _cancellationCallbacks = Task.CompletedTask;
+    private TaskOptions _pending;
+    private DateTime _startTime;
+    private bool _disposed;
+    private bool _reportedAborted;
     private Tuple<TaskTriggerInfo, ITaskTrigger>[] _triggers;
     private string _id;
 
@@ -136,31 +143,20 @@ public class ScheduledTaskWorker : IScheduledTaskWorker
     /// <inheritdoc />
     public string Category => ScheduledTask.Category;
 
-    /// <summary>
-    /// Gets or sets the current cancellation token.
-    /// </summary>
-    /// <value>The current cancellation token source.</value>
-    private CancellationTokenSource CurrentCancellationTokenSource { get; set; }
-
-    /// <summary>
-    /// Gets or sets the current execution start time.
-    /// </summary>
-    /// <value>The current execution start time.</value>
-    private DateTime CurrentExecutionStartTime { get; set; }
-
     /// <inheritdoc />
     public TaskState State
     {
         get
         {
-            if (CurrentCancellationTokenSource is not null)
+            lock (_executionLock)
             {
-                return CurrentCancellationTokenSource.IsCancellationRequested
-                            ? TaskState.Cancelling
-                            : TaskState.Running;
-            }
+                if (_cancellation is null)
+                {
+                    return TaskState.Idle;
+                }
 
-            return TaskState.Idle;
+                return _cancellation.IsCancellationRequested ? TaskState.Cancelling : TaskState.Running;
+            }
         }
     }
 
@@ -268,11 +264,17 @@ public class ScheduledTaskWorker : IScheduledTaskWorker
 
         trigger.Stop();
 
-        _taskManager.QueueScheduledTask(ScheduledTask, trigger.TaskOptions);
+        Queue(trigger.TaskOptions);
 
         await Task.Delay(1000).ConfigureAwait(false);
 
-        trigger.Start(LastExecutionResult, _logger, Name, false);
+        lock (_executionLock)
+        {
+            if (!_disposed && InternalTriggers.Any(entry => entry.Item2 == trigger))
+            {
+                trigger.Start(LastExecutionResult, _logger, Name, false);
+            }
+        }
     }
 
     /// <summary>
@@ -280,57 +282,87 @@ public class ScheduledTaskWorker : IScheduledTaskWorker
     /// </summary>
     /// <param name="options">Task options.</param>
     /// <returns>Task.</returns>
-    /// <exception cref="InvalidOperationException">Cannot execute a Task that is already running.</exception>
-    public async Task Execute(TaskOptions options)
+    public Task Execute(TaskOptions options)
     {
-        var task = Task.Run(async () => await ExecuteInternal(options).ConfigureAwait(false));
-
-        _currentTask = task;
-
-        try
+        lock (_executionLock)
         {
-            await task.ConfigureAwait(false);
-        }
-        finally
-        {
-            _currentTask = null;
-            GC.Collect();
+            if (_disposed)
+            {
+                return Task.CompletedTask;
+            }
+
+            return _cancellation is null ? StartLocked(options) : _lastRun;
         }
     }
 
-    private async Task ExecuteInternal(TaskOptions options)
+    internal void Queue(TaskOptions options, bool cancelRunning = false)
     {
-        // Cancel the current execution, if any
-        if (CurrentCancellationTokenSource is not null)
+        lock (_executionLock)
         {
-            throw new InvalidOperationException("Cannot execute a Task that is already running");
-        }
-
-        var progress = new Progress<double>();
-
-        CurrentCancellationTokenSource = new CancellationTokenSource();
-
-        _logger.LogDebug("Executing {0}", Name);
-
-        ((TaskManager)_taskManager).OnTaskExecuting(this);
-
-        progress.ProgressChanged += OnProgressChanged;
-
-        TaskCompletionStatus status;
-        CurrentExecutionStartTime = DateTime.UtcNow;
-
-        Exception failureException = null;
-
-        try
-        {
-            if (options is not null && options.MaxRuntimeTicks.HasValue)
+            if (_disposed)
             {
-                CurrentCancellationTokenSource.CancelAfter(TimeSpan.FromTicks(options.MaxRuntimeTicks.Value));
+                return;
             }
 
-            await ScheduledTask.ExecuteAsync(progress, CurrentCancellationTokenSource.Token).ConfigureAwait(false);
+            if (_cancellation is null)
+            {
+                StartLocked(options);
+                return;
+            }
 
-            status = TaskCompletionStatus.Completed;
+            // Multiple requests during one run share the first requested rerun.
+            _pending ??= options ?? new TaskOptions();
+            if (cancelRunning)
+            {
+                CancelLocked();
+            }
+        }
+    }
+
+    internal void QueueIfNotRunning()
+    {
+        lock (_executionLock)
+        {
+            if (State != TaskState.Running)
+            {
+                Queue(new TaskOptions());
+            }
+        }
+    }
+
+    private Task StartLocked(TaskOptions options)
+    {
+        var cancellation = new CancellationTokenSource();
+        var startTime = DateTime.UtcNow;
+        var previous = _lastRun;
+        _cancellation = cancellation;
+        _startTime = startTime;
+        _lastRun = Task.Run(async () =>
+        {
+            // Publish the previous result and completion event before the next start event.
+            await previous.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            await ExecuteInternal(options, cancellation, startTime).ConfigureAwait(false);
+        });
+        return _lastRun;
+    }
+
+    private async Task ExecuteInternal(TaskOptions options, CancellationTokenSource cancellation, DateTime startTime)
+    {
+        var progress = new Progress<double>();
+        progress.ProgressChanged += OnProgressChanged;
+        var status = TaskCompletionStatus.Completed;
+        Exception failureException = null;
+        try
+        {
+            _logger.LogDebug("Executing {Name}", Name);
+            ((TaskManager)_taskManager).OnTaskExecuting(this);
+            if (options?.MaxRuntimeTicks is long maxRuntimeTicks)
+            {
+                cancellation.CancelAfter(TimeSpan.FromTicks(maxRuntimeTicks));
+            }
+
+            cancellation.Token.ThrowIfCancellationRequested();
+            await ScheduledTask.ExecuteAsync(progress, cancellation.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -339,21 +371,41 @@ public class ScheduledTaskWorker : IScheduledTaskWorker
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error executing Scheduled Task");
-
             failureException = ex;
-
             status = TaskCompletionStatus.Failed;
         }
 
-        var startTime = CurrentExecutionStartTime;
-        var endTime = DateTime.UtcNow;
-
         progress.ProgressChanged -= OnProgressChanged;
-        CurrentCancellationTokenSource.Dispose();
-        CurrentCancellationTokenSource = null;
-        CurrentProgress = null;
+        var endTime = DateTime.UtcNow;
+        Task callbacks;
+        bool reportCompletion;
+        lock (_executionLock)
+        {
+            _cancellation = null;
+            CurrentProgress = null;
+            callbacks = _cancellationCallbacks;
+            _cancellationCallbacks = Task.CompletedTask;
+            reportCompletion = !_reportedAborted;
+            if (_pending is not null)
+            {
+                var next = _pending;
+                _pending = null;
+                StartLocked(next);
+            }
+        }
 
-        OnTaskCompleted(startTime, endTime, status, failureException);
+        try
+        {
+            await callbacks.ConfigureAwait(false);
+            if (reportCompletion)
+            {
+                OnTaskCompleted(startTime, endTime, status, failureException);
+            }
+        }
+        finally
+        {
+            cancellation.Dispose();
+        }
     }
 
     /// <summary>
@@ -376,12 +428,15 @@ public class ScheduledTaskWorker : IScheduledTaskWorker
     /// <exception cref="InvalidOperationException">Cannot cancel a Task unless it is in the Running state.</exception>
     public void Cancel()
     {
-        if (State != TaskState.Running)
+        lock (_executionLock)
         {
-            throw new InvalidOperationException("Cannot cancel a Task unless it is in the Running state.");
-        }
+            if (State != TaskState.Running)
+            {
+                throw new InvalidOperationException("Cannot cancel a Task unless it is in the Running state.");
+            }
 
-        CancelIfRunning();
+            CancelLocked();
+        }
     }
 
     /// <summary>
@@ -389,10 +444,30 @@ public class ScheduledTaskWorker : IScheduledTaskWorker
     /// </summary>
     public void CancelIfRunning()
     {
-        if (State == TaskState.Running)
+        lock (_executionLock)
         {
-            _logger.LogInformation("Attempting to cancel Scheduled Task {0}", Name);
-            CurrentCancellationTokenSource.Cancel();
+            CancelLocked();
+        }
+    }
+
+    private void CancelLocked()
+    {
+        if (_cancellation is { IsCancellationRequested: false })
+        {
+            _logger.LogInformation("Attempting to cancel Scheduled Task {Name}", Name);
+            _cancellationCallbacks = ObserveCancellationAsync(_cancellation.CancelAsync());
+        }
+    }
+
+    private async Task ObserveCancellationAsync(Task callbacks)
+    {
+        try
+        {
+            await callbacks.ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error cancelling scheduled task {Name}", Name);
         }
     }
 
@@ -539,68 +614,51 @@ public class ScheduledTaskWorker : IScheduledTaskWorker
     /// <param name="dispose"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
     protected virtual void Dispose(bool dispose)
     {
-        if (dispose)
+        if (!dispose)
         {
-            DisposeTriggers();
+            return;
+        }
 
-            var wasRunning = State == TaskState.Running;
-            var startTime = CurrentExecutionStartTime;
-
-            var token = CurrentCancellationTokenSource;
-            if (token is not null)
+        Task task;
+        lock (_executionLock)
+        {
+            if (_disposed)
             {
-                try
-                {
-                    _logger.LogInformation("{Name}: Cancelling", Name);
-                    token.Cancel();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error calling CancellationToken.Cancel();");
-                }
+                return;
             }
 
-            var task = _currentTask;
-            if (task is not null)
-            {
-                try
-                {
-                    _logger.LogInformation("{Name}: Waiting on Task", Name);
-                    var exited = task.Wait(2000);
+            _disposed = true;
+            _pending = null;
+            CancelLocked();
+            task = _lastRun;
+        }
 
-                    if (exited)
-                    {
-                        _logger.LogInformation("{Name}: Task exited", Name);
-                    }
-                    else
-                    {
-                        _logger.LogInformation("{Name}: Timed out waiting for task to stop", Name);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error calling Task.WaitAll();");
-                }
-            }
-
-            if (token is not null)
+        DisposeTriggers();
+        try
+        {
+            if (task.Wait(TimeSpan.FromSeconds(2)))
             {
-                try
-                {
-                    _logger.LogDebug("{Name}: Disposing CancellationToken", Name);
-                    token.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error calling CancellationToken.Dispose();");
-                }
-            }
-
-            if (wasRunning)
-            {
-                OnTaskCompleted(startTime, DateTime.UtcNow, TaskCompletionStatus.Aborted, null);
+                return;
             }
         }
+        catch (AggregateException ex)
+        {
+            _logger.LogError(ex, "Error waiting for scheduled task {Name} to stop", Name);
+            return;
+        }
+
+        lock (_executionLock)
+        {
+            if (_cancellation is null)
+            {
+                return;
+            }
+
+            _reportedAborted = true;
+        }
+
+        _logger.LogWarning("{Name}: Timed out waiting for task to stop", Name);
+        OnTaskCompleted(_startTime, DateTime.UtcNow, TaskCompletionStatus.Aborted, null);
     }
 
     /// <summary>
