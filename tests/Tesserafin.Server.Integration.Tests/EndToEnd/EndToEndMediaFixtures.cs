@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Tesserafin.Server.Integration.Tests.EndToEnd;
@@ -512,6 +513,29 @@ public static class EndToEndMediaFixtures
 
         var sibling = Path.Combine(directory, Path.GetFileName(ffmpeg).Replace("ffmpeg", "ffprobe", StringComparison.Ordinal));
         return File.Exists(sibling) ? sibling : "ffprobe";
+    }
+
+    /// <summary>
+    /// Copies a fixture into Matroska with the supplied FFmetadata chapters.
+    /// </summary>
+    public static async Task MuxChaptersAsync(string source, string target, string chapters, CancellationToken cancellationToken)
+    {
+        var metadata = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllTextAsync(metadata, ";FFMETADATA1\n" + chapters, cancellationToken).ConfigureAwait(false);
+            await RunFfmpegAsync(
+            [
+                "-hide_banner", "-loglevel", "error", "-y",
+                "-i", source, "-f", "ffmetadata", "-i", metadata,
+                "-map", "0:v:0", "-map", "0:a:0", "-map_chapters", "1",
+                "-c", "copy", target,
+            ]).ConfigureAwait(false);
+        }
+        finally
+        {
+            File.Delete(metadata);
+        }
     }
 
     /// <summary>

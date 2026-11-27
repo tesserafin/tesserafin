@@ -66,12 +66,12 @@ public interface IMediaSegmentManager
     Task<IEnumerable<MediaSegmentDto>> GetSegmentsAsync(BaseItem item, IEnumerable<MediaSegmentType>? typeFilter, LibraryOptions libraryOptions, bool filterByProvider = true);
 
     /// <summary>
-    /// Gets information about any media segments stored for the given itemId.
+    /// Checks whether the item has stored or chapter-derived media segments.
     /// </summary>
-    /// <param name="itemId">The id of the <see cref="BaseItem"/>.</param>
-    /// <returns>True if there are any segments stored for the item, otherwise false.</returns>
+    /// <param name="item">The media item.</param>
+    /// <returns>True if there are segments for the item.</returns>
     /// TODO: this should be async but as the only caller BaseItem.GetVersionInfo isn't async, this is also not. Venson.
-    bool HasSegments(Guid itemId);
+    bool HasSegments(BaseItem item);
 
     /// <summary>
     /// Gets a list of all registered Segment Providers and their IDs.
