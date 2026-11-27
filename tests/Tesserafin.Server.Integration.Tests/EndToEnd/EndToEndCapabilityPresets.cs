@@ -130,7 +130,7 @@ public static class EndToEndCapabilityPresets
     /// its merits, not forced by a constraint that forbade the alternatives.
     /// </remarks>
     /// <returns>Capabilities declaring mp4-only H.264/AAC direct play, with every delivery method allowed.</returns>
-    public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) RemuxMatroskaToMp4()
+    public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) RemuxMatroskaToMpegTs()
     {
         var decode = new DecodeCapabilities(
             DirectPlayProfiles: [new DecodeProfile(MediaKind.Video, [FixtureContainer], [FixtureVideoCodec], [FixtureAudioCodec])],
@@ -140,22 +140,24 @@ public static class EndToEndCapabilityPresets
             SupportsHls: true,
             SupportsDash: false);
 
-        var capabilities = new ClientCapabilities(decode, OutputProfiles: []);
+        // A remux needs an output the client declared (#374): one MPEG-TS stream over HTTP, which the
+        // session's progressive route executes (it produces MPEG-TS or Matroska, never MP4).
+        var capabilities = new ClientCapabilities(decode, OutputProfiles: [new PlaybackOutputProfile(MediaKind.Video, StreamingProtocol.Http, "ts", [FixtureVideoCodec], [FixtureAudioCodec], null, null, null)]);
         var constraints = BaseConstraints(allowDirectPlay: true, allowDirectStream: true, allowTranscoding: true);
 
         return (capabilities, constraints);
     }
 
     /// <summary>
-    /// Issue #59, matrix row 2: <see cref="RemuxMatroskaToMp4"/> with transcoding explicitly
+    /// Issue #59, matrix row 2: <see cref="RemuxMatroskaToMpegTs"/> with transcoding explicitly
     /// FORBIDDEN. Container is not supported but both codecs are copyable, so this is a genuine
     /// remux - which <see cref="PlaybackConstraints.AllowDirectStream"/>=true must keep permitting.
     /// Nothing here may be re-encoded, so <c>AllowTranscoding:false</c> must not block it.
     /// </summary>
-    /// <returns>The <see cref="RemuxMatroskaToMp4"/> capabilities, with constraints that forbid transcoding.</returns>
-    public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) RemuxMatroskaToMp4TranscodingForbidden()
+    /// <returns>The <see cref="RemuxMatroskaToMpegTs"/> capabilities, with constraints that forbid transcoding.</returns>
+    public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) RemuxMatroskaToMpegTsTranscodingForbidden()
     {
-        var (capabilities, _) = RemuxMatroskaToMp4();
+        var (capabilities, _) = RemuxMatroskaToMpegTs();
         var constraints = BaseConstraints(allowDirectPlay: true, allowDirectStream: true, allowTranscoding: false);
 
         return (capabilities, constraints);
@@ -256,26 +258,6 @@ public static class EndToEndCapabilityPresets
             StartTimeTicks: 0);
 
         return (capabilities, constraints);
-    }
-
-    /// <summary>
-    /// <see cref="TranscodeHls"/> with MP3 as the only audio target of its HLS output. The engine's
-    /// answer is a transcode to MP3, which a session refuses (it encodes audio to AAC only and the
-    /// client declares no AAC to re-plan to); the existing chain still serves it to a
-    /// <c>PlaybackInfo</c> client from <c>/Videos/{id}/master.m3u8</c> (<see cref="LegacyPlaybackInfo"/>),
-    /// the subject for that chain's own contracts while it still has consumers.
-    /// </summary>
-    /// <returns>HLS-transcode capabilities whose audio target the session journey does not execute.</returns>
-    public static (ClientCapabilities Capabilities, PlaybackConstraints Constraints) TranscodeHlsToAnUnexecutedTarget()
-    {
-        var (capabilities, constraints) = TranscodeHls();
-        var outputProfiles = new List<PlaybackOutputProfile>
-        {
-            new(MediaKind.Video, StreamingProtocol.Hls, "ts", [FixtureVideoCodec], ["mp3"], null, null, null),
-        };
-
-        // The audio must be re-encoded too, or the AAC source is copied and the target never matters.
-        return (capabilities with { OutputProfiles = outputProfiles }, constraints with { AllowAudioStreamCopy = false });
     }
 
     /// <summary>

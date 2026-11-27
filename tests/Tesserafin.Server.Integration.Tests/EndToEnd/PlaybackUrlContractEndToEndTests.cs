@@ -43,7 +43,7 @@ namespace Tesserafin.Server.Integration.Tests.EndToEnd;
 /// relies on, verified against <c>Tesserafin.Model/Dlna/StreamBuilder.cs</c>) - a deliberate simplification
 /// over maintaining five differently-encoded fixtures, since the play METHOD is what those tests need
 /// to control, not the codec. The one deliberate exception is
-/// <see cref="Remux_MatroskaSourceAnnouncedAsMp4_ServesRealMp4Bytes"/> (issue #57), which asserts on
+/// <see cref="Remux_MatroskaSource_ServesTheDeclaredMpegTs"/> (issue #57), which asserts on
 /// the CONTENT of the served bytes rather than only on the method: it needs a source whose container
 /// genuinely differs from the announced output container, so it uses the real Matroska fixture
 /// <see cref="EndToEndMediaFixtures.CreateH264AacMkvAsync"/> - with an mp4 source the defect it pins
@@ -209,7 +209,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         // the existing chain's contract - master playlist, then variant, then segment - reached through
         // its remaining caller, PlaybackInfo, for a target the session journey does not execute (MP3).
         var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 transcode fixture {Guid.NewGuid()}");
-        var descriptor = new { Url = await LegacyPlaybackInfo.TranscodingUrlAsync(_client, itemId, _userId, EndToEndCapabilityPresets.TranscodeHlsToAnUnexecutedTarget()) };
+        var descriptor = new { Url = LegacyHlsRoute.MasterUrl(_client, itemId) };
 
         var masterManifest = await GetTextAsync(descriptor.Url, "HLS master playlist");
         Assert.Contains("#EXTM3U", masterManifest, StringComparison.Ordinal);
@@ -264,57 +264,6 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     }
 
     /// <summary>
-    /// Scenario 5: the PR115c kill switch (<see cref="PlaybackShadowOptions.Mode"/> flipped away from
-    /// <see cref="PlaybackEngineMode.V2"/>/<see cref="PlaybackEngineMode.Canary"/>) forces legacy for
-    /// the very next request, with no restart - and the URL that request resolves to must still be
-    /// servable.
-    /// </summary>
-    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Fact]
-    public async Task KillSwitch_ForcesLegacyOnNextRequest_UrlStillServable()
-    {
-        // Since consolidation step 1 every source a session reads is executed by the session journey
-        // or refused: no session is planned by the existing chain for the kill switch to restore
-        // (docs/playback-path-inventory.md §7). The kill switch still governs that chain's remaining
-        // caller, PlaybackInfo, through the same live wiring.
-        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 kill switch fixture {Guid.NewGuid()}");
-
-        // V2 mode (not merely Canary): every session is v2-authoritative, no cohort-hash dependency -
-        // the simplest way to get a REAL "before" state where v2 actually served this request, so the
-        // "after" transition below is a genuine transition and not just re-observing the default.
-        _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.V2;
-        var beforeUrl = await LegacyPlaybackInfo.TranscodingUrlAsync(_client, itemId, _userId, EndToEndCapabilityPresets.TranscodeHls());
-        var before = LiveWiringOutcomeOf(beforeUrl);
-        Assert.True(before is { ServedByV2: true, FallbackReason: null }, $"Expected v2 to serve PlaybackInfo before the kill switch, got {before}.");
-        await AssertUrlServes200Async(beforeUrl, "Before kill switch");
-
-        // The kill switch itself: an operator flips PlaybackShadow.Mode back to Legacy. Per
-        // PlaybackLiveStreamResolver's own remarks, this takes effect on the very next request.
-        _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
-        var afterUrl = await LegacyPlaybackInfo.TranscodingUrlAsync(_client, itemId, _userId, EndToEndCapabilityPresets.TranscodeHls());
-        var after = LiveWiringOutcomeOf(afterUrl);
-        Assert.Equal(PlaybackLiveFallbackReason.KillSwitch, after?.FallbackReason);
-        Assert.False(after?.ServedByV2);
-        await AssertUrlServes200Async(afterUrl, "After kill switch (legacy fallback)");
-    }
-
-    /// <summary>
-    /// The live-wiring outcome recorded for the session PlaybackInfo created, found by the play
-    /// session its transcoding url names.
-    /// </summary>
-    private PlaybackLiveWiringOutcome? LiveWiringOutcomeOf(string transcodingUrl)
-    {
-        var query = transcodingUrl[(transcodingUrl.IndexOf('?', StringComparison.Ordinal) + 1)..];
-        var playSessionId = query.Split('&')
-            .Select(pair => pair.Split('=', 2))
-            .First(pair => string.Equals(pair[0], "PlaySessionId", StringComparison.OrdinalIgnoreCase))[1];
-        var session = Assert.Single(
-            _factory.Services.GetRequiredService<IPlaybackSessionManager>().GetAll(),
-            s => string.Equals(s.PlaySessionId, Uri.UnescapeDataString(playSessionId), StringComparison.Ordinal));
-        return _factory.Services.GetRequiredService<IPlaybackLiveWiringDiagnosticsStore>().TryGet(session.Id, out var outcome) ? outcome : null;
-    }
-
-    /// <summary>
     /// Scenario 6 (issue #57): a Remux decision must be EXECUTED, not merely announced.
     /// </summary>
     /// <remarks>
@@ -337,7 +286,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     /// </remarks>
     /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
     [Fact(Timeout = 90_000)]
-    public async Task Remux_MatroskaSourceAnnouncedAsMp4_ServesRealMp4Bytes()
+    public async Task Remux_MatroskaSource_ServesTheDeclaredMpegTs()
     {
         var mkvPath = await EndToEndMediaFixtures.CreateH264AacMkvAsync(_workDir);
         var itemId = LibraryItemSeeder.SeedVideo(
@@ -348,14 +297,14 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
             _baseStreams,
             $"Issue 57 matroska fixture {Guid.NewGuid()}");
 
-        var (capabilities, constraints) = EndToEndCapabilityPresets.RemuxMatroskaToMp4();
+        var (capabilities, constraints) = EndToEndCapabilityPresets.RemuxMatroskaToMpegTs();
 
         // The reported descriptor carried ServedBy=6 and NO FallbackReason - the v2 engine, not a
         // legacy fallback. V2 mode (not merely Canary) makes every session v2-authoritative with no
         // cohort-hash dependency; InitializeAsync resets this to Legacy before every test.
         _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.V2;
 
-        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-remux-mkv-to-mp4", cancellationToken: TestContext.Current.CancellationToken);
+        var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-remux-mkv-to-ts", cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackMethod.Remux, session.Method);
 
         var descriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
@@ -366,126 +315,30 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         Assert.NotEqual(PlaybackSessionResponse.LegacyDecisionVersion, descriptor.ServedBy);
 
         Assert.Equal(StreamingProtocol.Http, descriptor.Protocol);
-        Assert.Equal("mp4", descriptor.Container);
-        Assert.Equal("video/mp4", descriptor.MimeType);
+        Assert.Equal("ts", descriptor.Container);
+        Assert.Equal("video/mp2t", descriptor.MimeType);
 
         // Static=true means "serve the source file untouched" - DirectPlay semantics. A Remux that
         // asks for it can only ever serve the source container, whatever it announces.
         Assert.DoesNotContain("Static=true", descriptor.Url, StringComparison.OrdinalIgnoreCase);
 
-        var served = await GetBytesAsync(descriptor.Url, "Remux (Matroska source announced as mp4)");
+        var served = await GetBytesAsync(descriptor.Url, "Remux (Matroska source, MPEG-TS declared)");
         var source = await File.ReadAllBytesAsync(mkvPath, TestContext.Current.CancellationToken);
 
         Assert.False(
             served.AsSpan().SequenceEqual(source),
-            $"The served bytes are byte-identical to the source .mkv ({served.Length} bytes): the announced remux to mp4 never happened.");
+            $"The served bytes are byte-identical to the source .mkv ({served.Length} bytes): the announced remux never happened.");
 
         Assert.False(
             IsMatroska(served),
-            $"The served bytes start with the Matroska/EBML magic 1a45dfa3, but the descriptor announced Container=mp4/MimeType=video/mp4. Head: {Head(served)}");
-
-        Assert.True(
-            IsIsoBaseMediaFile(served),
-            $"The served bytes are not ISOBMFF: expected the ASCII box type 'ftyp' at offset 4. Head: {Head(served)}");
+            $"The served bytes start with the Matroska/EBML magic 1a45dfa3, but the descriptor announced Container=ts. Head: {Head(served)}");
 
         // The strongest available statement: what a real demuxer says the bytes ARE.
-        var probedPath = Path.Combine(_workDir, $"served-{Guid.NewGuid():N}.mp4");
+        var probedPath = Path.Combine(_workDir, $"served-{Guid.NewGuid():N}.ts");
         await File.WriteAllBytesAsync(probedPath, served, TestContext.Current.CancellationToken);
         var formatName = await EndToEndMediaFixtures.ProbeFormatNameAsync(probedPath);
         Assert.DoesNotContain("matroska", formatName, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("mp4", formatName, StringComparison.OrdinalIgnoreCase);
-    }
-
-    /// <summary>
-    /// #374: the existing chain must not answer a Remux with the source container the client
-    /// declared unplayable. Asserted down to what a demuxer says the served segment is.
-    /// </summary>
-    /// <remarks>
-    /// Driven through <c>POST Items/{id}/PlaybackInfo</c>, the chain's remaining caller for a local
-    /// video (every native client start that is not Sessions): a session remux of a local video is
-    /// executed by the session journey and never reaches this chain (RemuxFilmEndToEndTests).
-    /// </remarks>
-    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Fact(Timeout = 90_000)]
-    public async Task Remux_LegacyPath_UndeclaredSourceContainer_ServesDeclaredOutputNotSourceFile()
-    {
-        var mkvPath = await EndToEndMediaFixtures.CreateH264AacMkvAsync(_workDir);
-        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, mkvPath, "mkv", _baseStreams, $"Issue 374 fixture {Guid.NewGuid()}");
-
-        var (capabilities, constraints) = EndToEndCapabilityPresets.Remux();
-        var request = new JsonObject
-        {
-            ["UserId"] = _userId,
-            ["DeviceProfile"] = JsonSerializer.SerializeToNode(ReverseDlnaAdapter.ToDeviceProfile(capabilities), JsonDefaults.Options),
-            ["EnableDirectPlay"] = constraints.AllowDirectPlay,
-            ["EnableDirectStream"] = constraints.AllowDirectStream,
-            ["EnableTranscoding"] = constraints.AllowTranscoding,
-            ["AllowVideoStreamCopy"] = constraints.AllowVideoStreamCopy,
-            ["AllowAudioStreamCopy"] = constraints.AllowAudioStreamCopy,
-        };
-        using var content = new StringContent(request.ToJsonString(), Encoding.UTF8, "application/json");
-        using var response = await _client.PostAsync(FormattableString.Invariant($"Items/{itemId}/PlaybackInfo"), content, TestContext.Current.CancellationToken);
-        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        Assert.True(response.IsSuccessStatusCode, $"POST Items/{{id}}/PlaybackInfo: {(int)response.StatusCode} {Truncate(body)}");
-        var source = JsonNode.Parse(body)!["MediaSources"]!.AsArray()[0]!;
-        Assert.Equal("hls", source["TranscodingSubProtocol"]?.GetValue<string>(), StringComparer.OrdinalIgnoreCase);
-        Assert.Equal("ts", source["TranscodingContainer"]?.GetValue<string>(), StringComparer.OrdinalIgnoreCase);
-        var url = source["TranscodingUrl"]?.GetValue<string>();
-        Assert.False(string.IsNullOrEmpty(url), $"PlaybackInfo named no transcoding url: {Truncate(body)}");
-        Assert.DoesNotContain("Static=true", url, StringComparison.OrdinalIgnoreCase);
-
-        var master = await GetTextAsync(url, "#374 master");
-        var variantUrl = FirstUriLine(master, url);
-        Assert.NotNull(variantUrl);
-        var variant = await GetTextWithRetryAsync(variantUrl, "#374 variant", TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
-        var segmentUrl = FirstUriLine(variant, variantUrl);
-        Assert.NotNull(segmentUrl);
-
-        var served = await GetBytesAsync(segmentUrl, "#374 segment");
-        Assert.False(IsMatroska(served), $"Served bytes are still the source Matroska. Head: {Head(served)}");
-        var probedPath = Path.Combine(_workDir, $"served-374-{Guid.NewGuid():N}.ts");
-        await File.WriteAllBytesAsync(probedPath, served, TestContext.Current.CancellationToken);
-        Assert.Equal("mpegts", await EndToEndMediaFixtures.ProbeFormatNameAsync(probedPath));
-    }
-
-    /// <summary>
-    /// #374: a session v2 decided, falling back to legacy for real. With a compatible legacy output
-    /// the fallback serves it; without one it refuses, and never the undeclared source file.
-    /// </summary>
-    /// <param name="mode">The engine mode the session is planned under.</param>
-    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Theory(Timeout = 90_000)]
-    [InlineData(PlaybackEngineMode.V2)]
-    [InlineData(PlaybackEngineMode.Canary)]
-    public async Task RealFallbackFromV2_NeverServesTheUndeclaredSourceFile(PlaybackEngineMode mode)
-    {
-        var mkvPath = await EndToEndMediaFixtures.CreateH264AacMkvAsync(_workDir);
-        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, mkvPath, "mkv", _baseStreams, $"Issue 374 fallback {Guid.NewGuid()}");
-        var shadow = _configManager.Configuration.PlaybackShadow;
-        shadow.Mode = mode;
-        shadow.CanaryPercentage = 100;
-
-        var (mp4Declared, constraints) = EndToEndCapabilityPresets.RemuxMatroskaToMp4();
-        var withOutput = await CreateSessionAsync(itemId, mp4Declared, constraints, $"e2e-374-fallback-{mode}-ok", cancellationToken: TestContext.Current.CancellationToken);
-        var noOutput = mp4Declared with
-        {
-            Decode = mp4Declared.Decode with { DirectPlayProfiles = [new DecodeProfile(MediaKind.Video, ["webm"], [EndToEndCapabilityPresets.FixtureVideoCodec], [EndToEndCapabilityPresets.FixtureAudioCodec])] },
-        };
-        var withoutOutput = await CreateSessionAsync(itemId, noOutput, constraints, $"e2e-374-fallback-{mode}-none", cancellationToken: TestContext.Current.CancellationToken);
-
-        // The kill switch is the operator's real, live path back to legacy.
-        shadow.Mode = PlaybackEngineMode.Legacy;
-
-        var descriptor = await GetStreamDescriptorAsync(withOutput.Id, TestContext.Current.CancellationToken);
-        Assert.Equal(PlaybackLiveFallbackReason.KillSwitch, descriptor.FallbackReason);
-        Assert.Equal("mp4", descriptor.Container);
-        Assert.DoesNotContain("Static=true", descriptor.Url, StringComparison.OrdinalIgnoreCase);
-        var served = await GetBytesAsync(descriptor.Url, "#374 fallback");
-        Assert.False(IsMatroska(served), $"The fallback served the source Matroska. Head: {Head(served)}");
-        Assert.True(IsIsoBaseMediaFile(served), $"The fallback did not serve mp4. Head: {Head(served)}");
-
-        using var refused = await _client.GetAsync($"Playback/Sessions/{withoutOutput.Id}/Stream", TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+        Assert.Equal("mpegts", formatName);
     }
 
     /// <summary>
@@ -517,12 +370,12 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     /// </summary>
     /// <remarks>
     /// Byte-level on purpose, and for the same reason as
-    /// <see cref="Remux_MatroskaSourceAnnouncedAsMp4_ServesRealMp4Bytes"/>: a 200 proves the request
+    /// <see cref="Remux_MatroskaSource_ServesTheDeclaredMpegTs"/>: a 200 proves the request
     /// was not refused, but only the bytes prove a REAL remux still happened under the constraint.
     /// </remarks>
     /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
     [Fact(Timeout = 90_000)]
-    public async Task Remux_TranscodingForbidden_StillServesRealRemuxedMp4Bytes()
+    public async Task Remux_TranscodingForbidden_StillServesRealRemuxedBytes()
     {
         var mkvPath = await EndToEndMediaFixtures.CreateH264AacMkvAsync(_workDir);
         var itemId = LibraryItemSeeder.SeedVideo(
@@ -533,7 +386,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
             _baseStreams,
             $"Issue 59 remux-not-blocked fixture {Guid.NewGuid()}");
 
-        var (capabilities, constraints) = EndToEndCapabilityPresets.RemuxMatroskaToMp4TranscodingForbidden();
+        var (capabilities, constraints) = EndToEndCapabilityPresets.RemuxMatroskaToMpegTsTranscodingForbidden();
         Assert.False(constraints.AllowTranscoding, "Premise: this row is only meaningful with transcoding forbidden.");
 
         _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.V2;
@@ -542,7 +395,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         Assert.Equal(PlaybackMethod.Remux, session.Method);
 
         var descriptor = await GetStreamDescriptorAsync(session.Id, TestContext.Current.CancellationToken);
-        Assert.Equal("mp4", descriptor.Container);
+        Assert.Equal("ts", descriptor.Container);
         Assert.DoesNotContain("Static=true", descriptor.Url, StringComparison.OrdinalIgnoreCase);
 
         var served = await GetBytesAsync(descriptor.Url, "Remux under AllowTranscoding:false");
@@ -552,13 +405,12 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
             served.AsSpan().SequenceEqual(source),
             $"The served bytes are byte-identical to the source .mkv ({served.Length} bytes): the remux never happened.");
         Assert.False(IsMatroska(served), $"Served bytes are still Matroska. Head: {Head(served)}");
-        Assert.True(IsIsoBaseMediaFile(served), $"Served bytes are not ISOBMFF ('ftyp' at offset 4). Head: {Head(served)}");
 
-        var probedPath = Path.Combine(_workDir, $"served-59-remux-{Guid.NewGuid():N}.mp4");
+        var probedPath = Path.Combine(_workDir, $"served-59-remux-{Guid.NewGuid():N}.ts");
         await File.WriteAllBytesAsync(probedPath, served, TestContext.Current.CancellationToken);
         var formatName = await EndToEndMediaFixtures.ProbeFormatNameAsync(probedPath);
         Assert.DoesNotContain("matroska", formatName, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("mp4", formatName, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("mpegts", formatName);
     }
 
     /// <summary>
@@ -674,10 +526,6 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     private static bool IsMatroska(byte[] bytes) =>
         bytes.Length >= 4 && bytes[0] == 0x1A && bytes[1] == 0x45 && bytes[2] == 0xDF && bytes[3] == 0xA3;
 
-    /// <summary>ISO base media file format: the ASCII box type <c>ftyp</c> at offset 4 (ISO/IEC 14496-12).</summary>
-    private static bool IsIsoBaseMediaFile(byte[] bytes) =>
-        bytes.Length >= 8 && bytes[4] == (byte)'f' && bytes[5] == (byte)'t' && bytes[6] == (byte)'y' && bytes[7] == (byte)'p';
-
     private static string Head(byte[] bytes, int count = 16) =>
         Convert.ToHexString(bytes, 0, Math.Min(count, bytes.Length));
 
@@ -712,7 +560,7 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     /// Fetches a URL the descriptor named and returns the bytes it actually served, asserting 200
     /// and a minimum length first. Returning the bytes (rather than only asserting on them) is what
     /// lets a caller assert on the CONTENT - see
-    /// <see cref="Remux_MatroskaSourceAnnouncedAsMp4_ServesRealMp4Bytes"/>, where the whole point is
+    /// <see cref="Remux_MatroskaSource_ServesTheDeclaredMpegTs"/>, where the whole point is
     /// that a 200 with the right Content-Type proved nothing about what was inside it.
     /// </summary>
     private async Task<byte[]> GetBytesAsync(string relativeUrl, string diagnosticContext, int minBytes = 1)

@@ -12,7 +12,7 @@ namespace Tesserafin.MediaEncoding.Playback;
 public enum PlaybackLiveFallbackReason
 {
     /// <summary>
-    /// <see cref="IPlaybackExecutionPlanResolver.Resolve(PlaybackSessionId)"/> found no
+    /// <c>IPlaybackExecutionPlanResolver.Resolve</c> (removed, tesserafin#129 step 7) found no
     /// authoritative <see cref="V2PlanRecord"/> for this session at all: the session is outside the
     /// canary cohort, the effective <see cref="Tesserafin.Model.Configuration.PlaybackEngineMode"/> is
     /// <c>Legacy</c>/<c>Shadow</c>, or nothing was ever attached (session created before v2 became

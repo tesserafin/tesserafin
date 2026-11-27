@@ -128,7 +128,6 @@ public sealed class AudioHlsEndToEndTests : IClassFixture<DirectPlayFilmEndToEnd
         });
 
         var tracked = Assert.Single(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, playSession, StringComparison.Ordinal));
-        Assert.Null(tracked.Plan.StreamInfo);
         var job = _transcodeManager.GetTranscodingJob(playSession);
         Assert.NotNull(job);
         Assert.Equal(userId, job.UserId);
@@ -236,7 +235,6 @@ public sealed class AudioHlsEndToEndTests : IClassFixture<DirectPlayFilmEndToEnd
         // one job, its owner's.
         var tracked = Assert.Single(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, playSession, StringComparison.Ordinal));
         Assert.Equal(session.Id, tracked.Id.Value);
-        Assert.Null(tracked.Plan.StreamInfo);
         var job = _transcodeManager.GetTranscodingJob(playSession);
         Assert.NotNull(job);
         Assert.Equal(userId, job.UserId);

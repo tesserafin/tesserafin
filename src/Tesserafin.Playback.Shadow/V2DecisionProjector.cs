@@ -143,7 +143,7 @@ public static class V2DecisionProjector
     /// deliberately no <see cref="ReasonCategory"/> entry (like <c>SubtitleBurnInRequired</c>), so it
     /// is silently excluded here rather than manufacturing a false v2-only-reason divergence against
     /// legacy, which emits no reason bit at all for a successful subtitle conversion (see
-    /// <see cref="LegacyDecisionProjector"/>).
+    /// <c>LegacyDecisionProjector</c> (removed, tesserafin#129 step 7)).
     /// </summary>
     private static void FoldReasonCategories(ReasonNode node, HashSet<ReasonCategory> categories)
     {

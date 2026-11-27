@@ -46,8 +46,8 @@ public static class PlaybackSessionResponseMapper
     /// </returns>
     public static PlaybackSessionResponse Map(PlaybackSession session)
     {
+        // Without the retained engine record only the plan's own method and reasons are known.
         var plan = session.Plan;
-        var streamInfo = plan.StreamInfo;
         var method = MapMethod(plan.PlayMethod);
 
         return new PlaybackSessionResponse(
@@ -55,9 +55,9 @@ public static class PlaybackSessionResponseMapper
             MapKind(session.Kind),
             PlaybackSessionResponse.LegacyDecisionVersion,
             method,
-            MapOutput(streamInfo),
-            MapSelectedStreams(streamInfo),
-            DeriveTransforms(method, plan.TranscodeReasons, streamInfo),
+            OutputSpec.Empty,
+            SelectedStreams.None,
+            DeriveTransforms(method, plan.TranscodeReasons, null),
             MapReasons(plan.TranscodeReasons),
             session.CreatedAt,
             session.UpdatedAt,

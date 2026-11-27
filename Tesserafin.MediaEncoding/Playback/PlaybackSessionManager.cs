@@ -562,7 +562,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
                 // caller's input, not an outcome; PlanPreserved next to it is the outcome, and the
                 // two differ precisely on a legacy-tracked session (true / false).
                 _logger.LogInformation(
-                    "Playback session {SessionId} replaced in place (play session {PlaySessionId}, method {OldPlayMethod} -> {NewPlayMethod}, kind {OldKind} -> {NewKind}, incoming request null {IncomingRequestWasNull}, plan preserved {PlanPreserved}, stream info {HasStreamInfo}, attempt {PlaybackAttemptId}).",
+                    "Playback session {SessionId} replaced in place (play session {PlaySessionId}, method {OldPlayMethod} -> {NewPlayMethod}, kind {OldKind} -> {NewKind}, incoming request null {IncomingRequestWasNull}, plan preserved {PlanPreserved}, attempt {PlaybackAttemptId}).",
                     existingId,
                     playSessionId.ToSingleLogLine(),
                     existing.Plan.PlayMethod,
@@ -570,12 +570,9 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
                     existing.Kind,
                     updated.Kind,
                     request is null,
-                    // Issue #70: the bit that says whether this in-place replacement degraded a
-                    // client's planned decision or faithfully recorded a legacy one, plus whether
-                    // what the session ended up holding is servable at all - GET Stream 422s
-                    // without a StreamInfo, so a false/false pair here IS the unservable state.
+                    // Issue #70: whether this in-place replacement degraded a client's planned
+                    // decision or faithfully recorded another one.
                     preservePlannedDecision,
-                    updated.Plan.StreamInfo is not null,
                     updated.PlaybackAttemptId.ToSingleLogLine());
 
                 return updated;

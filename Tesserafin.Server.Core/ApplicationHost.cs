@@ -702,7 +702,6 @@ namespace Tesserafin.Server.Core
             // it directly (for example a future diagnostics endpoint) instead of being privately
             // owned/defaulted by the decorator - the decorator receives it by injection like its
             // other dependencies.
-            serviceCollection.AddSingleton<PlaybackSessionPlanner>();
             serviceCollection.AddSingleton<IPlaybackEngine, PlaybackEngine>();
             serviceCollection.AddSingleton<ShadowMetrics>();
             // PR113: one IShadowDiagnosticsStore singleton, shared between the shadow planner (which
@@ -732,18 +731,9 @@ namespace Tesserafin.Server.Core
                 () => provider.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow,
                 provider.GetRequiredService<PlaybackOperationalMetrics>(),
                 provider.GetRequiredService<ILogger<PlaybackStopThresholdGuard>>()));
-            // Consolidation step 1 (docs/playback-path-inventory.md §4): the outermost planner offers a
-            // local film's or episode's planning call to the v2 engine alone first; everything it does not own reaches
-            // the shadow/legacy chain below unchanged.
+            // Consolidation (docs/playback-path-inventory.md §7): the v2 engine decides every
+            // session alone; there is no other planner (tesserafin#129 step 7).
             serviceCollection.AddSingleton<IPlaybackSessionPlanner>(provider => new LocalMediaPlanner(
-                new ShadowPlaybackSessionPlanner(
-                    provider.GetRequiredService<PlaybackSessionPlanner>(),
-                    provider.GetRequiredService<IPlaybackEngine>(),
-                    provider.GetRequiredService<ILogger<ShadowPlaybackSessionPlanner>>(),
-                    () => provider.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow,
-                    provider.GetRequiredService<ShadowMetrics>(),
-                    provider.GetRequiredService<IShadowDiagnosticsStore>(),
-                    provider.GetRequiredService<IV2PlanStore>()),
                 provider.GetRequiredService<IPlaybackEngine>(),
                 provider.GetRequiredService<IV2PlanStore>(),
                 provider.GetRequiredService<ILogger<LocalMediaPlanner>>(),
@@ -775,18 +765,6 @@ namespace Tesserafin.Server.Core
                 null,
                 provider.GetRequiredService<PlaybackSessionLiveStreams>()));
 
-            // PR114a: registered so DI wiring exists ahead of the PR115 canary. PR115a: reads the
-            // authoritative IV2PlanStore singleton (not IShadowDiagnosticsStore, which only ever holds
-            // observability data), so it can resolve a session's v2 PlaybackExecutionPlan whenever an
-            // authoritative record was retained for it. PR115c: no longer dormant - MediaInfoHelper
-            // (the live streaming path) now consumes it.
-            serviceCollection.AddSingleton<IPlaybackExecutionPlanResolver, PlaybackExecutionPlanResolver>();
-            // PR117 (docs/pr116d-url-contract-design.md §3.3): the live-wiring decision extracted
-            // from MediaInfoHelper's own former private method into a shared, injectable component -
-            // one singleton, consumed both by MediaInfoHelper (which still defaults to building its
-            // own instance from the same dependencies when not supplied, for pre-PR117 test/call site
-            // compatibility) and by PlaybackSessionsController's new GET .../Stream endpoint.
-            serviceCollection.AddSingleton<IPlaybackLiveStreamResolver, PlaybackLiveStreamResolver>();
             serviceCollection.AddScoped<IClientEventLogger, ClientEventLogger>();
             serviceCollection.AddSingleton<IDirectoryService, DirectoryService>();
 

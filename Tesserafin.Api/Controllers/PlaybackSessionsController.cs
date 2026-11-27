@@ -54,9 +54,6 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     private readonly IMediaSourceManager _mediaSourceManager;
     private readonly IV2PlanStore _v2PlanStore;
     private readonly PlaybackSessionLiveStreams? _liveStreams;
-    private readonly IPlaybackLiveStreamResolver _liveStreamResolver;
-    private readonly IPlaybackLiveWiringDiagnosticsStore _liveWiringDiagnosticsStore;
-    private readonly IMediaEncoder _mediaEncoder;
     private readonly IShadowDiagnosticsStore _shadowDiagnosticsStore;
     private readonly ILogger<PlaybackSessionsController> _logger;
     private readonly IRecordingsManager? _recordingsManager;
@@ -71,18 +68,6 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
     /// <param name="mediaSourceManager">Instance of the <see cref="IMediaSourceManager"/> interface.</param>
     /// <param name="v2PlanStore">Instance of the <see cref="IV2PlanStore"/> interface (PR115a) — looked up to see whether v2 is authoritative for a session's response.</param>
-    /// <param name="liveStreamResolver">
-    /// PR117 (docs/pr116d-url-contract-design.md §3.3): the shared live-wiring decision, re-run at
-    /// call time on <see cref="GetPlaybackSessionStream"/> - same component, same kill switch/
-    /// stop-threshold guard/SourceId verification/Dolby Vision exclusion, that
-    /// <c>MediaInfoHelper.SetDeviceSpecificData</c> already consults for the legacy path.
-    /// </param>
-    /// <param name="liveWiringDiagnosticsStore">
-    /// PR117: read back immediately after <paramref name="liveStreamResolver"/> resolves, so the
-    /// descriptor's <c>FallbackReason</c> reflects exactly the decision that produced the URL - the
-    /// same store the admin diagnostics detail route already surfaces (PR115c).
-    /// </param>
-    /// <param name="mediaEncoder">Instance of the <see cref="IMediaEncoder"/> interface - resolves the external subtitle delivery URL for the descriptor.</param>
     /// <param name="logger">
     /// Issue #43: carries the client-supplied <c>PlaybackAttemptId</c> into the structured log scope
     /// for the duration of the action, so every line emitted while serving a request of one attempt
@@ -108,9 +93,6 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         IUserManager userManager,
         IMediaSourceManager mediaSourceManager,
         IV2PlanStore v2PlanStore,
-        IPlaybackLiveStreamResolver liveStreamResolver,
-        IPlaybackLiveWiringDiagnosticsStore liveWiringDiagnosticsStore,
-        IMediaEncoder mediaEncoder,
         ILogger<PlaybackSessionsController>? logger = null,
         IShadowDiagnosticsStore? shadowDiagnosticsStore = null,
         ITranscodeManager? transcodeManager = null,
@@ -129,9 +111,6 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         _userManager = userManager;
         _mediaSourceManager = mediaSourceManager;
         _v2PlanStore = v2PlanStore;
-        _liveStreamResolver = liveStreamResolver;
-        _liveWiringDiagnosticsStore = liveWiringDiagnosticsStore;
-        _mediaEncoder = mediaEncoder;
     }
 
     /// <summary>
@@ -192,12 +171,9 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             _liveStreams!.Attach(session.Id, liveStreamId);
         }
 
-        // A POST naming a play session that already has one replaces that session in place. When
-        // the new plan is the engine's, nothing of an earlier plan's job may be served for it.
-        if (session.Plan.StreamInfo is null)
-        {
-            await StopJobsOfAnEnginePlan(session.PlaySessionId, options.UserId).ConfigureAwait(false);
-        }
+        // A POST naming a play session that already has one replaces that session in place:
+        // nothing of an earlier plan's job may be served for the new one.
+        await StopJobsOfAnEnginePlan(session.PlaySessionId, options.UserId).ConfigureAwait(false);
 
         // Issue #43: the lifecycle line a browser e2e joins against X-Request-Id (the ambient
         // RequestId scope of #42) and the attempt scope opened above. One line per transition;
@@ -288,13 +264,9 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             _liveStreams!.Attach(session.Id, liveStreamId);
         }
 
-        // The plan just changed and the play session did not: see StopJobsOfAnEnginePlan. Whether
-        // the previous plan or the new one is the engine's, the job writing the previous plan's
-        // output must be gone before the new plan's playlist is read.
-        if (existingSession.Plan.StreamInfo is null || session.Plan.StreamInfo is null)
-        {
-            await StopJobsOfAnEnginePlan(existingSession.PlaySessionId, existingSession.Request?.Options.UserId).ConfigureAwait(false);
-        }
+        // The plan just changed and the play session did not: see StopJobsOfAnEnginePlan. The job
+        // writing the previous plan's output must be gone before the new plan's playlist is read.
+        await StopJobsOfAnEnginePlan(existingSession.PlaySessionId, existingSession.Request?.Options.UserId).ConfigureAwait(false);
 
         // Issue #43: the re-plan transition, with the decision bits that actually change on a track/
         // constraint change. The attempt id is read off the PATCHED session, which preserves the one
@@ -452,124 +424,25 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             return Conflict("Session has no PlaySessionId - PUT a replacement request supplying one before requesting a stream URL.");
         }
 
-        // Consolidation step 1: a local library video the engine alone decided - a direct play, or a remux or a
-        // transcode this server executes from the plan - has no legacy StreamInfo at all. Its descriptor is
-        // minted from the retained execution plan and names the session's own file or HLS route;
-        // nothing below (kill switch, resolver, StreamInfo.ToUrl) applies.
-        if (session.Plan.StreamInfo is null
-            && _v2PlanStore.TryGet(session.Id, out var engineDecided)
-            && engineDecided is { ExecutionPlan: { } enginePlan }
-            && LocalMediaDescriptorMapper.CanMap(enginePlan)
-            && session.Request?.Options is { } engineOptions)
-        {
-            if (string.IsNullOrEmpty(User.GetToken()))
-            {
-                return Forbid();
-            }
-
-            return Ok(LocalMediaDescriptorMapper.Map(session.Id, session.PlaySessionId, engineOptions.ItemId, enginePlan, engineDecided.Decision.EngineVersion, live: _liveStreams?.Get(session.Id) is not null));
-        }
-
-        var options = session.Request?.Options;
-        var legacyStreamInfo = session.Plan.StreamInfo;
-        var mediaSource = legacyStreamInfo?.MediaSource;
-        // PR #38: this used to be a second 409 on the same operation, which OpenAPI cannot express -
-        // one `responses` entry per status code per operation means two 409s discriminated only by
-        // their body are invisible to every generated client. The two conditions are genuinely
-        // different: the 409 above is REPAIRABLE by the client (PUT a request carrying a
-        // PlaySessionId), this one is structurally unservable, so it is 422.
-        if (options is null || legacyStreamInfo is null || mediaSource is null)
+        // Every session is decided by the engine alone (tesserafin#129 step 7): its descriptor is
+        // minted from the retained execution plan and names the session's own file or HLS route.
+        // PR #38: a session with no such plan is structurally unservable, so it is 422, not 409.
+        if (!_v2PlanStore.TryGet(session.Id, out var engineDecided)
+            || engineDecided is not { ExecutionPlan: { } enginePlan }
+            || !LocalMediaDescriptorMapper.CanMap(enginePlan)
+            || session.Request?.Options is not { } engineOptions)
         {
             return UnprocessableEntity("Session has no plannable stream - this endpoint only serves sessions planned via Playback/Sessions.");
         }
 
-        // PR118: a caller authenticated without a bearer token has no business triggering
-        // resolution at all. Checked before any operational effect (resolution, diagnostics,
-        // metrics). The token itself is not used: no descriptor carries a credential.
+        // PR118: a caller authenticated without a bearer token has no business reading a
+        // descriptor. The token itself is not used: no descriptor carries a credential.
         if (string.IsNullOrEmpty(User.GetToken()))
         {
             return Forbid();
         }
 
-        var resolved = _liveStreamResolver.Resolve(
-            session.Id,
-            legacyStreamInfo,
-            mediaSource,
-            options.Profile,
-            options.ItemId,
-            options.DeviceId,
-            session.PlaySessionId,
-            startTimeTicks,
-            options.AlwaysBurnInSubtitleWhenTranscoding);
-
-        // PR118: the legacy fallback path returns the SAME mutable StreamInfo instance retained in
-        // session.Plan.StreamInfo (not a fresh projection, unlike the v2-adapter path) - stamping
-        // PlaySessionId/StartPositionTicks directly onto it let two concurrent calls with different
-        // startTimeTicks race on each other's writes. WithRequestContext copies per-request first:
-        // mirrors MediaInfoHelper.SetDeviceSpecificData's own re-stamp, but never mutates the
-        // instance the session itself still holds, on either path (v2 or legacy).
-        var resolvedStreamInfo = resolved.WithRequestContext(
-            session.PlaySessionId,
-            startTimeTicks);
-
-        // §3: FallbackReason/ServedBy must reflect exactly the decision that produced
-        // resolvedStreamInfo, not a separately timed lookup - read back the outcome the resolver
-        // itself just recorded (PR115c's own store), then only look up the real engine version when
-        // that outcome says v2 actually served this request.
-        _liveWiringDiagnosticsStore.TryGet(session.Id, out var outcome);
-        var servedBy = PlaybackSessionResponse.LegacyDecisionVersion;
-        if (outcome is { ServedByV2: true } && _v2PlanStore.TryGet(session.Id, out var v2Record) && v2Record is not null)
-        {
-            servedBy = v2Record.Decision.EngineVersion;
-        }
-
-        // #374: a session v2 decides keeps a legacy plan as its fallback even when that plan serves
-        // nothing the client declared. A real fallback (kill switch, stop threshold, unexecutable
-        // plan) refuses rather than hand over the file the client said it cannot open.
-        if (outcome is not { ServedByV2: true }
-            && session.Kind == PlaybackMediaKind.Video
-            && PlaybackSessionPlanner.IsUnservableVideoPlan(resolvedStreamInfo))
-        {
-            return NoViablePlan(LocalMediaRefusal.None);
-        }
-
-        // Issue #57: a Remux decision (domain PlaybackMethod.Remux, mapped by
-        // PlaybackExecutionPlanAdapter to legacy PlayMethod.DirectStream) announced a container the
-        // source file does not have - Container=mp4/MimeType=video/mp4 for a Matroska source - and
-        // then served that source file BYTE-IDENTICALLY. Cause: StreamInfo.ToUrl appends
-        // "&Static=true" for every IsDirectStream stream (DirectStream OR DirectPlay), and
-        // VideosController.GetVideoStream answers Static=true with
-        // FileStreamResponseHelpers.GetStaticFileResult(state.MediaPath, ...) - the source file
-        // verbatim, under the announced container's MIME type. The decision and the descriptor are
-        // both correct (the client declared it cannot decode the source container, which is exactly
-        // what the ContainerNotSupported reason means); it is the EXECUTION that must actually
-        // remux, so the URL must not ask for the static file.
-        //
-        // Normalizing PlayMethod to Transcode for URL serialization is not a re-decision: it is
-        // exactly what the legacy PlaybackInfo path already does at its own URL-minting site
-        // (MediaInfoHelper.SetDeviceSpecificData sets `streamInfo.PlayMethod = PlayMethod.Transcode`
-        // before calling ToUrl for mediaSource.TranscodingUrl), which is why that path never
-        // exhibited this defect. This v2 descriptor endpoint was the one URL-minting site that
-        // skipped the normalization.
-        //
-        // DirectPlay is deliberately NOT normalized: there Static=true is correct - the announced
-        // container IS the source's, so serving the file verbatim is the honest answer.
-        //
-        // Gated on ServedByV2. A legacy plan still reaching here as DirectStream is one the planner
-        // kept because the client can open the source as it is; a legacy plan it could not open was
-        // re-planned onto a declared output profile (#374, PlaybackSessionPlanner.PlanVideo).
-        //
-        // Mutating here is safe and deliberately scoped: resolvedStreamInfo is the per-request
-        // MemberwiseClone WithRequestContext just produced (see the PR118 note above), never the
-        // instance session.Plan.StreamInfo retains, and PlayMethod is a value type. Nothing outside
-        // this method observes the change.
-        if (outcome is { ServedByV2: true } && resolvedStreamInfo.PlayMethod == PlayMethod.DirectStream)
-        {
-            resolvedStreamInfo.PlayMethod = PlayMethod.Transcode;
-        }
-
-        var descriptor = PlaybackSessionStreamDescriptorMapper.Map(resolvedStreamInfo, servedBy, outcome?.FallbackReason, _mediaEncoder);
-        return Ok(descriptor);
+        return Ok(LocalMediaDescriptorMapper.Map(session.Id, session.PlaySessionId, engineOptions.ItemId, enginePlan, engineDecided.Decision.EngineVersion, live: _liveStreams?.Get(session.Id) is not null));
     }
 
     /// <summary>

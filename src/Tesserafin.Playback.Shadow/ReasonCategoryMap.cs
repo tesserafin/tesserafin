@@ -7,7 +7,7 @@ namespace Tesserafin.Playback.Shadow;
 /// The single source of truth folding leaf reason names — shared by legacy
 /// <c>Tesserafin.Model.Session.TranscodeReason</c> flag names and v2
 /// <c>Tesserafin.Playback.Decision.ReasonCode</c> member names, which mirror each other 1-1 — into a
-/// <see cref="ReasonCategory"/>. Both <see cref="LegacyDecisionProjector"/> and
+/// <see cref="ReasonCategory"/>. Both <c>LegacyDecisionProjector</c> (removed, tesserafin#129 step 7) and
 /// <see cref="V2DecisionProjector"/> drive their folding through this one map so the two sides can
 /// never fold the same underlying reason into different categories. Names not present here (v2's
 /// positive/marker codes: <c>StreamCopyable</c>, <c>SourceSelected</c>, <c>MethodChosen</c>,

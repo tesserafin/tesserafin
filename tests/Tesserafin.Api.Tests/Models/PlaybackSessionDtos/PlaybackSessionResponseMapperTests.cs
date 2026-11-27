@@ -25,30 +25,6 @@ namespace Tesserafin.Api.Tests.Models.PlaybackSessionDtos;
 public sealed class PlaybackSessionResponseMapperTests
 {
     [Fact]
-    public void Map_DirectPlay_MapsMethodOutputAndNoTransforms()
-    {
-        var streamInfo = BuildStreamInfo(PlayMethod.DirectPlay, 0, "mp4", audioIndex: 1);
-        var session = BuildSession(PlayMethod.DirectPlay, 0, streamInfo);
-
-        var response = PlaybackSessionResponseMapper.Map(session);
-
-        Assert.Equal(PlaybackMethod.DirectPlay, response.Method);
-        Assert.Empty(response.Transforms);
-        Assert.Empty(response.Reasons);
-        Assert.Equal("mp4", response.Output.Container);
-        Assert.Equal("h264", response.Output.VideoCodec);
-        Assert.Equal("aac", response.Output.AudioCodec);
-        Assert.Equal(1, response.SelectedStreams.Audio);
-
-        // Legacy StreamInfo does not expose a reliable "selected video stream index": always null.
-        Assert.Null(response.SelectedStreams.Video);
-
-        // No subtitle index was passed to BuildStreamInfo: legacy positively selected none.
-        Assert.Null(response.SelectedStreams.Subtitle);
-        Assert.Equal(PlaybackSessionResponse.LegacyDecisionVersion, response.DecisionVersion);
-    }
-
-    [Fact]
     public void Map_DirectStream_NormalizesToRemuxMethodWithRemuxContainerTransform()
     {
         var streamInfo = BuildStreamInfo(PlayMethod.DirectStream, TranscodeReason.ContainerNotSupported, "mkv");
@@ -122,70 +98,6 @@ public sealed class PlaybackSessionResponseMapperTests
         var response = PlaybackSessionResponseMapper.Map(session);
 
         Assert.Equal(new[] { TransformKind.BurnInSubtitle }, response.Transforms);
-    }
-
-    [Fact]
-    public void Map_HdrSourceTranscodedForUnsupportedCodecToSdr_DerivesTonemapEvenWithoutRangeReason()
-    {
-        // PR111c: forced by video codec, not range - legacy sets no VideoRangeTypeNotSupported bit,
-        // so Tonemap must come from DetectedTonemap's output-state comparison instead: the source
-        // stream carries an HDR ColorTransfer (via MediaStream.VideoRangeType), while the chosen
-        // output codec's declared range (StreamInfo.TargetVideoRangeType, resolved off
-        // VideoCodecs/StreamOptions for a non-direct-stream method) is forced to SDR here.
-        var streamInfo = BuildStreamInfo(PlayMethod.Transcode, TranscodeReason.VideoCodecNotSupported, "mp4", colorTransfer: "smpte2084");
-        streamInfo.VideoCodecs = ["h264"];
-        streamInfo.StreamOptions["h264-rangetype"] = "SDR";
-        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.VideoCodecNotSupported, streamInfo);
-
-        var response = PlaybackSessionResponseMapper.Map(session);
-
-        Assert.Contains(TransformKind.Tonemap, response.Transforms);
-        Assert.Contains(TransformKind.TranscodeVideo, response.Transforms);
-    }
-
-    [Fact]
-    public void Map_Transcode_SubtitleFormatDiffersFromSource_DerivesConvertSubtitleWithNoReasonBit()
-    {
-        // PR111c: a real subtitle text-format conversion carries no reason bit at all.
-        var streamInfo = BuildStreamInfo(
-            PlayMethod.Transcode,
-            TranscodeReason.ContainerNotSupported,
-            "mp4",
-            subtitleIndex: 2,
-            subtitleDeliveryMethod: LegacySubtitleDeliveryMethod.External,
-            subtitleCodec: "srt",
-            subtitleFormat: "vtt");
-        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.ContainerNotSupported, streamInfo);
-
-        var response = PlaybackSessionResponseMapper.Map(session);
-
-        Assert.Contains(TransformKind.ConvertSubtitle, response.Transforms);
-        Assert.Equal("vtt", response.Output.SubtitleFormat);
-        Assert.NotNull(response.SelectedStreams.Subtitle);
-        Assert.Equal(2, response.SelectedStreams.Subtitle!.Index);
-        Assert.Equal(Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External, response.SelectedStreams.Subtitle.Delivery);
-    }
-
-    [Fact]
-    public void Map_SubtitleEncodeDeliveryMethod_MapsToBurnDeliveryOnSelectedSubtitle()
-    {
-        var streamInfo = BuildStreamInfo(
-            PlayMethod.Transcode,
-            TranscodeReason.SubtitleCodecNotSupported,
-            "mp4",
-            subtitleIndex: 3,
-            subtitleDeliveryMethod: LegacySubtitleDeliveryMethod.Encode,
-            subtitleCodec: "srt",
-            subtitleFormat: "srt");
-        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.SubtitleCodecNotSupported, streamInfo);
-
-        var response = PlaybackSessionResponseMapper.Map(session);
-
-        Assert.NotNull(response.SelectedStreams.Subtitle);
-        Assert.Equal(Tesserafin.Playback.Decision.SubtitleDeliveryMethod.Burn, response.SelectedStreams.Subtitle!.Delivery);
-
-        // Burn-in re-encodes the video, not a subtitle format conversion for delivery.
-        Assert.DoesNotContain(TransformKind.ConvertSubtitle, response.Transforms);
     }
 
     [Fact]
@@ -421,7 +333,7 @@ public sealed class PlaybackSessionResponseMapperTests
             PlaybackMediaKind.Video,
             null,
             null,
-            new PlaybackPlan(playMethod, reasons, streamInfo),
+            new PlaybackPlan(playMethod, reasons),
             DateTimeOffset.UnixEpoch,
             DateTimeOffset.UnixEpoch.AddMinutes(1));
 

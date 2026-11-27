@@ -303,7 +303,7 @@ public sealed class HlsOutputIsolationEndToEndTests : IClassFixture<HlsIsolation
         // The existing chain's HLS routes (/Videos/{id}/master.m3u8 ...), reached through their
         // remaining caller, PlaybackInfo: a session refuses a transcode it does not execute. The
         // session journey's own isolation is TranscodeFilmEndToEndTests.
-        var url = await LegacyPlaybackInfo.TranscodingUrlAsync(client, _item, userId, EndToEndCapabilityPresets.TranscodeHlsToAnUnexecutedTarget(), playSession);
+        var url = LegacyHlsRoute.MasterUrl(client, _item, playSession);
         var descriptor = new { Url = url };
         var master = await GetAsync(client, descriptor.Url);
         Assert.Equal(HttpStatusCode.OK, master.Status);

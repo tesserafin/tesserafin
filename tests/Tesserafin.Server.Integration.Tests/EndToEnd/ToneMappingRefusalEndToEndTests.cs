@@ -195,7 +195,6 @@ public sealed class ToneMappingRefusalEndToEndTests : IClassFixture<ToneMappingR
             base.ConfigureWebHost(builder);
             builder.ConfigureTestServices(services =>
                 services.AddSingleton<IPlaybackSessionPlanner>(provider => new LocalMediaPlanner(
-                    new LegacyChainReached(),
                     provider.GetRequiredService<IPlaybackEngine>(),
                     provider.GetRequiredService<IV2PlanStore>(),
                     provider.GetRequiredService<ILogger<LocalMediaPlanner>>(),

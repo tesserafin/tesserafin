@@ -25,6 +25,5 @@ public sealed class PlaybackObservationBoundaryTests : IClassFixture<TesserafinA
         var store = services.GetRequiredService<IShadowDiagnosticsStore>();
         Assert.Same(store, services.GetRequiredService<IPlaybackSessionDiagnostics>());
         Assert.Equal("Tesserafin.Playback.Shadow", store.GetType().Assembly.GetName().Name);
-        Assert.Equal(typeof(ShadowComparer).Assembly, typeof(ShadowPlaybackSessionPlanner).Assembly);
     }
 }

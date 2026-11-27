@@ -104,7 +104,7 @@ public sealed class EnginePlanEncodingRequestTests
     {
         var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
         var store = new InMemoryV2PlanStore();
-        var planner = new LocalMediaPlanner(inner.Object, new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance);
+        var planner = new LocalMediaPlanner(new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance);
         var options = new MediaOptions
         {
             ItemId = Guid.NewGuid(),
@@ -121,7 +121,6 @@ public sealed class EnginePlanEncodingRequestTests
 
         Assert.NotNull(plan);
         Assert.Equal(PlayMethod.Transcode, plan.PlayMethod);
-        Assert.Null(plan.StreamInfo);
         Assert.Equal(TranscodeReason.ContainerNotSupported | TranscodeReason.AudioCodecNotSupported, plan.TranscodeReasons);
         inner.VerifyNoOtherCalls();
     }
@@ -142,7 +141,7 @@ public sealed class EnginePlanEncodingRequestTests
 
         var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
         var store = new InMemoryV2PlanStore();
-        var planner = new LocalMediaPlanner(inner.Object, new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance);
+        var planner = new LocalMediaPlanner(new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance);
         var options = new MediaOptions
         {
             ItemId = Guid.NewGuid(),

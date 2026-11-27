@@ -67,8 +67,8 @@ namespace Tesserafin.Server.Integration.Tests.Controllers
         private static Tesserafin.Playback.Decision.ClientCapabilities Capabilities() => new(
             Decode: new DecodeCapabilities(
                 DirectPlayProfiles: [new DecodeProfile(MediaKind.Video, ["mp4"], ["h264"], ["aac"])],
-                VideoCodecs: [],
-                AudioCodecs: [],
+                VideoCodecs: [new VideoCodecCapability("h264", [], null, null, [], null, null)],
+                AudioCodecs: [new AudioCodecCapability("aac", null, null, null, null)],
                 SubtitleDelivery: [],
                 SupportsHls: true,
                 SupportsDash: false),
@@ -99,7 +99,9 @@ namespace Tesserafin.Server.Integration.Tests.Controllers
                     options: JsonDefaults.Options),
                 TestContext.Current.CancellationToken);
 
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.True(
+                response.StatusCode == HttpStatusCode.OK,
+                $"POST Playback/Sessions answered {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)}");
             var session = await response.Content.ReadFromJsonAsync<PlaybackSessionResponse>(JsonDefaults.Options, TestContext.Current.CancellationToken);
             Assert.NotNull(session);
             return session.Id;
@@ -132,23 +134,15 @@ namespace Tesserafin.Server.Integration.Tests.Controllers
             var containerValue = container.GetString();
             Assert.False(string.IsNullOrEmpty(containerValue));
 
-            // The container is EFFECTIVE, not advisory: the URL the same response carries addresses
-            // it. On http that is /stream.{container}; on hls it is &SegmentContainer={container}.
+            // The container is EFFECTIVE, not advisory: this client direct-plays the MP4 source, so
+            // the descriptor names MP4 and its content type, and the URL is the session's own (the
+            // engine addresses its output by session, not by container).
+            Assert.Equal("Http", root.GetProperty("Protocol").GetString());
+            Assert.Equal("mp4", containerValue);
+            Assert.Equal(Tesserafin.Model.Net.MimeTypes.GetMimeType(".mp4", null), mimeType.GetString());
             var url = root.GetProperty("Url").GetString();
             Assert.NotNull(url);
-            var isHls = string.Equals(root.GetProperty("Protocol").GetString(), "Hls", StringComparison.OrdinalIgnoreCase);
-            if (isHls)
-            {
-                Assert.Contains("SegmentContainer=" + containerValue, url, StringComparison.OrdinalIgnoreCase);
-                Assert.Equal("application/vnd.apple.mpegurl", mimeType.GetString());
-            }
-            else
-            {
-                Assert.Contains("/stream." + containerValue, url, StringComparison.OrdinalIgnoreCase);
-                Assert.Equal(
-                    Tesserafin.Model.Net.MimeTypes.GetMimeType("." + containerValue, null),
-                    mimeType.GetString());
-            }
+            Assert.Contains(FormattableString.Invariant($"/Playback/Sessions/{sessionId:N}"), url, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

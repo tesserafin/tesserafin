@@ -192,7 +192,7 @@ public sealed class PlaybackDiagnosticDetailMapperTests
             PlaybackMediaKind.Video,
             null,
             null,
-            new PlaybackPlan(PlayMethod.DirectPlay, default, streamInfo),
+            new PlaybackPlan(PlayMethod.DirectPlay, default),
             createdAt ?? DateTimeOffset.UnixEpoch,
             updatedAt ?? DateTimeOffset.UnixEpoch.AddMinutes(1));
 }

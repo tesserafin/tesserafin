@@ -92,7 +92,6 @@ public sealed class LocalMediaPlannerTests
         };
         var store = new InMemoryV2PlanStore();
         var planner = new LocalMediaPlanner(
-            new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object,
             new PlaybackEngine(),
             store,
             NullLogger<LocalMediaPlanner>.Instance);
@@ -121,7 +120,6 @@ public sealed class LocalMediaPlannerTests
 
         Assert.NotNull(plan);
         Assert.Equal(PlayMethod.DirectStream, plan.PlayMethod);
-        Assert.Null(plan.StreamInfo);
         Assert.NotNull(record?.ExecutionPlan);
         Assert.Equal(PlaybackMethod.Remux, record.ExecutionPlan.Method);
         Assert.Equal(StreamingProtocol.Hls, record.ExecutionPlan.Protocol);
@@ -146,18 +144,16 @@ public sealed class LocalMediaPlannerTests
     }
 
     [Fact]
-    public void A_remux_with_no_declared_hls_output_is_left_to_the_existing_chain()
+    public void A_remux_with_no_declared_hls_output_has_no_plan()
     {
-        var existing = new PlaybackPlan(PlayMethod.DirectStream, 0);
-        var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
-        inner.Setup(p => p.PlanVideo(It.IsAny<MediaOptions>())).Returns(existing);
-        var (planner, store) = Planner(inner.Object);
+        // There is no other planner to hand it to (tesserafin#129 step 7): no plan, a 422.
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
 
         using var capture = store.BeginCapture();
         using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(Browser(hlsOutput: false), _declared));
         var plan = planner.PlanVideo(Options(Source("film", "h264", 1, 2, "mkv")));
 
-        Assert.Same(existing, plan);
+        Assert.Null(plan);
         Assert.Null(store.TakeCaptured());
     }
 
@@ -209,7 +205,6 @@ public sealed class LocalMediaPlannerTests
         var record = store.TakeCaptured();
 
         Assert.Equal(PlayMethod.DirectPlay, plan?.PlayMethod);
-        Assert.Null(plan?.StreamInfo);
         Assert.Equal(PlaybackMethod.DirectPlay, record?.ExecutionPlan?.Method);
     }
 
@@ -232,7 +227,6 @@ public sealed class LocalMediaPlannerTests
         var record = store.TakeCaptured();
 
         Assert.Equal(PlayMethod.Transcode, plan?.PlayMethod);
-        Assert.Null(plan?.StreamInfo);
         var executed = record?.ExecutionPlan;
         Assert.NotNull(executed);
         Assert.Equal(PlaybackMethod.Transcode, executed.Method);
@@ -332,7 +326,6 @@ public sealed class LocalMediaPlannerTests
         var record = store.TakeCaptured();
 
         Assert.Equal(PlayMethod.DirectStream, plan?.PlayMethod);
-        Assert.Null(plan?.StreamInfo);
         var executed = record?.ExecutionPlan;
         Assert.NotNull(executed);
         Assert.Equal(PlaybackMethod.Remux, executed.Method);
@@ -440,7 +433,7 @@ public sealed class LocalMediaPlannerTests
         // cannot tone-map, the session is refused (decided 2026-11-27).
         var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
         var store = new InMemoryV2PlanStore();
-        var planner = new LocalMediaPlanner(inner.Object, new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance, canTonemap: () => canTonemap);
+        var planner = new LocalMediaPlanner(new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance, canTonemap: () => canTonemap);
         var film = Source("film", "hevc", 1, 2, "mkv");
         film.MediaStreams = [new MediaStream { Index = 0, Type = MediaStreamType.Video, Codec = "hevc", BitDepth = 10, ColorTransfer = "smpte2084", ColorPrimaries = "bt2020", ColorSpace = "bt2020nc" },
             .. film.MediaStreams.Where(stream => stream.Type != MediaStreamType.Video)];
@@ -487,7 +480,7 @@ public sealed class LocalMediaPlannerTests
     {
         // The strict inner planner proves the existing chain is never reached (decided 2026-11-27).
         var store = new InMemoryV2PlanStore();
-        var planner = new LocalMediaPlanner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object, new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance, canTonemap: () => canTonemap);
+        var planner = new LocalMediaPlanner(new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance, canTonemap: () => canTonemap);
         var film = Source("film", "hevc", 1, 2, "mkv");
         film.MediaStreams = [new MediaStream { Index = 0, Type = MediaStreamType.Video, Codec = "hevc", BitDepth = 10, ColorTransfer = "smpte2084", ColorPrimaries = "bt2020", ColorSpace = "bt2020nc" },
             .. film.MediaStreams.Where(stream => stream.Type != MediaStreamType.Video)];
@@ -909,7 +902,7 @@ public sealed class LocalMediaPlannerTests
     private static (LocalMediaPlanner Planner, InMemoryV2PlanStore Store) Planner(IPlaybackSessionPlanner inner, Func<IsoType, bool>? canReadDiscImage = null)
     {
         var store = new InMemoryV2PlanStore();
-        return (new LocalMediaPlanner(inner, new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance, canReadDiscImage: canReadDiscImage), store);
+        return (new LocalMediaPlanner(new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance, canReadDiscImage: canReadDiscImage), store);
     }
 
     private static MediaSourceInfo DiscImage(IsoType? isoType)

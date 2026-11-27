@@ -94,8 +94,7 @@ public sealed class PlaybackSessionDeliveryGuard
             return PlaybackSessionDelivery.Forbidden;
         }
 
-        if (session.Plan.StreamInfo is not null
-            || !_v2PlanStore.TryGet(session.Id, out var record)
+        if (!_v2PlanStore.TryGet(session.Id, out var record)
             || record?.ExecutionPlan is not { } plan
             || !servedBy(plan)
             || !options.ItemId.Equals(itemId)

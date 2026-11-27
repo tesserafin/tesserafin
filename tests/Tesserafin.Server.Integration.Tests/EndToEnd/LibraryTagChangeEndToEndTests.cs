@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -63,7 +64,7 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
     }
 
     /// <summary>
-    /// Adding the tag refuses bea every covered route at once - by id, PlaybackInfo, the bytes with
+    /// Adding the tag refuses bea every covered route at once - by id, the bytes with
     /// her token and with a capability minted before the change - for an item of Vault only and for
     /// one that is in both libraries; removing it gives them back; cleo is never refused. A restart
     /// decides the same, and removing the tag a restarted server loaded gives bea access again.
@@ -145,7 +146,6 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
         {
             var at = FormattableString.Invariant($"{what}, item {(item.Equals(seeded.InBoth) ? "in both libraries" : "in Vault only")}");
             Expect(at + ": by id", expected, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{item}?userId={userId}"), cancellationToken: TestContext.Current.CancellationToken));
-            Expect(at + ": PlaybackInfo", expected, await StatusAsync(client, HttpMethod.Post, FormattableString.Invariant($"Items/{item}/PlaybackInfo?userId={userId}"), new { }, cancellationToken: TestContext.Current.CancellationToken));
             Expect(at + ": bytes with the user's token", expected, await StatusAsync(client, HttpMethod.Get, Bytes(item), cancellationToken: TestContext.Current.CancellationToken));
             if (capabilities.TryGetValue((name, item), out var capability))
             {
@@ -188,10 +188,9 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
 
     private static async Task<string> MintAsync(HttpClient client, Guid userId, Guid item, CancellationToken cancellationToken)
     {
-        using var info = await client.PostAsJsonAsync(FormattableString.Invariant($"Items/{item}/PlaybackInfo?userId={userId}"), new { }, JsonDefaults.Options, cancellationToken);
-        info.EnsureSuccessStatusCode();
-        using var infoDocument = JsonDocument.Parse(await info.Content.ReadAsStringAsync(cancellationToken));
-        var (status, body) = await MintingFixture.MintAsync(client, [PlaybackCapabilityScope.Media], item, item.ToString("N"), infoDocument.RootElement.GetProperty("PlaySessionId").GetString()!);
+        // A play session is the client's own id: the capability is bound to it, nothing has to have opened it.
+        var playSession = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
+        var (status, body) = await MintingFixture.MintAsync(client, [PlaybackCapabilityScope.Media], item, item.ToString("N"), playSession);
         Assert.Equal(HttpStatusCode.OK, status);
         using var document = JsonDocument.Parse(body);
         return document.RootElement.GetProperty("Value").GetString()!;

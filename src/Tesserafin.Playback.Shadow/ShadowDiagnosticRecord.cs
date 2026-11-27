@@ -8,7 +8,7 @@ using Tesserafin.Playback.Decision;
 namespace Tesserafin.Playback.Shadow;
 
 /// <summary>
-/// Everything a shadow run (<see cref="ShadowPlaybackSessionPlanner"/>, PR98) computed for a single
+/// Everything a shadow run (<c>ShadowPlaybackSessionPlanner</c> (removed, tesserafin#129 step 7), PR98) computed for a single
 /// planning call, retained so the admin diagnostics surface (docs/pr92-design-playback-api-and-diagnostics.md
 /// §4.3, PR113) can serve a filtered detail without re-running anything. Captured only when shadow
 /// mode actually ran (enabled and not sampled out) - the common case (shadow off by default) never

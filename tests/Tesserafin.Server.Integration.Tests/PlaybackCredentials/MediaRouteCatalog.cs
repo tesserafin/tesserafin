@@ -35,7 +35,6 @@ public static class MediaRouteCatalog
             new("direct video HEAD", "Range/HEAD", PlaybackCapabilityScope.Media, "HEAD", $"/Videos/{item}/stream?static=true&mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),
             new("direct audio", "direct audio", PlaybackCapabilityScope.Media, "GET", $"/Audio/{item}/stream?static=true&mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Bytes),
             new("direct audio by container", "direct audio", PlaybackCapabilityScope.Media, "GET", $"/Audio/{item}/stream.mp4?static=true&mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Bytes),
-            new("universal audio", "universal/transcode", PlaybackCapabilityScope.Media, "GET", $"/Audio/{item}/universal?mediaSourceId={mediaSourceId}&container=mp4", true, true, false, MediaRouteEvidence.Entry),
             new("hls master video", "HLS master", PlaybackCapabilityScope.Media, "GET", $"/Videos/{item}/master.m3u8?mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),
             new("hls master audio", "HLS master", PlaybackCapabilityScope.Media, "GET", $"/Audio/{item}/master.m3u8?mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),
             new("hls variant video", "HLS variant", PlaybackCapabilityScope.Media, "GET", $"/Videos/{item}/main.m3u8?mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),

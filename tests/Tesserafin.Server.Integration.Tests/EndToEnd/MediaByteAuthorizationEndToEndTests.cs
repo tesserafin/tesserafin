@@ -89,7 +89,6 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
         { "GET", "Videos/{item}/stream.ts?" + Transcode + "&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
         { "HEAD", "Videos/{item}/stream.ts?" + Transcode + "&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
         { "GET", "Audio/{item}/stream.mp3?static=false&audioCodec=mp3&audioBitRate=128000&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
-        { "GET", "Audio/{item}/universal?container=mp3&audioCodec=mp3&transcodingContainer=mp3&transcodingProtocol=http&mediaSourceId={ms}&deviceId={id}", string.Empty },
         { "GET", "Videos/{item}/master.m3u8?" + Transcode + "&segmentContainer=ts&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
         { "HEAD", "Videos/{item}/master.m3u8?" + Transcode + "&segmentContainer=ts&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
         { "GET", "Videos/{item}/main.m3u8?" + Transcode + "&segmentContainer=ts&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
@@ -871,9 +870,15 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
     private async Task<Guid> CreatePlaybackSessionAsync(HttpClient client, Guid userId, string playSession, CancellationToken cancellationToken)
     {
         var (capabilities, constraints) = EndToEndCapabilityPresets.Remux();
+
+        // The item carries an external SRT track: the client says it renders it beside the stream.
+        // Nothing here may be transcoded, so a subtitle only burnt in would leave no playable output.
+        capabilities = capabilities with { Decode = capabilities.Decode with { SubtitleDelivery = [new Tesserafin.Playback.Decision.SubtitleCapability("srt", Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External)] } };
         var body = new CreatePlaybackSessionRequest(_item, userId, capabilities, constraints, MediaSourceId: null, PlaySessionId: playSession);
         using var response = await client.PostAsJsonAsync("Playback/Sessions", body, JsonDefaults.Options, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        Assert.True(
+            response.IsSuccessStatusCode,
+            $"POST Playback/Sessions answered {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync(cancellationToken)}");
         return (await response.Content.ReadFromJsonAsync<PlaybackSessionResponse>(JsonDefaults.Options, cancellationToken))!.Id;
     }
 

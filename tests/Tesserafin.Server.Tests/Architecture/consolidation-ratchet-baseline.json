@@ -3,15 +3,12 @@
   "entityStaticServices": [],
   "forbiddenDependencies": [],
   "streamBuilderFiles": [
-    "Tesserafin.Api/Helpers/MediaInfoHelper.cs",
     "Tesserafin.Api/Helpers/StreamingHelpers.cs",
-    "Tesserafin.MediaEncoding/Playback/PlaybackSessionPlanner.cs",
     "Tesserafin.Model/Dlna/StreamBuilder.cs",
     "Tesserafin.Model/Dlna/StreamInfo.cs",
     "src/Tesserafin.Playback.Dlna/PlaybackExecutionPlanAdapter.cs"
   ],
   "toStreamInfoCallers": [
-    "Tesserafin.MediaEncoding/Playback/PlaybackLiveStreamResolver.cs",
     "src/Tesserafin.Playback.Dlna/PlaybackExecutionPlanAdapter.cs"
   ]
 }

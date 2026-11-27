@@ -22,7 +22,7 @@ namespace Tesserafin.MediaEncoding.Tests.Playback;
 /// </para>
 /// <para>
 /// <c>TrackTranscodeOutput</c> builds <c>new PlaybackPlan(playMethod, transcodeReasons)</c>, whose
-/// <see cref="PlaybackPlan.StreamInfo"/> defaults to <c>null</c>
+/// <c>PlaybackPlan.StreamInfo</c> (since removed, tesserafin#129 step 7) defaults to <c>null</c>
 /// (<c>IPlaybackSessionPlanner.cs</c>). So the ordinary client sequence — <c>POST
 /// Playback/Sessions</c>, then fetch an HLS segment — replaced the planned session's
 /// <c>Plan.StreamInfo</c> with <c>null</c>. <c>GetPlaybackSessionStream</c> reads exactly that
@@ -43,28 +43,6 @@ public class PlaybackSessionManagerPlanPreservationTests
     private const string PlaySessionA = "play-session-a";
 
     private static readonly DateTimeOffset T0 = new(2026, 7, 20, 12, 0, 0, TimeSpan.Zero);
-
-    /// <summary>
-    /// THE red test. A legacy HLS segment fetch must not strip the servable plan off a session the
-    /// client established through the v2 API. The assertion names the field the 422 reads.
-    /// </summary>
-    [Fact]
-    public void TrackTranscodeOutput_OnClientOwnedSession_PreservesPlannedStreamInfo()
-    {
-        var fixture = new Fixture();
-        var session = fixture.CreateClientSession(PlaySessionA);
-        Assert.NotNull(session.Plan.StreamInfo);
-
-        fixture.Manager.TrackTranscodeOutput("h264", "aac", TranscodeReason.ContainerNotSupported, PlaySessionA);
-
-        var after = fixture.Manager.Get(session.Id);
-        Assert.NotNull(after);
-
-        // These two are precisely the locals GetPlaybackSessionStream tests for null before 422ing.
-        Assert.NotNull(after.Plan.StreamInfo);
-        Assert.NotNull(after.Plan.StreamInfo!.MediaSource);
-        Assert.Equal(Fixture.MediaSourceId, after.Plan.StreamInfo.MediaSource!.Id);
-    }
 
     /// <summary>
     /// The other two locals the same 422 reads. <c>Request</c> is issue #71's guard, already green;
@@ -117,7 +95,7 @@ public class PlaybackSessionManagerPlanPreservationTests
         var fixture = new Fixture();
         var tracked = fixture.Manager.Track(
             PlaybackMediaKind.Video,
-            new PlaybackPlan(PlayMethod.DirectPlay, default, Fixture.CreateStreamInfo()),
+            new PlaybackPlan(PlayMethod.DirectPlay, default),
             PlaySessionA);
 
         fixture.Manager.TrackTranscodeOutput("h264", "aac", TranscodeReason.ContainerNotSupported, PlaySessionA);
@@ -126,10 +104,6 @@ public class PlaybackSessionManagerPlanPreservationTests
         Assert.NotNull(after);
         Assert.Equal(PlayMethod.Transcode, after.Plan.PlayMethod);
         Assert.Equal(TranscodeReason.ContainerNotSupported, after.Plan.TranscodeReasons);
-
-        // The legacy path genuinely has no StreamInfo to contribute, and the exemption must not
-        // manufacture one for it: this is the state the endpoint legitimately 422s on.
-        Assert.Null(after.Plan.StreamInfo);
     }
 
     /// <summary>
@@ -143,14 +117,13 @@ public class PlaybackSessionManagerPlanPreservationTests
         var fixture = new Fixture();
         var first = fixture.CreateClientSession(PlaySessionA);
 
-        fixture.PlannedPlan = new PlaybackPlan(PlayMethod.DirectPlay, default, Fixture.CreateStreamInfo("source-2"));
+        fixture.PlannedPlan = new PlaybackPlan(PlayMethod.DirectPlay, default);
         var second = fixture.CreateClientSession(PlaySessionA);
 
         Assert.Equal(first.Id, second.Id);
         var after = fixture.Manager.Get(first.Id);
         Assert.NotNull(after);
         Assert.Equal(PlayMethod.DirectPlay, after.Plan.PlayMethod);
-        Assert.Equal("source-2", after.Plan.StreamInfo?.MediaSource?.Id);
     }
 
     /// <summary>
@@ -181,7 +154,7 @@ public class PlaybackSessionManagerPlanPreservationTests
         {
             var options = new MediaOptions { Profile = new DeviceProfile() };
             Request = new PlaybackSessionRequest(PlaybackMediaKind.Video, options);
-            PlannedPlan = new PlaybackPlan(PlayMethod.Transcode, TranscodeReason.ContainerNotSupported, CreateStreamInfo());
+            PlannedPlan = new PlaybackPlan(PlayMethod.Transcode, TranscodeReason.ContainerNotSupported);
             var planner = new Mock<IPlaybackSessionPlanner>();
             planner.Setup(p => p.PlanVideo(options)).Returns(() => PlannedPlan);
             Manager = new PlaybackSessionManager(
@@ -198,13 +171,6 @@ public class PlaybackSessionManagerPlanPreservationTests
         public PlaybackSessionRequest Request { get; }
 
         public PlaybackPlan PlannedPlan { get; set; }
-
-        public static StreamInfo CreateStreamInfo(string mediaSourceId = MediaSourceId) => new()
-        {
-            DeviceProfile = new DeviceProfile(),
-            PlayMethod = PlayMethod.Transcode,
-            MediaSource = new MediaSourceInfo { Id = mediaSourceId },
-        };
 
         public PlaybackSession CreateClientSession(string playSessionId)
         {

@@ -177,7 +177,6 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
         // One session, the one the client created, still holding the engine's decision.
         var tracked = Assert.Single(_sessionManager.GetAll(), s => string.Equals(s.PlaySessionId, playSession, StringComparison.Ordinal));
         Assert.Equal(session.Id, tracked.Id.Value);
-        Assert.Null(tracked.Plan.StreamInfo);
         var job = _transcodeManager.GetTranscodingJob(playSession);
         Assert.NotNull(job);
         Assert.Equal(userId, job.UserId);

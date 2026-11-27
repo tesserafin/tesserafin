@@ -43,7 +43,6 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
 {
     private static readonly AsyncLocal<LocalMediaRequest?> _current = new();
 
-    private readonly IPlaybackSessionPlanner _inner;
     private readonly IPlaybackEngine _engine;
     private readonly IV2PlanStore _v2PlanStore;
     private readonly ILogger<LocalMediaPlanner> _logger;
@@ -54,7 +53,6 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalMediaPlanner"/> class.
     /// </summary>
-    /// <param name="inner">The existing chain, used for every decision this journey does not own.</param>
     /// <param name="engine">The v2 decision engine.</param>
     /// <param name="v2PlanStore">The store the decided plan is published into.</param>
     /// <param name="logger">The logger.</param>
@@ -69,7 +67,6 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
     /// refused otherwise. Never, when null.
     /// </param>
     public LocalMediaPlanner(
-        IPlaybackSessionPlanner inner,
         IPlaybackEngine engine,
         IV2PlanStore v2PlanStore,
         ILogger<LocalMediaPlanner> logger,
@@ -79,11 +76,9 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
     {
         _canTonemap = canTonemap ?? (static () => false);
         _canReadDiscImage = canReadDiscImage ?? (static _ => false);
-        ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(v2PlanStore);
         ArgumentNullException.ThrowIfNull(logger);
-        _inner = inner;
         _engine = engine;
         _v2PlanStore = v2PlanStore;
         _logger = logger;
@@ -175,18 +170,22 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             && string.Equals(source.LiveStreamId, liveStreamId, StringComparison.Ordinal);
 
     /// <inheritdoc/>
-    public PlaybackPlan? PlanAudio(MediaOptions options) => Plan(options, MediaKind.Audio, _inner.PlanAudio);
+    public PlaybackPlan? PlanAudio(MediaOptions options) => Plan(options, MediaKind.Audio);
 
     /// <inheritdoc/>
-    public PlaybackPlan? PlanVideo(MediaOptions options) => Plan(options, MediaKind.Video, _inner.PlanVideo);
+    public PlaybackPlan? PlanVideo(MediaOptions options) => Plan(options, MediaKind.Video);
 
-    private PlaybackPlan? Plan(MediaOptions options, MediaKind kind, Func<MediaOptions, PlaybackPlan?> inner)
+    private PlaybackPlan? Plan(MediaOptions options, MediaKind kind)
     {
         ArgumentNullException.ThrowIfNull(options);
         var request = _current.Value;
         if (request is null)
         {
-            return inner(options);
+            // Only a library video or audio track, a Live TV channel or a recording is planned
+            // (PlaybackSessionsController opens the scope for them): anything else has no plan.
+            // There is no other planner (tesserafin#129 step 7).
+            _logger.LogInformation("Playback for item {ItemId} refused: not a library video, audio track or Live TV stream.", options.ItemId);
+            return null;
         }
 
         // A version the request names and this user's source list does not hold (withdrawn, or
@@ -209,7 +208,9 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
 
         if (record is null)
         {
-            return inner(options);
+            // No output the client accepts is one this server executes from a session.
+            _logger.LogInformation("Playback for item {ItemId} refused: no executable output matches the declared capabilities.", options.ItemId);
+            return null;
         }
 
         _v2PlanStore.Publish(record);

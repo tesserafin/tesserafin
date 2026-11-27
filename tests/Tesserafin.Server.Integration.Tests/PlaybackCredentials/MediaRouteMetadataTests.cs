@@ -72,8 +72,6 @@ public sealed class MediaRouteMetadataTests
             ["HEAD /Audio/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Audio/{itemId}/stream.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["HEAD /Audio/{itemId}/stream.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Audio/{itemId}/universal"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", null),
-            ["HEAD /Audio/{itemId}/universal"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", null),
             ["GET /Videos/{itemId}/live.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Videos/{itemId}/master.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["HEAD /Videos/{itemId}/master.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),

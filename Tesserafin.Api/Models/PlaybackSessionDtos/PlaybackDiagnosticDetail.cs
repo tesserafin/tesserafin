@@ -35,7 +35,7 @@ namespace Tesserafin.Api.Models.PlaybackSessionDtos;
 /// <param name="RequestContext">
 /// The request context a retained shadow run captured, or <see langword="null"/> when no
 /// diagnostic was retained for this session (shadow mode off is the common case: it defaults to
-/// disabled, per <see cref="ShadowPlaybackSessionPlanner"/>).
+/// disabled, per <c>ShadowPlaybackSessionPlanner</c> (removed, tesserafin#129 step 7)).
 /// <see cref="PlaybackRequestContext.UserId"/> (PR113b) is the real requesting user when the
 /// calling controller populated <c>MediaOptions.UserId</c>, or <see cref="Guid.Empty"/> for a
 /// caller that predates PR113b and never set it.

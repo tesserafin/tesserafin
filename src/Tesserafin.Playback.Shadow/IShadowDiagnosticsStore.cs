@@ -10,7 +10,7 @@ namespace Tesserafin.Playback.Shadow;
 /// for the admin diagnostics endpoint (docs/pr92-design-playback-api-and-diagnostics.md §4.3, PR113).
 /// </summary>
 /// <remarks>
-/// No session id exists yet when <see cref="ShadowPlaybackSessionPlanner"/> runs the shadow
+/// No session id exists yet when <c>ShadowPlaybackSessionPlanner</c> (removed, tesserafin#129 step 7) runs the shadow
 /// comparison (<c>Plan()</c> is called before <c>PlaybackSessionManager.StoreOrReplace</c> mints
 /// one), so correlation happens in two steps: the shadow run publishes its record into an ambient
 /// slot via <see cref="Publish"/>, scoped by <see cref="BeginCapture()"/> around the synchronous
@@ -51,7 +51,7 @@ public interface IShadowDiagnosticsStore : IPlaybackSessionDiagnostics
 
     /// <summary>
     /// Publishes a record into the currently open ambient capture scope. Called by
-    /// <see cref="ShadowPlaybackSessionPlanner"/> only when a shadow run actually executed (behind
+    /// <c>ShadowPlaybackSessionPlanner</c> (removed, tesserafin#129 step 7) only when a shadow run actually executed (behind
     /// its enabled/sampling gate) - never called otherwise, so <see cref="TakeCaptured"/> naturally
     /// returns <see langword="null"/> when shadow mode is off. PR113a: if no <see cref="BeginCapture()"/>
     /// scope is currently open on this async flow, the record is silently dropped rather than

@@ -451,36 +451,22 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
             builder.ConfigureTestServices(services =>
             {
                 services.AddSingleton<IPlaybackSessionPlanner>(provider => new LocalMediaPlanner(
-                    new LegacyChainReached(),
                     provider.GetRequiredService<IPlaybackEngine>(),
                     provider.GetRequiredService<IV2PlanStore>(),
                     provider.GetRequiredService<ILogger<LocalMediaPlanner>>(),
                     canTonemap: () => provider.GetRequiredService<IMediaEncoder>().SupportsFilter("tonemapx"),
                     canReadDiscImage: isoType => provider.GetRequiredService<IMediaEncoder>().SupportsDiscImage(isoType)));
-                services.AddSingleton<IPlaybackLiveStreamResolver, LegacyChainReached>();
                 services.AddSingleton(Channel);
                 services.AddSingleton<IChannel>(Channel);
             });
         }
     }
 
-    private sealed class LegacyChainReached : IPlaybackSessionPlanner, IPlaybackLiveStreamResolver
+    private sealed class LegacyChainReached : IPlaybackSessionPlanner
     {
         public PlaybackPlan? PlanAudio(MediaOptions options) => throw new InvalidOperationException("The legacy planner (StreamBuilder) was reached.");
 
         public PlaybackPlan? PlanVideo(MediaOptions options) => throw new InvalidOperationException("The legacy planner (StreamBuilder) was reached.");
-
-        public StreamInfo Resolve(
-            PlaybackSessionId sessionId,
-            StreamInfo legacyStreamInfo,
-            MediaSourceInfo mediaSource,
-            DeviceProfile profile,
-            Guid itemId,
-            string? deviceId,
-            string playSessionId,
-            long startTimeTicks,
-            bool alwaysBurnInSubtitleWhenTranscoding)
-            => throw new InvalidOperationException("The live-stream resolver (ToStreamInfo) was reached.");
     }
 #pragma warning restore CA1034
 }

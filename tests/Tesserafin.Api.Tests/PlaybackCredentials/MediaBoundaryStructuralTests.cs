@@ -46,7 +46,6 @@ public class MediaBoundaryStructuralTests
         ("PlaybackSessionProgressiveController", "GetPlaybackSessionProgressive", PlaybackCapabilityScope.Media),
         ("AudioController", "GetAudioStream", PlaybackCapabilityScope.Media),
         ("AudioController", "GetAudioStreamByContainer", PlaybackCapabilityScope.Media),
-        ("UniversalAudioController", "GetUniversalAudioStream", PlaybackCapabilityScope.Media),
         ("DynamicHlsController", "GetLiveHlsStream", PlaybackCapabilityScope.Media),
         ("DynamicHlsController", "GetMasterHlsVideoPlaylist", PlaybackCapabilityScope.Media),
         ("DynamicHlsController", "GetMasterHlsAudioPlaylist", PlaybackCapabilityScope.Media),

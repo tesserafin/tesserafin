@@ -49,9 +49,6 @@ public class PlaybackSessionsControllerTests
     private readonly Mock<IUserManager> _userManager = new();
     private readonly Mock<IMediaSourceManager> _mediaSourceManager = new();
     private readonly Mock<IV2PlanStore> _v2PlanStore = new();
-    private readonly Mock<IPlaybackLiveStreamResolver> _liveStreamResolver = new();
-    private readonly Mock<IPlaybackLiveWiringDiagnosticsStore> _liveWiringDiagnosticsStore = new();
-    private readonly Mock<IMediaEncoder> _mediaEncoder = new();
     private readonly Guid _userId = Guid.NewGuid();
     private readonly Guid _itemId = Guid.NewGuid();
 
@@ -63,9 +60,6 @@ public class PlaybackSessionsControllerTests
             _userManager.Object,
             _mediaSourceManager.Object,
             _v2PlanStore.Object,
-            _liveStreamResolver.Object,
-            _liveWiringDiagnosticsStore.Object,
-            _mediaEncoder.Object,
             logger);
 
         SetIdentity(controller, _userId);
@@ -192,7 +186,7 @@ public class PlaybackSessionsControllerTests
         var item = new Movie { Id = _itemId };
         SetUpItemAndUser(item);
         var streamInfo = new StreamInfo { DeviceProfile = new DeviceProfile(), PlayMethod = PlayMethod.DirectPlay, Container = "mp4" };
-        var plan = new PlaybackPlan(PlayMethod.DirectPlay, default, streamInfo);
+        var plan = new PlaybackPlan(PlayMethod.DirectPlay, default);
         var planner = new Mock<IPlaybackSessionPlanner>();
         planner.Setup(p => p.PlanVideo(It.IsAny<MediaOptions>())).Returns(plan);
         using var realManager = new PlaybackSessionManager(
@@ -205,10 +199,7 @@ public class PlaybackSessionsControllerTests
             _itemLookupService.Object,
             _userManager.Object,
             _mediaSourceManager.Object,
-            _v2PlanStore.Object,
-            _liveStreamResolver.Object,
-            _liveWiringDiagnosticsStore.Object,
-            _mediaEncoder.Object);
+            _v2PlanStore.Object);
         SetIdentity(controller, _userId);
 
         var created = await controller.CreatePlaybackSession(CreateRequest(playSessionId: "play-session-1"));
@@ -253,9 +244,8 @@ public class PlaybackSessionsControllerTests
         engine
             .Setup(e => e.Decide(It.IsAny<PlaybackRequestContext>(), It.IsAny<Tesserafin.Playback.Decision.ClientCapabilities>(), It.IsAny<IReadOnlyList<MediaSourceSnapshot>>(), It.IsAny<PlaybackConstraints>()))
             .Throws(new InvalidOperationException("offered to the engine"));
-        var inner = new Mock<IPlaybackSessionPlanner>();
         using var manager = new PlaybackSessionManager(
-            new LocalMediaPlanner(inner.Object, engine.Object, _v2PlanStore.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalMediaPlanner>.Instance),
+            new LocalMediaPlanner(engine.Object, _v2PlanStore.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalMediaPlanner>.Instance),
             new Mock<ITranscodeManager>().Object,
             new Mock<Tesserafin.Controller.Session.ISessionManager>().Object);
         var controller = new PlaybackSessionsController(
@@ -264,9 +254,6 @@ public class PlaybackSessionsControllerTests
             _userManager.Object,
             _mediaSourceManager.Object,
             _v2PlanStore.Object,
-            _liveStreamResolver.Object,
-            _liveWiringDiagnosticsStore.Object,
-            _mediaEncoder.Object,
             recordingsManager: recordings.Object);
         SetIdentity(controller, _userId);
 
@@ -275,7 +262,6 @@ public class PlaybackSessionsControllerTests
         engine.Verify(
             e => e.Decide(It.IsAny<PlaybackRequestContext>(), It.IsAny<Tesserafin.Playback.Decision.ClientCapabilities>(), It.IsAny<IReadOnlyList<MediaSourceSnapshot>>(), It.IsAny<PlaybackConstraints>()),
             offered ? Times.Once() : Times.Never());
-        inner.Verify(p => p.PlanVideo(It.IsAny<MediaOptions>()), offered ? Times.Never() : Times.Once());
     }
 
     [Fact]
@@ -284,7 +270,7 @@ public class PlaybackSessionsControllerTests
         var item = new Movie { Id = _itemId };
         SetUpItemAndUser(item);
         var streamInfo = new StreamInfo { DeviceProfile = new DeviceProfile(), PlayMethod = PlayMethod.DirectPlay, Container = "mp4" };
-        var session = new PlaybackSession(PlaybackSessionId.NewId(), PlaybackMediaKind.Video, null, null, new PlaybackPlan(PlayMethod.DirectPlay, default, streamInfo), default, default);
+        var session = new PlaybackSession(PlaybackSessionId.NewId(), PlaybackMediaKind.Video, null, null, new PlaybackPlan(PlayMethod.DirectPlay, default), default, default);
         _playbackSessionManager
             .Setup(m => m.Create(It.IsAny<PlaybackSessionRequest>(), null))
             .Returns(session);
@@ -469,9 +455,6 @@ public class PlaybackSessionsControllerTests
             _userManager.Object,
             _mediaSourceManager.Object,
             _v2PlanStore.Object,
-            _liveStreamResolver.Object,
-            _liveWiringDiagnosticsStore.Object,
-            _mediaEncoder.Object,
             transcodeManager: transcodeManager.Object,
             credentialService: credentials.Object);
         SetIdentity(controller, _userId);
@@ -615,7 +598,7 @@ public class PlaybackSessionsControllerTests
     {
         SetUpItemAndUser(new Movie { Id = _itemId });
         var streamInfo = new StreamInfo { DeviceProfile = new DeviceProfile(), PlayMethod = PlayMethod.DirectPlay, Container = "mp4" };
-        var plan = new PlaybackPlan(PlayMethod.DirectPlay, default, streamInfo);
+        var plan = new PlaybackPlan(PlayMethod.DirectPlay, default);
         var planner = new Mock<IPlaybackSessionPlanner>();
         planner.Setup(p => p.PlanVideo(It.IsAny<MediaOptions>())).Returns(plan);
         var manager = new PlaybackSessionManager(
@@ -629,9 +612,6 @@ public class PlaybackSessionsControllerTests
             _userManager.Object,
             _mediaSourceManager.Object,
             _v2PlanStore.Object,
-            _liveStreamResolver.Object,
-            _liveWiringDiagnosticsStore.Object,
-            _mediaEncoder.Object,
             logger);
         SetIdentity(controller, _userId);
         return (controller, manager, logger);
@@ -655,7 +635,7 @@ public class PlaybackSessionsControllerTests
             PlaybackMediaKind.Video,
             playSessionId,
             new PlaybackSessionRequest(PlaybackMediaKind.Video, options),
-            new PlaybackPlan(PlayMethod.DirectPlay, default, streamInfo),
+            new PlaybackPlan(PlayMethod.DirectPlay, default),
             default,
             default);
     }
@@ -678,26 +658,6 @@ public class PlaybackSessionsControllerTests
     /// verified here by asserting the resolver is never invoked and diagnostics are never read, not
     /// just that the response is a 403.
     /// </summary>
-    [Fact]
-    public void GetPlaybackSessionStream_CallerWithoutToken_ReturnsForbidden()
-    {
-        var session = BuildStreamableSession(_userId, "play-session-1");
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-
-        var controller = CreateController();
-        SetIdentity(controller, _userId, token: null);
-
-        var result = controller.GetPlaybackSessionStream(session.Id);
-
-        Assert.IsType<ForbidResult>(result.Result);
-        _liveStreamResolver.Verify(
-            r => r.Resolve(It.IsAny<PlaybackSessionId>(), It.IsAny<StreamInfo>(), It.IsAny<MediaSourceInfo>(), It.IsAny<DeviceProfile>(), It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<bool>()),
-            Times.Never);
-        _liveWiringDiagnosticsStore.Verify(
-            s => s.TryGet(It.IsAny<PlaybackSessionId>(), out It.Ref<PlaybackLiveWiringOutcome?>.IsAny),
-            Times.Never);
-    }
-
     [Fact]
     public void GetPlaybackSessionStream_UnknownSession_ReturnsNotFound()
     {
@@ -726,195 +686,6 @@ public class PlaybackSessionsControllerTests
     }
 
     [Fact]
-    public void GetPlaybackSessionStream_Owner_ReturnsDescriptor()
-    {
-        var session = BuildStreamableSession(_userId, "play-session-1");
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-        _liveStreamResolver
-            .Setup(r => r.Resolve(session.Id, session.Plan.StreamInfo!, It.IsAny<MediaSourceInfo>(), It.IsAny<DeviceProfile>(), _itemId, "device-1", "play-session-1", 0, false))
-            .Returns(session.Plan.StreamInfo!);
-        PlaybackLiveWiringOutcome? outcome = PlaybackLiveWiringOutcome.Served(DateTimeOffset.UtcNow);
-        _liveWiringDiagnosticsStore.Setup(s => s.TryGet(session.Id, out outcome)).Returns(true);
-
-        var result = CreateController().GetPlaybackSessionStream(session.Id);
-
-        var descriptor = Assert.IsType<PlaybackSessionStreamDescriptor>(Assert.IsAssignableFrom<OkObjectResult>(result.Result).Value);
-        Assert.NotNull(descriptor.Url);
-    }
-
-    /// <summary>
-    /// PR118 regression: the legacy fallback path returns the SAME <see cref="StreamInfo"/> instance
-    /// retained in <c>session.Plan.StreamInfo</c> (not a fresh projection) - two concurrent calls
-    /// with different <c>startTimeTicks</c> used to race on that shared instance's
-    /// <see cref="StreamInfo.PlaySessionId"/>/<see cref="StreamInfo.StartPositionTicks"/> before the
-    /// URL was built. Each response's own <c>startTimeTicks</c> must always show up in ITS OWN URL,
-    /// never the other call's, and the instance the session itself retains must come out completely
-    /// untouched by either call. Uses separate controller instances per call - exactly like ASP.NET's
-    /// own per-request controller lifetime - racing on the single shared mocked session/StreamInfo,
-    /// the actual source of the bug.
-    /// </summary>
-    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Fact]
-    public async Task GetPlaybackSessionStream_ConcurrentCallsWithDifferentTicks_DoNotMutateSharedStreamInfo()
-    {
-        var session = BuildStreamableSession(_userId, "play-session-1");
-        var sharedStreamInfo = session.Plan.StreamInfo!;
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-        _liveStreamResolver
-            .Setup(r => r.Resolve(session.Id, sharedStreamInfo, It.IsAny<MediaSourceInfo>(), It.IsAny<DeviceProfile>(), It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<bool>()))
-            .Returns(sharedStreamInfo);
-        PlaybackLiveWiringOutcome? outcome = PlaybackLiveWiringOutcome.Fallback(PlaybackLiveFallbackReason.KillSwitch, DateTimeOffset.UtcNow);
-        _liveWiringDiagnosticsStore.Setup(s => s.TryGet(session.Id, out outcome)).Returns(true);
-
-        // Sanity: nothing has touched the shared instance yet.
-        Assert.Equal(0, sharedStreamInfo.StartPositionTicks);
-        Assert.Null(sharedStreamInfo.PlaySessionId);
-
-        const long ticksA = 1000;
-        const long ticksB = 999999;
-        PlaybackSessionStreamDescriptor? descriptorA = null;
-        PlaybackSessionStreamDescriptor? descriptorB = null;
-        var barrier = new Barrier(2);
-        var cancellationToken = TestContext.Current.CancellationToken;
-
-        var taskA = Task.Run(
-            () =>
-            {
-                var controller = CreateController();
-                barrier.SignalAndWait(cancellationToken);
-                var result = controller.GetPlaybackSessionStream(session.Id, ticksA);
-                descriptorA = Assert.IsType<PlaybackSessionStreamDescriptor>(Assert.IsAssignableFrom<OkObjectResult>(result.Result).Value);
-            },
-            cancellationToken);
-        var taskB = Task.Run(
-            () =>
-            {
-                var controller = CreateController();
-                barrier.SignalAndWait(cancellationToken);
-                var result = controller.GetPlaybackSessionStream(session.Id, ticksB);
-                descriptorB = Assert.IsType<PlaybackSessionStreamDescriptor>(Assert.IsAssignableFrom<OkObjectResult>(result.Result).Value);
-            },
-            cancellationToken);
-
-        await Task.WhenAll(taskA, taskB);
-
-        Assert.NotNull(descriptorA);
-        Assert.NotNull(descriptorB);
-        Assert.Contains($"&StartTimeTicks={ticksA}", descriptorA!.Url, StringComparison.Ordinal);
-        Assert.Contains($"&StartTimeTicks={ticksB}", descriptorB!.Url, StringComparison.Ordinal);
-        Assert.DoesNotContain($"&StartTimeTicks={ticksB}", descriptorA!.Url, StringComparison.Ordinal);
-        Assert.DoesNotContain($"&StartTimeTicks={ticksA}", descriptorB!.Url, StringComparison.Ordinal);
-
-        // The instance the session itself still holds must never have been mutated by either call.
-        Assert.Equal(0, sharedStreamInfo.StartPositionTicks);
-        Assert.Null(sharedStreamInfo.PlaySessionId);
-    }
-
-    /// <summary>
-    /// Design doc §4.2: an administrator may resolve a stream URL for a session it does not own -
-    /// same elevated allowance <c>RequestHelpers.GetUserId</c> already grants elsewhere.
-    /// </summary>
-    [Fact]
-    public void GetPlaybackSessionStream_Admin_ReturnsDescriptorForOtherUsersSession()
-    {
-        var session = BuildStreamableSession(Guid.NewGuid(), "play-session-1");
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-        _liveStreamResolver
-            .Setup(r => r.Resolve(session.Id, It.IsAny<StreamInfo>(), It.IsAny<MediaSourceInfo>(), It.IsAny<DeviceProfile>(), It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<bool>()))
-            .Returns(session.Plan.StreamInfo!);
-        PlaybackLiveWiringOutcome? outcome = PlaybackLiveWiringOutcome.Served(DateTimeOffset.UtcNow);
-        _liveWiringDiagnosticsStore.Setup(s => s.TryGet(session.Id, out outcome)).Returns(true);
-
-        var controller = CreateController();
-        SetIdentity(controller, Guid.NewGuid(), isAdmin: true);
-
-        var result = controller.GetPlaybackSessionStream(session.Id);
-
-        Assert.IsAssignableFrom<OkObjectResult>(result.Result);
-    }
-
-    /// <summary>
-    /// Design doc §2.3 (mandatory): a session with no <c>PlaySessionId</c> cannot correlate a served
-    /// URL to the transcoding job lifecycle - the endpoint must refuse with <c>409</c>, not emit one.
-    /// </summary>
-    [Fact]
-    public void GetPlaybackSessionStream_NoPlaySessionId_ReturnsConflict()
-    {
-        var session = BuildStreamableSession(_userId, playSessionId: null);
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-
-        var result = CreateController().GetPlaybackSessionStream(session.Id);
-
-        Assert.IsType<ConflictObjectResult>(result.Result);
-        _liveStreamResolver.Verify(
-            r => r.Resolve(It.IsAny<PlaybackSessionId>(), It.IsAny<StreamInfo>(), It.IsAny<MediaSourceInfo>(), It.IsAny<DeviceProfile>(), It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<bool>()),
-            Times.Never);
-    }
-
-    /// <summary>
-    /// PR #38 (amended, 2cf777d2): the endpoint used to answer <c>409</c> for BOTH "no PlaySessionId"
-    /// and "no plannable stream". OpenAPI admits exactly one <c>responses</c> entry per status code
-    /// per operation, so two 409s discriminated only by their body cannot exist in the contract and
-    /// are invisible to every generated client. The conditions differ in kind - the 409 above is
-    /// repairable by a <c>PUT</c> supplying a <c>PlaySessionId</c>, this one is structurally
-    /// unservable - so this one is <c>422</c>. Asserted for each of the three shapes that reach it.
-    /// </summary>
-    /// <param name="noOptions">When true the session carries no request, so no playback options can be resolved.</param>
-    /// <param name="noStreamInfo">When true the plan carries no <c>StreamInfo</c>.</param>
-    /// <param name="noMediaSource">When true the plan's <c>StreamInfo</c> carries no media source.</param>
-    [Theory]
-    [InlineData(true, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(false, false, true)]
-    public void GetPlaybackSessionStream_NoPlannableStream_ReturnsUnprocessableEntity(bool noOptions, bool noStreamInfo, bool noMediaSource)
-    {
-        StreamInfo? streamInfo = noStreamInfo
-            ? null
-            : new StreamInfo
-            {
-                ItemId = _itemId,
-                DeviceProfile = new DeviceProfile(),
-                PlayMethod = PlayMethod.DirectPlay,
-                Container = "mkv",
-                MediaSource = noMediaSource ? null : new MediaSourceInfo { Id = "source-1" },
-            };
-
-        var request = noOptions
-            ? null
-            : new PlaybackSessionRequest(PlaybackMediaKind.Video, new MediaOptions { ItemId = _itemId, UserId = _userId, DeviceId = "device-1", Profile = new DeviceProfile() });
-
-        var session = new PlaybackSession(
-            PlaybackSessionId.NewId(),
-            PlaybackMediaKind.Video,
-            "play-session-1",
-            request,
-            new PlaybackPlan(PlayMethod.DirectPlay, default, streamInfo),
-            default,
-            default);
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-
-        var controller = CreateController();
-        // A null Request means EnsureCallerOwnsSessionOrIsAdmin has no owner to compare against, so
-        // only an administrator gets far enough to observe the 422 in that shape.
-        SetIdentity(controller, _userId, isAdmin: true);
-
-        var result = controller.GetPlaybackSessionStream(session.Id);
-
-        Assert.IsType<UnprocessableEntityObjectResult>(result.Result);
-        _liveStreamResolver.Verify(
-            r => r.Resolve(It.IsAny<PlaybackSessionId>(), It.IsAny<StreamInfo>(), It.IsAny<MediaSourceInfo>(), It.IsAny<DeviceProfile>(), It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<bool>()),
-            Times.Never);
-    }
-
-    /// <summary>
-    /// PR #38 (amended, 2cf777d2): the session was already proven to exist by the ownership check, so
-    /// a null from <c>Patch</c> can only mean re-planning produced no viable plan. That used to be a
-    /// <c>404</c>, indistinguishable from an unknown id - precisely the distinction a client needs on
-    /// a track change. <c>404</c> stays reserved for the unknown id
-    /// (<see cref="ReplacePlaybackSession_UnknownSession_ReturnsNotFound"/>).
-    /// </summary>
-    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Fact]
     public async Task ReplacePlaybackSession_ExistingSessionNoViablePlan_ReturnsUnprocessableEntity()
     {
         var item = new Movie { Id = _itemId };
@@ -928,573 +699,6 @@ public class PlaybackSessionsControllerTests
         var result = await CreateController().ReplacePlaybackSession(id, CreateReplaceRequest());
 
         Assert.IsType<UnprocessableEntityObjectResult>(result.Result);
-    }
-
-    /// <summary>
-    /// Issue #44 §8 arbitrage A: the server picked a container and reported it nowhere, so the client
-    /// had to borrow the legacy <c>TranscodingContainer</c> or fall back to legacy entirely. The
-    /// descriptor now carries the effective output container and its content type, taken from the
-    /// very <see cref="StreamInfo"/> that produced <c>Url</c>.
-    /// </summary>
-    [Fact]
-    public void GetPlaybackSessionStream_Http_ReportsEffectiveContainerAndMimeType()
-    {
-        var session = BuildStreamableSession(_userId, "play-session-1");
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-        _liveStreamResolver
-            .Setup(r => r.Resolve(It.IsAny<PlaybackSessionId>(), It.IsAny<StreamInfo>(), It.IsAny<MediaSourceInfo>(), It.IsAny<DeviceProfile>(), It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<bool>()))
-            .Returns(session.Plan.StreamInfo!);
-        PlaybackLiveWiringOutcome? outcome = PlaybackLiveWiringOutcome.Served(DateTimeOffset.UtcNow);
-        _liveWiringDiagnosticsStore.Setup(s => s.TryGet(session.Id, out outcome)).Returns(true);
-
-        var result = CreateController().GetPlaybackSessionStream(session.Id);
-
-        var descriptor = Assert.IsType<PlaybackSessionStreamDescriptor>(Assert.IsAssignableFrom<OkObjectResult>(result.Result).Value);
-        Assert.Equal("mkv", descriptor.Container);
-        Assert.Equal("video/x-matroska", descriptor.MimeType);
-        // The container reported is the one the URL itself carries - that is the whole point.
-        Assert.Contains("/stream.mkv", descriptor.Url, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// On HLS the URL addresses <c>master.m3u8</c> while <c>Container</c> is the SEGMENT container
-    /// (<c>&amp;SegmentContainer=</c>), so the reported type must be the playlist's, never the
-    /// segments'.
-    /// </summary>
-    [Fact]
-    public void GetPlaybackSessionStream_Hls_ReportsSegmentContainerAndPlaylistMimeType()
-    {
-        var hlsStreamInfo = new StreamInfo
-        {
-            ItemId = _itemId,
-            MediaSource = new MediaSourceInfo { Id = "source-1", Container = "mkv" },
-            DeviceProfile = new DeviceProfile(),
-            PlayMethod = PlayMethod.Transcode,
-            Container = "ts",
-            SubProtocol = MediaStreamProtocol.hls,
-        };
-        var session = BuildStreamableSession(_userId, "play-session-1", hlsStreamInfo);
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-        _liveStreamResolver
-            .Setup(r => r.Resolve(It.IsAny<PlaybackSessionId>(), It.IsAny<StreamInfo>(), It.IsAny<MediaSourceInfo>(), It.IsAny<DeviceProfile>(), It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<bool>()))
-            .Returns(hlsStreamInfo);
-        PlaybackLiveWiringOutcome? outcome = PlaybackLiveWiringOutcome.Served(DateTimeOffset.UtcNow);
-        _liveWiringDiagnosticsStore.Setup(s => s.TryGet(session.Id, out outcome)).Returns(true);
-
-        var result = CreateController().GetPlaybackSessionStream(session.Id);
-
-        var descriptor = Assert.IsType<PlaybackSessionStreamDescriptor>(Assert.IsAssignableFrom<OkObjectResult>(result.Result).Value);
-        Assert.Equal(StreamingProtocol.Hls, descriptor.Protocol);
-        Assert.Equal("ts", descriptor.Container);
-        Assert.Equal("application/vnd.apple.mpegurl", descriptor.MimeType);
-    }
-
-    /// <summary>
-    /// Design doc §3: <c>ServedBy</c> must be the real v2 engine version - read back from the same
-    /// <see cref="IV2PlanStore"/> record whose <see cref="V2PlanRecord.ExecutionPlan"/> the resolver
-    /// used - only when the live-wiring outcome the resolver itself just recorded says v2 served
-    /// this request; <c>FallbackReason</c> must be <see langword="null"/> in that case.
-    /// </summary>
-    [Fact]
-    public void GetPlaybackSessionStream_ServedByV2_ReflectsRealEngineVersionAndNullFallbackReason()
-    {
-        var session = BuildStreamableSession(_userId, "play-session-1");
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-        _liveStreamResolver
-            .Setup(r => r.Resolve(It.IsAny<PlaybackSessionId>(), It.IsAny<StreamInfo>(), It.IsAny<MediaSourceInfo>(), It.IsAny<DeviceProfile>(), It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<bool>()))
-            .Returns(session.Plan.StreamInfo!);
-        PlaybackLiveWiringOutcome? outcome = PlaybackLiveWiringOutcome.Served(DateTimeOffset.UtcNow);
-        _liveWiringDiagnosticsStore.Setup(s => s.TryGet(session.Id, out outcome)).Returns(true);
-
-        var selectedStreams = new SelectedStreams(0, 1, null);
-        var output = new OutputSpec("mkv", "h264", "aac", null, null, null, null, null, null, StreamingProtocol.Http, null);
-        var reasoning = ReasonNode.Leaf(ReasonCode.MethodChosen, ReasonOutcome.Chosen, ReasonSubject.Method());
-        var decision = PlaybackDecision.DirectPlay("source-1", selectedStreams, output, reasoning, engineVersion: 6);
-        V2PlanRecord? v2Record = new V2PlanRecord(decision, ExecutionPlan: null, DateTimeOffset.UtcNow);
-        _v2PlanStore.Setup(s => s.TryGet(session.Id, out v2Record)).Returns(true);
-
-        var result = CreateController().GetPlaybackSessionStream(session.Id);
-
-        var descriptor = Assert.IsType<PlaybackSessionStreamDescriptor>(Assert.IsAssignableFrom<OkObjectResult>(result.Result).Value);
-        Assert.Equal(6, descriptor.ServedBy);
-        Assert.Null(descriptor.FallbackReason);
-    }
-
-    /// <summary>
-    /// Design doc §3: <c>FallbackReason</c> must reflect exactly the typed reason the resolver
-    /// itself recorded for THIS call, and <c>ServedBy</c> must fall back to the legacy sentinel -
-    /// never a stale engine version left over from an earlier <c>POST</c>/<c>PUT</c>.
-    /// </summary>
-    /// <param name="reason">Typed fallback reason the resolver recorded for this call.</param>
-    [Theory]
-    [InlineData(PlaybackLiveFallbackReason.KillSwitch)]
-    [InlineData(PlaybackLiveFallbackReason.SourceIdMismatch)]
-    [InlineData(PlaybackLiveFallbackReason.DolbyVisionExclusion)]
-    [InlineData(PlaybackLiveFallbackReason.NoAuthoritativeRecord)]
-    [InlineData(PlaybackLiveFallbackReason.PlanNotExecutable)]
-    [InlineData(PlaybackLiveFallbackReason.AdapterError)]
-    [InlineData(PlaybackLiveFallbackReason.StopThresholdTripped)]
-    public void GetPlaybackSessionStream_Fallback_ReflectsTypedReasonAndLegacySentinel(PlaybackLiveFallbackReason reason)
-    {
-        var session = BuildStreamableSession(_userId, "play-session-1");
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-        _liveStreamResolver
-            .Setup(r => r.Resolve(It.IsAny<PlaybackSessionId>(), It.IsAny<StreamInfo>(), It.IsAny<MediaSourceInfo>(), It.IsAny<DeviceProfile>(), It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<bool>()))
-            .Returns(session.Plan.StreamInfo!);
-        PlaybackLiveWiringOutcome? outcome = PlaybackLiveWiringOutcome.Fallback(reason, DateTimeOffset.UtcNow);
-        _liveWiringDiagnosticsStore.Setup(s => s.TryGet(session.Id, out outcome)).Returns(true);
-
-        var result = CreateController().GetPlaybackSessionStream(session.Id);
-
-        var descriptor = Assert.IsType<PlaybackSessionStreamDescriptor>(Assert.IsAssignableFrom<OkObjectResult>(result.Result).Value);
-        Assert.Equal(PlaybackSessionResponse.LegacyDecisionVersion, descriptor.ServedBy);
-        Assert.Equal(reason, descriptor.FallbackReason);
-        // Even when a v2 record happens to still be retained (a mismatch/kill-switch/etc. fallback
-        // leaves it in place, per design doc §3.1), ServedBy must not report its engine version -
-        // only a live-wiring outcome that actually says "served by v2" may do that.
-        _v2PlanStore.Verify(s => s.TryGet(It.IsAny<PlaybackSessionId>(), out It.Ref<V2PlanRecord?>.IsAny), Times.Never);
-    }
-
-    /// <summary>
-    /// Design doc §1.3/§3.2: the URL this endpoint returns for a legacy-fallback session must be
-    /// exactly <c>StreamInfo.ToUrl(...)</c>'s own output for the session's planned <c>StreamInfo</c> -
-    /// the same call <c>MediaInfoHelper.SetDeviceSpecificData</c> already makes to build
-    /// <c>mediaSource.TranscodingUrl</c> for the identical <see cref="StreamInfo"/> shape, proving
-    /// this endpoint reuses <c>ResolveServedStreamInfo</c>'s extracted logic verbatim rather than a
-    /// new URL-serialization path. Uses the REAL <see cref="PlaybackLiveStreamResolver"/> (kill
-    /// switch forced off), not a mock, so the fallback decision is genuinely exercised.
-    /// </summary>
-    [Fact]
-    public void GetPlaybackSessionStream_LegacyFallback_UrlMatchesStreamInfoToUrl_Parity()
-    {
-        var mediaSource = new MediaSourceInfo { Id = "source-1", Container = "mkv", SupportsDirectPlay = true };
-        var streamInfo = new StreamInfo
-        {
-            ItemId = _itemId,
-            MediaSource = mediaSource,
-            DeviceProfile = new DeviceProfile(),
-            PlayMethod = PlayMethod.DirectPlay,
-            Container = "mkv",
-            AudioStreamIndex = 1,
-        };
-        var session = BuildStreamableSession(_userId, "play-session-1", streamInfo);
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-
-        var configManager = new Mock<IServerConfigurationManager>();
-        configManager.Setup(c => c.Configuration).Returns(new ServerConfiguration { PlaybackShadow = new PlaybackShadowOptions { Mode = PlaybackEngineMode.Legacy } });
-        var liveWiringStore = new InMemoryPlaybackLiveWiringDiagnosticsStore();
-        var realResolver = new PlaybackLiveStreamResolver(
-            configManager.Object,
-            Mock.Of<IPlaybackExecutionPlanResolver>(),
-            liveWiringStore,
-            new PlaybackOperationalMetrics(),
-            new PlaybackStopThresholdGuard(() => new PlaybackShadowOptions(), new PlaybackOperationalMetrics(), Mock.Of<ILogger<PlaybackStopThresholdGuard>>()),
-            Mock.Of<ILogger<PlaybackLiveStreamResolver>>());
-
-        var controller = new PlaybackSessionsController(
-            _playbackSessionManager.Object,
-            _itemLookupService.Object,
-            _userManager.Object,
-            _mediaSourceManager.Object,
-            _v2PlanStore.Object,
-            realResolver,
-            liveWiringStore,
-            _mediaEncoder.Object);
-        SetIdentity(controller, _userId, token: "caller-token");
-
-        var result = controller.GetPlaybackSessionStream(session.Id, startTimeTicks: 500);
-
-        var descriptor = Assert.IsType<PlaybackSessionStreamDescriptor>(Assert.IsAssignableFrom<OkObjectResult>(result.Result).Value);
-        Assert.Equal(PlaybackSessionResponse.LegacyDecisionVersion, descriptor.ServedBy);
-        Assert.Equal(PlaybackLiveFallbackReason.KillSwitch, descriptor.FallbackReason);
-
-        // Independent oracle: the exact StreamInfo.ToUrl call the legacy path itself makes.
-        streamInfo.PlaySessionId = "play-session-1";
-        streamInfo.StartPositionTicks = 500;
-        var expectedUrl = streamInfo.ToUrl(null, null, null);
-        Assert.Equal(expectedUrl, descriptor.Url);
-    }
-
-    /// <summary>
-    /// Design doc §1.3/§3.2, v2-served case: the URL must exactly match
-    /// <c>PlaybackExecutionPlanAdapter.ToStreamInfo</c>'s own output for the retained v2 plan - the
-    /// same adapter call <c>ResolveServedStreamInfo</c>'s extracted logic makes internally. Uses the
-    /// REAL <see cref="PlaybackLiveStreamResolver"/>/<see cref="PlaybackExecutionPlanResolver"/>/
-    /// <see cref="InMemoryV2PlanStore"/>, not mocks, so the v2-serving decision is genuinely
-    /// exercised end to end.
-    /// </summary>
-    [Fact]
-    public void GetPlaybackSessionStream_V2Served_UrlMatchesPlaybackExecutionPlanAdapterOutput_Parity()
-    {
-        var mediaSource = new MediaSourceInfo
-        {
-            Id = "source-1",
-            Container = "mkv",
-            SupportsDirectPlay = true,
-            MediaStreams = new List<MediaStream>
-            {
-                new() { Type = MediaStreamType.Video, Index = 0, Codec = "h264" },
-                new() { Type = MediaStreamType.Audio, Index = 1, Codec = "aac" },
-            },
-        };
-        var legacyStreamInfo = new StreamInfo
-        {
-            ItemId = _itemId,
-            MediaSource = mediaSource,
-            DeviceProfile = new DeviceProfile(),
-            PlayMethod = PlayMethod.DirectPlay,
-            Container = "mkv",
-            AudioStreamIndex = 5,
-            VideoCodecs = ["h264"],
-            AudioCodecs = ["aac"],
-        };
-        var profile = new DeviceProfile();
-        var options = new MediaOptions { ItemId = _itemId, UserId = _userId, DeviceId = "device-1", Profile = profile };
-        var session = new PlaybackSession(
-            PlaybackSessionId.NewId(),
-            PlaybackMediaKind.Video,
-            "play-session-1",
-            new PlaybackSessionRequest(PlaybackMediaKind.Video, options),
-            new PlaybackPlan(PlayMethod.DirectPlay, default, legacyStreamInfo),
-            default,
-            default);
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-
-        var selectedStreams = new SelectedStreams(Video: 0, Audio: 1, Subtitle: null);
-        var output = new OutputSpec("mkv", "h264", "aac", null, null, null, null, null, null, StreamingProtocol.Http, null);
-        var reasoning = ReasonNode.Leaf(ReasonCode.MethodChosen, ReasonOutcome.Chosen, ReasonSubject.Method());
-        var decision = PlaybackDecision.DirectPlay("source-1", selectedStreams, output, reasoning, engineVersion: 6);
-        var executionPlan = new PlaybackExecutionPlan(
-            PlaybackMethod.DirectPlay,
-            "source-1",
-            output.Container!,
-            output.Protocol,
-            selectedStreams.Video,
-            output.VideoCodec,
-            output.VideoBitrate,
-            output.Resolution,
-            output.VideoRange,
-            selectedStreams.Audio,
-            output.AudioCodec,
-            output.AudioBitrate,
-            output.AudioChannels,
-            output.TotalBitrate,
-            selectedStreams.Subtitle?.Index,
-            selectedStreams.Subtitle?.Delivery,
-            output.SubtitleFormat,
-            new List<TransformKind>());
-        var v2PlanStore = new InMemoryV2PlanStore();
-        v2PlanStore.Attach(session.Id, new V2PlanRecord(decision, executionPlan, DateTimeOffset.UtcNow));
-
-        var configManager = new Mock<IServerConfigurationManager>();
-        configManager.Setup(c => c.Configuration).Returns(new ServerConfiguration { PlaybackShadow = new PlaybackShadowOptions { Mode = PlaybackEngineMode.Canary, CanaryPercentage = 100 } });
-        var liveWiringStore = new InMemoryPlaybackLiveWiringDiagnosticsStore();
-        var executionPlanResolver = new PlaybackExecutionPlanResolver(v2PlanStore);
-        var realResolver = new PlaybackLiveStreamResolver(
-            configManager.Object,
-            executionPlanResolver,
-            liveWiringStore,
-            new PlaybackOperationalMetrics(),
-            new PlaybackStopThresholdGuard(() => new PlaybackShadowOptions(), new PlaybackOperationalMetrics(), Mock.Of<ILogger<PlaybackStopThresholdGuard>>()),
-            Mock.Of<ILogger<PlaybackLiveStreamResolver>>());
-
-        var controller = new PlaybackSessionsController(
-            _playbackSessionManager.Object,
-            _itemLookupService.Object,
-            _userManager.Object,
-            _mediaSourceManager.Object,
-            v2PlanStore,
-            realResolver,
-            liveWiringStore,
-            _mediaEncoder.Object);
-        SetIdentity(controller, _userId, token: "caller-token");
-
-        var result = controller.GetPlaybackSessionStream(session.Id, startTimeTicks: 250);
-
-        var descriptor = Assert.IsType<PlaybackSessionStreamDescriptor>(Assert.IsAssignableFrom<OkObjectResult>(result.Result).Value);
-        Assert.Equal(6, descriptor.ServedBy);
-        Assert.Null(descriptor.FallbackReason);
-
-        var context = new PlaybackExecutionContext(_itemId, "play-session-1", "device-1", profile.Id?.ToString("N"), 250, false);
-        var expectedStreamInfo = PlaybackExecutionPlanAdapter.ToStreamInfo(executionPlan, context, mediaSource, profile);
-        expectedStreamInfo.PlaySessionId = "play-session-1";
-        expectedStreamInfo.StartPositionTicks = 250;
-        Assert.Equal(expectedStreamInfo.ToUrl(null, null, null), descriptor.Url);
-    }
-
-    // ---------------------------------------------------------------------------------------
-    // Issue #70: POST DirectPlay -> PUT AllowDirectPlay:false -> GET Stream.
-    //
-    // The retry ladder reefin-web sends when a Direct Play attempt fails re-plans the SAME,
-    // still-directly-playable media with EnableDirectPlay:false (+ EnableDirectStream:false for a
-    // local source). The v2 engine used to pick the method from the media alone, find Direct Play
-    // forbidden by the constraints, and answer NotViable - so PlaybackExecutionPlanBuilder refused,
-    // ShadowPlaybackSessionPlanner published a V2PlanRecord with a NULL ExecutionPlan, and every
-    // subsequent GET /Stream fell back to legacy with PlaybackLiveFallbackReason.PlanNotExecutable.
-    // Legacy StreamBuilder demotes the same input to Transcode and answers 200
-    // (StreamBuilder.cs:729-730).
-    //
-    // These use the REAL PlaybackEngine, PlaybackExecutionPlanBuilder, InMemoryV2PlanStore,
-    // PlaybackExecutionPlanResolver and PlaybackLiveStreamResolver - only the session manager (which
-    // this PR must not touch) and the item/user lookups stay mocked.
-    // ---------------------------------------------------------------------------------------
-
-    private static Tesserafin.Playback.Decision.ClientCapabilities CreateDemotionCapabilities() => new(
-        Decode: new DecodeCapabilities(
-            DirectPlayProfiles: [new DecodeProfile(MediaKind.Video, ["mp4"], ["h264"], ["aac"])],
-            VideoCodecs: [new VideoCodecCapability("h264", [], null, null, [], null, null)],
-            AudioCodecs: [new AudioCodecCapability("aac", null, null, null, null)],
-            SubtitleDelivery: [],
-            SupportsHls: false,
-            SupportsDash: false),
-        OutputProfiles: [new PlaybackOutputProfile(MediaKind.Video, StreamingProtocol.Http, "mp4", ["h264"], ["aac"], null, null, null)]);
-
-    private static PlaybackConstraints CreateDemotionConstraints(bool allowDirectPlay, bool allowDirectStream)
-        => CreateConstraints() with { AllowDirectPlay = allowDirectPlay, AllowDirectStream = allowDirectStream };
-
-    private PlaybackRequestContext CreateDemotionContext() => new(
-        RequestId: Guid.NewGuid(),
-        ItemId: _itemId,
-        MediaSourceId: null,
-        UserId: _userId,
-        MediaKind: MediaKind.Video,
-        RequestedAt: DateTimeOffset.UtcNow,
-        EngineVersion: Tesserafin.Playback.Engine.PlaybackEngine.EngineVersion);
-
-    /// <summary>The media the client CAN direct-play: mp4/h264/aac, exactly what the POST planned.</summary>
-    private static MediaSourceSnapshot CreateDirectlyPlayableSnapshot() => new(
-        MediaSourceId: DemotionSourceId,
-        Container: "mp4",
-        Protocol: "http",
-        Bitrate: null,
-        RunTimeTicks: null,
-        VideoStreams: [new VideoStreamSnapshot(0, "h264", null, null, null, null, null, null, null, null, false, false)],
-        AudioStreams: [new AudioStreamSnapshot(1, "aac", 2, null, null, null, null, true)],
-        SubtitleStreams: [],
-        SupportsDirectPlay: true,
-        SupportsDirectStream: true,
-        SupportsTranscoding: true);
-
-    /// <summary>
-    /// The same shape, but with codecs the client cannot decode at all - the engine reaches
-    /// Transcode from the MEDIA here, with no demotion involved. The independent oracle for the
-    /// plan-equality obligation below.
-    /// </summary>
-    private static MediaSourceSnapshot CreateUndecodableSnapshot() => new(
-        MediaSourceId: DemotionSourceId,
-        Container: "mp4",
-        Protocol: "http",
-        Bitrate: null,
-        RunTimeTicks: null,
-        VideoStreams: [new VideoStreamSnapshot(0, "hevc", null, null, null, null, null, null, null, null, false, false)],
-        AudioStreams: [new AudioStreamSnapshot(1, "ac3", 2, null, null, null, null, true)],
-        SubtitleStreams: [],
-        SupportsDirectPlay: true,
-        SupportsDirectStream: true,
-        SupportsTranscoding: true);
-
-    private static PlaybackExecutionPlan BuildPlanOrFail(PlaybackDecision decision, string label)
-    {
-        Assert.True(decision.IsViable, $"{label}: decision is not viable (method {decision.Method}).");
-        Assert.True(
-            PlaybackExecutionPlanBuilder.TryBuild(decision, out var plan, out var refusal),
-            $"{label}: PlaybackExecutionPlanBuilder refused with {refusal}.");
-        return plan!;
-    }
-
-    /// <summary>
-    /// Field-for-field plan equality. The <c>with { Transforms = [] }</c> record comparison is
-    /// deliberate belt-and-braces: it covers every field of
-    /// <see cref="PlaybackExecutionPlan"/> - including any added later - while the explicit
-    /// transform-sequence assertion covers the one member record equality compares by reference.
-    /// </summary>
-    private static void AssertExecutionPlansEqual(PlaybackExecutionPlan expected, PlaybackExecutionPlan actual)
-    {
-        Assert.Equal(expected.Method, actual.Method);
-        Assert.Equal(expected.Container, actual.Container);
-        Assert.Equal(expected.VideoCodec, actual.VideoCodec);
-        Assert.Equal(expected.AudioCodec, actual.AudioCodec);
-        Assert.Equal(expected.Transforms, actual.Transforms);
-        Assert.Equal(expected with { Transforms = [] }, actual with { Transforms = [] });
-    }
-
-    /// <summary>
-    /// Issue #70 PHASE 3, the equality obligation at the execution level: the Transcode plan the
-    /// constraint-forbidden PUT produces must be the SAME plan the engine builds for a Transcode it
-    /// reached without any demotion, and must adapt to the same legacy <see cref="StreamInfo"/> and
-    /// the same served URL. Two independent references are compared, because "the plan a fresh POST
-    /// produces for the same media" has two readings and both must hold:
-    /// <list type="number">
-    /// <item>a fresh POST carrying the retry constraints (same media, no prior session) - proves the
-    /// PUT path is not special-cased relative to a first-planning of the same request;</item>
-    /// <item>a POST whose media (hevc/ac3, undecodable by this client) forces Transcode with no
-    /// demotion at all - the reference a plan synthesized from a NotViable decision, or a widened
-    /// v2 transform capability, could not match.</item>
-    /// </list>
-    /// </summary>
-    [Fact]
-    public void ReplacePlaybackSession_DirectPlayForbidden_PlanEqualsUndemotedTranscodePlan()
-    {
-        var engine = new Tesserafin.Playback.Engine.PlaybackEngine();
-        var capabilities = CreateDemotionCapabilities();
-
-        // POST: the session as originally planned - Direct Play, executable.
-        var postDecision = engine.Decide(
-            CreateDemotionContext(),
-            capabilities,
-            [CreateDirectlyPlayableSnapshot()],
-            CreateDemotionConstraints(allowDirectPlay: true, allowDirectStream: true));
-        Assert.Equal(PlaybackMethod.DirectPlay, postDecision.Method);
-        BuildPlanOrFail(postDecision, "POST");
-
-        // PUT: the retry, same media, Direct Play and Direct Stream both forbidden.
-        var putPlan = BuildPlanOrFail(
-            engine.Decide(
-                CreateDemotionContext(),
-                capabilities,
-                [CreateDirectlyPlayableSnapshot()],
-                CreateDemotionConstraints(allowDirectPlay: false, allowDirectStream: false)),
-            "PUT (AllowDirectPlay:false)");
-
-        // Reference 1: a fresh POST already carrying the retry constraints.
-        var freshPlan = BuildPlanOrFail(
-            engine.Decide(
-                CreateDemotionContext(),
-                capabilities,
-                [CreateDirectlyPlayableSnapshot()],
-                CreateDemotionConstraints(allowDirectPlay: false, allowDirectStream: false)),
-            "fresh POST (AllowDirectPlay:false)");
-
-        // Reference 2: a POST the MEDIA forces to Transcode - no demotion anywhere in its path.
-        var undemotedPlan = BuildPlanOrFail(
-            engine.Decide(
-                CreateDemotionContext(),
-                capabilities,
-                [CreateUndecodableSnapshot()],
-                CreateDemotionConstraints(allowDirectPlay: true, allowDirectStream: true)),
-            "POST (media-forced transcode)");
-
-        Assert.Equal(PlaybackMethod.Transcode, undemotedPlan.Method);
-        AssertExecutionPlansEqual(freshPlan, putPlan);
-        AssertExecutionPlansEqual(undemotedPlan, putPlan);
-
-        // ... and the same plan adapts to the same legacy StreamInfo and the same served URL.
-        var mediaSource = CreateDemotionMediaSource();
-        var profile = new DeviceProfile();
-        var context = new PlaybackExecutionContext(_itemId, "play-session-1", "device-1", profile.Id?.ToString("N"), 0, false);
-        var undemotedStreamInfo = PlaybackExecutionPlanAdapter.ToStreamInfo(undemotedPlan, context, mediaSource, profile);
-        var putStreamInfo = PlaybackExecutionPlanAdapter.ToStreamInfo(putPlan, context, mediaSource, profile);
-
-        Assert.Equal(undemotedStreamInfo.PlayMethod, putStreamInfo.PlayMethod);
-        Assert.Equal(undemotedStreamInfo.Container, putStreamInfo.Container);
-        Assert.Equal(undemotedStreamInfo.VideoCodecs, putStreamInfo.VideoCodecs);
-        Assert.Equal(undemotedStreamInfo.AudioCodecs, putStreamInfo.AudioCodecs);
-        Assert.Equal(undemotedStreamInfo.AudioStreamIndex, putStreamInfo.AudioStreamIndex);
-        Assert.Equal(undemotedStreamInfo.MediaSourceId, putStreamInfo.MediaSourceId);
-        Assert.Equal(
-            undemotedStreamInfo.ToUrl(null, "caller-token", null),
-            putStreamInfo.ToUrl(null, "caller-token", null));
-    }
-
-    private static MediaSourceInfo CreateDemotionMediaSource() => new()
-    {
-        Id = DemotionSourceId,
-        Container = "mp4",
-        SupportsDirectPlay = true,
-        MediaStreams = new List<MediaStream>
-        {
-            new() { Type = MediaStreamType.Video, Index = 0, Codec = "h264" },
-            new() { Type = MediaStreamType.Audio, Index = 1, Codec = "aac" },
-        },
-    };
-
-    /// <summary>
-    /// Issue #70, the API-level regression: after a PUT forbidding Direct Play on a still-directly-
-    /// playable source replaces the session's authoritative v2 record, GET /Stream must still be
-    /// served by v2 - not fall back to legacy with
-    /// <see cref="PlaybackLiveFallbackReason.PlanNotExecutable"/>.
-    /// </summary>
-    [Fact]
-    public void GetPlaybackSessionStream_AfterReplaceForbiddingDirectPlay_ServedByV2()
-    {
-        var engine = new Tesserafin.Playback.Engine.PlaybackEngine();
-        var capabilities = CreateDemotionCapabilities();
-        var mediaSource = CreateDemotionMediaSource();
-        var profile = new DeviceProfile();
-        var legacyStreamInfo = new StreamInfo
-        {
-            ItemId = _itemId,
-            MediaSource = mediaSource,
-            DeviceProfile = profile,
-            // Legacy demoted the same input to Transcode and answered 200 - which is precisely why
-            // the PUT succeeded while the v2 record it attached was unexecutable.
-            PlayMethod = PlayMethod.Transcode,
-            Container = "mp4",
-            AudioStreamIndex = 1,
-        };
-        var options = new MediaOptions { ItemId = _itemId, UserId = _userId, DeviceId = "device-1", Profile = profile };
-        var session = new PlaybackSession(
-            PlaybackSessionId.NewId(),
-            PlaybackMediaKind.Video,
-            "play-session-1",
-            new PlaybackSessionRequest(PlaybackMediaKind.Video, options),
-            new PlaybackPlan(PlayMethod.Transcode, TranscodeReason.DirectPlayError, legacyStreamInfo),
-            default,
-            default);
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-
-        var v2PlanStore = new InMemoryV2PlanStore();
-
-        // POST attached an executable Direct Play record ...
-        var postDecision = engine.Decide(
-            CreateDemotionContext(),
-            capabilities,
-            [CreateDirectlyPlayableSnapshot()],
-            CreateDemotionConstraints(allowDirectPlay: true, allowDirectStream: true));
-        PlaybackExecutionPlanBuilder.TryBuild(postDecision, out var postPlan, out _);
-        v2PlanStore.Attach(session.Id, new V2PlanRecord(postDecision, postPlan, DateTimeOffset.UtcNow));
-
-        // ... and the PUT replaces it with whatever the retry constraints decide. This is the exact
-        // publish shape ShadowPlaybackSessionPlanner uses: the record is attached whether or not the
-        // builder produced a plan.
-        var putDecision = engine.Decide(
-            CreateDemotionContext(),
-            capabilities,
-            [CreateDirectlyPlayableSnapshot()],
-            CreateDemotionConstraints(allowDirectPlay: false, allowDirectStream: false));
-        PlaybackExecutionPlanBuilder.TryBuild(putDecision, out var putPlan, out _);
-        v2PlanStore.Attach(session.Id, new V2PlanRecord(putDecision, putPlan, DateTimeOffset.UtcNow));
-
-        var configManager = new Mock<IServerConfigurationManager>();
-        configManager
-            .Setup(c => c.Configuration)
-            .Returns(new ServerConfiguration { PlaybackShadow = new PlaybackShadowOptions { Mode = PlaybackEngineMode.V2 } });
-        var liveWiringStore = new InMemoryPlaybackLiveWiringDiagnosticsStore();
-        var realResolver = new PlaybackLiveStreamResolver(
-            configManager.Object,
-            new PlaybackExecutionPlanResolver(v2PlanStore),
-            liveWiringStore,
-            new PlaybackOperationalMetrics(),
-            new PlaybackStopThresholdGuard(() => new PlaybackShadowOptions(), new PlaybackOperationalMetrics(), Mock.Of<ILogger<PlaybackStopThresholdGuard>>()),
-            Mock.Of<ILogger<PlaybackLiveStreamResolver>>());
-
-        var controller = new PlaybackSessionsController(
-            _playbackSessionManager.Object,
-            _itemLookupService.Object,
-            _userManager.Object,
-            _mediaSourceManager.Object,
-            v2PlanStore,
-            realResolver,
-            liveWiringStore,
-            _mediaEncoder.Object);
-        SetIdentity(controller, _userId, token: "caller-token");
-
-        var result = controller.GetPlaybackSessionStream(session.Id);
-
-        var descriptor = Assert.IsType<PlaybackSessionStreamDescriptor>(Assert.IsAssignableFrom<OkObjectResult>(result.Result).Value);
-        Assert.Null(descriptor.FallbackReason);
-        Assert.Equal(Tesserafin.Playback.Engine.PlaybackEngine.EngineVersion, descriptor.ServedBy);
-        Assert.Equal("mp4", descriptor.Container);
     }
 
     /// <summary>
@@ -1559,31 +763,6 @@ public class PlaybackSessionsControllerTests
     /// stored on the session and runs its work inside the same attempt scope POST/PUT open -
     /// proven by observing the scope genuinely active at the moment the resolver is invoked, and
     /// closed again by the time the action returns.
-    /// </summary>
-    [Fact]
-    public void GetPlaybackSessionStream_ExistingSession_ResolvesUnderStoredAttemptScope()
-    {
-        var session = BuildStreamableSession(_userId, "play-session-1") with { PlaybackAttemptId = AttemptId };
-        _playbackSessionManager.Setup(m => m.Get(session.Id)).Returns(session);
-        var logger = new RecordingLogger();
-        var scopeActiveDuringResolve = false;
-        _liveStreamResolver
-            .Setup(r => r.Resolve(It.IsAny<PlaybackSessionId>(), It.IsAny<StreamInfo>(), It.IsAny<MediaSourceInfo>(), It.IsAny<DeviceProfile>(), It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<bool>()))
-            .Callback(() => scopeActiveDuringResolve = logger.HasActiveScopeWithAttemptId(AttemptId))
-            .Returns(session.Plan.StreamInfo!);
-        PlaybackLiveWiringOutcome? outcome = PlaybackLiveWiringOutcome.Served(DateTimeOffset.UtcNow);
-        _liveWiringDiagnosticsStore.Setup(s => s.TryGet(session.Id, out outcome)).Returns(true);
-
-        var result = CreateController(logger).GetPlaybackSessionStream(session.Id);
-
-        Assert.IsAssignableFrom<OkObjectResult>(result.Result);
-        Assert.True(scopeActiveDuringResolve);
-        Assert.Empty(logger.ActiveScopes);
-    }
-
-    /// <summary>
-    /// Issue #43: a missing session has no stored attempt id to scope with - the 404 path must not
-    /// invent one, so no attempt scope is ever opened.
     /// </summary>
     [Fact]
     public void GetPlaybackSessionStream_UnknownSession_OpensNoAttemptScope()

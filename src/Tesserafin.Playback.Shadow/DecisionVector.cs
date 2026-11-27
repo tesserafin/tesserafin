@@ -7,7 +7,7 @@ namespace Tesserafin.Playback.Shadow;
 /// docs/pr93-compatibility-lab.md §4: method, selected stream indices, the set of transform
 /// classes, the set of reason categories, and the output shape (container/codecs/resolution/
 /// bitrate/video range/audio channels/subtitle delivery). Produced from either side by
-/// <see cref="LegacyDecisionProjector"/> or <see cref="V2DecisionProjector"/>, and compared by
+/// <c>LegacyDecisionProjector</c> (removed, tesserafin#129 step 7) or <see cref="V2DecisionProjector"/>, and compared by
 /// <see cref="ShadowComparer"/> — never by raw equality of the underlying
 /// <c>Tesserafin.Model.Dlna.StreamInfo</c> / <c>Tesserafin.Playback.Decision.PlaybackDecision</c> types.
 /// </summary>

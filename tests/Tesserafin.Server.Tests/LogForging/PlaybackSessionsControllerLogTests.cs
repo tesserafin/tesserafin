@@ -184,9 +184,6 @@ namespace Tesserafin.Server.Tests.LogForging
                     Mock.Of<IUserManager>(),
                     Mock.Of<IMediaSourceManager>(),
                     Mock.Of<IV2PlanStore>(),
-                    Mock.Of<IPlaybackLiveStreamResolver>(),
-                    Mock.Of<IPlaybackLiveWiringDiagnosticsStore>(),
-                    Mock.Of<IMediaEncoder>(),
                     probe.LoggerFor<PlaybackSessionsController>());
             }
 
