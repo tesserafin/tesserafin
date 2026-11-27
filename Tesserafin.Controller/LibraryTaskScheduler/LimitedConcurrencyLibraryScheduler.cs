@@ -23,6 +23,11 @@ public sealed class LimitedConcurrencyLibraryScheduler : ILimitedConcurrencyLibr
     private readonly IServerConfigurationManager _serverConfigurationManager;
     private readonly Dictionary<CancellationTokenSource, Task> _taskRunners = new();
 
+    /// <summary>
+    /// Cancelled by <see cref="DisposeAsync"/> so the idle cleanup wait never holds up the host's shutdown.
+    /// </summary>
+    private readonly CancellationTokenSource _disposing = new();
+
     private static readonly AsyncLocal<CancellationTokenSource> _deadlockDetector = new();
 
     /// <summary>
@@ -56,6 +61,11 @@ public sealed class LimitedConcurrencyLibraryScheduler : ILimitedConcurrencyLibr
     {
         lock (_taskLock)
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             if (_cleanupTask is not null)
             {
                 _logger.LogDebug("Cleanup task already scheduled.");
@@ -69,8 +79,11 @@ public sealed class LimitedConcurrencyLibraryScheduler : ILimitedConcurrencyLibr
         async Task RunCleanupTask()
         {
             _logger.LogDebug("Schedule cleanup task in {CleanupGracePerioid} sec.", CleanupGracePeriod);
-            await Task.Delay(TimeSpan.FromSeconds(CleanupGracePeriod)).ConfigureAwait(false);
-            if (_disposed)
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(CleanupGracePeriod), _disposing.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
             {
                 _logger.LogDebug("Abort cleaning up, already disposed.");
                 return;
@@ -78,6 +91,12 @@ public sealed class LimitedConcurrencyLibraryScheduler : ILimitedConcurrencyLibr
 
             lock (_taskLock)
             {
+                if (_disposed)
+                {
+                    _logger.LogDebug("Abort cleaning up, already disposed.");
+                    return;
+                }
+
                 if (_tasks.Reader.Count > 0 || _workCounter > 0)
                 {
                     _logger.LogDebug("Delay cleanup task, operations still running.");
@@ -278,23 +297,34 @@ public sealed class LimitedConcurrencyLibraryScheduler : ILimitedConcurrencyLibr
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        Task? cleanupTask;
+        lock (_taskLock)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            // Under the lock: no cleanup task can be scheduled or rescheduled after this point,
+            // so the one read here is the last one.
+            _disposed = true;
+            cleanupTask = _cleanupTask;
         }
 
-        _disposed = true;
+        await _disposing.CancelAsync().ConfigureAwait(false);
         _tasks.Writer.Complete();
         foreach (var item in _taskRunners)
         {
             await item.Key.CancelAsync().ConfigureAwait(false);
         }
 
-        if (_cleanupTask is not null)
+        if (cleanupTask is not null)
         {
-            await _cleanupTask.ConfigureAwait(false);
-            _cleanupTask?.Dispose();
+            await cleanupTask.ConfigureAwait(false);
+            cleanupTask.Dispose();
         }
+
+        _disposing.Dispose();
     }
 
     private class TaskQueueItem
