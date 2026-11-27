@@ -1,0 +1,82 @@
+# Seeds, on master, the caches the Tests jobs restore on pull requests.
+#
+# A cache written by a pull request is visible to that pull request only; a pull
+# request also restores what its base branch wrote. ci-tests.yml no longer runs on
+# master (it re-tested heads already tested on their pull request), so this
+# workflow writes the two caches its jobs read, without building or testing:
+#
+#   - NuGet packages, keyed exactly as in ci-tests.yml on the project files;
+#   - the native test packages' .deb archives, keyed on the runner image. They
+#     exist because the Azure Ubuntu mirror can stall on downloads (19 and 30
+#     minutes on 2026-10-22; see ci-tests.yml).
+#
+# The keys and paths below must stay identical to ci-tests.yml, or the pull
+# request jobs restore nothing.
+
+name: Test caches
+
+on:
+  push:
+    branches: [master]
+    # Only what changes either cache key or its contents.
+    paths:
+      - '**/*.csproj'
+      - '**/Directory.Packages.props'
+      - 'nuget.config'
+      - 'global.json'
+      - 'ci/install-native-test-deps.sh'
+      - '.github/workflows/ci-test-caches.yml'
+  schedule:
+    # Mondays 05:41 UTC. A new runner image changes the native key, and GitHub
+    # evicts a cache nobody reads for seven days. Off the hour, and away from this
+    # repository's other scheduled gates.
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SDK_VERSION: "10.0.x"
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: ${{ env.SDK_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Restore NuGet packages
+        run: dotnet restore Tesserafin.sln
+
+      - name: Native package cache key
+        id: native-key
+        run: |
+          echo "prefix=native-debs-${ImageOS}-" >> "$GITHUB_OUTPUT"
+          echo "key=native-debs-${ImageOS}-${ImageVersion}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache native test packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/native-test-debs
+          key: ${{ steps.native-key.outputs.key }}
+          restore-keys: ${{ steps.native-key.outputs.prefix }}
+
+      - name: Install native test dependencies
+        timeout-minutes: 8
+        run: ci/install-native-test-deps.sh

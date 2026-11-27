@@ -72,9 +72,8 @@ on:
     # is unmergeable until somebody pushes an unrelated commit. Observed on
     # #227.
     types: [opened, synchronize, reopened, ready_for_review]
-    # Deliberately NO paths-ignore. ci-tests.yml carries one for minute
-    # economy; applying the same filter here would let a code-only pull
-    # request skip ABI checking whenever its file list happened to match.
+    # Deliberately NO paths-ignore: a file filter here would let a code-only
+    # pull request skip ABI checking whenever its file list happened to match.
 
 permissions: {}
 

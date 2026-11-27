@@ -172,7 +172,8 @@ the web client is hosted separately.
 
 **Continuous integration**
 
-Build, test, and lint run automatically on `master` and on every pull request.
+Build, test, and lint run automatically on every pull request, and all but the
+test suite again on `master`.
 The [Tests](.github/workflows/ci-tests.yml) (build + full test suite) and
 [Format](.github/workflows/ci-format.yml) (`dotnet format`) workflows, together
 with the ABI, OpenAPI, dependency-audit, secret-scan, SDK-provenance, and CodeQL

@@ -75,14 +75,10 @@
 name: Tests
 
 on:
-  push:
-    branches: [master]
-    # Minute economy: a documentation-only change cannot break the build or
-    # the test suite. This is safe HERE because this workflow contains no
-    # security analysis — CodeQL must never carry a documentation exclusion.
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
+  # No push trigger. master only moves by fast-forward to a pull request head that
+  # passed both jobs here, so a push run re-tested a tree already tested, for a
+  # coverage report nothing published. The NuGet and native-package caches that
+  # push runs used to seed for pull requests are seeded by ci-test-caches.yml.
   pull_request:
     # NO paths-ignore, deliberately. `Tests` is about to become a REQUIRED status
     # check on the protected `master`. A path-filtered `pull_request` trigger does
@@ -91,8 +87,6 @@ on:
     # pull request can never merge. A documentation-only pull request would be
     # permanently unmergeable. The extra minutes are the deliberate price of a
     # required check that can actually report.
-    #
-    # The `push` trigger above keeps its exclusion: nothing gates on it.
     #
     # `ready_for_review` is REQUIRED here for the same "a required check must be
     # able to report" reason. `run-tests` is draft-gated below, and without this
@@ -113,18 +107,6 @@ concurrency:
 
 env:
   SDK_VERSION: "10.0.x"
-  # Code coverage through coverlet.MTP (Microsoft.Testing.Platform). These are the
-  # settings the former VSTest runsettings file carried: Cobertura,
-  # generated/obsolete code excluded, auto-properties skipped. Its Moq and
-  # coverlet-self exclusions are dropped: coverlet.MTP only instruments
-  # assemblies with sources (Moq never appeared), and a whole-solution run
-  # passing --coverlet-exclude crashes the test modules before they report.
-  COVERAGE_ARGS: >-
-    --coverlet --coverlet-output-format cobertura
-    --coverlet-exclude-by-attribute Obsolete
-    --coverlet-exclude-by-attribute GeneratedCodeAttribute
-    --coverlet-exclude-by-attribute CompilerGeneratedAttribute
-    --coverlet-skip-auto-props
 
 jobs:
   run-tests:
@@ -186,7 +168,7 @@ jobs:
       # restores the previous archives and downloads only what changed. The
       # cache only spares downloads; versions are still resolved against fresh
       # package lists. Caches written by a pull request are visible to that
-      # pull request only; master pushes seed the shared one.
+      # pull request only; ci-test-caches.yml seeds the shared one on master.
       - name: Native package cache key
         id: native-key
         if: runner.os == 'Linux'
@@ -231,10 +213,6 @@ jobs:
         # its 30-minute ceiling after every test had passed (run 40567555335).
         # Every class of that project, and no class elsewhere, sits under that
         # namespace, so the two filters partition the suite exactly.
-        # Minute economy: coverage instrumentation and the ReportGenerator step
-        # below run on master pushes only. On a pull request the question is
-        # "does it build and pass", and coverage roughly doubles the test
-        # stage for an answer nobody reads on the pull request itself.
         # The tests run on Microsoft.Testing.Platform (global.json "test.runner").
         # The integration project matches no test under this filter and exits 8
         # ("zero tests"); that code is ignored here, and the result check below
@@ -245,7 +223,6 @@ jobs:
           --configuration Release
           --filter 'Category!=Smoke&FullyQualifiedName!~Tesserafin.Server.Integration.Tests.'
           --ignore-exit-code 8
-          ${{ github.event_name == 'push' && env.COVERAGE_ARGS || '' }}
           --report-trx
           --results-directory artifacts/test-results/unit
           --hangdump --hangdump-timeout 20m
@@ -267,16 +244,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-      - name: Merge code coverage results
-        if: ${{ github.event_name == 'push' }}
-        uses: danielpalme/ReportGenerator-GitHub-Action@049f7ec958c672fd31d5cc1cb01622dc8d2e23ab # v5.5.10
-        with:
-          reports: "artifacts/test-results/**/coverage.cobertura*.xml"
-          targetdir: "merged/"
-          reporttypes: "Cobertura"
-
-      # TODO - which action / tool to use to publish code coverage results?
-      # - name: Publish code coverage results
 
   integration-tests:
     # The real-server end-to-end suite, split out of run-tests so each job has
@@ -332,12 +299,11 @@ jobs:
 
       - name: Run integration tests
         id: tests
-        # Same Category filter and coverage switch as run-tests.
+        # Same Category filter as run-tests.
         run: >
           dotnet test --project tests/Tesserafin.Server.Integration.Tests/Tesserafin.Server.Integration.Tests.csproj
           --configuration Release
           --filter 'Category!=Smoke'
-          ${{ github.event_name == 'push' && env.COVERAGE_ARGS || '' }}
           --report-trx
           --results-directory artifacts/test-results/integration
           --hangdump --hangdump-timeout 20m
@@ -467,11 +433,3 @@ jobs:
           path: artifacts/openapi-drift/
           if-no-files-found: ignore
           retention-days: 3
-
-      - name: Merge code coverage results
-        if: ${{ github.event_name == 'push' }}
-        uses: danielpalme/ReportGenerator-GitHub-Action@049f7ec958c672fd31d5cc1cb01622dc8d2e23ab # v5.5.10
-        with:
-          reports: "artifacts/test-results/**/coverage.cobertura*.xml"
-          targetdir: "merged/"
-          reporttypes: "Cobertura"

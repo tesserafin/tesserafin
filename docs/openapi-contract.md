@@ -12,7 +12,7 @@ généré, identifié, vérifié et consommé.
 >
 > | Control | Trigger | What it proves |
 > | --- | --- | --- |
-> | `Tests` (`ci-tests.yml`) | automatic, `push`/`pull_request` | the committed `openapi/openapi.json` is byte-for-byte what the **HEAD server** generates — the drift check of §7, now also enforced off-laptop |
+> | `Tests` (`ci-tests.yml`) | automatic, `pull_request` | the committed `openapi/openapi.json` is byte-for-byte what the **HEAD server** generates — the drift check of §7, now also enforced off-laptop |
 > | `OpenAPI Check` (`openapi-pull-request.yml`) | automatic, `pull_request` | the **merge-base** contract compared with the **pull-request head** contract is compatible, breaking or indeterminate |
 > | `./ci/run.sh` | local, mandatory | still the authoritative merge gate |
 >

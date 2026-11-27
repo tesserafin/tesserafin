@@ -108,6 +108,12 @@ enforcement), so a pull request cannot merge until they are green:
 | `SDK Provenance` | `sdk-provenance.yml` | build SDK matches `global.json` |
 | `Analyze csharp`, `Analyze actions`, `CodeQL` | `ci-codeql-analysis.yml` | static security analysis |
 
+`Tests` (`ci-tests.yml`) is the exception to the push rule: it runs on pull
+requests and by hand only. `master` moves only by fast-forward to a pull
+request head that passed it, so a push run would re-test the same tree.
+`ci-test-caches.yml` seeds on `master` the NuGet and native-package caches its
+pull-request jobs restore.
+
 ## Running the server
 
 See the **Development → Running the server** section of the [README](README.md).
