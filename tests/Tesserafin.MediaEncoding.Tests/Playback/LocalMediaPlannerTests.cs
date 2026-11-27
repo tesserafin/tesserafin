@@ -370,22 +370,36 @@ public sealed class LocalMediaPlannerTests
     }
 
     [Fact]
-    public void A_tuner_stream_the_session_did_not_open_is_left_to_the_existing_chain()
+    public void A_tuner_stream_the_session_did_not_open_is_refused_not_handed_to_the_existing_chain()
     {
-        var existing = new PlaybackPlan(PlayMethod.Transcode, 0);
-        var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
-        inner.Setup(p => p.PlanVideo(It.IsAny<MediaOptions>())).Returns(existing);
-        var (planner, store) = Planner(inner.Object);
+        // The strict inner planner proves the existing chain is not reached (decided 2026-11-27).
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
         var tuner = Source("tuner", "h264", 1, -1, container: "ts");
         tuner.Protocol = MediaProtocol.Http;
         tuner.IsInfiniteStream = true;
         tuner.LiveStreamId = "someone-else";
+        var declared = new LocalMediaRequest(Browser(hlsOutput: true), _declared, "live-1");
 
         using var capture = store.BeginCapture();
-        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(Browser(hlsOutput: true), _declared, "live-1"));
+        using var request = LocalMediaPlanner.BeginRequest(declared);
 
-        Assert.Same(existing, planner.PlanVideo(Options(tuner)));
+        Assert.Null(planner.PlanVideo(Options(tuner)));
         Assert.Null(store.TakeCaptured());
+        Assert.Equal(LocalMediaRefusal.NotTheHeldLiveStream, declared.Refusal);
+    }
+
+    [Fact]
+    public void A_request_with_no_source_is_refused_not_handed_to_the_existing_chain()
+    {
+        var (planner, store) = Planner(new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict).Object);
+        var declared = new LocalMediaRequest(Browser(hlsOutput: true), _declared);
+
+        using var capture = store.BeginCapture();
+        using var request = LocalMediaPlanner.BeginRequest(declared);
+
+        Assert.Null(planner.PlanVideo(Options()));
+        Assert.Null(store.TakeCaptured());
+        Assert.Equal(LocalMediaRefusal.NoSource, declared.Refusal);
     }
 
     [Theory]
@@ -420,11 +434,11 @@ public sealed class LocalMediaPlannerTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void An_hdr_source_for_an_sdr_client_is_tone_mapped_by_an_owned_transcode_only_where_the_executor_can(bool canTonemap)
+    public void An_hdr_source_for_an_sdr_client_is_tone_mapped_where_the_executor_can_and_refused_where_it_cannot(bool canTonemap)
     {
-        var existing = new PlaybackPlan(PlayMethod.Transcode, 0);
+        // The strict inner planner proves the existing chain is never reached: where the executor
+        // cannot tone-map, the session is refused (decided 2026-11-27).
         var inner = new Mock<IPlaybackSessionPlanner>(MockBehavior.Strict);
-        inner.Setup(p => p.PlanVideo(It.IsAny<MediaOptions>())).Returns(existing);
         var store = new InMemoryV2PlanStore();
         var planner = new LocalMediaPlanner(inner.Object, new PlaybackEngine(), store, NullLogger<LocalMediaPlanner>.Instance, canTonemap: () => canTonemap);
         var film = Source("film", "hevc", 1, 2, "mkv");
@@ -439,8 +453,9 @@ public sealed class LocalMediaPlannerTests
             },
         };
 
+        var declared = new LocalMediaRequest(sdrClient, _declared);
         using var capture = store.BeginCapture();
-        using var request = LocalMediaPlanner.BeginRequest(new LocalMediaRequest(sdrClient, _declared));
+        using var request = LocalMediaPlanner.BeginRequest(declared);
         var plan = planner.PlanVideo(Options(film));
         var executed = store.TakeCaptured()?.ExecutionPlan;
 
@@ -454,8 +469,9 @@ public sealed class LocalMediaPlannerTests
         }
         else
         {
-            Assert.Same(existing, plan);
+            Assert.Null(plan);
             Assert.Null(executed);
+            Assert.Equal(LocalMediaRefusal.ToneMappingUnavailable, declared.Refusal);
         }
     }
 

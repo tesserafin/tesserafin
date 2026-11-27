@@ -537,10 +537,10 @@ record and no refusal, so `inner(options)` - `StreamBuilder` - decides)
 
 | # | Reached when | Disposition |
 | --- | --- | --- |
-| S1 | the only executable plan tone-maps HDR to SDR, on a server whose FFmpeg has no `tonemapx` (`canTonemap` false; the F0 runtime has it, a distribution FFmpeg may not) | Owner 2026-11-27: 422 when the session has no validated conversion path; the Web shows the reason. |
+| S1 | the only executable plan tone-maps HDR to SDR, on a server whose FFmpeg has no `tonemapx` (`canTonemap` false; the F0 runtime has it, a distribution FFmpeg may not) | **Done 2026-11-27.** 422 with `reason: ToneMappingUnavailable` when no source has another executable output; the Web shows the reason with W2. Proof: `ToneMappingRefusalEndToEndTests` (legacy-free host, planner declaring no tone mapping; break control without the refusal: `500 The legacy planner (StreamBuilder) was reached`), planner unit tests with a strict inner planner. |
 | S2 | the engine keeps an HDR range out of the encode (`VideoRange` set without a tone map to SDR, for example HDR10 out of Dolby Vision): decided, not executed | Owner 2026-11-27: keep the HDR paths Sessions already executes (direct play when compatible included). Otherwise plan SDR only when the client accepts it and the conversion is available; else 422. Executing new HDR outputs is out of this deletion work. |
 | S3 | a transcode delivers a subtitle as `Embed` or `Hls` (only `External` and `Burn` execute) | Owner 2026-11-27: prefer an external track when the player renders it correctly, then burn-in when possible; if neither restores the selected track, 422. Keep embedded subtitles the player already reads in direct play. HLS subtitle renditions are out of this deletion work. |
-| S4 | the session's sources list is empty, or a live session's source is not the stream it holds | Owner 2026-11-27: refuse the session; for live, the planned source must be the one the session holds. |
+| S4 | the session's sources list is empty, or a live session's source is not the stream it holds | **Done 2026-11-27.** Refused: `reason: NoSource`, `NotTheHeldLiveStream`. Not reachable through the API (an item always lists its static source; the controller plans a live session on the stream it holds), so proved by planner unit tests with a strict inner planner, each failing without the change. |
 
 **Order (owner 2026-11-27).** W4 and S1/S4 now. Then S2/S3, then W1 to W3. Each server row comes
 with a session E2E and a break control showing the legacy planner is no longer reached; each Web

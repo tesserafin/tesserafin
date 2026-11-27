@@ -430,7 +430,7 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
     /// reflection and needs it public, so CA1034 is suppressed as in PlaybackSessionsControllerTests.
     /// </remarks>
 #pragma warning disable CA1034 // Nested types should not be visible
-    public sealed class LegacyFreeFactory : E2eApplicationFactory
+    public class LegacyFreeFactory : E2eApplicationFactory
     {
         /// <summary>
         /// Gets the FFmpeg the server runs: <c>TESSERAFIN_PROJECT_FFMPEG</c> when set (the project's

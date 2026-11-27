@@ -9,7 +9,14 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// <param name="Capabilities">The declared client capabilities.</param>
 /// <param name="Constraints">The declared playback constraints.</param>
 /// <param name="LiveStreamId">
-/// For a Live TV channel, the tuner stream this session opened: the one infinite source the planner
-/// may decide on. <see langword="null"/> for a library item.
+/// For a Live TV channel or a recording still being written, the stream this session opened: the
+/// one infinite source the planner may decide on. <see langword="null"/> for a library item.
 /// </param>
-public sealed record LocalMediaRequest(ClientCapabilities Capabilities, PlaybackConstraints Constraints, string? LiveStreamId = null);
+public sealed record LocalMediaRequest(ClientCapabilities Capabilities, PlaybackConstraints Constraints, string? LiveStreamId = null)
+{
+    /// <summary>
+    /// Gets or sets why the planner refused this request, once it has: read by the caller to say so in
+    /// its answer. <see cref="LocalMediaRefusal.None"/> while nothing was refused.
+    /// </summary>
+    public LocalMediaRefusal Refusal { get; set; }
+}

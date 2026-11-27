@@ -197,14 +197,13 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             return null;
         }
 
-        var record = TryDecide(request, options, kind, out var refused);
-        if (refused)
+        request.Refusal = LocalMediaRefusal.None;
+        var record = TryDecide(request, options, kind, out var refusal);
+        if (refusal != LocalMediaRefusal.None)
         {
-            // A transcode to a codec this server does not encode from a session, for a client that
-            // declares no H.264/AAC to re-plan to: refused, not handed to the existing chain.
-            _logger.LogInformation(
-                "Playback for item {ItemId} refused: no session provider reads its source (or this server's FFmpeg cannot open the disc image), or the only transcode the client allows encodes to a target other than H.264/AAC.",
-                options.ItemId);
+            // Refused, never handed to the existing chain: the caller says why in its answer.
+            request.Refusal = refusal;
+            _logger.LogInformation("Playback for item {ItemId} refused: {Refusal}.", options.ItemId, refusal);
             return null;
         }
 
@@ -383,15 +382,17 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
     private bool IsReadableDiscImage(MediaSourceInfo source)
         => IsLocalDiscImageSource(source) && _canReadDiscImage(source.IsoType!.Value);
 
-    private V2PlanRecord? TryDecide(LocalMediaRequest request, MediaOptions options, MediaKind kind, out bool refused)
+    private V2PlanRecord? TryDecide(LocalMediaRequest request, MediaOptions options, MediaKind kind, out LocalMediaRefusal refusal)
     {
-        refused = false;
+        refusal = LocalMediaRefusal.None;
         var sources = options.MediaSources
             .Where(source => string.IsNullOrEmpty(options.MediaSourceId) || string.Equals(source.Id, options.MediaSourceId, StringComparison.Ordinal))
             .ToList();
         var live = !string.IsNullOrEmpty(request.LiveStreamId);
         if (sources.Count == 0)
         {
+            // Nothing to decide on is not a decision for another planner (decided 2026-11-27).
+            refusal = LocalMediaRefusal.NoSource;
             return null;
         }
 
@@ -399,11 +400,20 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             ? IsSessionLiveSource(source, request.LiveStreamId)
             : IsLocalFileSource(source) || IsSeekableRemoteSource(source) || IsLocalDiscSource(source) || IsReadableDiscImage(source)))
         {
-            // A non-local source no session provider reads (another protocol, a remote stream with
-            // no known duration), and a disc image this server's FFmpeg cannot open or whose kind the
-            // scan did not recognise: refused, not handed to the existing chain (decided 2026-11-20,
+            // A live session decides only on the stream it holds (decided 2026-11-27). A non-local
+            // source no session provider reads (another protocol, a remote stream with no known
+            // duration), and a disc image this server's FFmpeg cannot open or whose kind the scan
+            // did not recognise: refused, not handed to the existing chain (decided 2026-11-20,
             // 2026-11-25).
-            refused = !live && sources.Any(source => source.Protocol != MediaProtocol.File || IsDiscImage(source));
+            if (live)
+            {
+                refusal = LocalMediaRefusal.NotTheHeldLiveStream;
+            }
+            else if (sources.Any(source => source.Protocol != MediaProtocol.File || IsDiscImage(source)))
+            {
+                refusal = LocalMediaRefusal.NoSessionProvider;
+            }
+
             return null;
         }
 
@@ -449,15 +459,21 @@ public sealed class LocalMediaPlanner : IPlaybackSessionPlanner
             {
                 transcode = new V2PlanRecord(decision, plan, _timeProvider.GetUtcNow());
             }
+            else if ((IsExecutableTranscode(plan) || (progressive && plan.Method == PlaybackMethod.Transcode && plan.VideoStreamIndex is not null)) && IsToneMappingToSdr(plan))
+            {
+                // The tone mapping this transcode needs, on a server whose FFmpeg cannot perform it:
+                // refused unless another source plays (decided 2026-11-27).
+                refusal = LocalMediaRefusal.ToneMappingUnavailable;
+            }
             else if (IsRefusedTranscodeTarget(plan))
             {
-                refused = true;
+                refusal = LocalMediaRefusal.TranscodeTargetNotExecuted;
             }
         }
 
         if (remux is not null || transcode is not null)
         {
-            refused = false;
+            refusal = LocalMediaRefusal.None;
         }
 
         return remux ?? transcode;

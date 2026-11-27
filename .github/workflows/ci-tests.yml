@@ -402,6 +402,7 @@ jobs:
           --require Tesserafin.Server.Integration.Tests.EndToEnd.ChannelItemEndToEndTests.ChannelItem_WithASourceNoSessionProviderReads_IsRefusedExplicitly
           --require Tesserafin.Server.Integration.Tests.EndToEnd.LiveTvSessionEndToEndTests.LiveTvChannel_PlaysFromTheSessionLiveRoute_OnOneTunerStream_ClosedByTheStop
           --require Tesserafin.Server.Integration.Tests.EndToEnd.LiveRecordingSessionEndToEndTests.RecordingBeingWritten_PlaysFromTheSessionLiveRoute_ThroughItsProvider
+          --require Tesserafin.Server.Integration.Tests.EndToEnd.ToneMappingRefusalEndToEndTests.ToneMapping_WithoutATonemappingFfmpeg_IsRefusedWithItsReason_NeverTheLegacyPlanner
           --require Tesserafin.Server.Integration.Tests.EndToEnd.BurnInSubtitleEndToEndTests.BurnIn_EmbeddedAss_IsBurntIntoTheEncodedVideoOnTheSessionHlsRoute
           --require Tesserafin.Server.Integration.Tests.EndToEnd.BurnInSubtitleEndToEndTests.BurnIn_SrtSidecar_IsBurntIntoTheEncodedVideoOnTheSessionHlsRoute
           --require Tesserafin.Server.Integration.Tests.EndToEnd.DirectPlayFilmEndToEndTests.Film_ParametersThatDoNotMatchTheSession_AreNotServed

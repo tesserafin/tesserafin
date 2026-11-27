@@ -166,7 +166,8 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         // shadow mode is off (the default) the shadow run never executes and this scope costs one
         // AsyncLocal write and produces nothing.
         PlaybackSession? session;
-        using (BeginLocalMediaScope(isLocalMedia, request, liveStreamId))
+        var localRequest = LocalMediaRequestOf(isLocalMedia, request, liveStreamId);
+        using (localRequest is null ? null : LocalMediaPlanner.BeginRequest(localRequest))
         using (_shadowDiagnosticsStore.BeginCapture(new ShadowCaptureInputs(request.Capabilities, HttpContext.Request.ContentLength, ReadCapturedScan())))
         {
             session = _playbackSessionManager.Create(
@@ -183,7 +184,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
                 await _liveStreams.CloseUnattachedAsync(liveStreamId).ConfigureAwait(false);
             }
 
-            return NoViablePlan();
+            return NoViablePlan(localRequest?.Refusal ?? LocalMediaRefusal.None);
         }
 
         if (liveStreamId is not null)
@@ -270,7 +271,8 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         // Issue #75: same ambient scope as the POST - a PUT re-plans with a complete new body, so it
         // carries its own declared capabilities and its own Content-Length.
         PlaybackSession? session;
-        using (BeginLocalMediaScope(isLocalMedia, request, liveStreamId))
+        var localRequest = LocalMediaRequestOf(isLocalMedia, request, liveStreamId);
+        using (localRequest is null ? null : LocalMediaPlanner.BeginRequest(localRequest))
         using (_shadowDiagnosticsStore.BeginCapture(new ShadowCaptureInputs(request.Capabilities, HttpContext.Request.ContentLength, ReadCapturedScan())))
         {
             session = _playbackSessionManager.Patch(id, new PlaybackSessionRequest(kind, options), request.PlaybackAttemptId);
@@ -278,7 +280,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
 
         if (session is null)
         {
-            return NoViablePlan();
+            return NoViablePlan(localRequest?.Refusal ?? LocalMediaRefusal.None);
         }
 
         if (liveStreamId is not null)
@@ -528,7 +530,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             && session.Kind == PlaybackMediaKind.Video
             && PlaybackSessionPlanner.IsUnservableVideoPlan(resolvedStreamInfo))
         {
-            return NoViablePlan();
+            return NoViablePlan(LocalMediaRefusal.None);
         }
 
         // Issue #57: a Remux decision (domain PlaybackMethod.Remux, mapped by
@@ -618,12 +620,30 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     /// <summary>
     /// #374: the refusal a client can act on when no delivery the request permits exists.
     /// </summary>
-    private ObjectResult NoViablePlan() => UnprocessableEntity(new ProblemDetails
+    private ObjectResult NoViablePlan(LocalMediaRefusal refusal)
     {
-        Status = StatusCodes.Status422UnprocessableEntity,
-        Title = "No playable output",
-        Detail = "No permitted delivery matches the declared capabilities. Declare a compatible output profile, or allow transcoding.",
-    });
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status422UnprocessableEntity,
+            Title = "No playable output",
+            Detail = refusal switch
+            {
+                LocalMediaRefusal.NoSource => "The item has no media source to play.",
+                LocalMediaRefusal.NotTheHeldLiveStream => "The source to plan is not the live stream this session holds.",
+                LocalMediaRefusal.NoSessionProvider => "This server cannot read the item's source for a playback session.",
+                LocalMediaRefusal.ToneMappingUnavailable => "The item is HDR and the client plays SDR only, but this server's FFmpeg cannot convert HDR to SDR.",
+                LocalMediaRefusal.TranscodeTargetNotExecuted => "The only transcode the client allows encodes to a codec this server does not encode for a playback session.",
+                _ => "No permitted delivery matches the declared capabilities. Declare a compatible output profile, or allow transcoding.",
+            },
+        };
+        if (refusal != LocalMediaRefusal.None)
+        {
+            // A stable code a client can show its own message for.
+            problem.Extensions["reason"] = refusal.ToString();
+        }
+
+        return UnprocessableEntity(problem);
+    }
 
     /// <summary>
     /// Issue #75 slice 75b: reads back the bounded structural scan the
@@ -793,9 +813,9 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     private static bool IsLibraryAudio(BaseItem item)
         => item is Tesserafin.Controller.Entities.Audio.Audio;
 
-    private static IDisposable? BeginLocalMediaScope(bool isLocalMedia, PlaybackPlanRequestBase request, string? liveStreamId)
+    private static LocalMediaRequest? LocalMediaRequestOf(bool isLocalMedia, PlaybackPlanRequestBase request, string? liveStreamId)
         => isLocalMedia || liveStreamId is not null
-            ? LocalMediaPlanner.BeginRequest(new LocalMediaRequest(request.Capabilities, request.Constraints, liveStreamId))
+            ? new LocalMediaRequest(request.Capabilities, request.Constraints, liveStreamId)
             : null;
 
     /// <summary>
