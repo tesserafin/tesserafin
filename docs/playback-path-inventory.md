@@ -515,6 +515,38 @@ Remaining consumers by name. Nothing is deleted globally while one of them still
 | `/Videos/{id}/master.m3u8`, `main.m3u8`, `hls1/...` with client-supplied encoding options | the same: Web and Android for everything that is not a library video served from its session |
 | Web `getPlaybackInfo` + `createStreamInfo` + V2 URL overlay, flag `enableV2PlaybackPath` | Web targets outside the local HTML Sessions journey and media for which Sessions returns a legacy descriptor |
 
+### Audit of the remaining `PlaybackInfo` callers (2026-11-27)
+
+Read from Web `main` `ffe11d6353` and server `master` `c2f0fd7447`. Android never calls
+`PlaybackInfo` (above). A remote player (Chromecast, another client's session) is handed item ids
+and plans for itself; this Web client asks nothing for it. Photos and books never reach the
+playback chain (`playOther`), nor do url items (trailers on YouTube: `createStreamInfoFromUrlItem`).
+Everything below is what still reaches `PlaybackInfo` or the legacy planner.
+
+**Web: where `PlaybackInfo` is still asked** (`src/components/playback/playbackmanager.js`)
+
+| # | Entry | Reached when | Disposition |
+| --- | --- | --- | --- |
+| W1 | Start, `playLegacyChain` (`isSessionMediaCandidate` false) | a server item on a local HTML player that the session journey does not own: a video type outside `Movie`, `Episode`, `Video`, `MusicVideo`, `Trailer`, `Recording` (and `TvChannel`); an audio type outside `Audio`, `AudioBook`; a `LocationType` other than `FileSystem` except a channel-plugin item (`Remote` + `Channel`) - an item whose own path is a url, or a virtual one; a video on the audio player or an audio track on the video player | Name each type the server serves and widen the candidate; refuse the rest at the journey instead of falling back. A `.strm` item is `FileSystem` (its path is the `.strm` file; its source follows the url) and is already owned. |
+| W2 | Start, after `planSessionMedia` returns `notApplicable` | `POST Playback/Sessions` answers 422 (no viable plan), or the descriptor names a url that is not a route of the session (a legacy plan, see S1-S3) | Once S1-S3 are refusals, a 422 ends the attempt with an error, and `notApplicable` goes. |
+| W3 | `changeStream` on a stream that is not session-owned | only a playback W1 or W2 started on the legacy chain (a session-owned stream re-plans through `replanSessionOwnedStream`, whose one fallback is W2 again) | Goes with W1 and W2. |
+| W4 | `self.getPlaybackInfo`, `self.getPlaybackMediaSources` (public methods) | no caller in `src/`: neither another module nor a plugin calls them | Dead: delete now. |
+
+**Server: where a session still reaches the legacy planner** (`LocalMediaPlanner.TryDecide` returns no
+record and no refusal, so `inner(options)` - `StreamBuilder` - decides)
+
+| # | Reached when | Disposition |
+| --- | --- | --- |
+| S1 | the only executable plan tone-maps HDR to SDR, on a server whose FFmpeg has no `tonemapx` (`canTonemap` false; the F0 runtime has it, a distribution FFmpeg may not) | Refuse with 422, naming the missing capability. |
+| S2 | the engine keeps an HDR range out of the encode (`VideoRange` set without a tone map to SDR, for example HDR10 out of Dolby Vision): decided, not executed | Execute it, or have the engine plan the SDR tone map only. Owner decision. |
+| S3 | a transcode delivers a subtitle as `Embed` or `Hls` (only `External` and `Burn` execute) | Execute an HLS subtitle rendition, or plan `External`/`Burn` only. |
+| S4 | the session's sources list is empty, or a live session's source is not the stream it holds | Refuse (no source is not a decision). |
+
+**Order.** W4 now (dead code). Then S1, S4 as refusals and S2, S3 decided by the owner, each with
+a session E2E and a break control showing the legacy planner is no longer reached. Then W1 type by
+type and W2/W3 with them, each proved in the browser with `PlaybackInfo` aborted at the network.
+Step 7 starts when no row is left.
+
 ## 8. Shared model boundary (consolidation step 4, candidate)
 
 `Model -> Data -> Database.Implementations` has been removed. Shared entities, enums and
