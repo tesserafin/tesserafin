@@ -36,11 +36,13 @@ namespace Tesserafin.Server.Integration.Tests.EndToEnd;
 /// An answer is searched for the withheld item's name, its file, its folder and its id; where the
 /// route selects by id it is also compared with the answer for an id that names nothing.
 /// </remarks>
-public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixture<HlsIsolationApplicationFactory>, IAsyncLifetime
+public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixture<ExplicitItemSelectionAuthorizationEndToEndTests.Server>, IAsyncLifetime
 {
     private const string Everything = "fields=Path,MediaSources,MediaStreams,ParentId,Overview,Tags";
 
-    private readonly HlsIsolationApplicationFactory _factory;
+    private readonly Server _factory;
+    private World _world = null!;
+    private World? _isolated;
     private HttpClient _admin = null!;
     private HttpClient _restricted = null!;
     private Guid _adminId;
@@ -57,7 +59,7 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     private string _hiddenName = null!;
     private string _visibleName = null!;
 
-    public ExplicitItemSelectionAuthorizationEndToEndTests(HlsIsolationApplicationFactory factory)
+    public ExplicitItemSelectionAuthorizationEndToEndTests(Server factory)
     {
         _factory = factory;
     }
@@ -142,110 +144,47 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
 
     public async ValueTask InitializeAsync()
     {
-        var (adminToken, adminId) = await _factory.EnsureAuthenticatedAsync();
-        _adminId = adminId;
-        _admin = _factory.CreateClient();
-        _admin.DefaultRequestHeaders.AddAuthHeader(adminToken);
-
-        _suffix = Guid.NewGuid().ToString("N")[..8];
-        _workDir = Directory.CreateTempSubdirectory("tesserafin-smr3-e2e-").FullName;
-        _hiddenName = "SECURITY-MEDIA-R3 withheld " + _suffix;
-        _visibleName = "SECURITY-MEDIA-R3 open " + _suffix;
-
-        // Both libraries before either folder: adding a library validates the root's children,
-        // and a folder no scan resolved would not survive it.
-        var openDir = await AddLibraryAsync("smr3-open-" + _suffix, TestContext.Current.CancellationToken);
-        var withheldDir = await AddLibraryAsync("smr3-withheld-" + _suffix, TestContext.Current.CancellationToken);
-
-        // So does the first collection a server is asked for: it creates the collections library, which also
-        // queues a library scan nothing awaits. A scan running during the seeding below removes what it did
-        // not resolve, and the next seeding write then fails on a foreign key (#317): wait for it to end.
-        var beforeFirst = DateTime.UtcNow;
-        bool createdTheCollectionsLibrary;
-        using (var before = JsonDocument.Parse(await _admin.GetStringAsync("Library/VirtualFolders", TestContext.Current.CancellationToken)))
-        {
-            createdTheCollectionsLibrary = !before.RootElement.EnumerateArray().Any(f => f.TryGetProperty("CollectionType", out var type) && type.GetString() == "boxsets");
-        }
-
-        using (var first = await _admin.PostAsync("Collections?name=smr3-first-" + _suffix, null, TestContext.Current.CancellationToken))
-        {
-            first.EnsureSuccessStatusCode();
-        }
-
-        if (createdTheCollectionsLibrary)
-        {
-            await WaitForLibraryScanAsync(beforeFirst, TestContext.Current.CancellationToken);
-        }
-
-        var libraries = await LibrariesAsync(TestContext.Current.CancellationToken);
-        _openLibrary = libraries["smr3-open-" + _suffix];
-        _withheldLibrary = libraries["smr3-withheld-" + _suffix];
-        _openFolder = AddFolder(openDir, _openLibrary);
-        _withheldFolder = AddFolder(withheldDir, _withheldLibrary);
-
-        _visible = Seed(Path.Combine(openDir, "open-" + _suffix + ".mp4"), _visibleName, _openFolder);
-        _hidden = Seed(Path.Combine(withheldDir, "withheld-" + _suffix + ".mp4"), _hiddenName, _withheldFolder);
-
-        // People, and a series with one episode to come next, for the routes that name those.
-        var library = _factory.Services.GetRequiredService<ILibraryManager>();
-        var libraryWrites = _factory.Services.GetRequiredService<IItemWriteCommands>();
-        foreach (var (id, who) in new[] { (_hidden, "withheld-" + _suffix + " actor"), (_visible, "open-" + _suffix + " actor") })
-        {
-            await _factory.Services.GetRequiredService<IItemPeopleCommands>().UpdateAsync(library.GetItemById(id)!, [new PersonInfo { Name = who, Type = PersonKind.Actor }], TestContext.Current.CancellationToken);
-        }
-
-        var series = new Series { Id = Guid.NewGuid(), Name = "withheld-" + _suffix + " series", Path = Path.Combine(withheldDir, "series"), ParentId = _withheldFolder, DateCreated = DateTime.UtcNow, DateModified = DateTime.UtcNow };
-        series.PresentationUniqueKey = series.CreatePresentationUniqueKey();
-        libraryWrites.CreateItems([series], null, CancellationToken.None);
-        var episode = new Episode
-        {
-            Id = Guid.NewGuid(),
-            Name = "withheld-" + _suffix + " episode",
-            Path = Path.Combine(withheldDir, "series", "withheld-" + _suffix + "-s01e01.mp4"),
-            ParentId = series.Id,
-            SeriesId = series.Id,
-            SeriesName = series.Name,
-            SeriesPresentationUniqueKey = series.PresentationUniqueKey,
-            ParentIndexNumber = 1,
-            IndexNumber = 1,
-            DateCreated = DateTime.UtcNow,
-            DateModified = DateTime.UtcNow,
-        };
-        episode.PresentationUniqueKey = episode.CreatePresentationUniqueKey();
-        libraryWrites.CreateItems([episode], null, CancellationToken.None);
-        _hiddenSeries = series.Id;
-
-        // The scenario holds only if the seeding did: every seeded item exists, under the folder of its library.
-        foreach (var (id, parent) in new[] { (_visible, _openFolder), (_hidden, _withheldFolder), (series.Id, _withheldFolder), (episode.Id, series.Id) })
-        {
-            var seeded = library.GetItemById(id);
-            Assert.True(seeded is not null, FormattableString.Invariant($"seeded item {id} is gone"));
-            Assert.Equal(parent, seeded.ParentId);
-        }
-
-        Assert.Equal([_openLibrary], library.GetCollectionFolders(library.GetItemById(_visible)!).Select(f => f.Id));
-        Assert.Equal([_withheldLibrary], library.GetCollectionFolders(library.GetItemById(_hidden)!).Select(f => f.Id));
-
-        (_restricted, _restrictedId) = await SignInAsync("smr3-restricted-" + _suffix, [_openLibrary], TestContext.Current.CancellationToken);
+        // Most tests only read: they share one world, built once for the class. A test that writes calls
+        // IsolateAsync first and gets libraries, items and a restricted user of its own.
+        Use(await _factory.SharedWorldAsync());
     }
 
     public async ValueTask DisposeAsync()
     {
-        foreach (var name in new[] { "smr3-open-" + _suffix, "smr3-withheld-" + _suffix })
+        if (_isolated is not null)
         {
-            using var removed = await _admin.DeleteAsync("Library/VirtualFolders?name=" + name, CancellationToken.None);
+            await _isolated.DisposeAsync();
         }
+    }
 
-        _admin.Dispose();
-        _restricted.Dispose();
-        try
-        {
-            Directory.Delete(_workDir, recursive: true);
-        }
-        catch (IOException)
-        {
-            // Best-effort cleanup.
-        }
+    /// <summary>Gives this test a world of its own, for a test that changes what it reads.</summary>
+    private async Task IsolateAsync()
+    {
+        // Adding a library validates the root's children and drops every folder no scan resolved, the
+        // shared world's among them: it is retired here and rebuilt by the next test that reads it.
+        await _factory.RetireSharedWorldAsync();
+        _isolated = await World.CreateAsync(_factory, TestContext.Current.CancellationToken);
+        Use(_isolated);
+    }
+
+    private void Use(World world)
+    {
+        _world = world;
+        _admin = world.Admin;
+        _adminId = world.AdminId;
+        _restricted = world.Restricted;
+        _restrictedId = world.RestrictedId;
+        _openLibrary = world.OpenLibrary;
+        _withheldLibrary = world.WithheldLibrary;
+        _openFolder = world.OpenFolder;
+        _withheldFolder = world.WithheldFolder;
+        _visible = world.Visible;
+        _hidden = world.Hidden;
+        _hiddenSeries = world.HiddenSeries;
+        _suffix = world.Suffix;
+        _workDir = world.WorkDir;
+        _hiddenName = world.HiddenName;
+        _visibleName = world.VisibleName;
     }
 
     /// <summary>Shared scoping preserves item/count/filter boundaries for visible and withheld libraries.</summary>
@@ -494,6 +433,8 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     [InlineData(true)]
     public async Task WithheldVersionOfAVisibleItem_IsNotDescribedThroughTheVisibleOne(bool withheldIsPrimary)
     {
+        await IsolateAsync();
+
         // The merge takes the widest as the primary.
         var open = Seed(Path.Combine(_workDir, "smr3-open-" + _suffix, "open-version-" + _suffix + ".mp4"), _visibleName + " version", _openFolder, withheldIsPrimary ? 320 : 1280);
         var withheld = Seed(Path.Combine(_workDir, "smr3-withheld-" + _suffix, "withheld-version-" + _suffix + ".mp4"), _hiddenName + " version", _withheldFolder, withheldIsPrimary ? 1280 : 320);
@@ -634,6 +575,8 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     [InlineData(false)]
     public async Task WithheldItemInAPlaylist_IsNotDescribedToTheRestrictedUser(bool ownedByTheRestrictedUser)
     {
+        await IsolateAsync();
+
         var owner = ownedByTheRestrictedUser ? _restricted : _admin;
         var ownerId = ownedByTheRestrictedUser ? _restrictedId : _adminId;
         Guid playlist;
@@ -688,6 +631,8 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     [Fact(Timeout = 120_000)]
     public async Task WithheldItemInACollection_IsNotDescribedToTheRestrictedUser()
     {
+        await IsolateAsync();
+
         Guid collection;
         using (var created = await _admin.PostAsync(FormattableString.Invariant($"Collections?name=smr3-collection-{_suffix}&ids={_hidden},{_visible}"), null, TestContext.Current.CancellationToken))
         {
@@ -738,6 +683,8 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
     [Fact(Timeout = 120_000)]
     public async Task WithheldIdReportedAsPlayedOrViewed_IsNotHandedBackDescribed()
     {
+        await IsolateAsync();
+
         // The instrument sees what it looks for: an item the user may see is described back.
         using (var playing = await _restricted.PostAsJsonAsync("Sessions/Playing", new { ItemId = _visible, MediaSourceId = _visible.ToString("N", CultureInfo.InvariantCulture), PlaySessionId = "smr3-open-" + _suffix, CanSeek = true }, JsonDefaults.Options, TestContext.Current.CancellationToken))
         {
@@ -818,110 +765,330 @@ public sealed class ExplicitItemSelectionAuthorizationEndToEndTests : IClassFixt
         }
     }
 
-    private Guid Seed(string file, string name, Guid folder, int width = 320)
-    {
-        File.WriteAllText(file, name);
-        return LibraryItemSeeder.SeedVideo(
-            _factory.Services.GetRequiredService<IItemWriteCommands>(),
-            _factory.Services.GetRequiredService<IMediaStreamRepository>(),
-            file,
-            "mp4",
-            [
-                new MediaStream { Index = 0, Type = MediaStreamType.Video, Codec = "h264", Width = width, Height = 240, IsDefault = true },
-                new MediaStream { Index = 1, Type = MediaStreamType.Audio, Codec = "aac", Channels = 2, IsDefault = true },
-            ],
-            name,
-            parentId: folder,
-            configure: movie =>
-            {
-                // Named after the file, so that what is withheld is recognisable wherever it comes out.
-                var mark = Path.GetFileNameWithoutExtension(file);
-                movie.Genres = [mark + "-genre"];
-                movie.Studios = [mark + "-studio"];
-                movie.Tags = [mark + "-tag"];
-            });
-    }
+    private Guid Seed(string file, string name, Guid folder, int width = 320) => _world.Seed(file, name, folder, width);
 
-    private async Task WaitForLibraryScanAsync(DateTime since, CancellationToken cancellationToken)
+    private Task RestrictAsync(Guid userId, Guid[] libraries, CancellationToken cancellationToken) => _world.RestrictAsync(userId, libraries, cancellationToken);
+
+    private Task<(HttpClient Client, Guid UserId)> SignInAsync(string name, Guid[] libraries, CancellationToken cancellationToken) => _world.SignInAsync(name, libraries, cancellationToken);
+
+    /// <summary>The class's server, and the world its read-only tests share.</summary>
+    public sealed class Server : HlsIsolationApplicationFactory
     {
-        var scan = _factory.Services.GetRequiredService<ITaskManager>().ScheduledTasks.Single(w => w.ScheduledTask.Key == "RefreshLibrary");
-        for (var i = 0; i < 600; i++)
+        private readonly SemaphoreSlim _gate = new(1, 1);
+        private World? _shared;
+
+        internal async Task<World> SharedWorldAsync()
         {
-            if (scan.State == TaskState.Idle && scan.LastExecutionResult?.EndTimeUtc >= since)
+            await _gate.WaitAsync(TestContext.Current.CancellationToken);
+            try
             {
-                return;
+                return _shared ??= await World.CreateAsync(this, TestContext.Current.CancellationToken);
             }
-
-            await Task.Delay(100, cancellationToken);
+            finally
+            {
+                _gate.Release();
+            }
         }
 
-        Assert.Fail("the library scan queued by the collections library did not finish");
-    }
+        internal async Task RetireSharedWorldAsync()
+        {
+            await _gate.WaitAsync(TestContext.Current.CancellationToken);
+            try
+            {
+                if (_shared is not null)
+                {
+                    await _shared.DisposeAsync();
+                    _shared = null;
+                }
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }
 
-    private async Task<string> AddLibraryAsync(string name, CancellationToken cancellationToken)
-    {
-        var directory = Directory.CreateDirectory(Path.Combine(_workDir, name)).FullName;
-        using var added = await _admin.PostAsJsonAsync("Library/VirtualFolders?collectionType=movies&refreshLibrary=false&name=" + name + "&paths=" + Uri.EscapeDataString(directory), new { }, JsonDefaults.Options, cancellationToken);
-        Assert.Equal(HttpStatusCode.NoContent, added.StatusCode);
-        return directory;
+        /// <inheritdoc/>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // The server goes with it: only its files outlive it.
+                _shared?.DeleteWorkDir();
+                _gate.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
     }
 
     /// <summary>
-    /// In place of the scan that would create it: the folder a library's directory is under the
-    /// root, which is the top parent its items are filed under and the library is scoped by.
+    /// Two real libraries, one movie in each, a withheld series with an episode, and a user enabled on
+    /// the open library alone.
     /// </summary>
-    private Guid AddFolder(string directory, Guid libraryId)
+    internal sealed class World : IAsyncDisposable
     {
-        var library = _factory.Services.GetRequiredService<ILibraryManager>();
-        var libraryWrites = _factory.Services.GetRequiredService<IItemWriteCommands>();
-        var folder = new Folder { Id = Guid.NewGuid(), Name = Path.GetFileName(directory), Path = directory, ParentId = library.RootFolder.Id, DateCreated = DateTime.UtcNow, DateModified = DateTime.UtcNow };
-        libraryWrites.CreateItems([folder], library.RootFolder, CancellationToken.None);
+        private readonly Server _factory;
 
-        // What the library's own refresh would have recorded after a scan.
-        Assert.IsType<CollectionFolder>(library.GetItemById(libraryId)).PhysicalFolderIds = [folder.Id];
-        return folder.Id;
-    }
-
-    private async Task<Dictionary<string, Guid>> LibrariesAsync(CancellationToken cancellationToken)
-    {
-        using var document = JsonDocument.Parse(await _admin.GetStringAsync("Library/VirtualFolders", cancellationToken));
-        return document.RootElement.EnumerateArray().ToDictionary(f => f.GetProperty("Name").GetString()!, f => Guid.Parse(f.GetProperty("ItemId").GetString()!));
-    }
-
-    private async Task RestrictAsync(Guid userId, Guid[] libraries, CancellationToken cancellationToken)
-    {
-        var user = (await _admin.GetFromJsonAsync<UserDto>(FormattableString.Invariant($"Users/{userId}"), JsonDefaults.Options, cancellationToken))!;
-        user.Policy!.EnableAllFolders = false;
-        user.Policy.EnabledFolders = libraries;
-        using var applied = await _admin.PostAsJsonAsync(FormattableString.Invariant($"Users/{userId}/Policy"), user.Policy, JsonDefaults.Options, cancellationToken);
-        applied.EnsureSuccessStatusCode();
-    }
-
-    private async Task<(HttpClient Client, Guid UserId)> SignInAsync(string name, Guid[] libraries, CancellationToken cancellationToken)
-    {
-        const string Password = "smr3-password";
-        UserDto created;
-        using (var response = await _admin.PostAsJsonAsync("/Users/New", new { Name = name, Password }, JsonDefaults.Options, cancellationToken))
+        private World(Server factory)
         {
-            response.EnsureSuccessStatusCode();
-            created = (await response.Content.ReadFromJsonAsync<UserDto>(JsonDefaults.Options, cancellationToken))!;
+            _factory = factory;
         }
 
-        await RestrictAsync(created.Id, libraries, cancellationToken);
+        public HttpClient Admin { get; private set; } = null!;
 
-        using var anonymous = _factory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/Users/AuthenticateByName");
-        request.Headers.TryAddWithoutValidation(AuthHelper.AuthHeaderName, MediaBoundaryFixture.AuthorizationHeader(name + "-device", null));
-        request.Content = JsonContent.Create(new { Username = name, Pw = Password }, options: JsonDefaults.Options);
-        using var authenticated = await anonymous.SendAsync(request, cancellationToken);
-        authenticated.EnsureSuccessStatusCode();
-        using var document = JsonDocument.Parse(await authenticated.Content.ReadAsStringAsync(cancellationToken));
+        public HttpClient Restricted { get; private set; } = null!;
 
-        var client = _factory.CreateClient();
-        client.Timeout = TimeSpan.FromSeconds(90);
-        client.DefaultRequestHeaders.TryAddWithoutValidation(
-            AuthHelper.AuthHeaderName,
-            MediaBoundaryFixture.AuthorizationHeader(name + "-device", document.RootElement.GetProperty("AccessToken").GetString()));
-        return (client, created.Id);
+        public Guid AdminId { get; private set; }
+
+        public Guid RestrictedId { get; private set; }
+
+        public Guid OpenLibrary { get; private set; }
+
+        public Guid WithheldLibrary { get; private set; }
+
+        public Guid OpenFolder { get; private set; }
+
+        public Guid WithheldFolder { get; private set; }
+
+        public Guid Visible { get; private set; }
+
+        public Guid Hidden { get; private set; }
+
+        public Guid HiddenSeries { get; private set; }
+
+        public string Suffix { get; private set; } = null!;
+
+        public string WorkDir { get; private set; } = null!;
+
+        public string HiddenName { get; private set; } = null!;
+
+        public string VisibleName { get; private set; } = null!;
+
+        public static async Task<World> CreateAsync(Server factory, CancellationToken cancellationToken)
+        {
+            var world = new World(factory);
+            await world.BuildAsync(cancellationToken);
+            return world;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            foreach (var name in new[] { "smr3-open-" + Suffix, "smr3-withheld-" + Suffix })
+            {
+                using var removed = await Admin.DeleteAsync("Library/VirtualFolders?name=" + name, CancellationToken.None);
+            }
+
+            Admin.Dispose();
+            Restricted.Dispose();
+            DeleteWorkDir();
+        }
+
+        public void DeleteWorkDir()
+        {
+            try
+            {
+                Directory.Delete(WorkDir, recursive: true);
+            }
+            catch (IOException)
+            {
+                // Best-effort cleanup.
+            }
+        }
+
+        private async Task BuildAsync(CancellationToken cancellationToken)
+        {
+            var (adminToken, adminId) = await _factory.EnsureAuthenticatedAsync();
+            AdminId = adminId;
+            Admin = _factory.CreateClient();
+            Admin.DefaultRequestHeaders.AddAuthHeader(adminToken);
+
+            Suffix = Guid.NewGuid().ToString("N")[..8];
+            WorkDir = Directory.CreateTempSubdirectory("tesserafin-smr3-e2e-").FullName;
+            HiddenName = "SECURITY-MEDIA-R3 withheld " + Suffix;
+            VisibleName = "SECURITY-MEDIA-R3 open " + Suffix;
+
+            // Both libraries before either folder: adding a library validates the root's children,
+            // and a folder no scan resolved would not survive it.
+            var openDir = await AddLibraryAsync("smr3-open-" + Suffix, cancellationToken);
+            var withheldDir = await AddLibraryAsync("smr3-withheld-" + Suffix, cancellationToken);
+
+            // So does the first collection a server is asked for: it creates the collections library, which also
+            // queues a library scan nothing awaits. A scan running during the seeding below removes what it did
+            // not resolve, and the next seeding write then fails on a foreign key (#317): wait for it to end.
+            var beforeFirst = DateTime.UtcNow;
+            bool createdTheCollectionsLibrary;
+            using (var before = JsonDocument.Parse(await Admin.GetStringAsync("Library/VirtualFolders", cancellationToken)))
+            {
+                createdTheCollectionsLibrary = !before.RootElement.EnumerateArray().Any(f => f.TryGetProperty("CollectionType", out var type) && type.GetString() == "boxsets");
+            }
+
+            using (var first = await Admin.PostAsync("Collections?name=smr3-first-" + Suffix, null, cancellationToken))
+            {
+                first.EnsureSuccessStatusCode();
+            }
+
+            if (createdTheCollectionsLibrary)
+            {
+                await WaitForLibraryScanAsync(beforeFirst, cancellationToken);
+            }
+
+            var libraries = await LibrariesAsync(cancellationToken);
+            OpenLibrary = libraries["smr3-open-" + Suffix];
+            WithheldLibrary = libraries["smr3-withheld-" + Suffix];
+            OpenFolder = AddFolder(openDir, OpenLibrary);
+            WithheldFolder = AddFolder(withheldDir, WithheldLibrary);
+
+            Visible = Seed(Path.Combine(openDir, "open-" + Suffix + ".mp4"), VisibleName, OpenFolder);
+            Hidden = Seed(Path.Combine(withheldDir, "withheld-" + Suffix + ".mp4"), HiddenName, WithheldFolder);
+
+            // People, and a series with one episode to come next, for the routes that name those.
+            var library = _factory.Services.GetRequiredService<ILibraryManager>();
+            var libraryWrites = _factory.Services.GetRequiredService<IItemWriteCommands>();
+            foreach (var (id, who) in new[] { (Hidden, "withheld-" + Suffix + " actor"), (Visible, "open-" + Suffix + " actor") })
+            {
+                await _factory.Services.GetRequiredService<IItemPeopleCommands>().UpdateAsync(library.GetItemById(id)!, [new PersonInfo { Name = who, Type = PersonKind.Actor }], cancellationToken);
+            }
+
+            var series = new Series { Id = Guid.NewGuid(), Name = "withheld-" + Suffix + " series", Path = Path.Combine(withheldDir, "series"), ParentId = WithheldFolder, DateCreated = DateTime.UtcNow, DateModified = DateTime.UtcNow };
+            series.PresentationUniqueKey = series.CreatePresentationUniqueKey();
+            libraryWrites.CreateItems([series], null, CancellationToken.None);
+            var episode = new Episode
+            {
+                Id = Guid.NewGuid(),
+                Name = "withheld-" + Suffix + " episode",
+                Path = Path.Combine(withheldDir, "series", "withheld-" + Suffix + "-s01e01.mp4"),
+                ParentId = series.Id,
+                SeriesId = series.Id,
+                SeriesName = series.Name,
+                SeriesPresentationUniqueKey = series.PresentationUniqueKey,
+                ParentIndexNumber = 1,
+                IndexNumber = 1,
+                DateCreated = DateTime.UtcNow,
+                DateModified = DateTime.UtcNow,
+            };
+            episode.PresentationUniqueKey = episode.CreatePresentationUniqueKey();
+            libraryWrites.CreateItems([episode], null, CancellationToken.None);
+            HiddenSeries = series.Id;
+
+            // The scenario holds only if the seeding did: every seeded item exists, under the folder of its library.
+            foreach (var (id, parent) in new[] { (Visible, OpenFolder), (Hidden, WithheldFolder), (series.Id, WithheldFolder), (episode.Id, series.Id) })
+            {
+                var seeded = library.GetItemById(id);
+                Assert.True(seeded is not null, FormattableString.Invariant($"seeded item {id} is gone"));
+                Assert.Equal(parent, seeded.ParentId);
+            }
+
+            Assert.Equal([OpenLibrary], library.GetCollectionFolders(library.GetItemById(Visible)!).Select(f => f.Id));
+            Assert.Equal([WithheldLibrary], library.GetCollectionFolders(library.GetItemById(Hidden)!).Select(f => f.Id));
+
+            (Restricted, RestrictedId) = await SignInAsync("smr3-restricted-" + Suffix, [OpenLibrary], cancellationToken);
+        }
+
+        public Guid Seed(string file, string name, Guid folder, int width = 320)
+        {
+            File.WriteAllText(file, name);
+            return LibraryItemSeeder.SeedVideo(
+                _factory.Services.GetRequiredService<IItemWriteCommands>(),
+                _factory.Services.GetRequiredService<IMediaStreamRepository>(),
+                file,
+                "mp4",
+                [
+                    new MediaStream { Index = 0, Type = MediaStreamType.Video, Codec = "h264", Width = width, Height = 240, IsDefault = true },
+                    new MediaStream { Index = 1, Type = MediaStreamType.Audio, Codec = "aac", Channels = 2, IsDefault = true },
+                ],
+                name,
+                parentId: folder,
+                configure: movie =>
+                {
+                    // Named after the file, so that what is withheld is recognisable wherever it comes out.
+                    var mark = Path.GetFileNameWithoutExtension(file);
+                    movie.Genres = [mark + "-genre"];
+                    movie.Studios = [mark + "-studio"];
+                    movie.Tags = [mark + "-tag"];
+                });
+        }
+
+        private async Task WaitForLibraryScanAsync(DateTime since, CancellationToken cancellationToken)
+        {
+            var scan = _factory.Services.GetRequiredService<ITaskManager>().ScheduledTasks.Single(w => w.ScheduledTask.Key == "RefreshLibrary");
+            for (var i = 0; i < 600; i++)
+            {
+                if (scan.State == TaskState.Idle && scan.LastExecutionResult?.EndTimeUtc >= since)
+                {
+                    return;
+                }
+
+                await Task.Delay(100, cancellationToken);
+            }
+
+            Assert.Fail("the library scan queued by the collections library did not finish");
+        }
+
+        private async Task<string> AddLibraryAsync(string name, CancellationToken cancellationToken)
+        {
+            var directory = Directory.CreateDirectory(Path.Combine(WorkDir, name)).FullName;
+            using var added = await Admin.PostAsJsonAsync("Library/VirtualFolders?collectionType=movies&refreshLibrary=false&name=" + name + "&paths=" + Uri.EscapeDataString(directory), new { }, JsonDefaults.Options, cancellationToken);
+            Assert.Equal(HttpStatusCode.NoContent, added.StatusCode);
+            return directory;
+        }
+
+        /// <summary>
+        /// In place of the scan that would create it: the folder a library's directory is under the
+        /// root, which is the top parent its items are filed under and the library is scoped by.
+        /// </summary>
+        private Guid AddFolder(string directory, Guid libraryId)
+        {
+            var library = _factory.Services.GetRequiredService<ILibraryManager>();
+            var libraryWrites = _factory.Services.GetRequiredService<IItemWriteCommands>();
+            var folder = new Folder { Id = Guid.NewGuid(), Name = Path.GetFileName(directory), Path = directory, ParentId = library.RootFolder.Id, DateCreated = DateTime.UtcNow, DateModified = DateTime.UtcNow };
+            libraryWrites.CreateItems([folder], library.RootFolder, CancellationToken.None);
+
+            // What the library's own refresh would have recorded after a scan.
+            Assert.IsType<CollectionFolder>(library.GetItemById(libraryId)).PhysicalFolderIds = [folder.Id];
+            return folder.Id;
+        }
+
+        private async Task<Dictionary<string, Guid>> LibrariesAsync(CancellationToken cancellationToken)
+        {
+            using var document = JsonDocument.Parse(await Admin.GetStringAsync("Library/VirtualFolders", cancellationToken));
+            return document.RootElement.EnumerateArray().ToDictionary(f => f.GetProperty("Name").GetString()!, f => Guid.Parse(f.GetProperty("ItemId").GetString()!));
+        }
+
+        public async Task RestrictAsync(Guid userId, Guid[] libraries, CancellationToken cancellationToken)
+        {
+            var user = (await Admin.GetFromJsonAsync<UserDto>(FormattableString.Invariant($"Users/{userId}"), JsonDefaults.Options, cancellationToken))!;
+            user.Policy!.EnableAllFolders = false;
+            user.Policy.EnabledFolders = libraries;
+            using var applied = await Admin.PostAsJsonAsync(FormattableString.Invariant($"Users/{userId}/Policy"), user.Policy, JsonDefaults.Options, cancellationToken);
+            applied.EnsureSuccessStatusCode();
+        }
+
+        public async Task<(HttpClient Client, Guid UserId)> SignInAsync(string name, Guid[] libraries, CancellationToken cancellationToken)
+        {
+            const string Password = "smr3-password";
+            UserDto created;
+            using (var response = await Admin.PostAsJsonAsync("/Users/New", new { Name = name, Password }, JsonDefaults.Options, cancellationToken))
+            {
+                response.EnsureSuccessStatusCode();
+                created = (await response.Content.ReadFromJsonAsync<UserDto>(JsonDefaults.Options, cancellationToken))!;
+            }
+
+            await RestrictAsync(created.Id, libraries, cancellationToken);
+
+            using var anonymous = _factory.CreateClient();
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/Users/AuthenticateByName");
+            request.Headers.TryAddWithoutValidation(AuthHelper.AuthHeaderName, MediaBoundaryFixture.AuthorizationHeader(name + "-device", null));
+            request.Content = JsonContent.Create(new { Username = name, Pw = Password }, options: JsonDefaults.Options);
+            using var authenticated = await anonymous.SendAsync(request, cancellationToken);
+            authenticated.EnsureSuccessStatusCode();
+            using var document = JsonDocument.Parse(await authenticated.Content.ReadAsStringAsync(cancellationToken));
+
+            var client = _factory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(90);
+            client.DefaultRequestHeaders.TryAddWithoutValidation(
+                AuthHelper.AuthHeaderName,
+                MediaBoundaryFixture.AuthorizationHeader(name + "-device", document.RootElement.GetProperty("AccessToken").GetString()));
+            return (client, created.Id);
+        }
     }
 }
