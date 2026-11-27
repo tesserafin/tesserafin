@@ -527,25 +527,27 @@ Everything below is what still reaches `PlaybackInfo` or the legacy planner.
 
 | # | Entry | Reached when | Disposition |
 | --- | --- | --- | --- |
-| W1 | Start, `playLegacyChain` (`isSessionMediaCandidate` false) | a server item on a local HTML player that the session journey does not own: a video type outside `Movie`, `Episode`, `Video`, `MusicVideo`, `Trailer`, `Recording` (and `TvChannel`); an audio type outside `Audio`, `AudioBook`; a `LocationType` other than `FileSystem` except a channel-plugin item (`Remote` + `Channel`) - an item whose own path is a url, or a virtual one; a video on the audio player or an audio track on the video player | Name each type the server serves and widen the candidate; refuse the rest at the journey instead of falling back. A `.strm` item is `FileSystem` (its path is the `.strm` file; its source follows the url) and is already owned. |
-| W2 | Start, after `planSessionMedia` returns `notApplicable` | `POST Playback/Sessions` answers 422 (no viable plan), or the descriptor names a url that is not a route of the session (a legacy plan, see S1-S3) | Once S1-S3 are refusals, a 422 ends the attempt with an error, and `notApplicable` goes. |
+| W1 | Start, `playLegacyChain` (`isSessionMediaCandidate` false) | a server item on a local HTML player that the session journey does not own: a video type outside `Movie`, `Episode`, `Video`, `MusicVideo`, `Trailer`, `Recording` (and `TvChannel`); an audio type outside `Audio`, `AudioBook`; a `LocationType` other than `FileSystem` except a channel-plugin item (`Remote` + `Channel`) - an item whose own path is a url, or a virtual one; a video on the audio player or an audio track on the video player | Owner 2026-11-27: add the types the server really executes, refuse the rest with an explicit message. A `.strm` item is `FileSystem` (its path is the `.strm` file; its source follows the url) and is already owned; keep a `.strm` case in the browser validation. |
+| W2 | Start, after `planSessionMedia` returns `notApplicable` | `POST Playback/Sessions` answers 422 (no viable plan), or the descriptor names a url that is not a route of the session (a legacy plan, see S1-S3) | Owner 2026-11-27: remove the fallback to `PlaybackInfo` explicitly - in the audited code a 422 alone still triggers it. A descriptor naming no session route is a contract error. Proved with `PlaybackInfo` aborted: start, track and quality changes, and the explicit refusal. |
 | W3 | `changeStream` on a stream that is not session-owned | only a playback W1 or W2 started on the legacy chain (a session-owned stream re-plans through `replanSessionOwnedStream`, whose one fallback is W2 again) | Goes with W1 and W2. |
-| W4 | `self.getPlaybackInfo`, `self.getPlaybackMediaSources` (public methods) | no caller in `src/`: neither another module nor a plugin calls them | Dead: delete now. |
+| W4 | `self.getPlaybackInfo`, `self.getPlaybackMediaSources` (public methods) | no caller in `src/`: neither another module nor a plugin calls them | Dead: delete now, after a search of the whole Web repository (entry points and tests included). |
 
 **Server: where a session still reaches the legacy planner** (`LocalMediaPlanner.TryDecide` returns no
 record and no refusal, so `inner(options)` - `StreamBuilder` - decides)
 
 | # | Reached when | Disposition |
 | --- | --- | --- |
-| S1 | the only executable plan tone-maps HDR to SDR, on a server whose FFmpeg has no `tonemapx` (`canTonemap` false; the F0 runtime has it, a distribution FFmpeg may not) | Refuse with 422, naming the missing capability. |
-| S2 | the engine keeps an HDR range out of the encode (`VideoRange` set without a tone map to SDR, for example HDR10 out of Dolby Vision): decided, not executed | Execute it, or have the engine plan the SDR tone map only. Owner decision. |
-| S3 | a transcode delivers a subtitle as `Embed` or `Hls` (only `External` and `Burn` execute) | Execute an HLS subtitle rendition, or plan `External`/`Burn` only. |
-| S4 | the session's sources list is empty, or a live session's source is not the stream it holds | Refuse (no source is not a decision). |
+| S1 | the only executable plan tone-maps HDR to SDR, on a server whose FFmpeg has no `tonemapx` (`canTonemap` false; the F0 runtime has it, a distribution FFmpeg may not) | Owner 2026-11-27: 422 when the session has no validated conversion path; the Web shows the reason. |
+| S2 | the engine keeps an HDR range out of the encode (`VideoRange` set without a tone map to SDR, for example HDR10 out of Dolby Vision): decided, not executed | Owner 2026-11-27: keep the HDR paths Sessions already executes (direct play when compatible included). Otherwise plan SDR only when the client accepts it and the conversion is available; else 422. Executing new HDR outputs is out of this deletion work. |
+| S3 | a transcode delivers a subtitle as `Embed` or `Hls` (only `External` and `Burn` execute) | Owner 2026-11-27: prefer an external track when the player renders it correctly, then burn-in when possible; if neither restores the selected track, 422. Keep embedded subtitles the player already reads in direct play. HLS subtitle renditions are out of this deletion work. |
+| S4 | the session's sources list is empty, or a live session's source is not the stream it holds | Owner 2026-11-27: refuse the session; for live, the planned source must be the one the session holds. |
 
-**Order.** W4 now (dead code). Then S1, S4 as refusals and S2, S3 decided by the owner, each with
-a session E2E and a break control showing the legacy planner is no longer reached. Then W1 type by
-type and W2/W3 with them, each proved in the browser with `PlaybackInfo` aborted at the network.
-Step 7 starts when no row is left.
+**Order (owner 2026-11-27).** W4 and S1/S4 now. Then S2/S3, then W1 to W3. Each server row comes
+with a session E2E and a break control showing the legacy planner is no longer reached; each Web
+row is proved in the browser with `PlaybackInfo` aborted at the network. Before step 7 starts, two
+separate proofs, since this audit is read from the code: no `PlaybackInfo` call from the browser on
+the journeys concerned, and no `StreamBuilder` pass on the Sessions side for S1 to S4, refusals
+included.
 
 ## 8. Shared model boundary (consolidation step 4, candidate)
 
