@@ -359,9 +359,15 @@ the session's stop. Closing it never stops the recording. The planner, the live 
 segment route and the delivery guard are the channel slice's, unchanged: no direct play of a
 growing file, an HLS remux or transcode on `Hls/live.m3u8`, ffmpeg reading `pipe:0`. Before this,
 the source named the `[Authorize]`d `LiveTv/LiveRecordings/{id}/stream` route as its encoder path,
-which ffmpeg, holding no credential, could not read. Proof: `LiveRecordingSessionEndToEndTests` (a
+which ffmpeg, holding no credential, could not read. The recording's source carries its item's id
+everywhere - the item's listing, the playback source list (`LiveTvMediaSourceProvider`) and the
+session's opened stream - so a client finds the source a session names among the item's own and
+mints a media capability for it; before, the playback list named it by the recording's id, and
+`Playback/Capabilities` refused the descriptor's source with 404. Proof: `LiveRecordingSessionEndToEndTests` (a
 paced writer growing a TS recording on disk; segments probed H.264 + AAC; another user refused; a
-re-plan keeps the held stream; the stop releases it while the recording goes on), required by name.
+re-plan keeps the held stream; the Web client's own path - the descriptor's source among the
+item's, a capability minted for it reading the live playlist and a segment with no other
+credential; the stop releases the stream while the recording goes on), required by name.
 Break controls: no recording branch in the controller (legacy planner reached), provider refusing
 every read (probe fails, 500), provider serving the probe only (the live playlist fails, so ffmpeg
 reads through the provider and not the file path).

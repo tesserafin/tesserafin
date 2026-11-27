@@ -131,9 +131,13 @@ namespace Tesserafin.Controller.Library
         /// start of the file, as it grows. Closing it does not stop the recording.
         /// </summary>
         /// <param name="info">The <see cref="ActiveRecordingInfo"/>.</param>
+        /// <param name="mediaSourceId">
+        /// The id the opened source takes: the media source the recording's item lists for its file, so
+        /// that a client finds the source a session names among the item's own.
+        /// </param>
         /// <param name="cancellationToken">The <see cref="CancellationToken"/>.</param>
         /// <returns>The opened stream's media source; its <see cref="MediaSourceInfo.LiveStreamId"/> names the stream.</returns>
-        Task<MediaSourceInfo> OpenRecordingStream(ActiveRecordingInfo info, CancellationToken cancellationToken);
+        Task<MediaSourceInfo> OpenRecordingStream(ActiveRecordingInfo info, string mediaSourceId, CancellationToken cancellationToken);
 
         /// <summary>
         /// Closes the media source.

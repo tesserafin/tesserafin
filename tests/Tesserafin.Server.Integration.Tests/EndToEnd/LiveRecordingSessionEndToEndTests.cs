@@ -123,6 +123,29 @@ public sealed class LiveRecordingSessionEndToEndTests : IClassFixture<DirectPlay
         Assert.Contains("video,h264", streams);
         Assert.Contains("audio,aac", streams);
 
+        // The Web client's own path: the media source the descriptor names is one the item lists, and
+        // a media-element credential minted for it reads the live playlist and a segment on its own.
+        var mediaSourceId = System.Web.HttpUtility.ParseQueryString(new Uri("http://host" + descriptor.Url).Query)["mediaSourceId"]!;
+        Assert.Equal(itemId.ToString("N"), mediaSourceId);
+        using (var item = await owner.GetAsync(FormattableString.Invariant($"Items/{itemId:N}?userId={ownerId:N}"), TestContext.Current.CancellationToken))
+        {
+            var itemBody = await item.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            Assert.True(item.IsSuccessStatusCode, FormattableString.Invariant($"GET Items/{itemId:N}: {(int)item.StatusCode} {itemBody}"));
+            using var document = JsonDocument.Parse(itemBody);
+            Assert.Contains(
+                document.RootElement.GetProperty("MediaSources").EnumerateArray(),
+                source => source.GetProperty("Id").GetString() == mediaSourceId);
+        }
+
+        var capability = await MintMediaCapabilityAsync(owner, itemId, mediaSourceId, PlaySession);
+        using (var anonymous = _factory.CreateClient())
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, await StatusAsync(anonymous, descriptor.Url));
+            var credentialed = await ReadLivePlaylistAsync(anonymous, descriptor.Url + "&playbackCapability=" + Uri.EscapeDataString(capability));
+            Assert.All(credentialed.Where(uri => !uri.Contains("-1.", StringComparison.Ordinal)), uri => Assert.Contains("playbackCapability=", uri, StringComparison.Ordinal));
+            Assert.NotEmpty(await GetBytesAsync(anonymous, credentialed.Last()));
+        }
+
         // Another user reaches neither the playlist nor a segment.
         Assert.Equal(HttpStatusCode.Forbidden, await StatusAsync(intruder, descriptor.Url));
         Assert.Equal(HttpStatusCode.Forbidden, await StatusAsync(intruder, segments.Last()));
@@ -205,7 +228,13 @@ public sealed class LiveRecordingSessionEndToEndTests : IClassFixture<DirectPlay
         {
             Id = recordingId,
             Path = recording,
-            Timer = new TimerInfo { Id = recordingId, Status = RecordingStatus.InProgress },
+            Timer = new TimerInfo
+            {
+                Id = recordingId,
+                Status = RecordingStatus.InProgress,
+                StartDate = DateTime.UtcNow.AddSeconds(-AlreadyRecordedSeconds),
+                EndDate = DateTime.UtcNow.AddHours(1),
+            },
             CancellationTokenSource = new CancellationTokenSource(),
         }));
         return (itemId, recordingId);
@@ -229,6 +258,19 @@ public sealed class LiveRecordingSessionEndToEndTests : IClassFixture<DirectPlay
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.True(response.IsSuccessStatusCode, FormattableString.Invariant($"PUT Playback/Sessions: {(int)response.StatusCode} {body}"));
         return JsonSerializer.Deserialize<PlaybackSessionResponse>(body, JsonDefaults.Options)!;
+    }
+
+    private static async Task<string> MintMediaCapabilityAsync(HttpClient client, Guid itemId, string mediaSourceId, string playSessionId)
+    {
+        using var response = await client.PostAsJsonAsync(
+            "Playback/Capabilities",
+            new { PlaySessionId = playSessionId, ItemId = itemId, MediaSourceId = mediaSourceId, Scopes = new[] { "Media" } },
+            JsonDefaults.Options,
+            TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.True(response.IsSuccessStatusCode, FormattableString.Invariant($"POST Playback/Capabilities: {(int)response.StatusCode} {body}"));
+        using var document = JsonDocument.Parse(body);
+        return document.RootElement.GetProperty("Value").GetString()!;
     }
 
     private static async Task<PlaybackSessionStreamDescriptor> GetDescriptorAsync(HttpClient client, Guid sessionId)

@@ -77,6 +77,13 @@ namespace Tesserafin.LiveTv
                 {
                     sources = await _mediaSourceManager.GetRecordingStreamMediaSources(activeRecordingInfo, cancellationToken)
                         .ConfigureAwait(false);
+
+                    // A recording is its item's one file: its source carries the item's id, as the
+                    // item's own listing and a playback session holding the recording name it.
+                    foreach (var source in sources)
+                    {
+                        source.Id = item.Id.ToString("N", CultureInfo.InvariantCulture);
+                    }
                 }
                 else
                 {

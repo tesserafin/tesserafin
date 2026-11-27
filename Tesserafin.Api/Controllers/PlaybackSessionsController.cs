@@ -665,7 +665,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             // A recording still being written is held the same way: opened as a stream read from the
             // start of its growing file, which ffmpeg reads through its provider (pipe:0), never
             // through the [Authorize]d LiveRecordings route.
-            (mediaSources, liveStreamId) = await OpenRecordingStream(recording, heldLiveStreamId, cancellationToken).ConfigureAwait(false);
+            (mediaSources, liveStreamId) = await OpenRecordingStream(item, recording, heldLiveStreamId, cancellationToken).ConfigureAwait(false);
         }
 
         // PR112b: the request now carries ClientCapabilities/PlaybackConstraints (PR91 decision
@@ -759,9 +759,10 @@ public class PlaybackSessionsController : BaseTesserafinApiController
 
     /// <summary>
     /// The recording's opened stream as its one media source: the stream this session already holds
-    /// when it re-plans, otherwise a new open of the recording.
+    /// when it re-plans, otherwise a new open of the recording, named as the item's own source.
     /// </summary>
     private async Task<(IReadOnlyList<MediaSourceInfo> Sources, string LiveStreamId)> OpenRecordingStream(
+        BaseItem item,
         ActiveRecordingInfo recording,
         string? heldLiveStreamId,
         CancellationToken cancellationToken)
@@ -772,7 +773,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             return ([held.Item1], heldLiveStreamId);
         }
 
-        var opened = await _mediaSourceManager.OpenRecordingStream(recording, cancellationToken).ConfigureAwait(false);
+        var opened = await _mediaSourceManager.OpenRecordingStream(recording, item.Id.ToString("N", System.Globalization.CultureInfo.InvariantCulture), cancellationToken).ConfigureAwait(false);
         return ([opened], opened.LiveStreamId);
     }
 

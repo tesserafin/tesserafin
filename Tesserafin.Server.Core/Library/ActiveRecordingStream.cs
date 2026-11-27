@@ -27,17 +27,19 @@ internal sealed class ActiveRecordingStream : ILiveStream, IDirectStreamProvider
     /// Initializes a new instance of the <see cref="ActiveRecordingStream"/> class.
     /// </summary>
     /// <param name="recording">The active recording.</param>
-    public ActiveRecordingStream(ActiveRecordingInfo recording)
+    /// <param name="mediaSourceId">The id of the media source the recording's item lists for its file.</param>
+    public ActiveRecordingStream(ActiveRecordingInfo recording, string mediaSourceId)
     {
         ArgumentNullException.ThrowIfNull(recording);
         ArgumentException.ThrowIfNullOrEmpty(recording.Path);
+        ArgumentException.ThrowIfNullOrEmpty(mediaSourceId);
         _path = recording.Path;
         UniqueId = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
         OriginalStreamId = recording.Id;
         ConsumerCount = 1;
         MediaSource = new MediaSourceInfo
         {
-            Id = recording.Id,
+            Id = mediaSourceId,
             LiveStreamId = UniqueId,
             Path = recording.Path,
             Protocol = MediaProtocol.File,

@@ -1004,11 +1004,11 @@ namespace Tesserafin.Server.Core.Library
         }
 
         /// <inheritdoc />
-        public async Task<MediaSourceInfo> OpenRecordingStream(ActiveRecordingInfo info, CancellationToken cancellationToken)
+        public async Task<MediaSourceInfo> OpenRecordingStream(ActiveRecordingInfo info, string mediaSourceId, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(info);
 
-            var stream = new ActiveRecordingStream(info);
+            var stream = new ActiveRecordingStream(info, mediaSourceId);
             var mediaSource = stream.MediaSource;
 
             // Probed through the provider, as an opened tuner stream is: the recording's own
