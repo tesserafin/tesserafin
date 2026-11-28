@@ -1235,7 +1235,7 @@ namespace Tesserafin.Controller.Entities
                 Type = type,
                 HasSegments = mediaSegmentManager.IsTypeSupported(item)
                     && (protocol is null or MediaProtocol.File)
-                    && mediaSegmentManager.HasSegments(item.Id)
+                    && mediaSegmentManager.HasSegments(item)
             };
 
             if (string.IsNullOrEmpty(info.Path))

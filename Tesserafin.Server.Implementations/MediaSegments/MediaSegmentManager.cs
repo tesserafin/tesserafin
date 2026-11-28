@@ -10,7 +10,9 @@ using Microsoft.Extensions.Logging;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Entities.Audio;
+using Tesserafin.Controller.Entities.TV;
 using Tesserafin.Controller.MediaSegments;
+using Tesserafin.Controller.Persistence;
 using Tesserafin.Controller.Providers;
 using Tesserafin.Data.Entities;
 using Tesserafin.Data.Enums;
@@ -27,6 +29,9 @@ namespace Tesserafin.Server.Implementations.MediaSegments;
 /// </summary>
 public class MediaSegmentManager : IMediaSegmentManager
 {
+    private const string ChapterProviderName = "Embedded intro chapters";
+
+    private readonly IChapterRepository _chapters;
     private readonly ILogger<MediaSegmentManager> _logger;
     private readonly IDbContextFactory<TesserafinDbContext> _dbProvider;
     private readonly IMediaSegmentProvider[] _segmentProviders;
@@ -36,14 +41,17 @@ public class MediaSegmentManager : IMediaSegmentManager
     /// </summary>
     /// <param name="logger">Logger.</param>
     /// <param name="dbProvider">EFCore Database factory.</param>
+    /// <param name="chapters">The chapter repository.</param>
     /// <param name="segmentProviders">List of all media segment providers.</param>
     public MediaSegmentManager(
         ILogger<MediaSegmentManager> logger,
         IDbContextFactory<TesserafinDbContext> dbProvider,
-        IEnumerable<IMediaSegmentProvider> segmentProviders)
+        IEnumerable<IMediaSegmentProvider> segmentProviders,
+        IChapterRepository chapters)
     {
         _logger = logger;
         _dbProvider = dbProvider;
+        _chapters = chapters;
 
         _segmentProviders = segmentProviders
             .OrderBy(i => i is IHasOrder hasOrder ? hasOrder.Order : 0)
@@ -227,9 +235,10 @@ public class MediaSegmentManager : IMediaSegmentManager
             var query = db.MediaSegments
                 .Where(e => e.ItemId.Equals(item.Id));
 
-            if (typeFilter is not null)
+            var types = typeFilter?.ToArray();
+            if (types is not null)
             {
-                query = query.Where(e => typeFilter.Contains(e.Type));
+                query = query.Where(e => types.Contains(e.Type));
             }
 
             if (filterByProvider)
@@ -238,21 +247,73 @@ public class MediaSegmentManager : IMediaSegmentManager
                     .Where(e => !libraryOptions.DisabledMediaSegmentProviders.Contains(e.Name, StringComparer.OrdinalIgnoreCase))
                     .Select(f => GetProviderId(f.Name))
                     .ToArray();
-                if (providerIds.Length == 0)
-                {
-                    return [];
-                }
-
                 query = query.Where(e => providerIds.Contains(e.SegmentProviderId));
             }
 
-            return query
+            var segments = await query
                 .OrderBy(e => e.StartTicks)
                 .AsNoTracking()
-                .AsEnumerable()
-                .Select(Map)
-                .ToArray();
+                .ToArrayAsync().ConfigureAwait(false);
+            var result = segments.Select(Map);
+            if ((types is null || types.Contains(MediaSegmentType.Intro))
+                && (!filterByProvider || !libraryOptions.DisabledMediaSegmentProviders.Contains(ChapterProviderName, StringComparer.OrdinalIgnoreCase))
+                && !segments.Any(segment => segment.Type == MediaSegmentType.Intro)
+                && GetChapterIntro(item) is { } intro)
+            {
+                return result.Append(intro).OrderBy(segment => segment.StartTicks).ToArray();
+            }
+
+            return result.ToArray();
         }
+    }
+
+    private MediaSegmentDto? GetChapterIntro(BaseItem item)
+    {
+        // An item-level segment can only describe one timeline.
+        if (item is not Episode { IsFileProtocol: true, IsVirtualItem: false, IsStacked: false } episode
+            || episode.LocalAlternateVersions.Length != 0
+            || episode.LinkedAlternateVersions.Length != 0
+            || episode.RunTimeTicks is not > 0)
+        {
+            return null;
+        }
+
+        // Use the current chapter snapshot, so refreshing the media also replaces its intro boundaries.
+        var chapters = _chapters.GetChapters(episode.Id);
+        int introIndex = -1;
+        for (int i = 0; i < chapters.Count; i++)
+        {
+            if (string.Equals(chapters[i].Name?.Trim(), "Intro", StringComparison.OrdinalIgnoreCase))
+            {
+                if (introIndex != -1)
+                {
+                    return null;
+                }
+
+                introIndex = i;
+            }
+        }
+
+        if (introIndex < 0 || introIndex + 1 == chapters.Count)
+        {
+            return null;
+        }
+
+        var start = chapters[introIndex].StartPositionTicks;
+        var end = chapters[introIndex + 1].StartPositionTicks;
+        if (start < 0 || end <= start || end >= episode.RunTimeTicks)
+        {
+            return null;
+        }
+
+        return new MediaSegmentDto
+        {
+            Id = FormattableString.Invariant($"{ChapterProviderName}/{episode.Id:N}/{start}/{end}").GetMD5(),
+            ItemId = episode.Id,
+            Type = MediaSegmentType.Intro,
+            StartTicks = start,
+            EndTicks = end,
+        };
     }
 
     private static MediaSegmentDto Map(MediaSegment segment)
@@ -281,10 +342,10 @@ public class MediaSegmentManager : IMediaSegmentManager
     }
 
     /// <inheritdoc />
-    public bool HasSegments(Guid itemId)
+    public bool HasSegments(BaseItem item)
     {
         using var db = _dbProvider.CreateDbContext();
-        return db.MediaSegments.Any(e => e.ItemId.Equals(itemId));
+        return db.MediaSegments.Any(e => e.ItemId.Equals(item.Id)) || GetChapterIntro(item) is not null;
     }
 
     /// <inheritdoc/>
@@ -301,8 +362,8 @@ public class MediaSegmentManager : IMediaSegmentManager
             return [];
         }
 
-        return _segmentProviders
-            .Select(p => (p.Name, GetProviderId(p.Name)));
+        var providers = _segmentProviders.Select(p => (p.Name, GetProviderId(p.Name)));
+        return item is Episode ? providers.Append((ChapterProviderName, GetProviderId(ChapterProviderName))) : providers;
     }
 
     private string GetProviderId(string name)
