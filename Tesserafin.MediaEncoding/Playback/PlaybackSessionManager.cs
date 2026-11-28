@@ -67,9 +67,9 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     // POST /Playback/Sessions) and therefore holds the PlaybackSessionId of. They are ended by that
     // client's own DELETE, or by the ExpiryTtl backstop - never by a PlaySessionId-keyed signal out
     // of the legacy transcode pipeline, which is the coupling issue #71 identifies as the root
-    // cause (shared with #70). Sessions merely Track()ed by that pipeline - the HLS segment path,
-    // DynamicHlsController -> TrackTranscodeOutput - are NOT in here: nobody holds their id and
-    // nobody will ever DELETE them, so their job ending remains the right moment to drop them.
+    // cause (shared with #70). A session only ever Track()ed, never created by a client, is NOT in
+    // here: nobody holds its id and nobody will ever DELETE it, so its job ending remains the right
+    // moment to drop it.
     // Guarded by _lock, same as _sessions and _byPlaySessionId; cleared in RemoveNoLock.
     private readonly HashSet<PlaybackSessionId> _clientOwnedSessions = new();
 
@@ -276,15 +276,6 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         => StoreOrReplace(kind, playSessionId, null, plan, playbackAttemptId);
 
     /// <inheritdoc/>
-    public PlaybackSession TrackTranscodeOutput(string outputVideoCodec, string outputAudioCodec, TranscodeReason transcodeReasons, string? playSessionId = null)
-    {
-        var playMethod = EncodingHelper.IsCopyCodec(outputVideoCodec) && EncodingHelper.IsCopyCodec(outputAudioCodec)
-            ? PlayMethod.DirectStream
-            : PlayMethod.Transcode;
-        return Track(PlaybackMediaKind.Video, new PlaybackPlan(playMethod, transcodeReasons), playSessionId);
-    }
-
-    /// <inheritdoc/>
     public bool Delete(PlaybackSessionId id)
     {
         lock (_lock)
@@ -442,18 +433,9 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
                 // unaffected (hence the endpoint reading as "admin only"). Issue #43's client-side
                 // teardown is impossible while that holds, DELETE being precisely the verb refused.
                 //
-                // Issue #70: Kind and Plan used to keep overwriting unconditionally, on the reasoning
-                // that Track's whole purpose is to record the plan actually being executed. That
-                // holds for a session the legacy pipeline established by itself - and ONLY there.
-                // TrackTranscodeOutput builds `new PlaybackPlan(playMethod, transcodeReasons)`, whose
-                // StreamInfo defaults to null (IPlaybackSessionPlanner), so for a session a CLIENT
-                // planned through POST Playback/Sessions the same overwrite REPLACED a fully planned
-                // v2 plan with a stub carrying no StreamInfo - and GET Stream reads exactly that
-                // (PlaybackSessionsController: legacyStreamInfo = session.Plan.StreamInfo,
-                // mediaSource = legacyStreamInfo?.MediaSource) and 422s when either is null. So the
-                // ordinary client sequence - POST, then fetch a segment - left the session alive but
-                // UNSERVABLE. Before issue #71 the segment path's job ending evicted the session
-                // outright, which is why nobody ever observed the degraded state.
+                // Issue #70: the same holds for Kind and Plan. Track's caller is the session routes'
+                // keepalive (PlaybackSessionDeliveryGuard), which contributes no decision: it must
+                // not replace the plan a client was given.
                 //
                 // The exemption is scoped exactly as issue #71 scoped its Request guard, and for the
                 // same reason - it must not become a blanket "never overwrite":

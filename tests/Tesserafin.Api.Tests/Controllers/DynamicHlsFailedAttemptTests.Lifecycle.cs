@@ -440,6 +440,9 @@ public sealed partial class DynamicHlsFailedAttemptTests
             var result = await controller.GetLivePlaylistInternal(
                 new Tesserafin.Controller.Streaming.VideoRequestDto
                 {
+                    // The plan the session retained: the source video and audio streams.
+                    VideoStreamIndex = 0,
+                    AudioStreamIndex = 1,
                     Id = _item,
                     Container = "ts",
                     Static = false,
@@ -467,7 +470,6 @@ public sealed partial class DynamicHlsFailedAttemptTests
                     StreamOptions = new Dictionary<string, string>(),
                     EnableSubtitlesInManifest = true,
                 },
-                sessionOwned: false,
                 sessionBinding: null).ConfigureAwait(false);
 
             return await Executed(result, httpContext, body).ConfigureAwait(false);

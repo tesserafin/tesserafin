@@ -70,7 +70,6 @@ public partial class DynamicHlsController : BaseTesserafinApiController
     private readonly ILogger<DynamicHlsController> _logger;
     private readonly EncodingHelper _encodingHelper;
     private readonly IDynamicHlsPlaylistGenerator _dynamicHlsPlaylistGenerator;
-    private readonly IPlaybackSessionManager _playbackSessionManager;
     private readonly IHlsJobOwnershipAuthorizer _jobOwnership;
     private EncodingOptions _encodingOptions;
 
@@ -87,7 +86,6 @@ public partial class DynamicHlsController : BaseTesserafinApiController
     /// <param name="logger">Instance of the <see cref="ILogger{DynamicHlsController}"/> interface.</param>
     /// <param name="encodingHelper">Instance of <see cref="EncodingHelper"/>.</param>
     /// <param name="dynamicHlsPlaylistGenerator">Instance of <see cref="IDynamicHlsPlaylistGenerator"/>.</param>
-    /// <param name="playbackSessionManager">Instance of the <see cref="IPlaybackSessionManager"/> interface.</param>
     /// <param name="jobOwnership">Instance of the <see cref="IHlsJobOwnershipAuthorizer"/> interface.</param>
     public DynamicHlsController(
         ILibraryManager libraryManager,
@@ -100,7 +98,6 @@ public partial class DynamicHlsController : BaseTesserafinApiController
         ILogger<DynamicHlsController> logger,
         EncodingHelper encodingHelper,
         IDynamicHlsPlaylistGenerator dynamicHlsPlaylistGenerator,
-        IPlaybackSessionManager playbackSessionManager,
         IHlsJobOwnershipAuthorizer jobOwnership)
     {
         _libraryManager = libraryManager;
@@ -113,7 +110,6 @@ public partial class DynamicHlsController : BaseTesserafinApiController
         _logger = logger;
         _encodingHelper = encodingHelper;
         _dynamicHlsPlaylistGenerator = dynamicHlsPlaylistGenerator;
-        _playbackSessionManager = playbackSessionManager;
         _jobOwnership = jobOwnership;
 
         _encodingOptions = serverConfigurationManager.GetEncodingOptions();
@@ -125,10 +121,9 @@ public partial class DynamicHlsController : BaseTesserafinApiController
     /// route checks the state against its plan and binds every segment uri to the session.
     /// </summary>
     /// <param name="streamingRequest">The request, built from the session's retained plan.</param>
-    /// <param name="sessionOwned">Whether the output is a session's, executed from its plan.</param>
     /// <param name="sessionBinding">Binds a segment uri to the session, when it is one.</param>
     /// <returns>The live playlist, or the refusal.</returns>
-    internal async Task<ActionResult> GetLivePlaylistInternal(StreamingRequestDto streamingRequest, bool sessionOwned, Func<string, bool, string>? sessionBinding)
+    internal async Task<ActionResult> GetLivePlaylistInternal(StreamingRequestDto streamingRequest, Func<string, bool, string>? sessionBinding)
     {
         // CTS lifecycle is managed internally.
         var cancellationTokenSource = new CancellationTokenSource();
@@ -138,8 +133,8 @@ public partial class DynamicHlsController : BaseTesserafinApiController
         var state = await ResolveStreamingState(streamingRequest, cancellationToken)
             .ConfigureAwait(false);
 
-        // A session-owned live output is the retained plan executed, or nothing (see IsThePlan).
-        if (sessionOwned && !IsThePlan(state, streamingRequest))
+        // A session's live output is the retained plan executed, or nothing (see IsThePlan).
+        if (!IsThePlan(state, streamingRequest))
         {
             state.Dispose();
             return PlanNotExecutable();
@@ -327,7 +322,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
             TranscodingJobType,
             cancellationToken);
 
-    private async Task<ActionResult> GetVariantPlaylistInternal(StreamingRequestDto streamingRequest, CancellationTokenSource cancellationTokenSource, bool sessionOwned = false)
+    private async Task<ActionResult> GetVariantPlaylistInternal(StreamingRequestDto streamingRequest, CancellationTokenSource cancellationTokenSource)
     {
         using var state = await ResolveStreamingState(streamingRequest, cancellationTokenSource.Token)
             .ConfigureAwait(false);
@@ -335,22 +330,12 @@ public partial class DynamicHlsController : BaseTesserafinApiController
         double fps = state.TargetFramerate ?? 0.0f;
         int segmentLength = state.SegmentLength * 1000;
 
-        if (sessionOwned)
+        // The session already exists and already holds its plan (PlaybackSessionDeliveryGuard
+        // keeps it alive): nothing is tracked or replaced here, and a state that is not the
+        // plan - another stream, a copy where the plan encodes or the reverse - is refused.
+        if (!IsThePlan(state, streamingRequest))
         {
-            // The session already exists and already holds its plan (PlaybackSessionDeliveryGuard
-            // keeps it alive): nothing is tracked or replaced here, and a state that is not the
-            // plan - another stream, a copy where the plan encodes or the reverse - is refused.
-            if (!IsThePlan(state, streamingRequest))
-            {
-                return PlanNotExecutable();
-            }
-        }
-        else
-        {
-            // Track this session for diagnostics using the codecs/reasons the client already decided
-            // (this controller does not itself plan direct-play-vs-transcode). The session ends
-            // automatically when the transcoding job with this PlaySessionId ends.
-            _playbackSessionManager.TrackTranscodeOutput(state.OutputVideoCodec, state.OutputAudioCodec, state.TranscodeReasons, streamingRequest.PlaySessionId);
+            return PlanNotExecutable();
         }
 
         // If video is transcoded and framerate is fractional (i.e. 23.976), we need to slightly adjust segment length
@@ -374,7 +359,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
         return new FileContentResult(Encoding.UTF8.GetBytes(playlist), MimeTypes.GetMimeType("playlist.m3u8"));
     }
 
-    internal async Task<ActionResult> GetDynamicSegment(StreamingRequestDto streamingRequest, int segmentId, bool sessionOwned = false)
+    internal async Task<ActionResult> GetDynamicSegment(StreamingRequestDto streamingRequest, int segmentId)
     {
         // NO BRANCH ON THE REQUEST BEFORE THE AUTHORIZER, BY CONSTRUCTION. The only entry is the
         // session route, which builds the request from the session's retained plan, so no caller
@@ -412,7 +397,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
         // stream whether it is copied or what it is encoded to. The executor does not re-decide:
         // a state that is not the plan is refused before anything is served or started. Derived from the server's own plan and source,
         // and placed after the ownership decision above, which stays unconditional.
-        if (sessionOwned && !IsThePlan(state, streamingRequest))
+        if (!IsThePlan(state, streamingRequest))
         {
             state.Dispose();
             return PlanNotExecutable();

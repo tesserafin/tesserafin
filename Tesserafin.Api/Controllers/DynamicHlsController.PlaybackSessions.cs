@@ -64,7 +64,7 @@ public partial class DynamicHlsController
         }
 
         using var cancellationTokenSource = new CancellationTokenSource();
-        return await GetVariantPlaylistInternal(request!, cancellationTokenSource, sessionOwned: true).ConfigureAwait(false);
+        return await GetVariantPlaylistInternal(request!, cancellationTokenSource).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -122,7 +122,7 @@ public partial class DynamicHlsController
 
         request.CurrentRuntimeTicks = runtimeTicks;
         request.ActualSegmentLengthTicks = actualSegmentLengthTicks;
-        return await GetDynamicSegment(request, segmentId, sessionOwned: true).ConfigureAwait(false);
+        return await GetDynamicSegment(request, segmentId).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -165,7 +165,6 @@ public partial class DynamicHlsController
 
         return await GetLivePlaylistInternal(
             request,
-            sessionOwned: true,
             (playlist, capabilityPropagated) => BindLiveSegments(playlist, itemId, mediaSourceId, playSessionId, capabilityPropagated)).ConfigureAwait(false);
     }
 

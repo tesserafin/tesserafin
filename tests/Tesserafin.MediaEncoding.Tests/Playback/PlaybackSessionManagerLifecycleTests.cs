@@ -90,9 +90,8 @@ public class PlaybackSessionManagerLifecycleTests
     }
 
     /// <summary>
-    /// Issue #71, scope boundary. A session the LEGACY pipeline tracked on its own
-    /// (<c>DynamicHlsController</c> → <c>TrackTranscodeOutput</c> → <see cref="IPlaybackSessionManager.Track"/>)
-    /// has no client holding an id and no client that will ever <c>DELETE</c> it, so its transcode
+    /// Issue #71, scope boundary. A session only ever tracked
+    /// (<see cref="IPlaybackSessionManager.Track"/>), never created by a client, has no client holding an id and no client that will ever <c>DELETE</c> it, so its transcode
     /// job ending remains the right moment to drop it. The fix must not turn those into a leak.
     /// </summary>
     [Fact]
@@ -244,33 +243,6 @@ public class PlaybackSessionManagerLifecycleTests
         Assert.Equal("job-1", entry.Properties["JobId"]);
         Assert.Equal(true, entry.Properties["Correlated"]);
         Assert.Equal(session.Id, Assert.IsType<PlaybackSessionId>(entry.Properties["SessionId"]));
-    }
-
-    /// <summary>
-    /// The two sibling booleans on the "replaced in place" line say different things and must not be
-    /// read as one flag: <c>IncomingRequestWasNull</c> is literally <c>request is null</c> — the
-    /// caller (here <c>Track</c>/<c>TrackTranscodeOutput</c>, the legacy HLS segment path) brought no
-    /// request of its own — while <c>PlanPreserved</c> additionally requires the session to be
-    /// client-owned. A legacy-tracked session is the case that separates them: true and false in the
-    /// same entry. Asserting the property NAME and VALUE, not the rendered string, is what pins the
-    /// structured field a log consumer actually reads.
-    /// </summary>
-    [Fact]
-    public void TrackTranscodeOutput_OnLegacyTrackedSession_LogsIncomingRequestWasNullSeparatelyFromPlanPreserved()
-    {
-        var fixture = new Fixture();
-        fixture.Manager.Track(PlaybackMediaKind.Video, new PlaybackPlan(PlayMethod.DirectPlay, default), PlaySessionA);
-        fixture.Logger.Entries.Clear();
-
-        fixture.Manager.TrackTranscodeOutput("h264", "aac", TranscodeReason.ContainerNotSupported, PlaySessionA);
-
-        var entry = Assert.Single(fixture.Logger.Entries, e => e.Message.Contains("replaced in place", StringComparison.Ordinal));
-
-        // Track passes request: null, so the incoming request genuinely was null...
-        Assert.Equal(true, entry.Properties["IncomingRequestWasNull"]);
-
-        // ...but this session is not client-owned, so the planned decision was NOT preserved.
-        Assert.Equal(false, entry.Properties["PlanPreserved"]);
     }
 
     /// <summary>

@@ -833,7 +833,6 @@ public sealed partial class DynamicHlsFailedAttemptTests : IDisposable
             NullLogger<DynamicHlsController>.Instance,
             encodingHelper,
             Mock.Of<IDynamicHlsPlaylistGenerator>(),
-            Mock.Of<IPlaybackSessionManager>(),
             authorizer);
     }
 
@@ -873,6 +872,9 @@ public sealed partial class DynamicHlsFailedAttemptTests : IDisposable
             var result = await controller.GetDynamicSegment(
                 new Tesserafin.Controller.Streaming.VideoRequestDto
                 {
+                    // The plan the session retained: the source video and audio streams.
+                    VideoStreamIndex = 0,
+                    AudioStreamIndex = 1,
                     Id = _item,
                     CurrentRuntimeTicks = Math.Max(segment, 0) * TimeSpan.FromSeconds(3).Ticks,
                     ActualSegmentLengthTicks = TimeSpan.FromSeconds(3).Ticks,

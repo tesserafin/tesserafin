@@ -512,10 +512,11 @@ reaches it), then the deletion is one coordinated change.
    the V2 overlay and the diagnostics page (web#323). A client plays from
    `Playback/Sessions/{id}/File|Progressive|Hls` alone. The shadow comparison and its
    diagnostics went next (#540), then `StreamBuilder`, `StreamInfo` and `PlaybackExecutionPlanAdapter`.
-   Still to delete: `ReverseDlnaAdapter` and the `DeviceProfile` it builds for `MediaOptions`, the
-   legacy branches of `GetDynamicSegment`; kept inert because the compatibility gate refuses to remove
-   a contract property: `ServerConfiguration.PlaybackShadow`, the descriptor's `ServedBy` and
-   `FallbackReason`, the cast fields.
+   `ReverseDlnaAdapter` and the `DeviceProfile` it built for `MediaOptions` followed (#542), then,
+   under a one-shot corrective transition, the contract properties nothing used (#543):
+   `ServerConfiguration.PlaybackShadow`, the descriptor's `ServedBy` and `FallbackReason`, and the
+   Cast fields. Last, the HLS executor's non-session branches: every HLS output is a session's and
+   is checked against its plan. Remaining: the mobile contract pin, which predates these removals.
    Original list - deletion, once the rows above are empty: `GET/POST Items/{id}/PlaybackInfo`, the inner planner
    (`PlaybackSessionPlanner`/`StreamBuilder` for sessions), `PlaybackExecutionPlanAdapter.ToStreamInfo`,
    `PlaybackSessionStreamDescriptorMapper`, `PlaybackLiveStreamResolver`, the client-option HLS and

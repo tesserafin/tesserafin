@@ -75,23 +75,6 @@ public interface IPlaybackSessionManager
     PlaybackSession Track(PlaybackMediaKind kind, PlaybackPlan plan, string? playSessionId = null, string? playbackAttemptId = null);
 
     /// <summary>
-    /// Tracks a video session, deriving <see cref="PlayMethod"/> from output codecs a caller has
-    /// already decided on (both a copy codec means <see cref="PlayMethod.DirectStream"/>,
-    /// otherwise <see cref="PlayMethod.Transcode"/> — see <see cref="EncodingHelper.IsCopyCodec"/>).
-    /// Use this instead of deriving <see cref="PlaybackPlan"/> by hand and calling
-    /// <see cref="Track"/> — e.g. a controller, such as the HLS variant-playlist endpoint, that
-    /// only sees the already-decided output codecs, not a full plan.
-    /// </summary>
-    /// <param name="outputVideoCodec">The output video codec, e.g. "copy" or "h264".</param>
-    /// <param name="outputAudioCodec">The output audio codec, e.g. "copy" or "aac".</param>
-    /// <param name="transcodeReasons">Why transcoding was needed, if it was.</param>
-    /// <param name="playSessionId">
-    /// The client-supplied play session id, when known. Same dedup semantics as <see cref="Track"/>.
-    /// </param>
-    /// <returns>The created (or updated) session.</returns>
-    PlaybackSession TrackTranscodeOutput(string outputVideoCodec, string outputAudioCodec, TranscodeReason transcodeReasons, string? playSessionId = null);
-
-    /// <summary>
     /// Removes a session.
     /// </summary>
     /// <param name="id">The session to remove.</param>

@@ -146,6 +146,43 @@ public sealed class DynamicHlsOwnershipCallSiteTests : IDisposable
     }
 
     /// <summary>
+    /// tesserafin#129 step 7: every caller of the segment action is a session, so the plan check
+    /// is unconditional. An authorized request whose plan is not what the executor would produce -
+    /// here a copy of the MP3 audio into an AAC segment - is refused with a 422 before anything
+    /// past the gate runs, and the authorizer was still asked first.
+    /// </summary>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    [Fact]
+    public async Task AnAuthorizedRequestThatIsNotThePlan_IsRefusedBeforeAnythingRuns()
+    {
+        var authorizer = new RecordingAuthorizer(HlsJobOwnershipOutcome.Authorized);
+        var (controller, _) = Controller(authorizer, out var beyondTheGate);
+
+        var result = await controller.GetDynamicSegment(
+            new Tesserafin.Controller.Streaming.StreamingRequestDto
+            {
+                AudioStreamIndex = 1,
+                Id = _itemA,
+                Container = "aac",
+                Static = false,
+                PlaySessionId = PlaySession,
+                SegmentContainer = "aac",
+                SegmentLength = 6,
+                MinSegments = 1,
+                MediaSourceId = MediaSourceId,
+                DeviceId = OwnerDevice,
+                AudioCodec = "aac",
+                AllowAudioStreamCopy = true,
+                StreamOptions = new Dictionary<string, string>(),
+            },
+            0).ConfigureAwait(true);
+
+        Assert.Equal(StatusCodes.Status422UnprocessableEntity, Assert.IsAssignableFrom<ObjectResult>(result).StatusCode);
+        Assert.False(beyondTheGate.Reached);
+        Assert.Single(authorizer.Questions);
+    }
+
+    /// <summary>
     /// The <c>Videos/{itemId}/live.m3u8</c> action — the OTHER of the two call sites R4 row R5
     /// blinded — asks the authorizer about this request's own <see cref="HttpContext"/>.
     /// </summary>
@@ -194,6 +231,8 @@ public sealed class DynamicHlsOwnershipCallSiteTests : IDisposable
         => controller.GetDynamicSegment(
             new Tesserafin.Controller.Streaming.StreamingRequestDto
             {
+                // The plan the session retained: the source audio stream, encoded to AAC.
+                AudioStreamIndex = 1,
                 Id = _itemA,
                 Container = "aac",
                 CurrentRuntimeTicks = TimeSpan.FromMinutes(1).Ticks,
@@ -207,7 +246,7 @@ public sealed class DynamicHlsOwnershipCallSiteTests : IDisposable
                 DeviceId = OwnerDevice,
                 AudioCodec = "aac",
                 EnableAutoStreamCopy = true,
-                AllowAudioStreamCopy = true,
+                AllowAudioStreamCopy = false,
                 AllowVideoStreamCopy = true,
                 CopyTimestamps = false,
                 SubtitleMethod = Tesserafin.Model.Dlna.SubtitleDeliveryMethod.External,
@@ -225,6 +264,9 @@ public sealed class DynamicHlsOwnershipCallSiteTests : IDisposable
         => controller.GetLivePlaylistInternal(
             new Tesserafin.Controller.Streaming.VideoRequestDto
             {
+                // The plan the session retained: the source video copied, its audio encoded to AAC.
+                VideoStreamIndex = 0,
+                AudioStreamIndex = 1,
                 Id = _itemA,
                 Container = "ts",
                 Static = false,
@@ -236,7 +278,7 @@ public sealed class DynamicHlsOwnershipCallSiteTests : IDisposable
                 DeviceId = OwnerDevice,
                 AudioCodec = "aac",
                 EnableAutoStreamCopy = true,
-                AllowAudioStreamCopy = true,
+                AllowAudioStreamCopy = false,
                 AllowVideoStreamCopy = true,
                 CopyTimestamps = false,
                 SubtitleMethod = Tesserafin.Model.Dlna.SubtitleDeliveryMethod.External,
@@ -250,7 +292,6 @@ public sealed class DynamicHlsOwnershipCallSiteTests : IDisposable
                 StreamOptions = new Dictionary<string, string>(),
                 EnableSubtitlesInManifest = true,
             },
-            sessionOwned: false,
             sessionBinding: null);
 
     private (DynamicHlsController Controller, HttpContext HttpContext) Controller(RecordingAuthorizer authorizer)
@@ -280,7 +321,8 @@ public sealed class DynamicHlsOwnershipCallSiteTests : IDisposable
             RunTimeTicks = TimeSpan.FromMinutes(1).Ticks,
             MediaStreams = new List<MediaStream>
             {
-                new() { Type = MediaStreamType.Audio, Index = 0, Codec = "mp3", Channels = 2, BitRate = 128000 }
+                new() { Type = MediaStreamType.Video, Index = 0, Codec = "h264", Width = 1280, Height = 720, BitRate = 2_000_000, RealFrameRate = 25, AverageFrameRate = 25 },
+                new() { Type = MediaStreamType.Audio, Index = 1, Codec = "mp3", Channels = 2, BitRate = 128000 }
             }
         };
         var mediaSourceManager = new Mock<IMediaSourceManager>();
@@ -335,7 +377,6 @@ public sealed class DynamicHlsOwnershipCallSiteTests : IDisposable
             NullLogger<DynamicHlsController>.Instance,
             encodingHelper,
             Mock.Of<IDynamicHlsPlaylistGenerator>(),
-            Mock.Of<IPlaybackSessionManager>(),
             authorizer)
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
