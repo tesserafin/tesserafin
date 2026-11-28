@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // tesserafin#129 step 7: the legacy route under test is deprecated, and this test goes with it.
 using System;
 using System.Collections.Generic;
 using System.Globalization;

@@ -21240,6 +21240,7 @@
     },
     "/Audio/{itemId}/stream": {
       "get": {
+        "deprecated": true,
         "operationId": "GetAudioStream",
         "parameters": [
           {
@@ -21764,6 +21765,7 @@
         ]
       },
       "head": {
+        "deprecated": true,
         "operationId": "HeadAudioStream",
         "parameters": [
           {
@@ -22290,6 +22292,7 @@
     },
     "/Audio/{itemId}/stream.{container}": {
       "get": {
+        "deprecated": true,
         "operationId": "GetAudioStreamByContainer",
         "parameters": [
           {
@@ -22815,6 +22818,7 @@
         ]
       },
       "head": {
+        "deprecated": true,
         "operationId": "HeadAudioStreamByContainer",
         "parameters": [
           {
@@ -59393,6 +59397,7 @@
     },
     "/System/PlaybackDiagnostics/Metrics": {
       "get": {
+        "deprecated": true,
         "operationId": "GetOperationalMetrics",
         "responses": {
           "200": {
@@ -59461,6 +59466,7 @@
     },
     "/System/PlaybackDiagnostics/Sessions": {
       "get": {
+        "deprecated": true,
         "operationId": "GetPlaybackSessions",
         "responses": {
           "200": {
@@ -59538,6 +59544,7 @@
     },
     "/System/PlaybackDiagnostics/Sessions/{id}": {
       "get": {
+        "deprecated": true,
         "operationId": "GetPlaybackSession",
         "parameters": [
           {
@@ -59639,6 +59646,7 @@
     },
     "/System/PlaybackDiagnostics/Sessions/{id}/Fixture": {
       "get": {
+        "deprecated": true,
         "operationId": "ExportFixture",
         "parameters": [
           {
@@ -64840,6 +64848,7 @@
     },
     "/Videos/{itemId}/stream": {
       "get": {
+        "deprecated": true,
         "operationId": "GetVideoStream",
         "parameters": [
           {
@@ -65382,6 +65391,7 @@
         ]
       },
       "head": {
+        "deprecated": true,
         "operationId": "HeadVideoStream",
         "parameters": [
           {
@@ -65926,6 +65936,7 @@
     },
     "/Videos/{itemId}/stream.{container}": {
       "get": {
+        "deprecated": true,
         "operationId": "GetVideoStreamByContainer",
         "parameters": [
           {
@@ -66468,6 +66479,7 @@
         ]
       },
       "head": {
+        "deprecated": true,
         "operationId": "HeadVideoStreamByContainer",
         "parameters": [
           {

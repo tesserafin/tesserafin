@@ -59,6 +59,7 @@ public class HlsSegmentController : BaseTesserafinApiController
     // throughout, from the same players, so the exemption outlived whatever it was for. Measured
     // against master, this route served a segment to a caller presenting no credential at all.
     [HttpGet("Audio/{itemId}/hls/{segmentId}/stream.mp3", Name = "GetHlsAudioSegmentLegacyMp3")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
     [HttpGet("Audio/{itemId}/hls/{segmentId}/stream.aac", Name = "GetHlsAudioSegmentLegacyAac")]
     [Authorize(Policy = Policies.MediaDelivery)]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -120,6 +121,7 @@ public class HlsSegmentController : BaseTesserafinApiController
     /// <response code="200">Hls video playlist returned.</response>
     /// <returns>A <see cref="FileStreamResult"/> containing the playlist.</returns>
     [HttpGet("Videos/{itemId}/hls/{playlistId}/stream.m3u8")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
     [Authorize(Policy = Policies.MediaDelivery)]
     [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, "itemId", "mediaSourceId")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -226,6 +228,7 @@ public class HlsSegmentController : BaseTesserafinApiController
     // Same disposition as GetHlsAudioSegmentLegacy above: the exemption outlived its reason, and
     // the route served video segments anonymously until this change.
     [HttpGet("Videos/{itemId}/hls/{playlistId}/{segmentId}.{segmentContainer}")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
     [Authorize(Policy = Policies.MediaDelivery)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

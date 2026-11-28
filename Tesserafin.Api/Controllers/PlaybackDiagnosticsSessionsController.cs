@@ -56,6 +56,7 @@ public class PlaybackDiagnosticsSessionsController : BaseTesserafinApiController
     /// <response code="200">Playback sessions returned.</response>
     /// <returns>The current sessions, each flagged with whether a richer diagnostic is available.</returns>
     [HttpGet]
+    [System.Obsolete("Removed with the shadow comparison (tesserafin#129 step 7): nothing records these diagnostics any more.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<IReadOnlyList<PlaybackSessionListItem>> GetPlaybackSessions()
     {
@@ -78,6 +79,7 @@ public class PlaybackDiagnosticsSessionsController : BaseTesserafinApiController
     /// <response code="404">Session not found.</response>
     /// <returns>The filtered diagnostic detail.</returns>
     [HttpGet("{id}")]
+    [System.Obsolete("Removed with the shadow comparison (tesserafin#129 step 7): nothing records these diagnostics any more.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult<PlaybackDiagnosticDetail> GetPlaybackSession([FromRoute] PlaybackSessionId id)
@@ -110,6 +112,7 @@ public class PlaybackDiagnosticsSessionsController : BaseTesserafinApiController
     /// <response code="422">The session has no retained shadow diagnostic to export.</response>
     /// <returns>The fixture, as schema-conformant JSON.</returns>
     [HttpGet("{id}/Fixture")]
+    [System.Obsolete("Removed with the shadow comparison (tesserafin#129 step 7): nothing records these diagnostics any more.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]

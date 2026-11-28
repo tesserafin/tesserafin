@@ -182,6 +182,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
     /// <response code="200">Hls live stream retrieved.</response>
     /// <returns>A <see cref="FileResult"/> containing the hls file.</returns>
     [HttpGet("Videos/{itemId}/live.m3u8")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesPlaylistFile]
     [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId")]
@@ -546,6 +547,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
     /// <response code="200">Video stream returned.</response>
     /// <returns>A <see cref="FileResult"/> containing the playlist file.</returns>
     [HttpGet("Videos/{itemId}/master.m3u8")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
     [HttpHead("Videos/{itemId}/master.m3u8", Name = "HeadMasterHlsVideoPlaylist")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesPlaylistFile]
@@ -720,6 +722,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
     /// <response code="200">Audio stream returned.</response>
     /// <returns>A <see cref="FileResult"/> containing the playlist file.</returns>
     [HttpGet("Audio/{itemId}/master.m3u8")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
     [HttpHead("Audio/{itemId}/master.m3u8", Name = "HeadMasterHlsAudioPlaylist")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesPlaylistFile]
@@ -889,6 +892,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
     /// <response code="200">Video stream returned.</response>
     /// <returns>A <see cref="FileResult"/> containing the audio file.</returns>
     [HttpGet("Videos/{itemId}/main.m3u8")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesPlaylistFile]
     [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId")]
@@ -1059,6 +1063,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
     /// <response code="200">Audio stream returned.</response>
     /// <returns>A <see cref="FileResult"/> containing the audio file.</returns>
     [HttpGet("Audio/{itemId}/main.m3u8")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesPlaylistFile]
     [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId")]
@@ -1232,6 +1237,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
     /// <response code="200">Video stream returned.</response>
     /// <returns>A <see cref="FileResult"/> containing the audio file.</returns>
     [HttpGet("Videos/{itemId}/hls1/{playlistId}/{segmentId}.{container}")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesVideoFile]
     [SuppressMessage("Microsoft.Performance", "CA1801:ReviewUnusedParameters", MessageId = "playlistId", Justification = "Imported from ServiceStack")]
@@ -1416,6 +1422,7 @@ public partial class DynamicHlsController : BaseTesserafinApiController
     /// <response code="200">Video stream returned.</response>
     /// <returns>A <see cref="FileResult"/> containing the audio file.</returns>
     [HttpGet("Audio/{itemId}/hls1/{playlistId}/{segmentId}.{container}")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesAudioFile]
     [SuppressMessage("Microsoft.Performance", "CA1801:ReviewUnusedParameters", MessageId = "playlistId", Justification = "Imported from ServiceStack")]

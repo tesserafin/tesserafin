@@ -326,6 +326,7 @@ public class VideosController : BaseTesserafinApiController
     /// <response code="200">Video stream returned.</response>
     /// <returns>A <see cref="FileResult"/> containing the audio file.</returns>
     [HttpGet("{itemId}/stream")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
     [HttpHead("{itemId}/stream", Name = "HeadVideoStream")]
     [Authorize(Policy = Policies.MediaDelivery)]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -570,6 +571,7 @@ public class VideosController : BaseTesserafinApiController
     /// <response code="200">Video stream returned.</response>
     /// <returns>A <see cref="FileResult"/> containing the audio file.</returns>
     [HttpGet("{itemId}/stream.{container}")]
+    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
     [HttpHead("{itemId}/stream.{container}", Name = "HeadVideoStreamByContainer")]
     [Authorize(Policy = Policies.MediaDelivery)]
     [ProducesResponseType(StatusCodes.Status200OK)]

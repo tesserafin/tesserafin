@@ -49,6 +49,7 @@ public class PlaybackDiagnosticsMetricsController : BaseTesserafinApiController
     /// <response code="200">Metrics returned.</response>
     /// <returns>The current metrics snapshot.</returns>
     [HttpGet]
+    [System.Obsolete("Removed with the shadow comparison (tesserafin#129 step 7): nothing records these diagnostics any more.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<PlaybackOperationalMetricsResponse> GetOperationalMetrics()
     {
