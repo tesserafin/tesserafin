@@ -34,7 +34,7 @@ public sealed class PlaybackSessionLiveStreamsTests : IDisposable
             .Returns(Task.CompletedTask);
         _liveStreams = new PlaybackSessionLiveStreams(mediaSources.Object, NullLogger<PlaybackSessionLiveStreams>.Instance);
 
-        var options = new MediaOptions { Profile = new DeviceProfile() };
+        var options = new MediaOptions();
         _request = new PlaybackSessionRequest(PlaybackMediaKind.Video, options);
         var planner = new Mock<IPlaybackSessionPlanner>();
         planner.Setup(p => p.PlanVideo(options)).Returns(new PlaybackPlan(PlayMethod.Transcode, default));

@@ -187,7 +187,7 @@ namespace Tesserafin.Server.Tests.LogForging
 
             public Fixture(RealFormatterLogProbe probe)
             {
-                var options = new MediaOptions { Profile = new DeviceProfile() };
+                var options = new MediaOptions();
                 _request = new PlaybackSessionRequest(PlaybackMediaKind.Video, options);
                 var planner = new Mock<IPlaybackSessionPlanner>();
                 planner.Setup(p => p.PlanVideo(options)).Returns(new PlaybackPlan(PlayMethod.DirectPlay, default));

@@ -161,7 +161,7 @@ namespace Tesserafin.Server.Tests.LogForging
 
             public Fixture(RealFormatterLogProbe probe, string? attemptId)
             {
-                var options = new MediaOptions { Profile = new DeviceProfile(), UserId = _ownerId };
+                var options = new MediaOptions { UserId = _ownerId };
                 _session = new PlaybackSession(
                     PlaybackSessionId.NewId(),
                     PlaybackMediaKind.Video,

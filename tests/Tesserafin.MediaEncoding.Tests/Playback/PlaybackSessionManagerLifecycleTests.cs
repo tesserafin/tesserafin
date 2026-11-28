@@ -295,7 +295,7 @@ public class PlaybackSessionManagerLifecycleTests
     {
         public Fixture()
         {
-            var options = new MediaOptions { Profile = new DeviceProfile() };
+            var options = new MediaOptions();
             Request = new PlaybackSessionRequest(PlaybackMediaKind.Video, options);
             var planner = new Mock<IPlaybackSessionPlanner>();
             planner.Setup(p => p.PlanVideo(options)).Returns(new PlaybackPlan(PlayMethod.DirectPlay, default));

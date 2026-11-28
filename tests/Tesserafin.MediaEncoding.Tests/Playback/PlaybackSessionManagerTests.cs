@@ -311,7 +311,7 @@ public class PlaybackSessionManagerTests
         return new PlaybackSessionManager(mockPlanner.Object, new Mock<ITranscodeManager>().Object, new Mock<ISessionManager>().Object);
     }
 
-    private static MediaOptions CreateOptions() => new() { Profile = new DeviceProfile() };
+    private static MediaOptions CreateOptions() => new();
 
     private static PlaybackPlan CreatePlan() => new(PlayMethod.DirectPlay, default);
 }

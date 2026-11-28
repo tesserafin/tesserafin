@@ -82,7 +82,7 @@ public sealed class PlaybackSessionFilesControllerTests : IDisposable
             VideoType = VideoType.VideoFile,
             Container = "mp4",
         };
-        var options = new MediaOptions { ItemId = _filmId, UserId = _ownerId, MediaSources = [source], Profile = new DeviceProfile() };
+        var options = new MediaOptions { ItemId = _filmId, UserId = _ownerId, MediaSources = [source], };
         var session = new PlaybackSession(
             _sessionId,
             PlaybackMediaKind.Video,

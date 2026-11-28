@@ -6,27 +6,12 @@ using Tesserafin.Playback.Decision;
 namespace Tesserafin.Playback.Dlna;
 
 /// <summary>
-/// Convenience facade over the individual DLNA-to-domain mappers
-/// (<see cref="ClientCapabilitiesMapper"/>, <see cref="PlaybackConstraintsMapper"/>,
-/// <see cref="MediaSourceSnapshotMapper"/>) plus a constructor for
+/// The engine's inputs from server state: a media source projected by
+/// <see cref="MediaSourceSnapshotMapper"/>, plus a constructor for
 /// <see cref="PlaybackRequestContext"/>, which has no legacy equivalent to adapt from.
 /// </summary>
 public static class DlnaPlaybackAdapter
 {
-    /// <summary>
-    /// Projects a legacy <see cref="DeviceProfile"/> into domain <see cref="ClientCapabilities"/>.
-    /// </summary>
-    /// <param name="profile">The legacy device profile to project.</param>
-    /// <returns>The equivalent domain capabilities.</returns>
-    public static ClientCapabilities ToCapabilities(DeviceProfile profile) => ClientCapabilitiesMapper.ToCapabilities(profile);
-
-    /// <summary>
-    /// Projects legacy <see cref="MediaOptions"/> into domain <see cref="PlaybackConstraints"/>.
-    /// </summary>
-    /// <param name="options">The legacy media options to project.</param>
-    /// <returns>The equivalent domain constraints.</returns>
-    public static PlaybackConstraints ToConstraints(MediaOptions options) => PlaybackConstraintsMapper.ToConstraints(options);
-
     /// <summary>
     /// Projects a legacy <see cref="MediaSourceInfo"/> into a frozen <see cref="MediaSourceSnapshot"/>.
     /// </summary>

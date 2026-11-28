@@ -335,7 +335,7 @@ public class PlaybackSessionsControllerTests
     /// </summary>
     private PlaybackSession BuildExistingSessionForAuth(PlaybackSessionId id, Guid ownerId)
     {
-        var options = new MediaOptions { ItemId = _itemId, UserId = ownerId, Profile = new DeviceProfile() };
+        var options = new MediaOptions { ItemId = _itemId, UserId = ownerId, };
         return new PlaybackSession(id, PlaybackMediaKind.Video, null, new PlaybackSessionRequest(PlaybackMediaKind.Video, options), new PlaybackPlan(PlayMethod.DirectPlay, default), default, default);
     }
 
@@ -429,7 +429,7 @@ public class PlaybackSessionsControllerTests
     public async Task DeletePlaybackSession_EndsOnlyTheOwnersJobs_AndRevokesTheCapabilities_Issue301()
     {
         var id = PlaybackSessionId.NewId();
-        var options = new MediaOptions { ItemId = _itemId, UserId = _userId, Profile = new DeviceProfile() };
+        var options = new MediaOptions { ItemId = _itemId, UserId = _userId, };
         var session = new PlaybackSession(id, PlaybackMediaKind.Video, "play-301", new PlaybackSessionRequest(PlaybackMediaKind.Video, options), new PlaybackPlan(PlayMethod.Transcode, default), default, default);
         _playbackSessionManager.Setup(m => m.Get(id)).Returns(session);
         _playbackSessionManager.Setup(m => m.Delete(id)).Returns(true);
@@ -612,7 +612,7 @@ public class PlaybackSessionsControllerTests
 
     private PlaybackSession BuildStreamableSession(Guid ownerId, string? playSessionId)
     {
-        var options = new MediaOptions { ItemId = _itemId, UserId = ownerId, DeviceId = "device-1", Profile = new DeviceProfile() };
+        var options = new MediaOptions { ItemId = _itemId, UserId = ownerId, DeviceId = "device-1", };
         return new PlaybackSession(
             PlaybackSessionId.NewId(),
             PlaybackMediaKind.Video,

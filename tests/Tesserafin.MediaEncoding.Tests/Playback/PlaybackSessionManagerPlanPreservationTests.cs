@@ -152,7 +152,7 @@ public class PlaybackSessionManagerPlanPreservationTests
 
         public Fixture()
         {
-            var options = new MediaOptions { Profile = new DeviceProfile() };
+            var options = new MediaOptions();
             Request = new PlaybackSessionRequest(PlaybackMediaKind.Video, options);
             PlannedPlan = new PlaybackPlan(PlayMethod.Transcode, TranscodeReason.ContainerNotSupported);
             var planner = new Mock<IPlaybackSessionPlanner>();

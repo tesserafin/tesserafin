@@ -88,7 +88,6 @@ public sealed class LocalMediaPlannerTests
             ItemId = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
             MediaSources = [first, second],
-            Profile = new DeviceProfile(),
         };
         var store = new InMemoryV2PlanStore();
         var planner = new LocalMediaPlanner(
@@ -921,7 +920,6 @@ public sealed class LocalMediaPlannerTests
             ItemId = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
             MediaSources = sources,
-            Profile = new DeviceProfile(),
         };
 
     private static ClientCapabilities Browser(bool hlsOutput)

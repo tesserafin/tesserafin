@@ -521,24 +521,20 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             (mediaSources, liveStreamId) = await OpenRecordingStream(item, recording, heldLiveStreamId, cancellationToken).ConfigureAwait(false);
         }
 
-        // PR112b: the request now carries ClientCapabilities/PlaybackConstraints (PR91 decision
-        // vocabulary), never a raw DeviceProfile - ReverseDlnaAdapter is the TEMPORARY translation
-        // back to what the legacy pipeline still consumes (delete alongside it - PR114a).
+        // The engine decides from the request's capabilities and constraints (LocalMediaRequest);
+        // these options carry what the server resolved: the item, its sources, the caller.
         var options = new MediaOptions
         {
             MediaSources = mediaSources.ToArray(),
             Context = EncodingContext.Streaming,
-            RequireDeclaredDelivery = true,
             ItemId = item.Id,
             UserId = userId,
-            Profile = ReverseDlnaAdapter.ToDeviceProfile(request.Capabilities),
             // A channel is planned on the one tuner source the session opened, whatever the client named.
             MediaSourceId = liveStreamId is null ? request.MediaSourceId : mediaSources[0].Id,
             // PR115a: the canary cohort key is deterministic on user+device, so v2 authority for a
             // session depends on the requesting device being identifiable here.
             DeviceId = User.GetDeviceId(),
         };
-        ReverseDlnaAdapter.ApplyConstraints(options, request.Constraints);
 
         if (!request.Constraints.AllowTranscoding)
         {

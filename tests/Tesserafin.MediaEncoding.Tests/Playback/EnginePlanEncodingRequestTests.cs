@@ -110,7 +110,6 @@ public sealed class EnginePlanEncodingRequestTests
             ItemId = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
             MediaSources = [Source("ac3")],
-            Profile = new DeviceProfile(),
         };
 
         PlaybackPlan? plan;
@@ -147,7 +146,6 @@ public sealed class EnginePlanEncodingRequestTests
             ItemId = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
             MediaSources = [Source("aac", videoCodec: "mpeg4")],
-            Profile = new DeviceProfile(),
         };
 
         // MPEG-4 Part 2 is decoded by no browser: the video is encoded, to H.264, and the plan is

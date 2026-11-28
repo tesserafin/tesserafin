@@ -216,5 +216,5 @@ public class PlaybackAttemptCorrelationTests
     }
 
     private static PlaybackSessionRequest BuildRequest() =>
-        new(PlaybackMediaKind.Video, new MediaOptions { ItemId = Guid.NewGuid(), Profile = new DeviceProfile() });
+        new(PlaybackMediaKind.Video, new MediaOptions { ItemId = Guid.NewGuid(), });
 }
