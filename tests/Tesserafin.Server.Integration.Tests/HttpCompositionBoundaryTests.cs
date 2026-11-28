@@ -54,12 +54,5 @@ public sealed class HttpCompositionBoundaryTests : IClassFixture<TesserafinAppli
         {
             Assert.Same(first.ServiceProvider.GetRequiredService(type), second.ServiceProvider.GetRequiredService(type));
         }
-
-        foreach (var type in new[] { typeof(AudioHelper), typeof(DynamicHlsHelper) })
-        {
-            var service = first.ServiceProvider.GetRequiredService(type);
-            Assert.Same(service, first.ServiceProvider.GetRequiredService(type));
-            Assert.NotSame(service, second.ServiceProvider.GetRequiredService(type));
-        }
     }
 }

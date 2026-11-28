@@ -47,133 +47,6 @@ public class HlsSegmentController : BaseTesserafinApiController
     }
 
     /// <summary>
-    /// Gets the specified audio segment for an audio item.
-    /// </summary>
-    /// <param name="itemId">The item id.</param>
-    /// <param name="segmentId">The segment id.</param>
-    /// <response code="200">Hls audio segment returned.</response>
-    /// <returns>A <see cref="FileStreamResult"/> containing the audio stream.</returns>
-    // The upstream comment this replaced said authentication could not be required "just yet due to
-    // seeing some requests come from Chrome without full query string". Its sibling route
-    // Audio/{itemId}/hls1/{playlistId}/{segmentId}.{container} has carried Policies.MediaDelivery
-    // throughout, from the same players, so the exemption outlived whatever it was for. Measured
-    // against master, this route served a segment to a caller presenting no credential at all.
-    [HttpGet("Audio/{itemId}/hls/{segmentId}/stream.mp3", Name = "GetHlsAudioSegmentLegacyMp3")]
-    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
-    [HttpGet("Audio/{itemId}/hls/{segmentId}/stream.aac", Name = "GetHlsAudioSegmentLegacyAac")]
-    [Authorize(Policy = Policies.MediaDelivery)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesAudioFile]
-    [SuppressMessage("Microsoft.Performance", "CA1801:ReviewUnusedParameters", MessageId = "itemId", Justification = "Required for ServiceStack")]
-    [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, "itemId", null)]
-    [RequiresVisibleItem("itemId")]
-    public ActionResult GetHlsAudioSegmentLegacy([FromRoute, Required] string itemId, [FromRoute, Required] string segmentId)
-    {
-        // #153-LTV-R3, finding R2-2. This route used to resolve
-        // `Path.Combine(transcodeFolderPath, segmentId + extension)` from the caller-supplied
-        // segment name alone, with only a containment check against a folder every job shares. It
-        // read no job and no caller, so any authenticated principal reached any job's audio bytes.
-        // Now the segment name only SELECTS a job, the caller is compared with that job, and the
-        // path is built from the job's own canonical root afterwards.
-        var decision = _jobOwnership.AuthorizeBySegmentName(HttpContext, segmentId);
-        if (decision.Binding is not { } binding || !decision.IsAuthorized)
-        {
-            return decision.Outcome == HlsJobOwnershipOutcome.NoSuchJob
-                ? NotFound("Hls segment not found.")
-                : Unauthorized();
-        }
-
-        if (!Guid.TryParse(itemId, out var routeItemId) || !routeItemId.Equals(binding.ItemId))
-        {
-            return Unauthorized();
-        }
-
-        // Before any file is named, so that the lines below stay exactly what the
-        // hostile-control manifest anchors on (r3-resolve-from-segment-id-alone).
-        if (_transcodeManager.GetTranscodingJob(binding.CanonicalPlaylistPath, TranscodingJobType.Hls)?.Failure is { Decision.ShouldFallback: true } failure)
-        {
-            return DynamicHlsController.TranscodeFailed(Response, failure);
-        }
-
-        var file = Path.GetFullPath(Path.Combine(
-            binding.CanonicalRoot,
-            string.Concat(segmentId, Path.GetExtension(Request.Path.Value.AsSpan()))));
-
-        if (!string.Equals(Path.GetDirectoryName(file), binding.CanonicalRoot, StringComparison.Ordinal))
-        {
-            return BadRequest("Invalid segment.");
-        }
-
-        if (!NamesASegmentOf(binding, file))
-        {
-            return NotFound("Hls segment not found.");
-        }
-
-        return FileStreamResponseHelpers.GetStaticFileResult(file, MimeTypes.GetMimeType(file));
-    }
-
-    /// <summary>
-    /// Gets a hls video playlist.
-    /// </summary>
-    /// <param name="itemId">The video id.</param>
-    /// <param name="playlistId">The playlist id.</param>
-    /// <response code="200">Hls video playlist returned.</response>
-    /// <returns>A <see cref="FileStreamResult"/> containing the playlist.</returns>
-    [HttpGet("Videos/{itemId}/hls/{playlistId}/stream.m3u8")]
-    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
-    [Authorize(Policy = Policies.MediaDelivery)]
-    [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, "itemId", "mediaSourceId")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesPlaylistFile]
-    [SuppressMessage("Microsoft.Performance", "CA1801:ReviewUnusedParameters", MessageId = "itemId", Justification = "Required for ServiceStack")]
-    [RequiresVisibleItem("itemId")]
-    public ActionResult GetHlsPlaylistLegacy([FromRoute, Required] string itemId, [FromRoute, Required] string playlistId)
-    {
-        // #153-LTV-R3. This route is UNREACHABLE and stays that way. Upstream jellyfin b176beb88e
-        // ("Reduce string allocations") rewrote the guard below and dropped its negation: the
-        // condition it replaced was `!Path.GetExtension(file).Equals(".m3u8", …)`. The route
-        // literal is `stream.m3u8`, so `Request.Path` always ends in `.m3u8`, so `file` always
-        // does, so the guard always fires. Every caller gets a 400.
-        //
-        // That is what makes #153-LTV-R2's finding R2-3 — "the playlist is resolved from
-        // playlistId alone" — correct as source reading and NOT exploitable: nobody obtains the
-        // playlist text, so no capability digest can leak through it. It is neither a bearer
-        // credential leak nor a text leak, and `TheLegacyPlaylistRoute_RefusesEveryCaller` pins
-        // that. Un-inverting the guard would OPEN a route that is currently closed, which is the
-        // opposite of this branch's direction, so it is deliberately not repaired here.
-        //
-        // What IS repaired: the action no longer names the shared transcode folder at all. It used
-        // to compose `Path.Combine(transcodeFolderPath, playlistId + extension)` before rejecting
-        // the request, so the resolution existed even though nothing reached it. Now the only path
-        // it could ever build comes from a job binding, and it never gets that far.
-        var decision = _jobOwnership.AuthorizeByPlaylistId(HttpContext, playlistId);
-        if (decision.Binding is not { } binding || !decision.IsAuthorized)
-        {
-            return decision.Outcome == HlsJobOwnershipOutcome.NoSuchJob
-                ? NotFound("Hls segment not found.")
-                : Unauthorized();
-        }
-
-        if (!Guid.TryParse(itemId, out var routeItemId) || !routeItemId.Equals(binding.ItemId))
-        {
-            return Unauthorized();
-        }
-
-        var file = Path.GetFullPath(Path.Combine(
-            binding.CanonicalRoot,
-            string.Concat(playlistId, Path.GetExtension(Request.Path.Value.AsSpan()))));
-
-        if (!string.Equals(Path.GetDirectoryName(file), binding.CanonicalRoot, StringComparison.Ordinal)
-            || Path.GetExtension(file.AsSpan()).Equals(".m3u8", StringComparison.OrdinalIgnoreCase))
-        {
-            return BadRequest("Invalid segment.");
-        }
-
-        return GetFileResult(file, binding.CanonicalPlaylistPath);
-    }
-
-    /// <summary>
     /// Stops an active encoding.
     /// </summary>
     /// <param name="deviceId">The device id of the client requesting. It selects nothing: the caller's device is the one its credential was issued to.</param>
@@ -214,47 +87,6 @@ public class HlsSegmentController : BaseTesserafinApiController
             .ConfigureAwait(false);
         return NoContent();
     }
-
-    /// <summary>
-    /// Gets a hls video segment.
-    /// </summary>
-    /// <param name="itemId">The item id.</param>
-    /// <param name="playlistId">The playlist id.</param>
-    /// <param name="segmentId">The segment id.</param>
-    /// <param name="segmentContainer">The segment container.</param>
-    /// <response code="200">Hls video segment returned.</response>
-    /// <response code="404">Hls segment not found.</response>
-    /// <returns>A <see cref="FileStreamResult"/> containing the video segment.</returns>
-    // Same disposition as GetHlsAudioSegmentLegacy above: the exemption outlived its reason, and
-    // the route served video segments anonymously until this change.
-    [HttpGet("Videos/{itemId}/hls/{playlistId}/{segmentId}.{segmentContainer}")]
-    [Obsolete("Removed with the legacy playback chain (tesserafin#129 step 7): play through Playback/Sessions.")]
-    [Authorize(Policy = Policies.MediaDelivery)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesVideoFile]
-    [SuppressMessage("Microsoft.Performance", "CA1801:ReviewUnusedParameters", MessageId = "itemId", Justification = "Required for ServiceStack")]
-    // The media source is read from the request, exactly as `GetHlsPlaylistLegacy` above already
-    // does (#153-LTV-S1). It was `null`, and a null demand agrees only with a capability that is
-    // itself bound to no media source — so a client that mints one per media source, which is what
-    // the shipped web client does for a transcode, could never reach a single Live TV segment. The
-    // item binding still holds either way: this widens which capability satisfies the route, not
-    // which item it reaches.
-    // #153-LTV-R1: and the play session, which was null. ValidateCapability guards its
-    // play-session comparison with `if (demand.PlaySessionId is not null && …)`, so a null demand
-    // skipped the check entirely and LTV-R0 reached a segment with a capability minted under a
-    // play session the server had never issued — 200, 387 468 bytes. The propagator now writes the
-    // play session into every fragment uri, so the client can satisfy the demand without the
-    // capability's binding ever being read off the wire.
-    [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId")]
-    [RequiresVisibleItem("itemId")]
-    public ActionResult GetHlsVideoSegmentLegacy(
-        [FromRoute, Required] string itemId,
-        [FromRoute, Required] string playlistId,
-        [FromRoute, Required] string segmentId,
-        [FromRoute, Required] string segmentContainer)
-        => ServeOwnedVideoSegment(itemId, playlistId, segmentId, requiredPlaySessionId: null);
 
     /// <summary>
     /// Gets a segment of the live HLS output of a Live TV session the v2 engine decided
@@ -308,7 +140,7 @@ public class HlsSegmentController : BaseTesserafinApiController
         return ServeOwnedVideoSegment(itemId.ToString("N", CultureInfo.InvariantCulture), playlistId, segmentId, playSessionId);
     }
 
-    private ActionResult ServeOwnedVideoSegment(string itemId, string playlistId, string segmentId, string? requiredPlaySessionId)
+    internal ActionResult ServeOwnedVideoSegment(string itemId, string playlistId, string segmentId, string? requiredPlaySessionId)
     {
         // #153-LTV-R1, LTV-R0 finding 2. Nothing below derives the file from the caller's
         // parameters. The job is resolved from server state FIRST, the path is canonicalised

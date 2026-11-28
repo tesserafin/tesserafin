@@ -196,26 +196,6 @@ public sealed class HlsOwnershipMatrixTests : IDisposable
     }
 
     /// <summary>
-    /// The audio sibling, same matrix. It has no <c>playlistId</c>, so its job is selected by the
-    /// segment name — which is exactly the resolution finding R2-2 was about.
-    /// </summary>
-    /// <param name="row">The matrix row.</param>
-    /// <param name="expectedToBeServed">Whether the mission allows this caller through.</param>
-    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    [Theory]
-    [MemberData(nameof(Matrix))]
-    public async Task AudioSegmentFamily(Row row, bool expectedToBeServed)
-    {
-        // "Job A's credential for job B's resource" is expressed for this family as the segment
-        // name of a job that is not the caller's. Job B's file IS on disk (#153-LTV-R5), so the
-        // refusal is a decision rather than an absence.
-        foreach (var verb in new[] { Verb.Get, Verb.Head, Verb.Range })
-        {
-            await AssertRow(row, verb, expectedToBeServed, JobA + "0.aac", _audioBytes, Family.Audio).ConfigureAwait(true);
-        }
-    }
-
-    /// <summary>
     /// The dynamic family's verdict, taken directly from the authorizer member those routes call.
     /// </summary>
     /// <param name="row">The matrix row.</param>
@@ -268,9 +248,7 @@ public sealed class HlsOwnershipMatrixTests : IDisposable
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };
 
-        var result = family == Family.Video
-            ? controller.GetHlsVideoSegmentLegacy(_itemA.ToString("N"), JobA, segmentName, "ts")
-            : controller.GetHlsAudioSegmentLegacy(_itemA.ToString("N"), segmentName);
+        var result = controller.ServeOwnedVideoSegment(_itemA.ToString("N"), JobA, segmentName, requiredPlaySessionId: null);
 
         var body = new MemoryStream();
         httpContext.Response.Body = body;
@@ -381,15 +359,6 @@ public sealed class HlsOwnershipMatrixTests : IDisposable
         registry
             .Setup(r => r.ResolveByPlaylistId(It.IsAny<string>()))
             .Returns((string id) => jobIsGone || !string.Equals(id, JobA, StringComparison.Ordinal)
-                ? null
-                : Binding(JobA, _itemA));
-
-        // The server's real rule: a segment name belongs to the job whose playlist identifier
-        // prefixes it. Job B exists on disk but is not in this registry, so a name of job B
-        // resolves to nothing — which is the closed refusal, not a fallback to the folder.
-        registry
-            .Setup(r => r.ResolveBySegmentName(It.IsAny<string>()))
-            .Returns((string name) => jobIsGone || !name.StartsWith(JobA, StringComparison.Ordinal)
                 ? null
                 : Binding(JobA, _itemA));
 

@@ -32,8 +32,6 @@ public class MediaBoundaryStructuralTests
     /// <summary>Gets the routes the phase-0 inventory classified as playback media or auxiliary media.</summary>
     public static IReadOnlyList<(string Controller, string Action, PlaybackCapabilityScope Scope)> Declared { get; } = new[]
     {
-        ("VideosController", "GetVideoStream", PlaybackCapabilityScope.Media),
-        ("VideosController", "GetVideoStreamByContainer", PlaybackCapabilityScope.Media),
         // Consolidation step 1: the file route of a session the engine alone decided to direct play.
         ("PlaybackSessionFilesController", "GetPlaybackSessionFile", PlaybackCapabilityScope.Media),
         // Consolidation step 1: the HLS routes of a session the engine alone decided to remux.
@@ -44,18 +42,6 @@ public class MediaBoundaryStructuralTests
         ("HlsSegmentController", "GetPlaybackSessionLiveSegment", PlaybackCapabilityScope.Media),
         // Step 4: the progressive output of a session, for a client that declares no HLS output.
         ("PlaybackSessionProgressiveController", "GetPlaybackSessionProgressive", PlaybackCapabilityScope.Media),
-        ("AudioController", "GetAudioStream", PlaybackCapabilityScope.Media),
-        ("AudioController", "GetAudioStreamByContainer", PlaybackCapabilityScope.Media),
-        ("DynamicHlsController", "GetLiveHlsStream", PlaybackCapabilityScope.Media),
-        ("DynamicHlsController", "GetMasterHlsVideoPlaylist", PlaybackCapabilityScope.Media),
-        ("DynamicHlsController", "GetMasterHlsAudioPlaylist", PlaybackCapabilityScope.Media),
-        ("DynamicHlsController", "GetVariantHlsVideoPlaylist", PlaybackCapabilityScope.Media),
-        ("DynamicHlsController", "GetVariantHlsAudioPlaylist", PlaybackCapabilityScope.Media),
-        ("DynamicHlsController", "GetHlsVideoSegment", PlaybackCapabilityScope.Media),
-        ("DynamicHlsController", "GetHlsAudioSegment", PlaybackCapabilityScope.Media),
-        ("HlsSegmentController", "GetHlsPlaylistLegacy", PlaybackCapabilityScope.Media),
-        ("HlsSegmentController", "GetHlsAudioSegmentLegacy", PlaybackCapabilityScope.Media),
-        ("HlsSegmentController", "GetHlsVideoSegmentLegacy", PlaybackCapabilityScope.Media),
         ("SubtitleController", "GetSubtitle", PlaybackCapabilityScope.Subtitles),
 
         // A0's roster omitted this one. It carried [RequiresPlaybackCapability] and no policy, so

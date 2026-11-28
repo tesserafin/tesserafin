@@ -212,116 +212,9 @@ public sealed class HlsJobOwnershipTests : IDisposable
     // Legacy HLS audio segment: Audio/{itemId}/hls/{segmentId}/stream.mp3|.aac  (finding R2-2)
     // ---------------------------------------------------------------------------------------
 
-    /// <summary>
-    /// The audio sibling resolves its file from the caller-supplied <c>segmentId</c> alone, with
-    /// only a containment check against the flat transcode folder. It reads no job and no caller.
-    /// </summary>
-    /// <remarks>
-    /// #153-LTV-R5. The fixture now holds job B's audio segment as well as job A's, so the two
-    /// audio refusals below are separable: one is about WHO is asking, the other about WHICH job
-    /// owns the name, and neither can be satisfied by a file that simply is not there.
-    /// </remarks>
-    [Fact]
-    public void ADurableTokenOfAnotherUser_NeverReachesTheJobsAudioSegment()
-    {
-        var result = InvokeAudio(
-            callerUserId: _strangerUserId,
-            callerDeviceId: "stranger-device",
-            segmentId: JobA + "0");
-
-        Assert.False(
-            IsFileResultFor(result, JobA + "0.aac"),
-            "a durable token belonging to another user reached the job's audio segment bytes.");
-    }
-
-    /// <summary>
-    /// <c>segmentId</c> alone must never name a file. With no job owning the name, the answer is a
-    /// closed refusal — the route must not fall back to the flat transcode folder.
-    /// </summary>
-    /// <remarks>
-    /// #153-LTV-R5, repairing R4 finding F3. This test used to be vacuous twice over: the file it
-    /// asserts against was never written by the fixture, and it also passed <c>jobIsGone: true</c>,
-    /// so the whole registry was empty and "this NAME belongs to no job" was never the reason for
-    /// anything. Now job A is LIVE while the caller names job B's segment, and job B's segment file
-    /// really is on disk — so a resolution that fell back to the folder, or that selected the wrong
-    /// job, would serve it and this test would fail.
-    /// </remarks>
-    [Fact]
-    public void AnAudioSegmentNameOwnedByNoJob_IsNeverServed()
-    {
-        Assert.True(
-            File.Exists(Path.Combine(_transcodePath, JobB + "0.aac")),
-            "the fixture must really contain the file this test asserts is not served.");
-
-        var result = InvokeAudio(
-            callerUserId: _ownerUserId,
-            callerDeviceId: OwnerDevice,
-            segmentId: JobB + "0");
-
-        Assert.False(
-            IsFileResultFor(result, JobB + "0.aac"),
-            "a segment name owned by no active job resolved a file in the transcode folder.");
-    }
-
-    /// <summary>
-    /// Anti-vacuity for the two audio refusals: the job's own owner still reaches its own audio
-    /// segment.
-    /// </summary>
-    [Fact]
-    public void TheOwnersOwnDurableToken_StillReachesItsAudioSegment()
-    {
-        var result = InvokeAudio(
-            callerUserId: _ownerUserId,
-            callerDeviceId: OwnerDevice,
-            segmentId: JobA + "0");
-
-        Assert.True(
-            IsFileResultFor(result, JobA + "0.aac"),
-            "the owner could not read its own audio segment; the audio refusals would be vacuous.");
-    }
-
     // ---------------------------------------------------------------------------------------
     // Legacy HLS playlist: Videos/{itemId}/hls/{playlistId}/stream.m3u8  (finding R2-3)
     // ---------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// The legacy playlist route is unreachable, and this pins why.
-    /// </summary>
-    /// <remarks>
-    /// MEASURED, NOT ASSUMED. Upstream jellyfin b176beb88e ("Reduce string allocations") added the
-    /// guard <c>|| Path.GetExtension(file).Equals(".m3u8")</c> where the condition it replaced was
-    /// <c>!Path.GetExtension(file).Equals(".m3u8")</c>. The route literal is <c>stream.m3u8</c>, so
-    /// <c>Request.Path</c> always ends in <c>.m3u8</c>, so <c>file</c> always ends in <c>.m3u8</c>,
-    /// so the guard always fires. Every request to this route is a 400 whoever makes it.
-    ///
-    /// CONSEQUENCE FOR R2-3. The finding "the playlist is resolved from playlistId alone" is
-    /// correct as source reading and NOT exploitable: no caller can obtain the playlist text, so
-    /// no capability digest can leak through it and it is not a bearer-credential leak. The
-    /// inversion is deliberately NOT repaired here — un-inverting it would open a route that is
-    /// currently closed, which is the opposite of this branch's direction. It is pinned instead,
-    /// so that a later repair cannot silently open it without also crossing this test.
-    /// </remarks>
-    [Fact]
-    public void TheLegacyPlaylistRoute_RefusesEveryCaller()
-    {
-        // The owner reaches the authorizer, is authorized, and is then stopped by the inverted
-        // guard itself — which is the measurement that R2-3 is unreachable rather than merely
-        // unauthorized. A stranger never gets that far.
-        Assert.IsType<BadRequestObjectResult>(InvokePlaylist(_ownerUserId, OwnerDevice));
-        Assert.IsType<UnauthorizedResult>(InvokePlaylist(_strangerUserId, "stranger-device"));
-    }
-
-    /// <summary>
-    /// The playlist route no longer resolves anything from the shared transcode folder: with no
-    /// job owning the identifier, the answer is a closed refusal rather than a file.
-    /// </summary>
-    [Fact]
-    public void TheLegacyPlaylistRoute_ResolvesNothingWhenNoJobOwnsThePlaylist()
-    {
-        var result = InvokePlaylist(_ownerUserId, OwnerDevice, jobIsGone: true);
-
-        Assert.IsType<NotFoundObjectResult>(result);
-    }
 
     // ---------------------------------------------------------------------------------------
 
@@ -381,13 +274,9 @@ public sealed class HlsJobOwnershipTests : IDisposable
                 Generation: 1);
 
         // The registry stands in for the live job list: job A exists (unless the test says it is
-        // gone) and nothing else does. Both lookups the routes use are wired, so the audio route
-        // is exercised through the same job selection the server would do.
+        // gone) and nothing else does.
         var registry = new Mock<IHlsSegmentBindingRegistry>(MockBehavior.Loose);
         registry.Setup(r => r.ResolveByPlaylistId(JobA)).Returns(binding);
-        registry
-            .Setup(r => r.ResolveBySegmentName(It.IsAny<string>()))
-            .Returns((string name) => name.StartsWith(JobA, StringComparison.Ordinal) ? binding : null);
 
         var transcodeManager = new Mock<ITranscodeManager>(MockBehavior.Loose);
         transcodeManager
@@ -423,35 +312,7 @@ public sealed class HlsJobOwnershipTests : IDisposable
         };
 
         return Controller(httpContext, jobIsGone)
-            .GetHlsVideoSegmentLegacy(_itemA.ToString("N"), JobA, segmentId, "ts");
-    }
-
-    private ActionResult InvokeAudio(
-        Guid? callerUserId,
-        string? callerDeviceId,
-        string segmentId,
-        bool jobIsGone = false)
-    {
-        var httpContext = new DefaultHttpContext
-        {
-            Request = { Path = new PathString($"/Audio/{_itemA:N}/hls/{segmentId}/stream.aac") },
-            User = Principal(callerUserId, callerDeviceId, isApiKey: false, isAdministrator: false)
-        };
-
-        return Controller(httpContext, jobIsGone)
-            .GetHlsAudioSegmentLegacy(_itemA.ToString("N"), segmentId);
-    }
-
-    private ActionResult InvokePlaylist(Guid callerUserId, string callerDeviceId, bool jobIsGone = false)
-    {
-        var httpContext = new DefaultHttpContext
-        {
-            Request = { Path = new PathString($"/Videos/{_itemA:N}/hls/{JobA}/stream.m3u8") },
-            User = Principal(callerUserId, callerDeviceId, isApiKey: false, isAdministrator: false)
-        };
-
-        return Controller(httpContext, jobIsGone)
-            .GetHlsPlaylistLegacy(_itemA.ToString("N"), JobA);
+            .ServeOwnedVideoSegment(_itemA.ToString("N"), JobA, segmentId, requiredPlaySessionId: null);
     }
 
     public void Dispose()

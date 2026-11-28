@@ -110,7 +110,7 @@ public sealed class LiveTvSegmentPlaySessionBindingTests
     private static RequiresPlaybackCapabilityAttribute SegmentRouteDemand()
     {
         var action = typeof(HlsSegmentController)
-            .GetMethod(nameof(HlsSegmentController.GetHlsVideoSegmentLegacy), BindingFlags.Public | BindingFlags.Instance);
+            .GetMethod(nameof(HlsSegmentController.GetPlaybackSessionLiveSegment), BindingFlags.Public | BindingFlags.Instance);
         Assert.NotNull(action);
         var attribute = action!.GetCustomAttribute<RequiresPlaybackCapabilityAttribute>();
         Assert.NotNull(attribute);

@@ -51,10 +51,6 @@ public sealed class MediaRouteMetadataTests
     public static IReadOnlyDictionary<string, (PlaybackCapabilityScope Scope, string? ItemKey, string? MediaSourceKey, string? PlaySessionKey)> Roster { get; }
         = new Dictionary<string, (PlaybackCapabilityScope, string?, string?, string?)>(StringComparer.Ordinal)
         {
-            ["GET /Videos/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["HEAD /Videos/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Videos/{itemId}/stream.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["HEAD /Videos/{itemId}/stream.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             // Consolidation step 1: a direct-play session's file route. The session id names the session;
             // item, media source and play session are query values the action also matches against it.
             ["GET /Playback/Sessions/{id}/File"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
@@ -68,29 +64,6 @@ public sealed class MediaRouteMetadataTests
             ["GET /Playback/Sessions/{id}/Progressive.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["HEAD /Playback/Sessions/{id}/Progressive.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
             ["GET /Playback/Sessions/{id}/Hls/hls/{playlistId}/{segmentId}.{segmentContainer}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Audio/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["HEAD /Audio/{itemId}/stream"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Audio/{itemId}/stream.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["HEAD /Audio/{itemId}/stream.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Videos/{itemId}/live.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Videos/{itemId}/master.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["HEAD /Videos/{itemId}/master.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Audio/{itemId}/master.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["HEAD /Audio/{itemId}/master.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Videos/{itemId}/main.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Audio/{itemId}/main.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Videos/{itemId}/hls1/{playlistId}/{segmentId}.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Audio/{itemId}/hls1/{playlistId}/{segmentId}.{container}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Videos/{itemId}/hls/{playlistId}/stream.m3u8"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", null),
-            // #153-LTV-S1: the media source is read from the request here, as it already is on the
-            // legacy playlist route above. A null demand agrees only with a capability bound to no
-            // media source, which no Live TV transcode ever mints.
-            // #153-LTV-R1: the play-session key was null here, which made ValidateCapability skip
-            // its play-session comparison entirely. LTV-R0 reached a segment with a capability
-            // minted under a play session the server had never issued.
-            ["GET /Videos/{itemId}/hls/{playlistId}/{segmentId}.{segmentContainer}"] = (PlaybackCapabilityScope.Media, "itemId", "mediaSourceId", "playSessionId"),
-            ["GET /Audio/{itemId}/hls/{segmentId}/stream.mp3"] = (PlaybackCapabilityScope.Media, "itemId", null, null),
-            ["GET /Audio/{itemId}/hls/{segmentId}/stream.aac"] = (PlaybackCapabilityScope.Media, "itemId", null, null),
             ["GET /Videos/{routeItemId}/{routeMediaSourceId}/Subtitles/{routeIndex}/Stream.{routeFormat}"] = (PlaybackCapabilityScope.Subtitles, "routeItemId", "routeMediaSourceId", null),
             ["GET /Videos/{routeItemId}/{routeMediaSourceId}/Subtitles/{routeIndex}/{routeStartPositionTicks}/Stream.{routeFormat}"] = (PlaybackCapabilityScope.Subtitles, "routeItemId", "routeMediaSourceId", null),
             ["GET /Videos/{itemId}/{mediaSourceId}/Subtitles/{index}/subtitles.m3u8"] = (PlaybackCapabilityScope.Subtitles, "itemId", "mediaSourceId", null),
@@ -177,11 +150,11 @@ public sealed class MediaRouteMetadataTests
         var hidden = HiddenHlsEndpoints().ToArray();
 
         // Enumerated by controller type, not by path substring: a keyword filter over route
-        // templates finds thirteen and silently drops Videos/ActiveEncodings, which is an endpoint
-        // of these controllers just as much as the segment routes are. Sixteen since the two
-        // HLS routes of a remux session (Playback/Sessions/{id}/Hls/...) joined DynamicHlsController;
-        // eighteen since a Live TV session's live playlist and segment route joined them.
-        Assert.Equal(18, hidden.Length);
+        // templates would silently drop Videos/ActiveEncodings, which is an endpoint of these
+        // controllers just as much as the segment routes are. Five since the client-option routes
+        // went with the legacy chain (tesserafin#129 step 7): a session's HLS playlist, its
+        // segments, its live playlist and live segments, and ActiveEncodings.
+        Assert.Equal(5, hidden.Length);
 
         var anonymous = hidden
             .Where(endpoint => endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Count == 0

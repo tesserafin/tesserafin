@@ -94,8 +94,6 @@ namespace Tesserafin.Server
             serviceCollection.AddSingleton<IWebSocketManager, WebSocketManager>();
             serviceCollection.AddSingleton<IHlsJobOwnershipAuthorizer, HlsJobOwnershipAuthorizer>();
             serviceCollection.AddSingleton<PlaybackSessionDeliveryGuard>();
-            serviceCollection.AddScoped<AudioHelper>();
-            serviceCollection.AddScoped<DynamicHlsHelper>();
 
             // TODO search the assemblies instead of adding them manually?
             serviceCollection.AddSingleton<IWebSocketListener, SessionWebSocketListener>();

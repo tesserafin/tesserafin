@@ -161,7 +161,7 @@ public sealed class HlsRefusalOpensNothingTests : IDisposable
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };
 
-        return (controller.GetHlsVideoSegmentLegacy(_itemA.ToString("N"), JobA, JobA + "0", "ts"), httpContext);
+        return (controller.ServeOwnedVideoSegment(_itemA.ToString("N"), JobA, JobA + "0", requiredPlaySessionId: null), httpContext);
     }
 
     public void Dispose()

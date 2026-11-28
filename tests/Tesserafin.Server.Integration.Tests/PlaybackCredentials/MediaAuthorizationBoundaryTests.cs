@@ -37,24 +37,24 @@ public sealed class MediaAuthorizationBoundaryTests
 
     public static IEnumerable<object[]> AllRoutes()
         => MediaRouteCatalog
-            .For(Guid.Empty, string.Empty, MediaBoundaryFixture.SubtitleStreamIndex)
+            .For(Guid.Empty, string.Empty, MediaBoundaryFixture.SubtitleStreamIndex, MediaRouteSessions.None)
             .Select(route => new object[] { route.Name });
 
     public static IEnumerable<object[]> ItemBoundRoutes()
         => MediaRouteCatalog
-            .For(Guid.Empty, string.Empty, MediaBoundaryFixture.SubtitleStreamIndex)
+            .For(Guid.Empty, string.Empty, MediaBoundaryFixture.SubtitleStreamIndex, MediaRouteSessions.None)
             .Where(route => route.ItemBound)
             .Select(route => new object[] { route.Name });
 
     public static IEnumerable<object[]> PlaySessionBoundRoutes()
         => MediaRouteCatalog
-            .For(Guid.Empty, string.Empty, MediaBoundaryFixture.SubtitleStreamIndex)
+            .For(Guid.Empty, string.Empty, MediaBoundaryFixture.SubtitleStreamIndex, MediaRouteSessions.None)
             .Where(route => route.PlaySessionBound)
             .Select(route => new object[] { route.Name });
 
     public static IEnumerable<object[]> MediaSourceBoundRoutes()
         => MediaRouteCatalog
-            .For(Guid.Empty, string.Empty, MediaBoundaryFixture.SubtitleStreamIndex)
+            .For(Guid.Empty, string.Empty, MediaBoundaryFixture.SubtitleStreamIndex, MediaRouteSessions.None)
             .Where(route => route.MediaSourceBound)
             .Select(route => new object[] { route.Name });
 
@@ -68,21 +68,10 @@ public sealed class MediaAuthorizationBoundaryTests
     /// <returns>The route names.</returns>
     public static IEnumerable<object[]> MediaSourceInQueryRoutes()
         => MediaRouteCatalog
-            .For(Guid.Empty, string.Empty, MediaBoundaryFixture.SubtitleStreamIndex)
+            .For(Guid.Empty, string.Empty, MediaBoundaryFixture.SubtitleStreamIndex, MediaRouteSessions.None)
             .Where(route => route.MediaSourceBound
                 && route.Scope == PlaybackCapabilityScope.Media
                 && route.Path.Contains("mediaSourceId=", StringComparison.Ordinal))
-            .Select(route => new object[] { route.Name });
-
-    /// <summary>
-    /// Every MEDIA route that names no media source. A Fonts route names none either, but for a
-    /// different reason - it is minted item-less - so it belongs to a different property.
-    /// </summary>
-    /// <returns>The route names.</returns>
-    public static IEnumerable<object[]> MediaSourceUnboundMediaRoutes()
-        => MediaRouteCatalog
-            .For(Guid.Empty, string.Empty, MediaBoundaryFixture.SubtitleStreamIndex)
-            .Where(route => !route.MediaSourceBound && route.Scope == PlaybackCapabilityScope.Media)
             .Select(route => new object[] { route.Name });
 
     // ---------------------------------------------------------------------------------------
@@ -293,7 +282,8 @@ public sealed class MediaAuthorizationBoundaryTests
         var capability = await _fixture.MintAsync(
             [route.Scope],
             _fixture.OtherItemId,
-            route.MediaSourceBound ? _fixture.OtherMediaSourceId : null);
+            route.MediaSourceBound ? _fixture.OtherMediaSourceId : null,
+            playSessionId: route.PlaySessionId ?? MediaBoundaryFixture.DefaultPlaySession);
 
         using var client = _fixture.AnonymousClient();
         var (status, body) = await MediaBoundaryFixture.SendAsync(
@@ -325,7 +315,7 @@ public sealed class MediaAuthorizationBoundaryTests
     public async Task A_capability_minted_for_a_different_playback_is_refused(string routeName)
     {
         var route = Route(routeName);
-        var capability = await _fixture.MintAsync([route.Scope], _fixture.OtherItemId, _fixture.OtherMediaSourceId);
+        var capability = await _fixture.MintAsync([route.Scope], _fixture.OtherItemId, _fixture.OtherMediaSourceId, playSessionId: route.PlaySessionId ?? MediaBoundaryFixture.DefaultPlaySession);
 
         using var client = _fixture.AnonymousClient();
         var (status, body) = await MediaBoundaryFixture.SendAsync(
@@ -337,37 +327,9 @@ public sealed class MediaAuthorizationBoundaryTests
     }
 
     /// <summary>
-    /// The defect item 4 names first: a capability BOUND to a media source, presented on a route
-    /// that names none, was accepted because the demand was null and a null demand matched
-    /// anything. A binding that only holds when the route bothers to state it is not a binding.
-    /// </summary>
-    /// <returns>A task.</returns>
-    /// <param name="routeName">The route under test.</param>
-    [Theory]
-    [MemberData(nameof(MediaSourceUnboundMediaRoutes))]
-    public async Task A_media_source_bound_capability_is_refused_where_the_route_names_no_media_source(string routeName)
-    {
-        // A Theory over every media route that names none, not one route by name (#153-LTV-S1).
-        // It was pinned to "hls legacy segment"; when that route started naming a media source the
-        // property would have lost its only subject silently.
-        var route = Route(routeName);
-        Assert.False(route.MediaSourceBound, "This test needs a route that names no media source.");
-
-        var capability = await _fixture.MintAsync([PlaybackCapabilityScope.Media], _fixture.ItemId, _fixture.MediaSourceId);
-
-        using var client = _fixture.AnonymousClient();
-        var (status, body) = await MediaBoundaryFixture.SendAsync(
-            client,
-            route.Method,
-            route.WithQuery("playbackCapability", Uri.EscapeDataString(capability.Value)));
-
-        AssertRefused(status, body, route, "a media-source-bound capability on a route that names no media source");
-    }
-
-    /// <summary>
-    /// #153-LTV-S1. The theory below must never run over an empty set. The legacy HLS video
-    /// segment route is the one this stage put there; if it ever stops naming a media source in
-    /// the query, the property loses its subject and this fails rather than passing vacuously.
+    /// #153-LTV-S1. The theory below must never run over an empty set. The session routes name
+    /// their media source in the query; if they ever stop, the property loses its subject and this
+    /// fails rather than passing vacuously.
     /// </summary>
     [Fact]
     public void TheMediaSourceInQueryRoutes_AreNotEmpty()
@@ -375,7 +337,7 @@ public sealed class MediaAuthorizationBoundaryTests
         var names = MediaSourceInQueryRoutes().Select(row => (string)row[0]).ToList();
 
         Assert.NotEmpty(names);
-        Assert.Contains("hls legacy segment", names);
+        Assert.Contains("session file", names);
     }
 
     /// <summary>
@@ -392,7 +354,7 @@ public sealed class MediaAuthorizationBoundaryTests
     {
         var route = Route(routeName);
 
-        var capability = await _fixture.MintAsync([route.Scope], _fixture.ItemId, _fixture.MediaSourceId);
+        var capability = await _fixture.MintAsync([route.Scope], _fixture.ItemId, _fixture.MediaSourceId, playSessionId: route.PlaySessionId ?? MediaBoundaryFixture.DefaultPlaySession);
 
         // The media source is REPLACED, never appended: two `mediaSourceId` values would arrive as
         // one comma-joined string, which refuses for a reason that has nothing to do with the
@@ -427,7 +389,7 @@ public sealed class MediaAuthorizationBoundaryTests
             return;
         }
 
-        var capability = await _fixture.MintAsync([route.Scope], _fixture.ItemId, mediaSourceId: null);
+        var capability = await _fixture.MintAsync([route.Scope], _fixture.ItemId, mediaSourceId: null, playSessionId: route.PlaySessionId ?? MediaBoundaryFixture.DefaultPlaySession);
 
         using var client = _fixture.AnonymousClient();
         var (status, body) = await MediaBoundaryFixture.SendAsync(
@@ -439,7 +401,7 @@ public sealed class MediaAuthorizationBoundaryTests
     }
 
     /// <summary>
-    /// The eleven routes that expose <c>playSessionId</c> compare it. A capability is bound to one
+    /// Every route that exposes <c>playSessionId</c> compare it. A capability is bound to one
     /// playback; naming a different one in the URL is a claim about somebody else's.
     /// </summary>
     /// <remarks>
@@ -456,13 +418,16 @@ public sealed class MediaAuthorizationBoundaryTests
     public async Task A_capability_bound_to_another_play_session_is_refused(string routeName)
     {
         var route = Route(routeName);
-        const string Owned = "r1-owned-play-session";
+
+        // A session route names its session's own play session, and a session serves only that
+        // one: the capability is minted for it, and the request names it, or another one, or none.
+        var owned = route.PlaySessionId ?? "r1-owned-play-session";
 
         var capability = await _fixture.MintAsync(
             [route.Scope],
             _fixture.ItemId,
             route.MediaSourceBound ? _fixture.MediaSourceId : null,
-            Owned);
+            owned);
 
         var withCapability = route.WithQuery("playbackCapability", Uri.EscapeDataString(capability.Value));
 
@@ -471,14 +436,14 @@ public sealed class MediaAuthorizationBoundaryTests
             var (status, _) = await MediaBoundaryFixture.SendAsync(
                 matching,
                 route.Method,
-                withCapability + "&playSessionId=" + Owned);
+                WithPlaySession(withCapability, owned));
 
             AssertReachedTheAction(status, route, "a capability naming its own play session");
         }
 
         using (var absent = _fixture.AnonymousClient())
         {
-            var (status, _) = await MediaBoundaryFixture.SendAsync(absent, route.Method, withCapability);
+            var (status, _) = await MediaBoundaryFixture.SendAsync(absent, route.Method, WithPlaySession(withCapability, null));
 
             AssertReachedTheAction(status, route, "a request that named no play session at all");
         }
@@ -487,7 +452,7 @@ public sealed class MediaAuthorizationBoundaryTests
         var (refused, body) = await MediaBoundaryFixture.SendAsync(
             client,
             route.Method,
-            withCapability + "&playSessionId=someone-elses-playback");
+            WithPlaySession(withCapability, "someone-elses-playback"));
 
         AssertRefused(refused, body, route, "a capability bound to a different play session");
     }
@@ -516,7 +481,8 @@ public sealed class MediaAuthorizationBoundaryTests
         var capability = await _fixture.MintAsync(
             [wrongScope],
             _fixture.ItemId,
-            route.MediaSourceBound && route.Scope != PlaybackCapabilityScope.Fonts ? _fixture.MediaSourceId : null);
+            route.MediaSourceBound && route.Scope != PlaybackCapabilityScope.Fonts ? _fixture.MediaSourceId : null,
+            playSessionId: route.PlaySessionId ?? MediaBoundaryFixture.DefaultPlaySession);
 
         using var client = _fixture.AnonymousClient();
         var (status, body) = await MediaBoundaryFixture.SendAsync(
@@ -562,6 +528,25 @@ public sealed class MediaAuthorizationBoundaryTests
         Assert.True(
             status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden,
             $"GET {path} with the capability in '{key}' answered {(int)status}. A capability must never authenticate a general endpoint.");
+    }
+
+    /// <summary>
+    /// Names <paramref name="playSessionId"/> as the request's play session, REPLACING the one the
+    /// route already names (two values would arrive as one comma-joined string and be refused for
+    /// a reason unrelated to the binding), or naming none at all.
+    /// </summary>
+    private static string WithPlaySession(string path, string? playSessionId)
+    {
+        var named = System.Text.RegularExpressions.Regex.Replace(path, "[?&]playSessionId=[^&]*", string.Empty);
+        if (named.Contains('&', StringComparison.Ordinal) && !named.Contains('?', StringComparison.Ordinal))
+        {
+            var first = named.IndexOf('&', StringComparison.Ordinal);
+            named = string.Concat(named.AsSpan(0, first), "?", named.AsSpan(first + 1));
+        }
+
+        return playSessionId is null
+            ? named
+            : named + (named.Contains('?', StringComparison.Ordinal) ? '&' : '?') + "playSessionId=" + playSessionId;
     }
 
     private MediaRoute Route(string name)

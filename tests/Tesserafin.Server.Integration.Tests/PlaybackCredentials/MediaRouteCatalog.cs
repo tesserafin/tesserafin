@@ -17,40 +17,43 @@ namespace Tesserafin.Server.Integration.Tests.PlaybackCredentials;
 public static class MediaRouteCatalog
 {
     /// <summary>
+    /// The play sessions the fixture's sessions are created under, one each: a second session a
+    /// user creates under the same play session REPLACES the first.
+    /// </summary>
+    public const string FilePlaySession = "r1-session-file";
+
+    /// <summary>The progressive session's play session.</summary>
+    public const string ProgressivePlaySession = "r1-session-progressive";
+
+    /// <summary>The HLS session's play session.</summary>
+    public const string HlsPlaySession = "r1-session-hls";
+
+    /// <summary>
     /// Builds the catalogue for one seeded fixture.
     /// </summary>
     /// <param name="itemId">The seeded item.</param>
     /// <param name="mediaSourceId">That item's media source id.</param>
     /// <param name="subtitleStreamIndex">The index of the fixture's external subtitle stream.</param>
+    /// <param name="sessions">The sessions the session routes are addressed through.</param>
     /// <returns>Every media route, bound to the fixture.</returns>
-    public static IReadOnlyList<MediaRoute> For(Guid itemId, string mediaSourceId, int subtitleStreamIndex)
+    public static IReadOnlyList<MediaRoute> For(Guid itemId, string mediaSourceId, int subtitleStreamIndex, MediaRouteSessions sessions)
     {
+        ArgumentNullException.ThrowIfNull(sessions);
         var item = itemId.ToString("D", CultureInfo.InvariantCulture);
         var subtitle = subtitleStreamIndex.ToString(CultureInfo.InvariantCulture);
+        string Binding(string playSession) => $"itemId={item}&mediaSourceId={mediaSourceId}&playSessionId={playSession}";
+        string Session(Guid id) => id.ToString("N", CultureInfo.InvariantCulture);
 
         return
         [
-            new("direct video", "direct video", PlaybackCapabilityScope.Media, "GET", $"/Videos/{item}/stream?static=true&mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Bytes),
-            new("direct video by container", "direct video", PlaybackCapabilityScope.Media, "GET", $"/Videos/{item}/stream.mp4?static=true&mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Bytes),
-            new("direct video HEAD", "Range/HEAD", PlaybackCapabilityScope.Media, "HEAD", $"/Videos/{item}/stream?static=true&mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),
-            new("direct audio", "direct audio", PlaybackCapabilityScope.Media, "GET", $"/Audio/{item}/stream?static=true&mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Bytes),
-            new("direct audio by container", "direct audio", PlaybackCapabilityScope.Media, "GET", $"/Audio/{item}/stream.mp4?static=true&mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Bytes),
-            new("hls master video", "HLS master", PlaybackCapabilityScope.Media, "GET", $"/Videos/{item}/master.m3u8?mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),
-            new("hls master audio", "HLS master", PlaybackCapabilityScope.Media, "GET", $"/Audio/{item}/master.m3u8?mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),
-            new("hls variant video", "HLS variant", PlaybackCapabilityScope.Media, "GET", $"/Videos/{item}/main.m3u8?mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),
-            new("hls variant audio", "HLS variant", PlaybackCapabilityScope.Media, "GET", $"/Audio/{item}/main.m3u8?mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),
-            new("hls live", "HLS variant", PlaybackCapabilityScope.Media, "GET", $"/Videos/{item}/live.m3u8?mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),
-            new("hls segment video", "HLS segment", PlaybackCapabilityScope.Media, "GET", $"/Videos/{item}/hls1/main/0.mp4?mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),
-            new("hls segment audio", "HLS segment", PlaybackCapabilityScope.Media, "GET", $"/Audio/{item}/hls1/main/0.mp4?mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),
-            new("hls legacy playlist", "HLS variant", PlaybackCapabilityScope.Media, "GET", $"/Videos/{item}/hls/main/stream.m3u8?mediaSourceId={mediaSourceId}", true, true, false, MediaRouteEvidence.Entry),
-            // #153-LTV-S1: the video segment route now reads `mediaSourceId` from the request, as
-            // the legacy playlist route above already did. The two audio segment routes below still
-            // name none, so the "bound capability on a route that names no media source" property
-            // keeps its witnesses.
-            // #153-LTV-R1: and the play session, which was not named at all.
-            new("hls legacy segment", "HLS segment", PlaybackCapabilityScope.Media, "GET", $"/Videos/{item}/hls/main/0.ts?mediaSourceId={mediaSourceId}", true, true, true, MediaRouteEvidence.Entry),
-            new("hls legacy audio mp3", "HLS segment", PlaybackCapabilityScope.Media, "GET", $"/Audio/{item}/hls/seg/stream.mp3", true, false, false, MediaRouteEvidence.Entry),
-            new("hls legacy audio aac", "HLS segment", PlaybackCapabilityScope.Media, "GET", $"/Audio/{item}/hls/seg/stream.aac", true, false, false, MediaRouteEvidence.Entry),
+            // The session routes (tesserafin#129 step 7: a session plays from these alone). Each
+            // names its item, media source and play session in the query, and each is checked
+            // against its session's owner and retained plan after the capability.
+            new("session file", "session file", PlaybackCapabilityScope.Media, "GET", $"/Playback/Sessions/{Session(sessions.File)}/File?{Binding(FilePlaySession)}", true, true, true, MediaRouteEvidence.Bytes, FilePlaySession),
+            new("session file HEAD", "Range/HEAD", PlaybackCapabilityScope.Media, "HEAD", $"/Playback/Sessions/{Session(sessions.File)}/File?{Binding(FilePlaySession)}", true, true, true, MediaRouteEvidence.Entry, FilePlaySession),
+            new("session progressive", "session progressive", PlaybackCapabilityScope.Media, "GET", $"/Playback/Sessions/{Session(sessions.Progressive)}/Progressive.ts?{Binding(ProgressivePlaySession)}", true, true, true, MediaRouteEvidence.Entry, ProgressivePlaySession),
+            new("session hls playlist", "HLS variant", PlaybackCapabilityScope.Media, "GET", $"/Playback/Sessions/{Session(sessions.Hls)}/Hls/main.m3u8?{Binding(HlsPlaySession)}", true, true, true, MediaRouteEvidence.Entry, HlsPlaySession),
+            new("session hls segment", "HLS segment", PlaybackCapabilityScope.Media, "GET", $"/Playback/Sessions/{Session(sessions.Hls)}/Hls/hls1/main/0.ts?runtimeTicks=0&actualSegmentLengthTicks=0&{Binding(HlsPlaySession)}", true, true, true, MediaRouteEvidence.Entry, HlsPlaySession),
             new("subtitle stream", "subtitle", PlaybackCapabilityScope.Subtitles, "GET", $"/Videos/{item}/{mediaSourceId}/Subtitles/{subtitle}/Stream.vtt", true, true, false, MediaRouteEvidence.Bytes),
             new("subtitle stream from position", "subtitle", PlaybackCapabilityScope.Subtitles, "GET", $"/Videos/{item}/{mediaSourceId}/Subtitles/{subtitle}/0/Stream.vtt", true, true, false, MediaRouteEvidence.Bytes),
             new("subtitle playlist", "subtitle", PlaybackCapabilityScope.Subtitles, "GET", $"/Videos/{item}/{mediaSourceId}/Subtitles/{subtitle}/subtitles.m3u8?segmentLength=10", true, true, false, MediaRouteEvidence.Entry),

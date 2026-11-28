@@ -24,7 +24,8 @@ public sealed record MediaRoute(
     bool ItemBound,
     bool MediaSourceBound,
     bool PlaySessionBound,
-    MediaRouteEvidence Evidence)
+    MediaRouteEvidence Evidence,
+    string? PlaySessionId = null)
 {
     /// <summary>
     /// Appends a query parameter to this route's path, choosing the right separator.

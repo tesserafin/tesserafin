@@ -6,9 +6,7 @@ namespace Tesserafin.Api.Models.PlaybackSessionDtos;
 /// <summary>
 /// PR117 (docs/pr116d-url-contract-design.md §2.2): the companion, client-facing descriptor of the
 /// executable URL for a session already planned via <c>Playback/Sessions</c> - returned only from
-/// <c>GET Playback/Sessions/{id}/Stream</c>, never composed into <see cref="PlaybackSessionListItem"/>
-/// or <see cref="PlaybackDiagnosticDetail"/> (design doc §1.4: those two reach the admin-elevated,
-/// cross-user diagnostics surface). Neither URL carries a credential: the client authenticates
+/// <c>GET Playback/Sessions/{id}/Stream</c>. Neither URL carries a credential: the client authenticates
 /// each request for the resource with its own session or a playback capability.
 /// </summary>
 /// <param name="Url">
@@ -50,7 +48,7 @@ namespace Tesserafin.Api.Models.PlaybackSessionDtos;
 /// <c>Content-Type</c> header - <c>application/vnd.apple.mpegurl</c> on
 /// <see cref="StreamingProtocol.Hls"/> (the playlist's type, not the segments'), otherwise
 /// <c>MimeTypes.GetMimeType("." + Container)</c>, the same call
-/// <c>VideosController</c>/<c>AudioHelper</c> make on the container they actually write. Reported
+/// the removed client-option stream routes make on the container they actually write. Reported
 /// rather than re-derived client-side so the announced type can never disagree with the response
 /// the URL will really produce. <see langword="null"/> when no container is known, or when no
 /// mapping exists for it.

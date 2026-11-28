@@ -174,58 +174,6 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         await AssertUrlServes200Async(descriptor.Url, "Remux/DirectStream");
     }
 
-    /// <summary>
-    /// Scenario 3: Transcode to HLS - manifest AND at least one real segment.
-    /// </summary>
-    /// <remarks>
-    /// <b>Root-caused and fixed, not papered over.</b> This scenario used to hang past both its own
-    /// <see cref="FactAttribute.Timeout"/> and <see cref="CreateBoundedCancellation"/>'s per-call
-    /// bound: the real ffmpeg process completes in well under a second and writes a complete, valid
-    /// VOD <c>.m3u8</c> (<c>#EXT-X-ENDLIST</c>) plus its <c>.ts</c> segment to disk, but the segment
-    /// HTTP request never returned. Root cause, confirmed by instrumenting
-    /// <c>DynamicHlsController.GetSegmentResult</c>'s readiness-wait loop directly: <c>Process.Exited</c>
-    /// fires <c>TranscodeManager.OnFfMpegProcessExited</c>, which sets <c>job.HasExited = true</c> and
-    /// then immediately calls <c>job.Dispose()</c> - and <see cref="TranscodingJob.Dispose"/> used to
-    /// null out <see cref="TranscodingJob.CurrentAttempt"/> as part of that cleanup, which silently
-    /// reverted <c>job.HasExited</c>'s getter (<c>CurrentAttempt?.HasExited ?? false</c>) back to
-    /// <c>false</c> the instant <c>Dispose()</c> ran - even though the process had genuinely already
-    /// exited. <c>GetSegmentResult</c>'s <c>while (!transcodingJob.HasExited)</c> readiness loop can
-    /// then never exit on its own condition again, and - for this fixture, which produces exactly one
-    /// segment - its "or the next segment appeared" alternative never becomes true either, so the
-    /// request hung forever even though the file it needed to serve was already complete and correct
-    /// on disk. Fixed at the source in <see cref="TranscodingJob.Dispose"/> (stopped nulling
-    /// <c>CurrentAttempt</c> - nothing else in the codebase reads it, so the seam for a future
-    /// multi-attempt fallback wasn't lost). <see cref="CreateBoundedCancellation"/>'s per-call bound is
-    /// kept as defense in depth (a genuinely stuck request - e.g. a real transcode failure - should
-    /// still fail this test fast rather than hang the run), not because it is still needed to survive
-    /// this particular bug.
-    /// </remarks>
-    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Fact(Timeout = 90_000)]
-    public async Task Transcode_Hls_PostThenGetStream_ServesManifestAndSegment()
-    {
-        // A transcode the local video journey executes from the session never reaches this chain
-        // (TranscodeFilmEndToEndTests), and one it does not execute is refused by the session. This is
-        // the existing chain's contract - master playlist, then variant, then segment - reached through
-        // its remaining caller, PlaybackInfo, for a target the session journey does not execute (MP3).
-        var itemId = LibraryItemSeeder.SeedVideo(_factory.Services.GetRequiredService<IItemWriteCommands>(), _mediaStreamRepository, _fixturePath, "mp4", _baseStreams, $"PR119 transcode fixture {Guid.NewGuid()}");
-        var descriptor = new { Url = LegacyHlsRoute.MasterUrl(_client, itemId) };
-
-        var masterManifest = await GetTextAsync(descriptor.Url, "HLS master playlist");
-        Assert.Contains("#EXTM3U", masterManifest, StringComparison.Ordinal);
-
-        var variantUrl = FirstUriLine(masterManifest, descriptor.Url)
-            ?? throw new InvalidOperationException($"HLS master playlist named no variant. Content:\n{masterManifest}");
-
-        var mediaPlaylist = await GetTextWithRetryAsync(variantUrl, "HLS media playlist", TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
-        Assert.Contains("#EXTINF", mediaPlaylist, StringComparison.Ordinal);
-
-        var segmentUrl = FirstUriLine(mediaPlaylist, variantUrl)
-            ?? throw new InvalidOperationException($"HLS media playlist named no segment. Content:\n{mediaPlaylist}");
-
-        await AssertUrlServes200Async(segmentUrl, "HLS segment", minBytes: 1);
-    }
-
     /// <summary>Scenario 4: an external subtitle sidecar is named on the descriptor and itself servable.</summary>
     /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
     [Fact]

@@ -25,25 +25,6 @@ public interface IHlsSegmentBindingRegistry
     HlsSegmentBinding? ResolveByPlaylistId(string playlistId);
 
     /// <summary>
-    /// Returns the binding of the job that owns a segment file name, or <see langword="null"/>
-    /// if no active job does (#153-LTV-R3).
-    /// </summary>
-    /// <remarks>
-    /// For <c>Audio/{itemId}/hls/{segmentId}/stream.mp3</c> and its <c>.aac</c> sibling, which
-    /// name no playlist at all. #153-LTV-R2 found that route resolving
-    /// <c>Path.Combine(transcodeFolderPath, segmentId + extension)</c> from the caller-supplied
-    /// segment name alone, with only a containment check against a folder every job shares.
-    ///
-    /// ffmpeg is told to write a job's segments as <c>{playlistId}%d.{ext}</c>, so a segment name
-    /// belongs to the job whose playlist identifier prefixes it. That prefix is the ONLY thing the
-    /// caller's string is used for: it picks a candidate job, and every path afterwards is built
-    /// from that job's own canonical root.
-    /// </remarks>
-    /// <param name="segmentName">The segment file name, without extension, the route named.</param>
-    /// <returns>The binding, or <see langword="null"/>.</returns>
-    HlsSegmentBinding? ResolveBySegmentName(string segmentName);
-
-    /// <summary>
     /// Returns the binding of the job that writes a given output path, or <see langword="null"/>
     /// if no active job does (#153-LTV-R3).
     /// </summary>

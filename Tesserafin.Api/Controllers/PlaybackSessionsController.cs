@@ -37,11 +37,8 @@ namespace Tesserafin.Api.Controllers;
 /// The client-facing playback session protocol (docs/pr92-design-playback-api-and-diagnostics.md
 /// §2-3): create, fully replace, and end a session. Responses are the stable, versioned
 /// <see cref="PlaybackSessionResponse"/> (PR91 decision vocabulary), never the internal
-/// <see cref="PlaybackSession"/> record. The admin-only listing/diagnostic surface this controller
-/// used to also expose has moved to <see cref="PlaybackDiagnosticsSessionsController"/> — it never
-/// shared this controller's public or authorization scope, only its route. Since PR115a, responses
-/// reflect the v2 decision (<c>DecisionVersion</c> = the real engine version) for sessions the
-/// canary made v2-authoritative, and the legacy projection otherwise.
+/// <see cref="PlaybackSession"/> record. Responses reflect the engine's decision
+/// (<c>DecisionVersion</c> = the real engine version): it is the only planner (tesserafin#129 step 7).
 /// </summary>
 [Route("Playback/Sessions")]
 [Authorize]

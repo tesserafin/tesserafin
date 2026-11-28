@@ -318,8 +318,8 @@
         },
         {
           "file": "Tesserafin.Api/Controllers/DynamicHlsController.cs",
-          "find": "        return Content(playlistText, MimeTypes.GetMimeType(\"playlist.m3u8\"));\n    }\n\n    /// <summary>\n    /// Gets a video hls playlist stream.",
-          "replace": "        return Content(playlistText, MimeTypes.GetMimeType(\"playlist.m3u8\"));\n    }\n\n    private static string NotPropagated(string manifest, string value, string? mediaSourceId, Uri origin, string? playSessionId)\n        => manifest;\n\n    /// <summary>\n    /// Gets a video hls playlist stream."
+          "find": "        return Content(playlistText, MimeTypes.GetMimeType(\"playlist.m3u8\"));\n    }\n\n    // Resolves the StreamState for a streaming request.",
+          "replace": "        return Content(playlistText, MimeTypes.GetMimeType(\"playlist.m3u8\"));\n    }\n\n    private static string NotPropagated(string manifest, string value, string? mediaSourceId, Uri origin, string? playSessionId)\n        => manifest;\n\n    // Resolves the StreamState for a streaming request."
         }
       ],
       "historicalMutations": [
@@ -840,7 +840,6 @@
         "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests",
         "expectedTests": [
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.VideoSegmentFamily",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.AudioSegmentFamily",
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.DynamicFamilyVerdict"
         ]
       },
@@ -874,7 +873,6 @@
         "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests",
         "expectedTests": [
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.VideoSegmentFamily",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.AudioSegmentFamily",
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.DynamicFamilyVerdict"
         ]
       },
@@ -899,7 +897,6 @@
         "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests",
         "expectedTests": [
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.VideoSegmentFamily",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.AudioSegmentFamily",
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.DynamicFamilyVerdict"
         ]
       },
@@ -924,7 +921,6 @@
         "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests",
         "expectedTests": [
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.VideoSegmentFamily",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.AudioSegmentFamily",
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.DynamicFamilyVerdict"
         ]
       },
@@ -954,7 +950,6 @@
         "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests",
         "expectedTests": [
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.VideoSegmentFamily",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.AudioSegmentFamily",
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.DynamicFamilyVerdict"
         ]
       },
@@ -965,107 +960,6 @@
           "replace": "        if (user.GetIsApiKey())\n        {\n            return true;\n        }"
         }
       ]
-    },
-    {
-      "id": "r3-remove-the-audio-route-authorizer",
-      "stage": "R3",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "the audio sibling refuses a caller who is not the job owner",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests",
-        "expectedTests": [
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.VideoSegmentFamily",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.AudioSegmentFamily",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.DynamicFamilyVerdict"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Auth/HlsJobOwnership/HlsJobOwnershipAuthorizer.cs",
-          "find": "    public HlsJobOwnershipDecision AuthorizeBySegmentName(HttpContext context, string segmentName)\n        => Decide(context, _bindings.ResolveBySegmentName(segmentName));",
-          "replace": "    public HlsJobOwnershipDecision AuthorizeBySegmentName(HttpContext context, string segmentName)\n        => _bindings.ResolveBySegmentName(segmentName) is { } unchecked_\n            ? HlsJobOwnershipDecision.Authorized(unchecked_)\n            : HlsJobOwnershipDecision.NoSuchJob();"
-        }
-      ],
-      "note": "The mutation removes the authorization from the AUDIO member itself rather than from the guard clause in the action. The first draft deleted `|| !decision.IsAuthorized` from the action and graded INERT, which is a fact about the design worth recording: a refused decision carries NO binding, so `decision.Binding is not { } binding` refuses on its own and the IsAuthorized clause is a second lock on the same door. Removing one lock is not removing the door — so the control now removes the door."
-    },
-    {
-      "id": "r3-remove-the-playlist-route-authorizer",
-      "stage": "R3",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "the legacy playlist route refuses a caller who is not the job owner (this member also serves the legacy video segment route, so the mutation removes the authorizer from both)",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsJobOwnershipTests.TheLegacyPlaylistRoute",
-        "expectedTests": [
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsJobOwnershipTests.TheLegacyPlaylistRoute_RefusesEveryCaller",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsJobOwnershipTests.TheLegacyPlaylistRoute_ResolvesNothingWhenNoJobOwnsThePlaylist"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Auth/HlsJobOwnership/HlsJobOwnershipAuthorizer.cs",
-          "find": "    public HlsJobOwnershipDecision AuthorizeByPlaylistId(HttpContext context, string playlistId)\n        => Decide(context, _bindings.ResolveByPlaylistId(playlistId));",
-          "replace": "    public HlsJobOwnershipDecision AuthorizeByPlaylistId(HttpContext context, string playlistId)\n        => _bindings.ResolveByPlaylistId(playlistId) is { } unchecked_\n            ? HlsJobOwnershipDecision.Authorized(unchecked_)\n            : HlsJobOwnershipDecision.NoSuchJob();"
-        }
-      ],
-      "note": "Same reasoning as the audio control. AuthorizeByPlaylistId is shared by the playlist and the video segment routes, so this mutation is wider than the mission words it; the gate filter names the playlist tests, which is where the mission asks for the evidence."
-    },
-    {
-      "id": "r3-resolve-from-segment-id-alone",
-      "stage": "R3",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "a segment name never names a file: it only selects a job",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "inventory",
-        "script": "ci/hls-job-backed-route-inventory.sh"
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Controllers/HlsSegmentController.cs",
-          "find": "    public HlsSegmentController(\n        ITranscodeManager transcodeManager,",
-          "replace": "    public HlsSegmentController(\n        IServerConfigurationManager serverConfigurationManager,\n        ITranscodeManager transcodeManager,"
-        },
-        {
-          "file": "Tesserafin.Api/Controllers/HlsSegmentController.cs",
-          "find": "        var file = Path.GetFullPath(Path.Combine(\n            binding.CanonicalRoot,\n            string.Concat(segmentId, Path.GetExtension(Request.Path.Value.AsSpan()))));\n\n        if (!string.Equals(Path.GetDirectoryName(file), binding.CanonicalRoot, StringComparison.Ordinal))\n        {\n            return BadRequest(\"Invalid segment.\");\n        }\n\n        if (!NamesASegmentOf(binding, file))\n        {\n            return NotFound(\"Hls segment not found.\");\n        }\n\n        return FileStreamResponseHelpers.GetStaticFileResult(file, MimeTypes.GetMimeType(file));",
-          "replace": "        var file = Path.GetFullPath(Path.Combine(\n            _serverConfigurationManager.GetTranscodePath(),\n            string.Concat(segmentId, Path.GetExtension(Request.Path.Value.AsSpan()))));\n\n        return FileStreamResponseHelpers.GetStaticFileResult(file, MimeTypes.GetMimeType(file));"
-        }
-      ],
-      "note": "Graded by the source gate: the gate asserts every Path.Combine in this controller is rooted in the binding canonical root, and that the controller cannot name the shared transcode folder at all."
-    },
-    {
-      "id": "r3-resolve-from-playlist-id-alone",
-      "stage": "R3",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "a playlist identifier never names a file: it only selects a job",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "inventory",
-        "script": "ci/hls-job-backed-route-inventory.sh"
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Controllers/HlsSegmentController.cs",
-          "find": "    public HlsSegmentController(\n        ITranscodeManager transcodeManager,",
-          "replace": "    public HlsSegmentController(\n        IServerConfigurationManager serverConfigurationManager,\n        ITranscodeManager transcodeManager,"
-        },
-        {
-          "file": "Tesserafin.Api/Controllers/HlsSegmentController.cs",
-          "find": "        var file = Path.GetFullPath(Path.Combine(\n            binding.CanonicalRoot,\n            string.Concat(playlistId, Path.GetExtension(Request.Path.Value.AsSpan()))));",
-          "replace": "        var file = Path.GetFullPath(Path.Combine(\n            _serverConfigurationManager.GetTranscodePath(),\n            string.Concat(playlistId, Path.GetExtension(Request.Path.Value.AsSpan()))));"
-        }
-      ],
-      "note": "Same gate, same reason, on the playlist action."
     },
     {
       "id": "r3-open-the-file-before-authorizing",
@@ -1100,7 +994,6 @@
         "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests",
         "expectedTests": [
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.VideoSegmentFamily",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.AudioSegmentFamily",
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.DynamicFamilyVerdict"
         ]
       },
@@ -1126,7 +1019,6 @@
         "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests",
         "expectedTests": [
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.VideoSegmentFamily",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.AudioSegmentFamily",
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.HlsOwnershipMatrixTests.DynamicFamilyVerdict"
         ]
       },
@@ -1152,7 +1044,6 @@
         "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership",
         "expectedTests": [
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.ActiveEncodingsOwnershipTests",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests",
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsOwnershipCallSiteTests",
           "Tesserafin.Api.Tests.LiveTvSegmentOwnership.InFlightRevocationTests"
         ]
@@ -1210,87 +1101,6 @@
         }
       ],
       "note": "R4 finding F1, half two. Neutering the implementation and blinding the call site are different failures and both were invisible; both are pinned separately. POLISH-2-R4: the action no longer looks one job up and decides for all of them - it hands the manager the question to put to each job - so blinding the call site is now answering it yes for every job."
-    },
-    {
-      "id": "r5-select-any-job-for-a-segment-name",
-      "stage": "R5",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "a segment name selects the job that WRITES it, not simply the first live job",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership",
-        "expectedTests": [
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests.ASegmentNameSelectsTheJobThatWritesIt_NotTheFirstJobInTheRegistry",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests.EachOwnerReachesTheirOwnJobsAudioSegment_WithThatJobsOwnBytes",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests.TheRegistryOrderChangesNothing",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests.ASegmentNameNoLiveJobWrites_ResolvesNothingAndServesNothing"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.MediaEncoding/Transcoding/TranscodeManager.cs",
-          "find": "            return !string.IsNullOrEmpty(jobPlaylistId)\n                   && segmentName.StartsWith(jobPlaylistId, StringComparison.Ordinal);",
-          "replace": "            return !string.IsNullOrEmpty(jobPlaylistId);"
-        }
-      ],
-      "note": "The mission's `FirstOrDefault` / `le premier job` / `segmentId seul` mutation stated at the predicate: the name stops constraining anything, so the name alone once again names a file under whichever job happens to be first."
-    },
-    {
-      "id": "r5-select-the-wrong-job-for-a-segment-name",
-      "stage": "R5",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "a segment name selects the RIGHT job, not merely a job",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership",
-        "expectedTests": [
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests.ASegmentNameSelectsTheJobThatWritesIt_NotTheFirstJobInTheRegistry",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests.EachOwnerReachesTheirOwnJobsAudioSegment_WithThatJobsOwnBytes",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests.TheRegistryOrderChangesNothing",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests.ASegmentNameNoLiveJobWrites_ResolvesNothingAndServesNothing"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.MediaEncoding/Transcoding/TranscodeManager.cs",
-          "find": "                   && segmentName.StartsWith(jobPlaylistId, StringComparison.Ordinal);",
-          "replace": "                   && !segmentName.StartsWith(jobPlaylistId, StringComparison.Ordinal);"
-        }
-      ],
-      "note": "R4 finding F3 verbatim: this inversion left all 69 tests green at the candidate commit, verified twice, the second time by hand with a confirmed 23-project rebuild."
-    },
-    {
-      "id": "r5-selecthlsjob-ignores-its-predicate",
-      "stage": "R5",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "the job registry's shared selector applies the predicate it is given",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership",
-        "expectedTests": [
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests.ASegmentNameSelectsTheJobThatWritesIt_NotTheFirstJobInTheRegistry",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests.EachOwnerReachesTheirOwnJobsAudioSegment_WithThatJobsOwnBytes",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests.TheRegistryOrderChangesNothing",
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.AudioSegmentJobSelectionTests.ASegmentNameNoLiveJobWrites_ResolvesNothingAndServesNothing"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.MediaEncoding/Transcoding/TranscodeManager.cs",
-          "find": "            return _activeTranscodingJobs.FirstOrDefault(j =>\n                j.Type == type\n                && j.Path is not null\n                && predicate(j));",
-          "replace": "            return _activeTranscodingJobs.FirstOrDefault(j =>\n                j.Type == type\n                && j.Path is not null);"
-        }
-      ],
-      "note": "The literal `FirstOrDefault` the mission names, at the one place all three resolutions share. It degrades every member at once, which is why it is graded separately from the predicate mutations above."
     },
     {
       "id": "r5-blind-the-dynamic-segment-call-site",
@@ -1404,238 +1214,6 @@
         }
       ],
       "note": "R4 finding F4 was exactly this sentence. R5 reproduced both of its halves as INERT, so its return is a regression in the evidence rather than in the code - which is why an inventory gate, not a test, is what catches it."
-    },
-    {
-      "id": "cql-remove-boundary-attribute",
-      "stage": "CQL",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "the two dynamic segment actions carry the startTimeTicks boundary",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsStartTimeTicksBoundaryTests.ExactlyTheTwoSegmentActions_CarryTheBoundary",
-        "expectedTests": [
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsStartTimeTicksBoundaryTests.ExactlyTheTwoSegmentActions_CarryTheBoundary"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Controllers/DynamicHlsController.cs",
-          "find": "    [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, \"itemId\", \"mediaSourceId\", \"playSessionId\")]\n    [RejectsStartTimeTicks(\"startTimeTicks\")]\n    public async Task<ActionResult> GetHlsVideoSegment(",
-          "replace": "    [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, \"itemId\", \"mediaSourceId\", \"playSessionId\")]\n    public async Task<ActionResult> GetHlsVideoSegment(",
-          "count": 1
-        },
-        {
-          "file": "Tesserafin.Api/Controllers/DynamicHlsController.cs",
-          "find": "    [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, \"itemId\", \"mediaSourceId\", \"playSessionId\")]\n    [RejectsStartTimeTicks(\"startTimeTicks\")]\n    public async Task<ActionResult> GetHlsAudioSegment(",
-          "replace": "    [RequiresPlaybackCapability(PlaybackCapabilityScope.Media, \"itemId\", \"mediaSourceId\", \"playSessionId\")]\n    public async Task<ActionResult> GetHlsAudioSegment(",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "id": "cql-neuter-boundary-refusal",
-      "stage": "CQL",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "a forbidden startTimeTicks is refused at the MVC boundary",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Server.Integration.Tests/Tesserafin.Server.Integration.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Server.Integration.Tests.PlaybackCredentials.DynamicHlsStartTimeTicksHttpMatrixTests.AForbiddenStartTimeTicks_IsRefusedWithFourHundredAndZeroBytes",
-        "expectedTests": [
-          "Tesserafin.Server.Integration.Tests.PlaybackCredentials.DynamicHlsStartTimeTicksHttpMatrixTests.AForbiddenStartTimeTicks_IsRefusedWithFourHundredAndZeroBytes"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Attributes/RejectsStartTimeTicksAttribute.cs",
-          "find": "            context.Result = new ContentResult { StatusCode = StatusCodes.Status400BadRequest };",
-          "replace": "            _ = ticks;",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "id": "cql-validate-after-stream-resolution",
-      "stage": "CQL",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "a forbidden value is refused before any streaming state is resolved",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsStartTimeTicksBoundaryTests.AForbiddenValue_ResolvesNoStreamNamesNoPathAndTouchesNoJob",
-        "expectedTests": [
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsStartTimeTicksBoundaryTests.AForbiddenValue_ResolvesNoStreamNamesNoPathAndTouchesNoJob"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Attributes/RejectsStartTimeTicksAttribute.cs",
-          "find": "            context.Result = new ContentResult { StatusCode = StatusCodes.Status400BadRequest };",
-          "replace": "            _ = ticks;",
-          "count": 1
-        },
-        {
-          "file": "Tesserafin.Api/Controllers/DynamicHlsController.cs",
-          "find": "        var state = await ResolveStreamingState(streamingRequest, cancellationToken)\n            .ConfigureAwait(false);\n\n        var playlistPath = Path.ChangeExtension(state.OutputFilePath, \".m3u8\");",
-          "replace": "        var state = await ResolveStreamingState(streamingRequest, cancellationToken)\n            .ConfigureAwait(false);\n\n        var playlistPath = Path.ChangeExtension(state.OutputFilePath, \".m3u8\");\n\n        if ((streamingRequest.StartTimeTicks ?? 0) != 0)\n        {\n            state.Dispose();\n            throw new ArgumentException(\"StartTimeTicks is not allowed.\");\n        }",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "id": "cql-refuse-after-the-path-is-named",
-      "stage": "CQL",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "a forbidden value is refused before any output path is named or job touched",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsStartTimeTicksBoundaryTests.AForbiddenValue_ResolvesNoStreamNamesNoPathAndTouchesNoJob",
-        "expectedTests": [
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsStartTimeTicksBoundaryTests.AForbiddenValue_ResolvesNoStreamNamesNoPathAndTouchesNoJob"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Attributes/RejectsStartTimeTicksAttribute.cs",
-          "find": "            context.Result = new ContentResult { StatusCode = StatusCodes.Status400BadRequest };",
-          "replace": "            _ = ticks;",
-          "count": 1
-        },
-        {
-          "file": "Tesserafin.Api/Controllers/DynamicHlsController.cs",
-          "find": "        var segmentPath = GetSegmentPath(state, playlistPath, segmentId);",
-          "replace": "        var segmentPath = GetSegmentPath(state, playlistPath, segmentId);\n\n        if ((streamingRequest.StartTimeTicks ?? 0) != 0)\n        {\n            state.Dispose();\n            throw new ArgumentException(\"StartTimeTicks is not allowed.\");\n        }",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "id": "cql-remove-authorizer-call",
-      "stage": "CQL",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "the dynamic segment action asks the ownership authorizer, unconditionally",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsStartTimeTicksBoundaryTests.TheOwnershipMatrix_IsUnchangedByTheBoundary",
-        "expectedTests": [
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsStartTimeTicksBoundaryTests.TheOwnershipMatrix_IsUnchangedByTheBoundary"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Controllers/DynamicHlsController.cs",
-          "find": "        // covered by it too.\n        var ownership = _jobOwnership.AuthorizeByOutputPath(HttpContext, playlistPath);",
-          "replace": "        // covered by it too.\n        var ownership = HlsJobOwnershipDecision.NoSuchJob();",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "id": "cql-authorizer-conditional-on-starttimeticks",
-      "stage": "CQL",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "the ownership call is not conditional on a caller-supplied value",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsStartTimeTicksBoundaryTests.AnAllowedValue_ReachesTheAuthorizerExactlyOnceOnTheSameHttpContext",
-        "expectedTests": [
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsStartTimeTicksBoundaryTests.AnAllowedValue_ReachesTheAuthorizerExactlyOnceOnTheSameHttpContext"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Controllers/DynamicHlsController.cs",
-          "find": "        // covered by it too.\n        var ownership = _jobOwnership.AuthorizeByOutputPath(HttpContext, playlistPath);",
-          "replace": "        // covered by it too.\n        var ownership = streamingRequest.StartTimeTicks is null\n            ? _jobOwnership.AuthorizeByOutputPath(HttpContext, playlistPath)\n            : HlsJobOwnershipDecision.Authorized(new HlsSegmentBinding(\n                Path.GetFileNameWithoutExtension(playlistPath),\n                Guid.Empty,\n                \"any-device\",\n                streamingRequest.Id,\n                streamingRequest.MediaSourceId,\n                streamingRequest.PlaySessionId,\n                Path.GetDirectoryName(Path.GetFullPath(playlistPath))!,\n                Path.GetFullPath(playlistPath),\n                1));",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "id": "cql-accept-another-user",
-      "stage": "CQL",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "a caller who is not the job's owner receives no media byte",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsStartTimeTicksBoundaryTests.TheOwnershipMatrix_IsUnchangedByTheBoundary",
-        "expectedTests": [
-          "Tesserafin.Api.Tests.LiveTvSegmentOwnership.DynamicHlsStartTimeTicksBoundaryTests.TheOwnershipMatrix_IsUnchangedByTheBoundary"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Auth/HlsJobOwnership/HlsJobOwnershipAuthorizer.cs",
-          "find": "        return CallerIsTheOwner(context, capability, binding.UserId, binding.DeviceId)\n            ? HlsJobOwnershipDecision.Authorized(binding)\n            : HlsJobOwnershipDecision.Refused();",
-          "replace": "        return HlsJobOwnershipDecision.Authorized(binding);",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "id": "cql-refusal-carries-a-body",
-      "stage": "CQL",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "the boundary's refusal carries no bytes, not merely the right status",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Server.Integration.Tests/Tesserafin.Server.Integration.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Server.Integration.Tests.PlaybackCredentials.DynamicHlsStartTimeTicksHttpMatrixTests.AForbiddenStartTimeTicks_IsRefusedWithFourHundredAndZeroBytes",
-        "expectedTests": [
-          "Tesserafin.Server.Integration.Tests.PlaybackCredentials.DynamicHlsStartTimeTicksHttpMatrixTests.AForbiddenStartTimeTicks_IsRefusedWithFourHundredAndZeroBytes"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Attributes/RejectsStartTimeTicksAttribute.cs",
-          "find": "            context.Result = new ContentResult { StatusCode = StatusCodes.Status400BadRequest };",
-          "replace": "            context.Result = new ContentResult\n            {\n                StatusCode = StatusCodes.Status400BadRequest,\n                Content = \"StartTimeTicks is not allowed.\"\n            };",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "id": "cql-restore-the-inline-guard",
-      "stage": "CQL",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "GetDynamicSegment carries no branch on the request in front of the authorizer",
-      "note": "The CodeQL control, expressed as the source property CodeQL is reading. Restoring the guard on the repaired tree reproduces cs/user-controlled-bypass at the guard's own line - measured with CodeQL 2.26.3 and codeql/csharp-queries 1.9.1, the CLI and pack the hosted run pinned, four thread flows from the same two startTimeTicks parameters. That measurement needs a C# database and cannot run here, so this row pins the source shape instead: the inline branch must not come back. It is a proxy for the CodeQL result and is stated as one.",
-      "timeoutSeconds": 600,
-      "gate": {
-        "kind": "source",
-        "file": "Tesserafin.Api/Controllers/DynamicHlsController.cs",
-        "absentPattern": "streamingRequest\\.StartTimeTicks \\?\\? 0"
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Controllers/DynamicHlsController.cs",
-          "find": "        // method and must stay that way; anything this route cannot honour belongs on the filter.\n        //\n        // CTS lifecycle is managed internally.",
-          "replace": "        // method and must stay that way; anything this route cannot honour belongs on the filter.\n        //\n        if ((streamingRequest.StartTimeTicks ?? 0) > 0)\n        {\n            throw new ArgumentException(\"StartTimeTicks is not allowed.\");\n        }\n\n        // CTS lifecycle is managed internally.",
-          "count": 1
-        }
-      ]
     },
     {
       "id": "p2r4-start-on-what-a-released-job-left",
@@ -1923,130 +1501,6 @@
         }
       ],
       "note": "The play session id is in the body of the report. Both stop reports selected by it with no comparison at all."
-    },
-    {
-      "id": "p2r4-any-name-with-the-prefix-is-a-segment",
-      "stage": "P2R4",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "the legacy routes open nothing but the job's playlist identifier followed by an index",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Api.Tests/Tesserafin.Api.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Api.Tests.Controllers.DynamicHlsFailedAttemptTests",
-        "expectedTests": [
-          "Tesserafin.Api.Tests.Controllers.DynamicHlsFailedAttemptTests.LegacyRoutes_DoNotServeTheProgressiveFileThatSharesTheOutputsName"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Controllers/HlsSegmentController.cs",
-          "find": "        return index is \"-1\" || (index.Length > 0 && !index.ContainsAnyExceptInRange('0', '9'));",
-          "replace": "        return index.Length >= 0;",
-          "count": 1
-        }
-      ],
-      "note": "The identifier alone, with an extension the url supplies separately, is the file a progressive transcode of the same request writes; the playlist and its temporary file carry the prefix too."
-    },
-    {
-      "id": "p293-progressive-refusal-ignored",
-      "stage": "P293",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "a progressive output another user's job writes is refused, not taken over",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Server.Integration.Tests/Tesserafin.Server.Integration.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveOutputIsolationEndToEndTests",
-        "expectedTests": [
-          "Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveOutputIsolationEndToEndTests.UrlOfARunningTranscode_ReplayedByAnotherUser_IsRefused",
-          "Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveOutputIsolationEndToEndTests.UrlOfAReleasedTranscode_ReplayedByAnotherUser_IsNotAnsweredFromWhatWasLeft"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Helpers/FileStreamResponseHelpers.cs",
-          "find": "            if (ownership.Outcome == HlsJobOwnershipOutcome.Refused)\n            {\n                state.Dispose();\n                return new UnauthorizedResult();\n            }\n\n",
-          "replace": "",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "id": "p293-progressive-serves-a-file-nobody-owns",
-      "stage": "P293",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "a progressive output no job is registered on is not served, its former owner's bytes included",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Server.Integration.Tests/Tesserafin.Server.Integration.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveOutputIsolationEndToEndTests",
-        "expectedTests": [
-          "Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveOutputIsolationEndToEndTests.UrlOfAReleasedTranscode_ReplayedByAnotherUser_IsNotAnsweredFromWhatWasLeft",
-          "Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveOutputIsolationEndToEndTests.UrlOfAReleasedTranscode_ReplayedWhileTheNewFfmpegIsHeld_IsServedNoByteOfWhatWasLeft"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Helpers/FileStreamResponseHelpers.cs",
-          "find": "            if (!ownership.IsAuthorized || !File.Exists(outputPath))",
-          "replace": "            if (!File.Exists(outputPath))",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "id": "p293-progressive-residual-not-removed",
-      "stage": "P293",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "a residual progressive output is removed before the new ffmpeg starts, so none of it is served while that ffmpeg is held",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Server.Integration.Tests/Tesserafin.Server.Integration.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveOutputIsolationEndToEndTests",
-        "expectedTests": [
-          "Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveOutputIsolationEndToEndTests.UrlOfAReleasedTranscode_ReplayedWhileTheNewFfmpegIsHeld_IsServedNoByteOfWhatWasLeft"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.Api/Helpers/FileStreamResponseHelpers.cs",
-          "find": "                    File.Delete(outputPath);",
-          "replace": "                    // removal removed",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "id": "p293-progressive-asks-the-hls-registry",
-      "stage": "P293",
-      "status": "NEW",
-      "expect": "RED",
-      "property": "the progressive route is compared with the progressive job on its output, not with an HLS job",
-      "timeoutSeconds": 1800,
-      "gate": {
-        "kind": "dotnet-test",
-        "project": "tests/Tesserafin.Server.Integration.Tests/Tesserafin.Server.Integration.Tests.csproj",
-        "filter": "FullyQualifiedName~Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveOutputIsolationEndToEndTests",
-        "expectedTests": [
-          "Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveOutputIsolationEndToEndTests.UrlOfARunningTranscode_ReplayedByAnotherUser_IsRefused",
-          "Tesserafin.Server.Integration.Tests.EndToEnd.ProgressiveOutputIsolationEndToEndTests.UrlOfAReleasedTranscode_ReplayedByAnotherUser_IsNotAnsweredFromWhatWasLeft"
-        ]
-      },
-      "mutations": [
-        {
-          "file": "Tesserafin.MediaEncoding/Transcoding/TranscodeManager.cs",
-          "find": "        return Project(SelectJob(TranscodingJobType.Progressive, j =>",
-          "replace": "        return Project(SelectJob(TranscodingJobType.Hls, j =>",
-          "count": 1
-        }
-      ]
     }
   ]
 }

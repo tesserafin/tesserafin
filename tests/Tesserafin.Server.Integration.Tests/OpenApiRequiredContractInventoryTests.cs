@@ -17,7 +17,7 @@ namespace Tesserafin.Server.Integration.Tests
     /// <c>src/Tesserafin.Playback.Decision/</c>, deliberately <b>not</b> derived by re-running the
     /// filter's own rule. A test that recomputed the rule would pass for any rule; this one fails
     /// if the filter's behaviour ever stops matching the reviewed inventory in
-    /// <c>docs/pr-openapi-required-audit.md</c> §3 (approach C: 29 entries, 13 schemas).
+    /// <c>docs/pr-openapi-required-audit.md</c> §3 (approach C: 29 entries, 13 schemas; 18 entries, 8 schemas since the diagnostic snapshot schemas went with the shadow comparison, tesserafin#129 step 7).
     /// </para>
     /// </summary>
     public sealed class OpenApiRequiredContractInventoryTests
@@ -52,7 +52,7 @@ namespace Tesserafin.Server.Integration.Tests
         private const int RequiredOutsideNamespace = 33;
 
         /// <summary>
-        /// The 29 members, across 13 schemas, that are primary-constructor parameters of
+        /// The 18 members, across 8 schemas, that are primary-constructor parameters of
         /// non-nullable reference type with no default value - and therefore the exact set the
         /// server answers 400 for when absent.
         /// </summary>
@@ -60,18 +60,13 @@ namespace Tesserafin.Server.Integration.Tests
             new Dictionary<string, string[]>(StringComparer.Ordinal)
             {
                 ["PlaybackDecisionAudioCodecCapability"] = ["Codec"],
-                ["PlaybackDecisionAudioStreamSnapshot"] = ["Codec"],
                 ["PlaybackDecisionClientCapabilities"] = ["Decode", "OutputProfiles"],
                 ["PlaybackDecisionDecodeCapabilities"] = ["AudioCodecs", "DirectPlayProfiles", "SubtitleDelivery", "VideoCodecs"],
                 ["PlaybackDecisionDecodeProfile"] = ["AudioCodecs", "Containers", "VideoCodecs"],
-                ["PlaybackDecisionMediaSourceSnapshot"] = ["AudioStreams", "Container", "MediaSourceId", "Protocol", "SubtitleStreams", "VideoStreams"],
                 ["PlaybackDecisionPlaybackConstraints"] = ["PreferredSubtitleLanguages"],
                 ["PlaybackDecisionPlaybackOutputProfile"] = ["AudioCodecs", "Container", "VideoCodecs"],
-                ["PlaybackDecisionReasonNode"] = ["Children", "Subject"],
                 ["PlaybackDecisionSubtitleCapability"] = ["Format"],
-                ["PlaybackDecisionSubtitleStreamSnapshot"] = ["Format"],
                 ["PlaybackDecisionVideoCodecCapability"] = ["Codec", "Profiles", "VideoRangeTypes"],
-                ["PlaybackDecisionVideoStreamSnapshot"] = ["Codec"],
             };
 
         /// <summary>
@@ -83,8 +78,6 @@ namespace Tesserafin.Server.Integration.Tests
         private static readonly string[] _expectedWithoutRequired =
         [
             "PlaybackDecisionOutputSpec",
-            "PlaybackDecisionPlaybackRequestContext",
-            "PlaybackDecisionReasonSubject",
             "PlaybackDecisionResolution",
             "PlaybackDecisionSelectedStreams",
             "PlaybackDecisionSelectedSubtitle",
@@ -116,8 +109,8 @@ namespace Tesserafin.Server.Integration.Tests
                 Assert.Equal(expectedMembers.OrderBy(m => m, StringComparer.Ordinal), actual[schemaId]);
             }
 
-            Assert.Equal(29, actual.Sum(entry => entry.Value.Length));
-            Assert.Equal(13, actual.Count);
+            Assert.Equal(18, actual.Sum(entry => entry.Value.Length));
+            Assert.Equal(8, actual.Count);
         }
 
         [Fact]
@@ -153,18 +146,11 @@ namespace Tesserafin.Server.Integration.Tests
         [InlineData("PlaybackDecisionPlaybackOutputProfile", "Protocol")]
         [InlineData("PlaybackDecisionPlaybackConstraints", "AllowDirectPlay")]
         [InlineData("PlaybackDecisionPlaybackConstraints", "StartTimeTicks")]
-        [InlineData("PlaybackDecisionAudioStreamSnapshot", "Index")]
-        [InlineData("PlaybackDecisionSubtitleStreamSnapshot", "IsForced")]
-        [InlineData("PlaybackDecisionVideoStreamSnapshot", "IsAnamorphic")]
         // Nullable reference / value types: absent and null are indistinguishable, both accepted.
         [InlineData("PlaybackDecisionVideoCodecCapability", "MaxLevel")]
         [InlineData("PlaybackDecisionVideoCodecCapability", "MaxBitDepth")]
         [InlineData("PlaybackDecisionVideoCodecCapability", "MaxResolution")]
         [InlineData("PlaybackDecisionVideoCodecCapability", "MaxBitrate")]
-        [InlineData("PlaybackDecisionMediaSourceSnapshot", "RunTimeTicks")]
-        [InlineData("PlaybackDecisionReasonNode", "Detail")]
-        [InlineData("PlaybackDecisionAudioStreamSnapshot", "Language")]
-        [InlineData("PlaybackDecisionVideoStreamSnapshot", "Profile")]
         public void MembersTheServerAcceptsAbsent_AreNotRequired(string schemaId, string propertyName)
         {
             var schemas = ReadSchemas();

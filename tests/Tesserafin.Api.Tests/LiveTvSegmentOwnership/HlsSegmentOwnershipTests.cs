@@ -353,6 +353,6 @@ public sealed class HlsSegmentOwnershipTests : IDisposable
             ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = httpContext }
         };
 
-        return controller.GetHlsVideoSegmentLegacy(itemId.ToString("N"), playlistId, segmentId, "ts");
+        return controller.ServeOwnedVideoSegment(itemId.ToString("N"), playlistId, segmentId, requiredPlaySessionId: null);
     }
 }

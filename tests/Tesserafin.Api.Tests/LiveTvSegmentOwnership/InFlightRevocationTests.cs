@@ -152,7 +152,6 @@ public sealed class InFlightRevocationTests : IDisposable
 
         // No resurrection: repeated resolution stays empty, on every member the routes use.
         Assert.Null(registry.ResolveByPlaylistId(JobPlaylist));
-        Assert.Null(registry.ResolveBySegmentName(JobPlaylist + "0"));
         Assert.Null(registry.ResolveByOutputPath(Path.Combine(_root, JobPlaylist + ".m3u8")));
         Assert.Null(registry.ResolveByPlaylistId(JobPlaylist));
 
@@ -259,7 +258,7 @@ public sealed class InFlightRevocationTests : IDisposable
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };
 
-        var result = controller.GetHlsVideoSegmentLegacy(_itemA.ToString("N"), playlistId, segmentId, "ts");
+        var result = controller.ServeOwnedVideoSegment(_itemA.ToString("N"), playlistId, segmentId, requiredPlaySessionId: null);
 
         var body = new MemoryStream();
         httpContext.Response.Body = body;
@@ -302,9 +301,6 @@ public sealed class InFlightRevocationTests : IDisposable
 
         public HlsSegmentBinding? ResolveByPlaylistId(string playlistId)
             => Resolve(string.Equals(playlistId, _binding.PlaylistId, StringComparison.Ordinal));
-
-        public HlsSegmentBinding? ResolveBySegmentName(string segmentName)
-            => Resolve(segmentName.StartsWith(_binding.PlaylistId, StringComparison.Ordinal));
 
         public HlsSegmentBinding? ResolveByOutputPath(string outputPath)
             => Resolve(string.Equals(outputPath, _binding.CanonicalPlaylistPath, StringComparison.Ordinal));

@@ -265,7 +265,7 @@ public sealed partial class DynamicHlsFailedAttemptTests
             var httpContext = Context(FormattableString.Invariant($"/Videos/{_item:N}/hls/{playlistId}/{playlistId}0.ts"), _stranger, OtherDevice, out var body);
             var controller = _newLegacyController!();
             controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
-            var leaked = await Executed(controller.GetHlsVideoSegmentLegacy(_item.ToString("N"), playlistId, playlistId + "0", "ts"), httpContext, body);
+            var leaked = await Executed(controller.ServeOwnedVideoSegment(_item.ToString("N"), playlistId, playlistId + "0", requiredPlaySessionId: null), httpContext, body);
             Assert.Fail(FormattableString.Invariant($"the legacy segment route answered another user {leaked.Status} \"{leaked.Text}\": a segment the first user's live transcode left"));
         }
 
@@ -285,57 +285,6 @@ public sealed partial class DynamicHlsFailedAttemptTests
         Assert.Equal(StatusCodes.Status404NotFound, owner.Status);
         Assert.Equal(StatusCodes.Status404NotFound, other.Status);
         Assert.DoesNotContain("segment 1", owner.Text + other.Text, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task LegacyRoutes_DoNotServeTheProgressiveFileThatSharesTheOutputsName()
-    {
-        // The job's owner is served any file that carries the job's prefix - and "{name}.{ext}",
-        // the prefix and nothing after it, is a progressive transcode's, possibly somebody else's.
-        var attempt = await StartPlayback(hardware: false, segments: 6);
-        var playlistId = Path.GetFileName(attempt.Prefix);
-        await File.WriteAllTextAsync(attempt.Prefix + ".mp4", "a progressive transcode", TestContext.Current.CancellationToken);
-
-        var video = Context(FormattableString.Invariant($"/Videos/{_item:N}/hls/{playlistId}/{playlistId}.mp4"), null, OwnerDevice, out var videoBody);
-        var controller = _newLegacyController!();
-        controller.ControllerContext = new ControllerContext { HttpContext = video };
-        var fromVideo = await Executed(controller.GetHlsVideoSegmentLegacy(_item.ToString("N"), playlistId, playlistId, "mp4"), video, videoBody);
-
-        var audio = Context(FormattableString.Invariant($"/Audio/{_item:N}/hls/{playlistId}/stream.mp4"), null, OwnerDevice, out var audioBody);
-        controller = _newLegacyController!();
-        controller.ControllerContext = new ControllerContext { HttpContext = audio };
-        var fromAudio = await Executed(controller.GetHlsAudioSegmentLegacy(_item.ToString("N"), playlistId), audio, audioBody);
-
-        Assert.Equal(StatusCodes.Status404NotFound, fromVideo.Status);
-        Assert.Equal(StatusCodes.Status404NotFound, fromAudio.Status);
-        Assert.DoesNotContain("progressive", fromVideo.Text + fromAudio.Text, StringComparison.Ordinal);
-
-        // The name that is opened is the segment id AND an extension the url supplies separately.
-        // An url ending in a dot supplies none, and the whole file name can then be the id; so
-        // can the playlist's, or its temporary file's.
-        await File.WriteAllTextAsync(attempt.Prefix + ".m3u8", "the playlist", TestContext.Current.CancellationToken);
-        await File.WriteAllTextAsync(attempt.Prefix + ".m3u8.tmp", "the playlist, being written", TestContext.Current.CancellationToken);
-        await File.WriteAllTextAsync(attempt.Prefix + "1x.mp4", "not a segment either", TestContext.Current.CancellationToken);
-        foreach (var (segmentId, container, tail) in new[] { (playlistId + ".mp4", ".", ".mp4.."), (playlistId + ".m3u8", ".", ".m3u8.."), (playlistId + ".m3u8", "tmp", ".m3u8.tmp"), (playlistId + "1x", "mp4", "1x.mp4") })
-        {
-            var spelled = Context(FormattableString.Invariant($"/Videos/{_item:N}/hls/{playlistId}/{playlistId}{tail}"), null, OwnerDevice, out var spelledBody);
-            controller = _newLegacyController!();
-            controller.ControllerContext = new ControllerContext { HttpContext = spelled };
-            var answer = await Executed(controller.GetHlsVideoSegmentLegacy(_item.ToString("N"), playlistId, segmentId, container), spelled, spelledBody);
-            Assert.True(answer.Status == StatusCodes.Status404NotFound, FormattableString.Invariant($"{tail}: {answer.Status} \"{answer.Text}\""));
-        }
-
-        // The audio route's extension is the url's too, and an url ending in a slash has none.
-        var slashed = Context(FormattableString.Invariant($"/Audio/{_item:N}/hls/{playlistId}.mp4/stream.mp3/"), null, OwnerDevice, out var slashedBody);
-        controller = _newLegacyController!();
-        controller.ControllerContext = new ControllerContext { HttpContext = slashed };
-        var fromSlashed = await Executed(controller.GetHlsAudioSegmentLegacy(_item.ToString("N"), playlistId + ".mp4"), slashed, slashedBody);
-        Assert.True(fromSlashed.Status == StatusCodes.Status404NotFound, FormattableString.Invariant($"trailing slash: {fromSlashed.Status} \"{fromSlashed.Text}\""));
-
-        // And it is not that these routes serve nothing: a segment of the job's is still the owner's.
-        Assert.Equal("segment 1", (await LegacySegmentRequest(attempt, 1)).Text);
-        Assert.Equal("segment 1", (await LegacyAudioRequest(attempt, 1)).Text);
-        Assert.Equal("init", (await LegacySegmentRequest(attempt, Init)).Text);
     }
 
     // ---------------------------------------------------------------- whose transcodes a stop reaches

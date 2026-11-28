@@ -134,8 +134,9 @@ public sealed class HlsOutputIsolationEndToEndTests : IClassFixture<HlsIsolation
         var job = Assert.Single(_started, j => j.PlaySessionId == playSession);
         var segmentFile = Directory.GetFiles(_transcodes, Path.GetFileNameWithoutExtension(job.Path!) + "0.*").Single();
 
-        // While its job is registered the first user's output is refused to anybody else.
-        Assert.Equal(HttpStatusCode.Unauthorized, (await GetAsync(_other, segmentUrl)).Status);
+        // While its job is registered the first user's output is refused to anybody else: the
+        // session is the first user's.
+        Assert.Equal(HttpStatusCode.Forbidden, (await GetAsync(_other, segmentUrl)).Status);
 
         // Stopped by its owner, through the route a player uses; and the removal fails.
         _fileSystem.FailDeferredRemovalsUnder = _transcodes;
@@ -156,17 +157,13 @@ public sealed class HlsOutputIsolationEndToEndTests : IClassFixture<HlsIsolation
 
         var replay = await GetAsync(_other, segmentUrl);
 
+        // Released or not, the session is still the first user's: refused, and nothing of what the
+        // released transcode left is served.
         Assert.False(
             replay.Body.AsSpan().IndexOf(_mark) >= 0,
             FormattableString.Invariant($"another user's replay was answered {(int)replay.Status} with {replay.Body.Length} bytes carrying the mark: the file the first user's transcode left on disk"));
-        Assert.Equal(HttpStatusCode.OK, replay.Status);
-        Assert.Equal(0x47, replay.Body[0]);
-
-        // Its own transcode, on an output that is now its own.
-        var successor = Assert.Single(_started, j => j.PlaySessionId == playSession && !ReferenceEquals(j, job));
-        Assert.Equal(job.Path, successor.Path);
-        Assert.Equal(_otherId, successor.UserId);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await GetAsync(_owner, segmentUrl)).Status);
+        Assert.Equal(HttpStatusCode.Forbidden, replay.Status);
+        Assert.DoesNotContain(_started, j => j.PlaySessionId == playSession && !ReferenceEquals(j, job));
     }
 
     /// <summary>
@@ -296,21 +293,26 @@ public sealed class HlsOutputIsolationEndToEndTests : IClassFixture<HlsIsolation
     }
 
     /// <summary>
-    /// Plans a transcode and follows its playlists to the URLs of its segments, as a player does.
+    /// Plans a transcode through a playback session and follows its playlist to the URLs of its
+    /// segments, as a player does.
     /// </summary>
     private async Task<List<string>> PlayToSegmentsAsync(HttpClient client, Guid userId, string playSession)
     {
-        // The existing chain's HLS routes (/Videos/{id}/master.m3u8 ...), reached through their
-        // remaining caller, PlaybackInfo: a session refuses a transcode it does not execute. The
-        // session journey's own isolation is TranscodeFilmEndToEndTests.
-        var url = LegacyHlsRoute.MasterUrl(client, _item, playSession);
-        var descriptor = new { Url = url };
-        var master = await GetAsync(client, descriptor.Url);
-        Assert.Equal(HttpStatusCode.OK, master.Status);
-        var variantUrl = Uris(Encoding.UTF8.GetString(master.Body), descriptor.Url)[0];
-        var variant = await GetAsync(client, variantUrl);
-        Assert.Equal(HttpStatusCode.OK, variant.Status);
-        return Uris(Encoding.UTF8.GetString(variant.Body), variantUrl);
+        var (capabilities, constraints) = EndToEndCapabilityPresets.TranscodeHls();
+        var request = new CreatePlaybackSessionRequest(_item, userId, capabilities, constraints, MediaSourceId: null, PlaySessionId: playSession);
+        using var created = await client.PostAsJsonAsync("Playback/Sessions", request, JsonDefaults.Options, TestContext.Current.CancellationToken);
+        var body = await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.True(created.IsSuccessStatusCode, $"POST Playback/Sessions: {(int)created.StatusCode} {body}");
+        var session = JsonSerializer.Deserialize<PlaybackSessionResponse>(body, JsonDefaults.Options)!;
+
+        var descriptor = await client.GetFromJsonAsync<PlaybackSessionStreamDescriptor>(
+            FormattableString.Invariant($"Playback/Sessions/{session.Id}/Stream"),
+            JsonDefaults.Options,
+            TestContext.Current.CancellationToken);
+        var playlistUrl = descriptor!.Url.TrimStart('/');
+        var playlist = await GetAsync(client, playlistUrl);
+        Assert.Equal(HttpStatusCode.OK, playlist.Status);
+        return Uris(Encoding.UTF8.GetString(playlist.Body), playlistUrl);
     }
 
     /// <summary>

@@ -505,9 +505,14 @@ reaches it), then the deletion is one coordinated change.
    session planner's inner chain (`PlaybackSessionPlanner`, the shadow comparison planner and its
    legacy projector), `PlaybackLiveStreamResolver`, `PlaybackExecutionPlanResolver`,
    `PlaybackSessionStreamDescriptorMapper` and `MediaInfoHelper`. `LocalMediaPlanner` decides every
-   session alone; what it does not plan is refused. Still to delete: `StreamBuilder`, the
-   client-option HLS and progressive routes, the shadow/live-wiring diagnostics stores, the Web V2
-   URL overlay and `enableV2PlaybackPath`, the mobile `MediaInfoApi`.
+   session alone; what it does not plan is refused. Then (2026-11-28, deprecated by #538): the
+   client-option stream and HLS routes (`Videos|Audio/{id}/stream[.{container}]`, `master.m3u8`,
+   `main.m3u8`, `live.m3u8`, `hls1/...`, the legacy `hls/` segments), `AudioController`,
+   `System/PlaybackDiagnostics/*` and its static page; the Web removed Chromecast, `getStreamUrls`,
+   the V2 overlay and the diagnostics page (web#323). A client plays from
+   `Playback/Sessions/{id}/File|Progressive|Hls` alone. Still to delete: the `StreamBuilder`
+   planner, the shadow/live-wiring diagnostics stores, `PlaybackStopThresholdGuard`, the legacy
+   branches of `GetDynamicSegment`, the server cast fields.
    Original list - deletion, once the rows above are empty: `GET/POST Items/{id}/PlaybackInfo`, the inner planner
    (`PlaybackSessionPlanner`/`StreamBuilder` for sessions), `PlaybackExecutionPlanAdapter.ToStreamInfo`,
    `PlaybackSessionStreamDescriptorMapper`, `PlaybackLiveStreamResolver`, the client-option HLS and

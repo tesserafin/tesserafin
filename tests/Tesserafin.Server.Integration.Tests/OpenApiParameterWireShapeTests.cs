@@ -64,45 +64,6 @@ namespace Tesserafin.Server.Integration.Tests
             "Opaque identifier for a Tesserafin.Controller.MediaEncoding.PlaybackSession.";
 
         /// <summary>
-        /// The four streaming routes whose 200 response bodies are binary, times GET and HEAD.
-        /// </summary>
-        /// <returns>Method and path.</returns>
-        public static TheoryData<string, string> StreamRoutes() => new()
-        {
-            { "GET", "/Audio/{itemId}/stream" },
-            { "HEAD", "/Audio/{itemId}/stream" },
-            { "GET", "/Audio/{itemId}/stream.{container}" },
-            { "HEAD", "/Audio/{itemId}/stream.{container}" },
-            { "GET", "/Videos/{itemId}/stream" },
-            { "HEAD", "/Videos/{itemId}/stream" },
-            { "GET", "/Videos/{itemId}/stream.{container}" },
-            { "HEAD", "/Videos/{itemId}/stream.{container}" },
-        };
-
-        /// <summary>
-        /// The eight contract sites that expose <c>streamOptions</c>.
-        ///
-        /// <para>
-        /// Eight, not the fourteen C# declarations: the six in <c>DynamicHlsController</c> are
-        /// excluded from the document by that controller's class-level
-        /// <c>[ApiExplorerSettings(IgnoreApi = true)]</c>. That exclusion is deliberate and is not
-        /// part of #226.
-        /// </para>
-        /// </summary>
-        /// <returns>Method, path and operation id.</returns>
-        public static TheoryData<string, string, string> StreamOptionsSites() => new()
-        {
-            { "GET", "/Audio/{itemId}/stream", "GetAudioStream" },
-            { "HEAD", "/Audio/{itemId}/stream", "HeadAudioStream" },
-            { "GET", "/Audio/{itemId}/stream.{container}", "GetAudioStreamByContainer" },
-            { "HEAD", "/Audio/{itemId}/stream.{container}", "HeadAudioStreamByContainer" },
-            { "GET", "/Videos/{itemId}/stream", "GetVideoStream" },
-            { "HEAD", "/Videos/{itemId}/stream", "HeadVideoStream" },
-            { "GET", "/Videos/{itemId}/stream.{container}", "GetVideoStreamByContainer" },
-            { "HEAD", "/Videos/{itemId}/stream.{container}", "HeadVideoStreamByContainer" },
-        };
-
-        /// <summary>
         /// The five path parameters bound to <c>PlaybackSessionId</c>.
         /// </summary>
         /// <returns>Method, path and the operation's own <c>description</c> for the parameter.</returns>
@@ -111,8 +72,6 @@ namespace Tesserafin.Server.Integration.Tests
             { "DELETE", "/Playback/Sessions/{id}", "The session to remove." },
             { "PUT", "/Playback/Sessions/{id}", "The session to replace." },
             { "GET", "/Playback/Sessions/{id}/Stream", "The session to resolve a stream URL for." },
-            { "GET", "/System/PlaybackDiagnostics/Sessions/{id}", "The session to look up." },
-            { "GET", "/System/PlaybackDiagnostics/Sessions/{id}/Fixture", "The session to export." },
         };
 
         /// <summary>
@@ -207,58 +166,6 @@ namespace Tesserafin.Server.Integration.Tests
         }
 
         /// <summary>
-        /// Each of the eight <c>streamOptions</c> sites keeps its string-valued map schema, its
-        /// description and its optionality, and now names <c>deepObject</c>/<c>explode: true</c> —
-        /// the encoding <c>?streamOptions[key]=value</c> the binder already accepts.
-        /// </summary>
-        /// <param name="method">The HTTP method.</param>
-        /// <param name="path">The templated path.</param>
-        /// <param name="operationId">The expected operation id.</param>
-        [Theory]
-        [MemberData(nameof(StreamOptionsSites))]
-        public void StreamOptions_IsADeepObjectStringMap_WithExplodeTrue(string method, string path, string operationId)
-        {
-            using var document = OpenApiParameterResolution.ReadCommittedContract();
-            var root = document.RootElement;
-
-            var site = OpenApiParameterResolution
-                .EnumerateParameters(root)
-                .SingleOrDefault(candidate =>
-                    string.Equals(candidate.Method, method, StringComparison.Ordinal)
-                    && string.Equals(candidate.Path, path, StringComparison.Ordinal)
-                    && string.Equals(candidate.Name, "streamOptions", StringComparison.Ordinal));
-
-            Assert.True(
-                site is not null,
-                string.Create(CultureInfo.InvariantCulture, $"{method} {path} declares no 'streamOptions' parameter."));
-            Assert.Equal(operationId, site!.OperationId);
-            Assert.Equal("query", site.In);
-            Assert.Equal("deepObject", site.Style);
-            Assert.True(site.Explode, string.Create(CultureInfo.InvariantCulture, $"{site.Describe} does not declare explode: true."));
-
-            Assert.True(
-                site.Parameter.TryGetProperty("description", out var description)
-                && string.Equals(description.GetString(), StreamOptionsDescription, StringComparison.Ordinal),
-                string.Create(CultureInfo.InvariantCulture, $"{site.Describe} lost its description."));
-
-            // Optional in C# (`Dictionary<string, string>? streamOptions`), so the contract must not
-            // have started demanding it.
-            Assert.True(
-                !site.Parameter.TryGetProperty("required", out var required) || required.ValueKind == JsonValueKind.False,
-                string.Create(CultureInfo.InvariantCulture, $"{site.Describe} became required."));
-
-            var resolved = OpenApiParameterResolution.ResolveParameterSchema(site, root);
-            Assert.Equal("object", OpenApiParameterResolution.TypeOf(resolved));
-
-            Assert.True(
-                resolved.TryGetValue("additionalProperties", out var additional),
-                string.Create(CultureInfo.InvariantCulture, $"{site.Describe} lost its additionalProperties value schema."));
-
-            var value = OpenApiParameterResolution.ResolveSchema(additional, root);
-            Assert.Equal("string", OpenApiParameterResolution.TypeOf(value));
-        }
-
-        /// <summary>
         /// Each of the five <c>PlaybackSessionId</c> path parameters resolves to the scalar the binder
         /// accepts, keeps its opaque-identifier description, and stays required.
         /// </summary>
@@ -343,37 +250,6 @@ namespace Tesserafin.Server.Integration.Tests
             Assert.False(
                 additional.EnumerateObject().Any(),
                 "ProblemDetails.additionalProperties gained a constraint; extension members are not restricted to any one type.");
-        }
-
-        /// <summary>
-        /// The four binary streaming families keep <c>type: string</c> / <c>format: binary</c> bodies.
-        /// </summary>
-        /// <param name="method">The HTTP method.</param>
-        /// <param name="path">The templated path.</param>
-        [Theory]
-        [MemberData(nameof(StreamRoutes))]
-        public void StreamResponses_RemainBinary(string method, string path)
-        {
-            using var document = OpenApiParameterResolution.ReadCommittedContract();
-            var root = document.RootElement;
-
-            var operation = OpenApiParameterResolution
-                .EnumerateOperations(root)
-                .Single(candidate =>
-                    string.Equals(candidate.Method, method, StringComparison.Ordinal)
-                    && string.Equals(candidate.Path, path, StringComparison.Ordinal))
-                .Operation;
-
-            var content = operation.GetProperty("responses").GetProperty("200").GetProperty("content");
-            var mediaTypes = content.EnumerateObject().Select(entry => entry.Name).ToList();
-
-            Assert.NotEmpty(mediaTypes);
-            foreach (var mediaType in content.EnumerateObject())
-            {
-                var resolved = OpenApiParameterResolution.ResolveSchema(mediaType.Value.GetProperty("schema"), root);
-                Assert.Equal("string", OpenApiParameterResolution.TypeOf(resolved));
-                Assert.Equal("binary", OpenApiParameterResolution.FormatOf(resolved));
-            }
         }
 
         /// <summary>

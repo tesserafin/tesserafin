@@ -80,10 +80,6 @@ public sealed class HlsJobOwnershipAuthorizer : IHlsJobOwnershipAuthorizer
         => Decide(context, _bindings.ResolveByPlaylistId(playlistId));
 
     /// <inheritdoc />
-    public HlsJobOwnershipDecision AuthorizeBySegmentName(HttpContext context, string segmentName)
-        => Decide(context, _bindings.ResolveBySegmentName(segmentName));
-
-    /// <inheritdoc />
     public HlsJobOwnershipDecision AuthorizeByOutputPath(HttpContext context, string outputPath)
         => Decide(context, _bindings.ResolveByOutputPath(outputPath));
 

@@ -43,33 +43,6 @@ namespace Tesserafin.Server.Integration.Tests
         }
 
         /// <summary>
-        /// The running generation pipeline emits <c>explode: true</c> on every <c>deepObject</c>
-        /// parameter, so <c>DeepObjectExplodeParameterFilter</c> is proven registered and effective.
-        /// </summary>
-        /// <returns>A task.</returns>
-        [Fact]
-        public async Task LiveDocument_DeclaresExplodeTrue_OnEveryDeepObjectParameter()
-        {
-            using var document = await GenerateAsync();
-            var sites = OpenApiParameterResolution.EnumerateParameters(document.RootElement)
-                .Where(site => string.Equals(site.Style, "deepObject", StringComparison.Ordinal))
-                .ToList();
-
-            // If Swashbuckle ever stops emitting deepObject for object query parameters, the
-            // invariant above would pass vacuously and prove nothing. Say so out loud.
-            Assert.True(
-                sites.Count > 0,
-                "The live document declares no deepObject parameter at all; the explode invariant would be vacuous.");
-
-            var offenders = sites.Where(site => site.Explode is not true).Select(site => site.Describe).ToList();
-            Assert.True(
-                offenders.Count == 0,
-                string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"The running server emits {offenders.Count} deepObject parameter(s) without explode: true:{Environment.NewLine}  {string.Join(Environment.NewLine + "  ", offenders)}"));
-        }
-
-        /// <summary>
         /// The running generation pipeline emits no object-shaped path parameter, so the
         /// <c>PlaybackSessionId</c> scalar mapping is proven registered and effective.
         /// </summary>

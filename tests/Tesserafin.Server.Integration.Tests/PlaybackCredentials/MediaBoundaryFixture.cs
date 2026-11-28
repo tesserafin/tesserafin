@@ -9,12 +9,14 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Tesserafin.Api.Models.PlaybackCredentialDtos;
+using Tesserafin.Api.Models.PlaybackSessionDtos;
 using Tesserafin.Api.Models.StartupDtos;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.Net.PlaybackCredentials;
 using Tesserafin.Controller.Persistence;
 using Tesserafin.Extensions.Json;
 using Tesserafin.Model.Entities;
+using Tesserafin.Playback.Decision;
 using Tesserafin.Server.Integration.Tests.EndToEnd;
 using Xunit;
 
@@ -42,6 +44,11 @@ public sealed class MediaBoundaryFixture : IAsyncLifetime
 {
     /// <summary>The index of the fixture's external subtitle stream.</summary>
     public const int SubtitleStreamIndex = 2;
+
+    /// <summary>
+    /// The play session a capability is bound to when a test names none and the route names none.
+    /// </summary>
+    public const string DefaultPlaySession = "r1-play-session";
 
     /// <summary>The device id the fixture's own session uses.</summary>
     public const string PrimaryDeviceId = "r1-primary-device";
@@ -72,6 +79,11 @@ public sealed class MediaBoundaryFixture : IAsyncLifetime
 
     /// <summary>Gets every media route, bound to this fixture.</summary>
     public IReadOnlyList<MediaRoute> Routes { get; private set; } = [];
+
+    /// <summary>
+    /// Gets the playback sessions the session routes are addressed through.
+    /// </summary>
+    public MediaRouteSessions Sessions { get; private set; } = MediaRouteSessions.None;
 
     /// <summary>
     /// Gets a copy of the exact bytes on disk behind <see cref="ItemId"/>. A method, not a
@@ -111,7 +123,45 @@ public sealed class MediaBoundaryFixture : IAsyncLifetime
         ItemId = SeedItem(Factory.Services.GetRequiredService<IItemWriteCommands>(), mediaStreamRepository, "fixture.mp4", "R1 media boundary fixture");
         OtherItemId = SeedItem(Factory.Services.GetRequiredService<IItemWriteCommands>(), mediaStreamRepository, "other.mp4", "R1 media boundary second fixture");
 
-        Routes = MediaRouteCatalog.For(ItemId, MediaSourceId, SubtitleStreamIndex);
+        Sessions = await CreateSessionsAsync().ConfigureAwait(false);
+        Routes = MediaRouteCatalog.For(ItemId, MediaSourceId, SubtitleStreamIndex, Sessions);
+    }
+
+    /// <summary>
+    /// Creates one playback session per delivery the session routes serve - a direct play (its
+    /// <c>File</c> route), a progressive remux and an HLS remux - all under
+    /// its own play session (<see cref="MediaRouteCatalog"/>): a route names it, and a capability for
+    /// that route is minted for it.
+    /// </summary>
+    /// <returns>The sessions, by delivery.</returns>
+    private async Task<MediaRouteSessions> CreateSessionsAsync()
+    {
+        using var client = DurableHeaderClient();
+        var me = await client.GetFromJsonAsync<JsonElement>("/Users/Me", JsonDefaults.Options).ConfigureAwait(false);
+        var userId = Guid.Parse(me.GetProperty("Id").GetString()!, CultureInfo.InvariantCulture);
+
+        // The fixture carries an external SRT track; the client renders it beside the stream, so a
+        // session that selects it is not refused for a subtitle it cannot deliver.
+        static ClientCapabilities WithExternalSrt(ClientCapabilities capabilities)
+            => capabilities with { Decode = capabilities.Decode with { SubtitleDelivery = [new SubtitleCapability("srt", SubtitleDeliveryMethod.External)] } };
+
+        var (direct, directConstraints) = EndToEndCapabilityPresets.DirectPlay();
+        var (progressive, progressiveConstraints) = EndToEndCapabilityPresets.RemuxMatroskaToMpegTs();
+        var (hls, hlsConstraints) = EndToEndCapabilityPresets.Remux();
+
+        return new MediaRouteSessions(
+            File: await CreateSessionAsync(client, userId, WithExternalSrt(direct), directConstraints, MediaRouteCatalog.FilePlaySession).ConfigureAwait(false),
+            Progressive: await CreateSessionAsync(client, userId, WithExternalSrt(progressive), progressiveConstraints with { AllowDirectPlay = false }, MediaRouteCatalog.ProgressivePlaySession).ConfigureAwait(false),
+            Hls: await CreateSessionAsync(client, userId, WithExternalSrt(hls), hlsConstraints, MediaRouteCatalog.HlsPlaySession).ConfigureAwait(false));
+    }
+
+    private async Task<Guid> CreateSessionAsync(HttpClient client, Guid userId, ClientCapabilities capabilities, PlaybackConstraints constraints, string playSessionId)
+    {
+        var request = new CreatePlaybackSessionRequest(ItemId, userId, capabilities, constraints, MediaSourceId: null, PlaySessionId: playSessionId);
+        using var response = await client.PostAsJsonAsync("/Playback/Sessions", request, JsonDefaults.Options).ConfigureAwait(false);
+        var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        Assert.True(response.IsSuccessStatusCode, $"POST /Playback/Sessions answered {(int)response.StatusCode}: {body}");
+        return JsonSerializer.Deserialize<PlaybackSessionResponse>(body, JsonDefaults.Options)!.Id;
     }
 
     /// <inheritdoc />
@@ -205,7 +255,7 @@ public sealed class MediaBoundaryFixture : IAsyncLifetime
         IReadOnlyList<PlaybackCapabilityScope> scopes,
         Guid? itemId,
         string? mediaSourceId,
-        string playSessionId = "r1-play-session")
+        string playSessionId = DefaultPlaySession)
     {
         using var client = DurableHeaderClient();
         return await MintWithAsync(client, scopes, itemId, mediaSourceId, playSessionId).ConfigureAwait(false);
@@ -226,7 +276,7 @@ public sealed class MediaBoundaryFixture : IAsyncLifetime
         IReadOnlyList<PlaybackCapabilityScope> scopes,
         Guid? itemId,
         string? mediaSourceId,
-        string playSessionId = "r1-play-session")
+        string playSessionId = DefaultPlaySession)
     {
         ArgumentNullException.ThrowIfNull(client);
 
@@ -283,7 +333,8 @@ public sealed class MediaBoundaryFixture : IAsyncLifetime
             client,
             [route.Scope],
             route.ItemBound ? ItemId : null,
-            route.MediaSourceBound ? MediaSourceId : null).ConfigureAwait(false);
+            route.MediaSourceBound ? MediaSourceId : null,
+            route.PlaySessionId ?? DefaultPlaySession).ConfigureAwait(false);
     }
 
     /// <summary>

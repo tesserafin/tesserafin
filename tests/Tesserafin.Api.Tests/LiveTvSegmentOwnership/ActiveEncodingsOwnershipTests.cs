@@ -461,9 +461,6 @@ public sealed class ActiveEncodingsOwnershipTests : IDisposable
         public HlsJobOwnershipDecision AuthorizeByPlaylistId(HttpContext context, string playlistId)
             => _inner.AuthorizeByPlaylistId(context, playlistId);
 
-        public HlsJobOwnershipDecision AuthorizeBySegmentName(HttpContext context, string segmentName)
-            => _inner.AuthorizeBySegmentName(context, segmentName);
-
         public HlsJobOwnershipDecision AuthorizeByOutputPath(HttpContext context, string outputPath)
             => _inner.AuthorizeByOutputPath(context, outputPath);
 
@@ -486,9 +483,6 @@ public sealed class ActiveEncodingsOwnershipTests : IDisposable
         public List<(HttpContext Context, Guid OwnerUserId, string? OwnerDeviceId)> Questions { get; } = new();
 
         public HlsJobOwnershipDecision AuthorizeByPlaylistId(HttpContext context, string playlistId)
-            => HlsJobOwnershipDecision.NoSuchJob();
-
-        public HlsJobOwnershipDecision AuthorizeBySegmentName(HttpContext context, string segmentName)
             => HlsJobOwnershipDecision.NoSuchJob();
 
         public HlsJobOwnershipDecision AuthorizeByOutputPath(HttpContext context, string outputPath)

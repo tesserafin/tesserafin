@@ -28,14 +28,6 @@ public interface IHlsJobOwnershipAuthorizer
     HlsJobOwnershipDecision AuthorizeByPlaylistId(HttpContext context, string playlistId);
 
     /// <summary>
-    /// Authorizes a caller against the job that owns a segment file name.
-    /// </summary>
-    /// <param name="context">The request.</param>
-    /// <param name="segmentName">The segment name, without extension, the route named.</param>
-    /// <returns>The decision, carrying the binding it was made against.</returns>
-    HlsJobOwnershipDecision AuthorizeBySegmentName(HttpContext context, string segmentName);
-
-    /// <summary>
     /// Authorizes a caller against the job that writes a resolved output path.
     /// </summary>
     /// <param name="context">The request.</param>

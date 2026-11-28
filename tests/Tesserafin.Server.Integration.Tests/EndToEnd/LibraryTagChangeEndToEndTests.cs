@@ -86,12 +86,12 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
             using var cleo = server.ClientFor("r2-cleo", seeded.CleoToken);
             using var anonymous = server.CreateClient();
 
-            var capabilities = new Dictionary<(string User, Guid Item), string>();
+            var capabilities = new Dictionary<(string User, Guid Item), (string Capability, string Url)>();
             foreach (var (name, client, userId) in new[] { ("bea", bea, seeded.BeaId), ("cleo", cleo, seeded.CleoId) })
             {
                 foreach (var item in seeded.Items)
                 {
-                    capabilities[(name, item)] = await MintAsync(client, userId, item, TestContext.Current.CancellationToken);
+                    capabilities[(name, item)] = await OpenAsync(client, userId, item, TestContext.Current.CancellationToken);
                 }
             }
 
@@ -119,7 +119,7 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
             using var bea = restarted.ClientFor("r2-bea", seeded.BeaToken);
             using var cleo = restarted.ClientFor("r2-cleo", seeded.CleoToken);
             using var anonymous = restarted.CreateClient();
-            var none = new Dictionary<(string User, Guid Item), string>();
+            var none = new Dictionary<(string User, Guid Item), (string Capability, string Url)>();
 
             await AssertDecisionsAsync("after a restart, bea", bea, anonymous, seeded.BeaId, seeded, none, "bea", allowed: false);
             await AssertDecisionsAsync("after a restart, cleo", cleo, anonymous, seeded.CleoId, seeded, none, "cleo", allowed: true);
@@ -137,7 +137,7 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
         HttpClient anonymous,
         Guid userId,
         Seeded seeded,
-        Dictionary<(string User, Guid Item), string> capabilities,
+        Dictionary<(string User, Guid Item), (string Capability, string Url)> capabilities,
         string name,
         bool allowed)
     {
@@ -146,10 +146,17 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
         {
             var at = FormattableString.Invariant($"{what}, item {(item.Equals(seeded.InBoth) ? "in both libraries" : "in Vault only")}");
             Expect(at + ": by id", expected, await StatusAsync(client, HttpMethod.Get, FormattableString.Invariant($"Items/{item}?userId={userId}"), cancellationToken: TestContext.Current.CancellationToken));
-            Expect(at + ": bytes with the user's token", expected, await StatusAsync(client, HttpMethod.Get, Bytes(item), cancellationToken: TestContext.Current.CancellationToken));
-            if (capabilities.TryGetValue((name, item), out var capability))
+            // The bytes are a session's: the one opened before the change, or, after a restart that
+            // dropped it, one opened now - which a withheld item is refused at creation.
+            if (capabilities.TryGetValue((name, item), out var opened))
             {
-                Expect(at + ": bytes with a capability minted before the change", expected, await StatusAsync(anonymous, HttpMethod.Get, Bytes(item) + "&playbackCapability=" + Uri.EscapeDataString(capability), cancellationToken: TestContext.Current.CancellationToken));
+                Expect(at + ": bytes with the user's token", expected, await StatusAsync(client, HttpMethod.Get, opened.Url, cancellationToken: TestContext.Current.CancellationToken));
+                Expect(at + ": bytes with a capability minted before the change", expected, await StatusAsync(anonymous, HttpMethod.Get, opened.Url + "&playbackCapability=" + Uri.EscapeDataString(opened.Capability), cancellationToken: TestContext.Current.CancellationToken));
+            }
+            else
+            {
+                var (created, url) = await SessionFileRoute.OpenAsync(client, userId, item, SessionFileRoute.NewPlaySession(), TestContext.Current.CancellationToken);
+                Expect(at + ": bytes with the user's token", expected, url is null ? created : await StatusAsync(client, HttpMethod.Get, url, cancellationToken: TestContext.Current.CancellationToken));
             }
         }
 
@@ -172,8 +179,6 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
         }
     }
 
-    private static string Bytes(Guid item) => FormattableString.Invariant($"Videos/{item}/stream?static=true&mediaSourceId={item:N}");
-
     private static async Task<HttpStatusCode> StatusAsync(HttpClient client, HttpMethod method, string url, object? body = null, CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(method, url);
@@ -186,14 +191,18 @@ public sealed class LibraryTagChangeEndToEndTests : IDisposable
         return response.StatusCode;
     }
 
-    private static async Task<string> MintAsync(HttpClient client, Guid userId, Guid item, CancellationToken cancellationToken)
+    /// <summary>
+    /// Opens a direct-play session for the item and mints a capability for its play session.
+    /// </summary>
+    private static async Task<(string Capability, string Url)> OpenAsync(HttpClient client, Guid userId, Guid item, CancellationToken cancellationToken)
     {
-        // A play session is the client's own id: the capability is bound to it, nothing has to have opened it.
-        var playSession = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
+        var playSession = SessionFileRoute.NewPlaySession();
+        var (created, url) = await SessionFileRoute.OpenAsync(client, userId, item, playSession, cancellationToken);
+        Assert.True(url is not null, FormattableString.Invariant($"POST Playback/Sessions answered {(int)created} for item {item}"));
         var (status, body) = await MintingFixture.MintAsync(client, [PlaybackCapabilityScope.Media], item, item.ToString("N"), playSession);
         Assert.Equal(HttpStatusCode.OK, status);
         using var document = JsonDocument.Parse(body);
-        return document.RootElement.GetProperty("Value").GetString()!;
+        return (document.RootElement.GetProperty("Value").GetString()!, url!);
     }
 
     /// <summary>

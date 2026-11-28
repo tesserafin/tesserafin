@@ -178,27 +178,6 @@ public sealed class TranscodeManager : ITranscodeManager, IHlsSegmentBindingRegi
     }
 
     /// <inheritdoc />
-    public HlsSegmentBinding? ResolveBySegmentName(string segmentName)
-    {
-        if (string.IsNullOrEmpty(segmentName))
-        {
-            return null;
-        }
-
-        // #153-LTV-R3. The audio sibling route names no playlist, so the segment name is all there
-        // is to select a job with — and selecting is ALL it is used for. ffmpeg writes a job's
-        // segments as "{playlistId}%d.{ext}", so the owner is the job whose playlist identifier
-        // prefixes the name. The file itself is then built from that job's own canonical root by
-        // the caller of this method, never from the transcode folder plus this string.
-        return Project(SelectHlsJob(j =>
-        {
-            var jobPlaylistId = Path.GetFileNameWithoutExtension(j.Path);
-            return !string.IsNullOrEmpty(jobPlaylistId)
-                   && segmentName.StartsWith(jobPlaylistId, StringComparison.Ordinal);
-        }));
-    }
-
-    /// <inheritdoc />
     public HlsSegmentBinding? ResolveByOutputPath(string outputPath)
     {
         if (string.IsNullOrEmpty(outputPath))

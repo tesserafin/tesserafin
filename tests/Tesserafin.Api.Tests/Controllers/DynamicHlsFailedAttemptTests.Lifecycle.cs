@@ -143,26 +143,6 @@ public sealed partial class DynamicHlsFailedAttemptTests
     }
 
     [Fact]
-    public async Task LegacyRoutes_KeepRefusingAFailedAttemptsFiles_PastTheThirtySeconds()
-    {
-        var attempt = await StartPlayback(hardware: true, segments: 6);
-        var beforeRemoval = _fileSystem.PauseBeforeRemoval(attempt.Prefix);
-        Fail(attempt, 134, DeviceLost);
-        await beforeRemoval.Reached;
-
-        // The files are still there, and the answer the segment route keeps has run out.
-        _clock.Advance(FailureAnswerLifetime + TimeSpan.FromTicks(1));
-        var video = await LegacySegmentRequest(attempt, 1);
-        var audio = await LegacyAudioRequest(attempt, 1);
-
-        beforeRemoval.Open();
-        await attempt.Ended.WaitAsync(Patience, TestContext.Current.CancellationToken);
-
-        AssertFailed(video, "software");
-        AssertFailed(audio, "software");
-    }
-
-    [Fact]
     public async Task LiveRequestOfAnotherUserDecidedBeforeTheJobExisted_DoesNotGetItsPlaylist()
     {
         Configure(hardware: true);
@@ -457,58 +437,38 @@ public sealed partial class DynamicHlsFailedAttemptTests
 
         return Task.Run(async () =>
         {
-            var result = await controller.GetLiveHlsStream(
-                itemId: _item,
-                container: "ts",
-                @static: null,
-                @params: null,
-                tag: null,
-                deviceProfileId: null,
-                playSessionId: named ? SessionA : null,
-                segmentContainer: "ts",
-                segmentLength: 3,
-                minSegments: minSegments,
-                mediaSourceId: MediaSourceId,
-                deviceId: named ? OwnerDevice : null,
-                audioCodec: "aac",
-                enableAutoStreamCopy: false,
-                allowVideoStreamCopy: false,
-                allowAudioStreamCopy: false,
-                audioSampleRate: null,
-                maxAudioBitDepth: null,
-                audioBitRate: 128000,
-                audioChannels: null,
-                maxAudioChannels: 2,
-                profile: null,
-                level: null,
-                framerate: null,
-                maxFramerate: null,
-                copyTimestamps: null,
-                startTimeTicks: null,
-                width: null,
-                height: null,
-                videoBitRate: 2_000_000,
-                subtitleStreamIndex: null,
-                subtitleMethod: null,
-                maxRefFrames: null,
-                maxVideoBitDepth: null,
-                requireAvc: null,
-                deInterlace: null,
-                requireNonAnamorphic: null,
-                transcodingMaxAudioChannels: null,
-                cpuCoreLimit: null,
-                liveStreamId: null,
-                enableMpegtsM2TsMode: null,
-                videoCodec: "h264",
-                subtitleCodec: null,
-                transcodeReasons: null,
-                audioStreamIndex: null,
-                videoStreamIndex: null,
-                context: null,
-                streamOptions: new Dictionary<string, string>(),
-                maxWidth: null,
-                maxHeight: null,
-                enableSubtitlesInManifest: null).ConfigureAwait(false);
+            var result = await controller.GetLivePlaylistInternal(
+                new Tesserafin.Controller.Streaming.VideoRequestDto
+                {
+                    Id = _item,
+                    Container = "ts",
+                    Static = false,
+                    PlaySessionId = named ? SessionA : null,
+                    SegmentContainer = "ts",
+                    SegmentLength = 3,
+                    MinSegments = minSegments,
+                    MediaSourceId = MediaSourceId,
+                    DeviceId = named ? OwnerDevice : null,
+                    AudioCodec = "aac",
+                    EnableAutoStreamCopy = false,
+                    AllowAudioStreamCopy = false,
+                    AllowVideoStreamCopy = false,
+                    MaxAudioChannels = 2,
+                    AudioBitRate = 128000,
+                    CopyTimestamps = false,
+                    VideoBitRate = 2_000_000,
+                    SubtitleMethod = Tesserafin.Model.Dlna.SubtitleDeliveryMethod.External,
+                    RequireAvc = false,
+                    DeInterlace = false,
+                    RequireNonAnamorphic = false,
+                    EnableMpegtsM2TsMode = false,
+                    VideoCodec = "h264",
+                    Context = Tesserafin.Model.Dlna.EncodingContext.Streaming,
+                    StreamOptions = new Dictionary<string, string>(),
+                    EnableSubtitlesInManifest = true,
+                },
+                sessionOwned: false,
+                sessionBinding: null).ConfigureAwait(false);
 
             return await Executed(result, httpContext, body).ConfigureAwait(false);
         });
@@ -526,19 +486,6 @@ public sealed partial class DynamicHlsFailedAttemptTests
         var controller = _newLegacyController!();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
-        return Task.Run(() => Executed(controller.GetHlsVideoSegmentLegacy(_item.ToString("N"), playlistId, segmentId, "mp4"), httpContext, body));
-    }
-
-    /// <summary>
-    /// <c>Audio/{itemId}/hls/{segmentId}/stream.aac</c>, the audio sibling, which selects its job by the segment's name.
-    /// </summary>
-    private Task<Response> LegacyAudioRequest(Start attempt, int segment)
-    {
-        var segmentId = Path.GetFileNameWithoutExtension(attempt.Segment(segment));
-        var httpContext = Context(FormattableString.Invariant($"/Audio/{_item:N}/hls/{segmentId}/stream.mp4"), null, OwnerDevice, out var body);
-        var controller = _newLegacyController!();
-        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
-
-        return Task.Run(() => Executed(controller.GetHlsAudioSegmentLegacy(_item.ToString("N"), segmentId), httpContext, body));
+        return Task.Run(() => Executed(controller.ServeOwnedVideoSegment(_item.ToString("N"), playlistId, segmentId, requiredPlaySessionId: null), httpContext, body));
     }
 }

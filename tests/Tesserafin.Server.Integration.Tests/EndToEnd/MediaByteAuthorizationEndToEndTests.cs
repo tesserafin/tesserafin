@@ -81,21 +81,6 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
 
     public static TheoryData<string, string, string> ItemRoutes => new()
     {
-        { "GET", "Videos/{item}/stream?static=true&mediaSourceId={ms}", string.Empty },
-        { "HEAD", "Videos/{item}/stream?static=true&mediaSourceId={ms}", string.Empty },
-        { "GET", "Videos/{item}/stream?static=true&mediaSourceId={ms}", "bytes=0-15" },
-        { "GET", "Videos/{item}/stream.mp4?static=true&mediaSourceId={ms}", string.Empty },
-        { "GET", "Audio/{item}/stream?static=true&mediaSourceId={ms}", string.Empty },
-        { "GET", "Videos/{item}/stream.ts?" + Transcode + "&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
-        { "HEAD", "Videos/{item}/stream.ts?" + Transcode + "&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
-        { "GET", "Audio/{item}/stream.mp3?static=false&audioCodec=mp3&audioBitRate=128000&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
-        { "GET", "Videos/{item}/master.m3u8?" + Transcode + "&segmentContainer=ts&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
-        { "HEAD", "Videos/{item}/master.m3u8?" + Transcode + "&segmentContainer=ts&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
-        { "GET", "Videos/{item}/main.m3u8?" + Transcode + "&segmentContainer=ts&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
-        { "GET", "Videos/{item}/hls1/main/0.ts?" + Transcode + "&segmentContainer=ts&runtimeTicks=0&actualSegmentLengthTicks=30000000&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
-        { "GET", "Videos/{item}/live.m3u8?container=ts&" + Transcode + "&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
-        { "GET", "Audio/{item}/main.m3u8?static=false&audioCodec=aac&audioBitRate=128000&segmentContainer=ts&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
-        { "GET", "Audio/{item}/hls1/main/0.ts?static=false&audioCodec=aac&audioBitRate=128000&segmentContainer=ts&runtimeTicks=0&actualSegmentLengthTicks=30000000&mediaSourceId={ms}&deviceId={id}&playSessionId={id}", string.Empty },
         { "GET", "Videos/{item}/{ms}/Subtitles/2/Stream.vtt", string.Empty },
         { "GET", "Videos/{item}/{ms}/Subtitles/2/Stream.srt", string.Empty },
         { "GET", "Videos/{item}/{ms}/Subtitles/2/0/Stream.vtt", string.Empty },
@@ -199,144 +184,6 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
     }
 
     /// <summary>
-    /// The allowed user's progressive transcode is registered; the withheld user replays its url.
-    /// Then the transcode is released, its file stays, and the replay is sent again.
-    /// </summary>
-    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Fact(Timeout = 120_000)]
-    public async Task ProgressiveUrlOfAnAllowedUser_ReplayedByTheWithheldUser_IsNotAnswered_ActiveOrResidual()
-    {
-        var playSession = "smr1-replay-" + Guid.NewGuid().ToString("N");
-        var url = FormattableString.Invariant($"Videos/{_item}/stream.ts?{Transcode}&mediaSourceId={_item:N}&deviceId={playSession}&playSessionId={playSession}");
-
-        TranscodingJob job;
-        int requests;
-        using (var request = Request("GET", url))
-        using (var playing = await _allowed.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken))
-        {
-            Assert.Equal(HttpStatusCode.OK, playing.StatusCode);
-            job = Assert.Single(_started, j => j.PlaySessionId == playSession);
-            Assert.Same(job, _transcodeManager.GetTranscodingJob(job.Path!, TranscodingJobType.Progressive));
-            requests = job.ActiveRequestCount;
-
-            // Active: the owner is still connected.
-            var active = await SendAsync(_withheld, "GET", url, string.Empty, TestContext.Current.CancellationToken);
-            Assert.Equal(HttpStatusCode.NotFound, active.Status);
-            Assert.Equal(requests, job.ActiveRequestCount);
-        }
-
-        // Released by its owner; the removal of its file fails, so the file stays with no job on it.
-        _fileSystem.FailDeferredRemovalsUnder = _transcodes;
-        using (var stopped = await _allowed.DeleteAsync(FormattableString.Invariant($"Videos/ActiveEncodings?deviceId={playSession}&playSessionId={playSession}"), TestContext.Current.CancellationToken))
-        {
-            Assert.Equal(HttpStatusCode.NoContent, stopped.StatusCode);
-        }
-
-        await EventuallyAsync(() => _transcodeManager.GetTranscodingJob(job.Path!, TranscodingJobType.Progressive) is null, "the released transcode never left the registry", TestContext.Current.CancellationToken);
-        await File.WriteAllBytesAsync(job.Path!, _mark, TestContext.Current.CancellationToken);
-
-        var residual = await SendAsync(_withheld, "GET", url, string.Empty, TestContext.Current.CancellationToken);
-
-        Assert.True(File.Exists(job.Path), "the released transcode's file is not on disk: this run shows nothing");
-        Assert.Equal(HttpStatusCode.NotFound, residual.Status);
-        Assert.False(Carries(residual.Body, _mark));
-        Assert.DoesNotContain(_started, j => j.UserId.Equals(_withheldId));
-    }
-
-    /// <summary>
-    /// The withheld user asks for an item of its own, naming the play session of somebody's
-    /// transcode of the item it may not see.
-    /// </summary>
-    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Fact(Timeout = 120_000)]
-    public async Task PlaySessionOfAnotherItemsTranscode_NamedOnOnesOwnItem_DoesNotChangeWhatIsServed()
-    {
-        var playSession = "smr1-borrowed-" + Guid.NewGuid().ToString("N");
-        var theirs = FormattableString.Invariant($"Videos/{_item}/stream.ts?{Transcode}&mediaSourceId={_item:N}&deviceId={playSession}&playSessionId={playSession}");
-        using var request = Request("GET", theirs);
-        using var playing = await _allowed.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, playing.StatusCode);
-        Assert.NotNull(_transcodeManager.GetTranscodingJob(playSession));
-
-        var mine = await SendAsync(_withheld, "GET", FormattableString.Invariant($"Videos/{_own}/stream?static=true&mediaSourceId={_own:N}&playSessionId={playSession}"), string.Empty, TestContext.Current.CancellationToken);
-
-        Assert.False(mine.Body.AsSpan().SequenceEqual(_itemBytes), "the withheld user was served the withheld item's file under its own item's id");
-        Assert.Equal(HttpStatusCode.OK, mine.Status);
-        Assert.True(mine.Body.AsSpan().SequenceEqual(_ownBytes));
-    }
-
-    /// <summary>
-    /// The withheld item is merged, as another version, with an item the withheld user may see.
-    /// A media source is then another item's file, named on the visible item's routes.
-    /// </summary>
-    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Fact(Timeout = 120_000)]
-    public async Task WithheldItemMergedAsAVersionOfAVisibleOne_IsNotServedThroughTheVisibleOne()
-    {
-        using (var merged = await _admin.PostAsync(FormattableString.Invariant($"Videos/MergeVersions?ids={_own},{_item}"), null, TestContext.Current.CancellationToken))
-        {
-            Assert.Equal(HttpStatusCode.NoContent, merged.StatusCode);
-        }
-
-        string[] templates =
-        [
-            "Videos/{0}/stream?static=true&mediaSourceId={1}",
-            "Videos/{0}/stream.ts?" + Transcode + "&mediaSourceId={1}&deviceId={2}&playSessionId={2}",
-            "Videos/{0}/master.m3u8?" + Transcode + "&segmentContainer=ts&mediaSourceId={1}&deviceId={2}&playSessionId={2}",
-            "Videos/{0}/hls1/main/0.ts?" + Transcode + "&segmentContainer=ts&runtimeTicks=0&actualSegmentLengthTicks=30000000&mediaSourceId={1}&deviceId={2}&playSessionId={2}",
-            "Videos/{0}/{1}/Subtitles/2/Stream.vtt",
-            "Videos/{0}/{1}/Subtitles/2/subtitles.m3u8?segmentLength=30",
-        ];
-        foreach (var template in templates)
-        {
-            string Url(Guid source) => string.Format(CultureInfo.InvariantCulture, template, _own, source.ToString("N", CultureInfo.InvariantCulture), "smr1-" + Guid.NewGuid().ToString("N"));
-
-            // The version is reached through the visible item at all: by a user who may see both.
-            var served = await SendAsync(_allowed, "GET", Url(_item), string.Empty, TestContext.Current.CancellationToken);
-            Assert.True((int)served.Status is >= 200 and < 300, FormattableString.Invariant($"{template}: the allowed user was answered {(int)served.Status}"));
-
-            var refused = await SendAsync(_withheld, "GET", Url(_item), string.Empty, TestContext.Current.CancellationToken);
-            var unknown = await SendAsync(_withheld, "GET", Url(Guid.NewGuid()), string.Empty, TestContext.Current.CancellationToken);
-
-            Assert.False((int)refused.Status is >= 200 and < 300, FormattableString.Invariant($"{template}: the withheld user was answered {(int)refused.Status} with {refused.Body.Length} bytes"));
-            Assert.Equal(unknown.Status, refused.Status);
-            Assert.Equal(unknown.Body.Length, refused.Body.Length);
-        }
-
-        Assert.DoesNotContain(_started, j => j.UserId.Equals(_withheldId));
-
-        // Its own version is still its own.
-        var mine = await SendAsync(_withheld, "GET", FormattableString.Invariant($"Videos/{_own}/stream?static=true&mediaSourceId={_own:N}"), string.Empty, TestContext.Current.CancellationToken);
-        Assert.True(mine.Body.AsSpan().SequenceEqual(_ownBytes));
-    }
-
-    /// <summary>
-    /// A capability is validated against the media source the query names; the legacy
-    /// <c>params</c> blob names another one afterwards.
-    /// </summary>
-    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Fact(Timeout = 120_000)]
-    public async Task CapabilityForOneMediaSource_WithAParamsBlobNamingAnother_IsRefused()
-    {
-        using (var merged = await _admin.PostAsync(FormattableString.Invariant($"Videos/MergeVersions?ids={_own},{_item}"), null, TestContext.Current.CancellationToken))
-        {
-            Assert.Equal(HttpStatusCode.NoContent, merged.StatusCode);
-        }
-
-        var playSession = "smr1-params-" + Guid.NewGuid().ToString("N");
-        var capability = await MediaBoundaryFixture.MintWithAsync(_allowed, [PlaybackCapabilityScope.Media], _own, _own.ToString("N", CultureInfo.InvariantCulture), playSession);
-        var bound = FormattableString.Invariant($"Videos/{_own}/stream?static=true&mediaSourceId={_own:N}&playSessionId={playSession}&playbackCapability={Uri.EscapeDataString(capability.Value)}");
-        using var anonymous = _factory.CreateClient();
-
-        Assert.True((await SendAsync(anonymous, "GET", bound, string.Empty, TestContext.Current.CancellationToken)).Body.AsSpan().SequenceEqual(_ownBytes));
-
-        var rewritten = await SendAsync(anonymous, "GET", bound + FormattableString.Invariant($"&params=;;{_item:N}"), string.Empty, TestContext.Current.CancellationToken);
-
-        Assert.False(rewritten.Body.AsSpan().SequenceEqual(_itemBytes), "the capability was served a media source it was not minted for");
-        Assert.Equal(HttpStatusCode.Unauthorized, rewritten.Status);
-    }
-
-    /// <summary>
     /// #301: a capability beside another user's token is a contradiction, whoever that user is. Beside
     /// its own user's token, or alone, it is served.
     /// </summary>
@@ -345,8 +192,7 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
     public async Task CapabilityBesideADurableToken_IsServedOnlyForItsOwnUser()
     {
         var playSession = "pc301-" + Guid.NewGuid().ToString("N");
-        var capability = await MediaBoundaryFixture.MintWithAsync(_allowed, [PlaybackCapabilityScope.Media], _item, _item.ToString("N", CultureInfo.InvariantCulture), playSession);
-        var url = FormattableString.Invariant($"Videos/{_item}/stream?static=true&mediaSourceId={_item:N}&playSessionId={playSession}&playbackCapability={Uri.EscapeDataString(capability.Value)}");
+        var url = await CapabilityUrlAsync(_allowed, _allowedId, playSession);
         using var anonymous = _factory.CreateClient();
 
         Assert.True((await SendAsync(anonymous, "GET", url, string.Empty, TestContext.Current.CancellationToken)).Body.AsSpan().SequenceEqual(_itemBytes));
@@ -375,7 +221,7 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
         using var keys = JsonDocument.Parse(await _admin.GetStringAsync("Auth/Keys", TestContext.Current.CancellationToken));
         var key = keys.RootElement.GetProperty("Items").EnumerateArray().Single(k => k.GetProperty("AppName").GetString() == app).GetProperty("AccessToken").GetString();
         var playSession = "pc301-key-" + Guid.NewGuid().ToString("N");
-        var url = await CapabilityUrlAsync(_allowed, playSession);
+        var url = await CapabilityUrlAsync(_allowed, _allowedId, playSession);
         using var anonymous = _factory.CreateClient();
 
         var contradicted = await SendAsync(anonymous, "GET", url + "&ApiKey=" + key, string.Empty, TestContext.Current.CancellationToken);
@@ -399,8 +245,8 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
         var bobSession = await CreatePlaybackSessionAsync(_second, _secondId, playSession, TestContext.Current.CancellationToken);
         Assert.NotEqual(aliceSession, bobSession);
 
-        var aliceUrl = await CapabilityUrlAsync(_allowed, playSession);
-        var bobUrl = await CapabilityUrlAsync(_second, playSession);
+        var aliceUrl = await CapabilityUrlAsync(_allowed, _allowedId, playSession);
+        var bobUrl = await CapabilityUrlAsync(_second, _secondId, playSession);
         using var anonymous = _factory.CreateClient();
         Assert.True((await SendAsync(anonymous, "GET", aliceUrl, string.Empty, TestContext.Current.CancellationToken)).Body.AsSpan().SequenceEqual(_itemBytes));
         Assert.True((await SendAsync(anonymous, "GET", bobUrl, string.Empty, TestContext.Current.CancellationToken)).Body.AsSpan().SequenceEqual(_itemBytes));
@@ -422,8 +268,8 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
     {
         var playSession = "pc301-devices-" + Guid.NewGuid().ToString("N");
         using var otherDevice = await SignInAgainAsync("smr1-allowed-" + _suffix, "pc301-other-device", TestContext.Current.CancellationToken);
-        var firstUrl = await CapabilityUrlAsync(_allowed, playSession);
-        var otherUrl = await CapabilityUrlAsync(otherDevice, playSession);
+        var firstUrl = await CapabilityUrlAsync(_allowed, _allowedId, playSession);
+        var otherUrl = await CapabilityUrlAsync(otherDevice, _allowedId, playSession);
         using var anonymous = _factory.CreateClient();
 
         await EndAsync(otherDevice, Guid.Empty, playSession, byStopReport: true, cancellationToken: TestContext.Current.CancellationToken);
@@ -431,35 +277,12 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(anonymous, "GET", otherUrl, string.Empty, TestContext.Current.CancellationToken)).Status);
         Assert.True((await SendAsync(anonymous, "GET", firstUrl, string.Empty, TestContext.Current.CancellationToken)).Body.AsSpan().SequenceEqual(_itemBytes));
 
-        var otherAgain = await CapabilityUrlAsync(otherDevice, playSession);
+        var otherAgain = await CapabilityUrlAsync(otherDevice, _allowedId, playSession);
         var session = await CreatePlaybackSessionAsync(_allowed, _allowedId, playSession, TestContext.Current.CancellationToken);
         await EndAsync(_allowed, session, playSession, byStopReport: false, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(anonymous, "GET", firstUrl, string.Empty, TestContext.Current.CancellationToken)).Status);
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(anonymous, "GET", otherAgain, string.Empty, TestContext.Current.CancellationToken)).Status);
-    }
-
-    /// <summary>
-    /// #301: the owner stamped on a job started under a capability is the capability's user and the
-    /// device of its session, even beside a token of the same user on another device.
-    /// </summary>
-    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Fact(Timeout = 120_000)]
-    public async Task JobStartedUnderACapabilityBesideAnotherDevicesToken_IsStampedWithTheCapabilitysDevice()
-    {
-        var name = "smr1-allowed-" + _suffix;
-        var playSession = "pc301-stamp-" + Guid.NewGuid().ToString("N");
-        using var otherDevice = await SignInAgainAsync(name, "pc301-stamp-device", TestContext.Current.CancellationToken);
-        var capability = await MediaBoundaryFixture.MintWithAsync(_allowed, [PlaybackCapabilityScope.Media], _item, _item.ToString("N", CultureInfo.InvariantCulture), playSession);
-        var url = FormattableString.Invariant($"Videos/{_item}/stream.ts?{Transcode}&mediaSourceId={_item:N}&deviceId={playSession}&playSessionId={playSession}&playbackCapability={Uri.EscapeDataString(capability.Value)}");
-
-        using var request = Request("GET", url);
-        using var playing = await otherDevice.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, playing.StatusCode);
-        var job = Assert.Single(_started, j => j.PlaySessionId == playSession);
-        Assert.Equal(_allowedId, job.UserId);
-        Assert.Equal(name + "-device", job.OwnerDeviceId);
     }
 
     /// <summary>
@@ -507,10 +330,10 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
     public async Task RightWithdrawnBetweenTwoRequests_TheSecondIsRefused_ForATokenACapabilityAndARunningTranscode()
     {
         var playSession = "smr1-withdrawn-" + Guid.NewGuid().ToString("N");
-        var direct = FormattableString.Invariant($"Videos/{_item}/stream?static=true&mediaSourceId={_item:N}&playSessionId={playSession}");
-        var progressive = FormattableString.Invariant($"Videos/{_item}/stream.ts?{Transcode}&mediaSourceId={_item:N}&deviceId={playSession}&playSessionId={playSession}");
-        var capability = await MediaBoundaryFixture.MintWithAsync(_second, [PlaybackCapabilityScope.Media], _item, _item.ToString("N", CultureInfo.InvariantCulture), playSession);
-        var byCapability = direct + "&playbackCapability=" + Uri.EscapeDataString(capability.Value);
+        var byCapability = await CapabilityUrlAsync(_second, _secondId, playSession);
+        var direct = byCapability[..byCapability.IndexOf("&playbackCapability=", StringComparison.Ordinal)];
+        var progressiveSession = playSession + "-progressive";
+        var progressive = await ProgressiveUrlAsync(_second, _secondId, progressiveSession);
         using var anonymous = _factory.CreateClient();
 
         var before = await SendAsync(_second, "GET", direct, string.Empty, TestContext.Current.CancellationToken);
@@ -520,23 +343,10 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
         using var request = Request("GET", progressive);
         using var playing = await _second.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, playing.StatusCode);
-        var job = Assert.Single(_started, j => j.PlaySessionId == playSession);
+        var job = Assert.Single(_started, j => j.PlaySessionId == progressiveSession);
         var requests = job.ActiveRequestCount;
 
-        // A transcode behind the legacy segment route, which resolves a job and never the item.
-        var live = FormattableString.Invariant($"Videos/{_item}/live.m3u8?container=ts&{Transcode}&mediaSourceId={_item:N}&deviceId={playSession}-live&playSessionId={playSession}-live");
-        var playlist = await SendAsync(_second, "GET", live, string.Empty, TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, playlist.Status);
-        var segment = Encoding.UTF8.GetString(playlist.Body).Split('\n').Select(l => l.Trim()).First(l => l.Length > 0 && !l.StartsWith('#'));
-        segment = segment.StartsWith('/') ? segment[1..] : FormattableString.Invariant($"Videos/{_item}/{segment}");
-        Assert.Equal(HttpStatusCode.OK, (await SendAsync(_second, "GET", segment, string.Empty, TestContext.Current.CancellationToken)).Status);
-
         await WithholdAsync(_secondId, cancellationToken: TestContext.Current.CancellationToken);
-
-        var legacy = await SendAsync(_second, "GET", segment, string.Empty, TestContext.Current.CancellationToken);
-        Assert.False((int)legacy.Status is >= 200 and < 300, FormattableString.Invariant($"legacy segment route answered {(int)legacy.Status} with {legacy.Body.Length} bytes to {segment}"));
-        Assert.Equal(HttpStatusCode.NotFound, legacy.Status);
-        Assert.NotNull(_transcodeManager.GetTranscodingJob(playSession + "-live"));
 
         Assert.Equal(HttpStatusCode.NotFound, (await SendAsync(_second, "GET", direct, string.Empty, TestContext.Current.CancellationToken)).Status);
         Assert.Equal(HttpStatusCode.NotFound, (await SendAsync(_second, "HEAD", direct, string.Empty, TestContext.Current.CancellationToken)).Status);
@@ -546,35 +356,25 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
         // Its own transcode, still registered, on an output that is still there.
         Assert.Equal(HttpStatusCode.NotFound, (await SendAsync(_second, "GET", progressive, string.Empty, TestContext.Current.CancellationToken)).Status);
         Assert.Equal(requests, job.ActiveRequestCount);
-        Assert.Equal(2, _started.Count(j => j.UserId.Equals(_secondId)));
+        Assert.Equal(1, _started.Count(j => j.UserId.Equals(_secondId)));
     }
 
     /// <summary>
-    /// The three routes the fix changed that a bare film does not reach: an attachment, the
-    /// trickplay playlist and the legacy audio segment. Each is served to a user who may see the
+    /// The two routes the fix changed that a bare film does not reach: an attachment and the
+    /// trickplay playlist. Each is served to a user who may see the
     /// item, refused to one who may not as an item that does not exist, and refused to the first
     /// once its right is withdrawn.
     /// </summary>
     /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
     [Fact(Timeout = 120_000)]
-    public async Task AttachmentTrickplayPlaylistAndLegacyAudioSegment_AreServedToWhoMaySeeTheItem_AndToNobodyElse()
+    public async Task AttachmentAndTrickplayPlaylist_AreServedToWhoMaySeeTheItem_AndToNobodyElse()
     {
         await SeedAttachmentAndTrickplayAsync(TestContext.Current.CancellationToken);
-
-        // A transcode of the allowed user's, and a file under one of its segments' names with the
-        // extension the audio route asks for: that route selects a job by the segment's name.
-        var playSession = "smr1-audio-" + Guid.NewGuid().ToString("N");
-        var live = FormattableString.Invariant($"Videos/{_item}/live.m3u8?container=ts&{Transcode}&mediaSourceId={_item:N}&deviceId={playSession}&playSessionId={playSession}");
-        Assert.Equal(HttpStatusCode.OK, (await SendAsync(_second, "GET", live, string.Empty, TestContext.Current.CancellationToken)).Status);
-        var job = Assert.Single(_started, j => j.PlaySessionId == playSession);
-        var segment = Path.GetFileNameWithoutExtension(job.Path!) + "0";
-        await File.WriteAllBytesAsync(Path.Combine(Path.GetDirectoryName(job.Path!)!, segment + ".aac"), _mark, TestContext.Current.CancellationToken);
 
         (string Template, byte[] Content)[] routes =
         [
             ("Videos/{0}/{0:N}/Attachments/" + AttachmentIndex, _mark),
             ("Videos/{0}/Trickplay/" + EndToEndMediaFixtures.Width + "/tiles.m3u8", Encoding.ASCII.GetBytes("#EXT-X-TILES")),
-            ("Audio/{0}/hls/" + segment + "/stream.aac", _mark),
         ];
         string Url(string template, Guid item) => string.Format(CultureInfo.InvariantCulture, template, item);
 
@@ -599,58 +399,6 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
             Assert.True(withdrawn.Status == HttpStatusCode.NotFound, FormattableString.Invariant($"{template}: answered {(int)withdrawn.Status} after the right was withdrawn"));
             Assert.False(Carries(withdrawn.Body, content));
         }
-
-        Assert.NotNull(_transcodeManager.GetTranscodingJob(playSession));
-    }
-
-    /// <summary>
-    /// SECURITY-MEDIA-R3. The legacy audio segment route alone, and the withdrawal alone: one
-    /// user, one url, one transcode that stays registered and one file that stays on disk. Served
-    /// before the right is withdrawn, refused after as for an item that does not exist, and served
-    /// again once the right is given back - so that the right is the only thing the refusal can
-    /// be an answer to.
-    /// </summary>
-    /// <param name="extension">The extension the route is asked with.</param>
-    /// <returns>A <see cref="Task"/> representing the asynchronous test.</returns>
-    [Theory(Timeout = 120_000)]
-    [InlineData("aac")]
-    [InlineData("mp3")]
-    public async Task LegacyAudioSegment_IsRefusedWhileTheRightIsWithdrawn_AndOnlyThen(string extension)
-    {
-        var playSession = "smr3-audio-" + Guid.NewGuid().ToString("N");
-        var live = FormattableString.Invariant($"Videos/{_item}/live.m3u8?container=ts&{Transcode}&mediaSourceId={_item:N}&deviceId={playSession}&playSessionId={playSession}");
-        Assert.Equal(HttpStatusCode.OK, (await SendAsync(_second, "GET", live, string.Empty, TestContext.Current.CancellationToken)).Status);
-        var job = Assert.Single(_started, j => j.PlaySessionId == playSession);
-
-        // The route selects a job by the segment's name and serves the file of that name.
-        var segment = Path.GetFileNameWithoutExtension(job.Path!) + "0";
-        var file = Path.Combine(Path.GetDirectoryName(job.Path!)!, segment + "." + extension);
-        await File.WriteAllBytesAsync(file, _mark, TestContext.Current.CancellationToken);
-        var url = FormattableString.Invariant($"Audio/{_item}/hls/{segment}/stream.{extension}");
-        var unknownUrl = FormattableString.Invariant($"Audio/{Guid.NewGuid()}/hls/{segment}/stream.{extension}");
-
-        var before = await SendAsync(_second, "GET", url, string.Empty, TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, before.Status);
-        Assert.True(Carries(before.Body, _mark));
-
-        await WithholdAsync(_secondId, cancellationToken: TestContext.Current.CancellationToken);
-
-        var withdrawn = await SendAsync(_second, "GET", url, string.Empty, TestContext.Current.CancellationToken);
-        var unknown = await SendAsync(_second, "GET", unknownUrl, string.Empty, TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.NotFound, withdrawn.Status);
-        Assert.False(Carries(withdrawn.Body, _mark));
-        Assert.Equal(unknown.Status, withdrawn.Status);
-        Assert.Equal(unknown.Body, withdrawn.Body);
-
-        // Nothing else changed: the transcode is the same registered job, its file is still there.
-        Assert.Same(job, _transcodeManager.GetTranscodingJob(playSession));
-        Assert.True(File.Exists(file));
-
-        await WithholdAsync(_secondId, withheld: false, cancellationToken: TestContext.Current.CancellationToken);
-
-        var restored = await SendAsync(_second, "GET", url, string.Empty, TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, restored.Status);
-        Assert.True(Carries(restored.Body, _mark));
     }
 
     /// <summary>
@@ -710,15 +458,16 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
     {
         foreach (var (client, userId) in new[] { (_allowed, _allowedId), (_second, _secondId) })
         {
-            var playSession = "smr1-both-" + Guid.NewGuid().ToString("N");
-            var direct = await SendAsync(client, "GET", FormattableString.Invariant($"Videos/{_item}/stream?static=true&mediaSourceId={_item:N}"), string.Empty, TestContext.Current.CancellationToken);
+            var (_, file) = await SessionFileRoute.OpenAsync(client, userId, _item, SessionFileRoute.NewPlaySession(), TestContext.Current.CancellationToken);
+            var direct = await SendAsync(client, "GET", file!, string.Empty, TestContext.Current.CancellationToken);
             Assert.True(direct.Body.AsSpan().SequenceEqual(_itemBytes));
 
-            var ranged = await SendAsync(client, "GET", FormattableString.Invariant($"Videos/{_item}/stream?static=true&mediaSourceId={_item:N}"), "bytes=16-31", TestContext.Current.CancellationToken);
+            var ranged = await SendAsync(client, "GET", file!, "bytes=16-31", TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.PartialContent, ranged.Status);
             Assert.True(ranged.Body.AsSpan().SequenceEqual(_itemBytes.AsSpan(16, 16)));
 
-            var transcoded = await SendAsync(client, "GET", FormattableString.Invariant($"Videos/{_item}/stream.ts?{Transcode}&mediaSourceId={_item:N}&deviceId={playSession}&playSessionId={playSession}"), string.Empty, TestContext.Current.CancellationToken);
+            var playSession = "smr1-both-" + Guid.NewGuid().ToString("N");
+            var transcoded = await SendAsync(client, "GET", await ProgressiveUrlAsync(client, userId, playSession), string.Empty, TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.OK, transcoded.Status);
             Assert.Equal(0x47, transcoded.Body[0]);
             Assert.Equal(userId, Assert.Single(_started, j => j.PlaySessionId == playSession).UserId);
@@ -742,8 +491,9 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
         using var keys = JsonDocument.Parse(await _admin.GetStringAsync("Auth/Keys", TestContext.Current.CancellationToken));
         var key = keys.RootElement.GetProperty("Items").EnumerateArray().Single(k => k.GetProperty("AppName").GetString() == app).GetProperty("AccessToken").GetString();
         using var anonymous = _factory.CreateClient();
+        var (_, file) = await SessionFileRoute.OpenAsync(_allowed, _allowedId, _item, SessionFileRoute.NewPlaySession(), TestContext.Current.CancellationToken);
 
-        var served = await SendAsync(anonymous, "GET", FormattableString.Invariant($"Videos/{_item}/stream?static=true&mediaSourceId={_item:N}&ApiKey={key}"), string.Empty, TestContext.Current.CancellationToken);
+        var served = await SendAsync(anonymous, "GET", file + "&ApiKey=" + key, string.Empty, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, served.Status);
         Assert.True(served.Body.AsSpan().SequenceEqual(_itemBytes));
@@ -861,10 +611,31 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
         applied.EnsureSuccessStatusCode();
     }
 
-    private async Task<string> CapabilityUrlAsync(HttpClient client, string playSession)
+    /// <summary>
+    /// Opens a direct-play session for the caller under <paramref name="playSession"/> and names
+    /// its <c>File</c> route with a capability minted for that play session.
+    /// </summary>
+    private async Task<string> CapabilityUrlAsync(HttpClient client, Guid userId, string playSession)
     {
+        var (created, url) = await SessionFileRoute.OpenAsync(client, userId, _item, playSession, TestContext.Current.CancellationToken);
+        Assert.True(url is not null, FormattableString.Invariant($"POST Playback/Sessions answered {(int)created}"));
         var capability = await MediaBoundaryFixture.MintWithAsync(client, [PlaybackCapabilityScope.Media], _item, _item.ToString("N", CultureInfo.InvariantCulture), playSession);
-        return FormattableString.Invariant($"Videos/{_item}/stream?static=true&mediaSourceId={_item:N}&playSessionId={playSession}&playbackCapability={Uri.EscapeDataString(capability.Value)}");
+        return url + "&playbackCapability=" + Uri.EscapeDataString(capability.Value);
+    }
+
+    /// <summary>
+    /// Opens a session for the caller whose plan is one progressive MPEG-TS stream, and names it.
+    /// </summary>
+    private async Task<string> ProgressiveUrlAsync(HttpClient client, Guid userId, string playSession)
+    {
+        var (capabilities, constraints) = EndToEndCapabilityPresets.RemuxMatroskaToMpegTs();
+        capabilities = capabilities with { Decode = capabilities.Decode with { SubtitleDelivery = [new Tesserafin.Playback.Decision.SubtitleCapability("srt", Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External)] } };
+        var body = new CreatePlaybackSessionRequest(_item, userId, capabilities, constraints with { AllowDirectPlay = false }, MediaSourceId: null, PlaySessionId: playSession);
+        using var response = await client.PostAsJsonAsync("Playback/Sessions", body, JsonDefaults.Options, TestContext.Current.CancellationToken);
+        Assert.True(response.IsSuccessStatusCode, $"POST Playback/Sessions answered {(int)response.StatusCode}");
+        var session = (await response.Content.ReadFromJsonAsync<PlaybackSessionResponse>(JsonDefaults.Options, TestContext.Current.CancellationToken))!;
+        var descriptor = await client.GetFromJsonAsync<PlaybackSessionStreamDescriptor>(FormattableString.Invariant($"Playback/Sessions/{session.Id}/Stream"), JsonDefaults.Options, TestContext.Current.CancellationToken);
+        return descriptor!.Url.TrimStart('/');
     }
 
     private async Task<Guid> CreatePlaybackSessionAsync(HttpClient client, Guid userId, string playSession, CancellationToken cancellationToken)
