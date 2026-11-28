@@ -54,7 +54,7 @@ public enum PlaybackLiveFallbackReason
     KillSwitch,
 
     /// <summary>
-    /// <see cref="Tesserafin.Playback.Dlna.PlaybackExecutionPlanAdapter.ToStreamInfo"/> threw while
+    /// <c>PlaybackExecutionPlanAdapter.ToStreamInfo</c> (removed, tesserafin#129 step 7) threw while
     /// converting an otherwise-eligible plan. Never allowed to fail the request or affect the legacy
     /// path - caught, logged, and downgraded to a legacy-served response, the same "v2 must never
     /// break the live path" discipline <c>ShadowPlaybackSessionPlanner</c> already applies to the

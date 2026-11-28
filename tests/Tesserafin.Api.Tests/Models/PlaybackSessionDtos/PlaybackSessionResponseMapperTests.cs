@@ -27,8 +27,7 @@ public sealed class PlaybackSessionResponseMapperTests
     [Fact]
     public void Map_DirectStream_NormalizesToRemuxMethodWithRemuxContainerTransform()
     {
-        var streamInfo = BuildStreamInfo(PlayMethod.DirectStream, TranscodeReason.ContainerNotSupported, "mkv");
-        var session = BuildSession(PlayMethod.DirectStream, TranscodeReason.ContainerNotSupported, streamInfo);
+        var session = BuildSession(PlayMethod.DirectStream, TranscodeReason.ContainerNotSupported);
 
         var response = PlaybackSessionResponseMapper.Map(session);
 
@@ -44,8 +43,7 @@ public sealed class PlaybackSessionResponseMapperTests
     [InlineData(TranscodeReason.VideoRangeTypeNotSupported, ReasonCode.VideoRangeTypeNotSupported)]
     public void Map_Transcode_MirrorsEachTranscodeReasonToItsOneToOneReasonCode(TranscodeReason reason, ReasonCode expectedCode)
     {
-        var streamInfo = BuildStreamInfo(PlayMethod.Transcode, reason, "mp4");
-        var session = BuildSession(PlayMethod.Transcode, reason, streamInfo);
+        var session = BuildSession(PlayMethod.Transcode, reason);
 
         var response = PlaybackSessionResponseMapper.Map(session);
 
@@ -55,8 +53,7 @@ public sealed class PlaybackSessionResponseMapperTests
     [Fact]
     public void Map_Transcode_AudioCodecReason_DerivesTranscodeAudioOnly()
     {
-        var streamInfo = BuildStreamInfo(PlayMethod.Transcode, TranscodeReason.AudioCodecNotSupported, "mp4");
-        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.AudioCodecNotSupported, streamInfo);
+        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.AudioCodecNotSupported);
 
         var response = PlaybackSessionResponseMapper.Map(session);
 
@@ -66,8 +63,7 @@ public sealed class PlaybackSessionResponseMapperTests
     [Fact]
     public void Map_Transcode_AudioChannelsReason_DerivesTranscodeAudioAndDownmix()
     {
-        var streamInfo = BuildStreamInfo(PlayMethod.Transcode, TranscodeReason.AudioChannelsNotSupported, "mp4");
-        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.AudioChannelsNotSupported, streamInfo);
+        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.AudioChannelsNotSupported);
 
         var response = PlaybackSessionResponseMapper.Map(session);
 
@@ -79,8 +75,7 @@ public sealed class PlaybackSessionResponseMapperTests
     [Fact]
     public void Map_Transcode_VideoRangeReason_DerivesTranscodeVideoAndTonemap()
     {
-        var streamInfo = BuildStreamInfo(PlayMethod.Transcode, TranscodeReason.VideoRangeTypeNotSupported, "mp4");
-        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.VideoRangeTypeNotSupported, streamInfo);
+        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.VideoRangeTypeNotSupported);
 
         var response = PlaybackSessionResponseMapper.Map(session);
 
@@ -92,8 +87,7 @@ public sealed class PlaybackSessionResponseMapperTests
     [Fact]
     public void Map_Transcode_SubtitleReason_DerivesBurnInSubtitle()
     {
-        var streamInfo = BuildStreamInfo(PlayMethod.Transcode, TranscodeReason.SubtitleCodecNotSupported, "mp4");
-        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.SubtitleCodecNotSupported, streamInfo);
+        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.SubtitleCodecNotSupported);
 
         var response = PlaybackSessionResponseMapper.Map(session);
 
@@ -103,7 +97,7 @@ public sealed class PlaybackSessionResponseMapperTests
     [Fact]
     public void Map_NoStreamInfo_ReturnsEmptyOutputAndNoSelectedStreams()
     {
-        var session = BuildSession(PlayMethod.DirectPlay, 0, streamInfo: null);
+        var session = BuildSession(PlayMethod.DirectPlay, 0);
 
         var response = PlaybackSessionResponseMapper.Map(session);
 
@@ -116,10 +110,7 @@ public sealed class PlaybackSessionResponseMapperTests
     [Fact]
     public void Map_DoesNotPopulateTotalOrAudioBitrate_ToAvoidFabricatingAValue()
     {
-        var streamInfo = BuildStreamInfo(PlayMethod.Transcode, TranscodeReason.VideoBitrateNotSupported, "mp4");
-        streamInfo.VideoBitrate = 4_000_000;
-
-        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.VideoBitrateNotSupported, streamInfo);
+        var session = BuildSession(PlayMethod.Transcode, TranscodeReason.VideoBitrateNotSupported);
 
         var response = PlaybackSessionResponseMapper.Map(session);
 
@@ -152,8 +143,7 @@ public sealed class PlaybackSessionResponseMapperTests
     [Fact]
     public void Map_WithNullV2Record_IsIdenticalToLegacyMap()
     {
-        var streamInfo = BuildStreamInfo(PlayMethod.DirectPlay, 0, "mp4", audioIndex: 1);
-        var session = BuildSession(PlayMethod.DirectPlay, 0, streamInfo);
+        var session = BuildSession(PlayMethod.DirectPlay, 0);
 
         var legacyResponse = PlaybackSessionResponseMapper.Map(session);
         var overloadResponse = PlaybackSessionResponseMapper.Map(session, v2Record: null);
@@ -168,8 +158,7 @@ public sealed class PlaybackSessionResponseMapperTests
         // The legacy-sourced session (method/streamInfo) is deliberately different from the v2
         // decision below - proving the overload takes EVERYTHING from the v2 decision verbatim, not
         // a blend with the legacy projection.
-        var streamInfo = BuildStreamInfo(PlayMethod.DirectPlay, 0, "mp4", audioIndex: 1);
-        var session = BuildSession(PlayMethod.DirectPlay, 0, streamInfo);
+        var session = BuildSession(PlayMethod.DirectPlay, 0);
 
         var output = new OutputSpec(
             Container: "mkv",
@@ -254,8 +243,7 @@ public sealed class PlaybackSessionResponseMapperTests
         // v2 was authoritative for the planning call but produced nothing executable: the response
         // must not claim v2 authorship it did not deliver on, so it falls back to the legacy
         // projection exactly as a null record would.
-        var streamInfo = BuildStreamInfo(PlayMethod.DirectPlay, 0, "mp4", audioIndex: 1);
-        var session = BuildSession(PlayMethod.DirectPlay, 0, streamInfo);
+        var session = BuildSession(PlayMethod.DirectPlay, 0);
 
         var notViable = PlaybackDecision.NotViable(
             PlaybackMethod.Transcode,
@@ -277,8 +265,7 @@ public sealed class PlaybackSessionResponseMapperTests
         // PR115c live path falls back to legacy execution for that session, so the response must too
         // - it must never announce v2 authorship (DecisionVersion 6) when the client will effectively
         // get legacy. The guard is plan-centric, not viability-centric.
-        var streamInfo = BuildStreamInfo(PlayMethod.DirectPlay, 0, "mp4", audioIndex: 1);
-        var session = BuildSession(PlayMethod.DirectPlay, 0, streamInfo);
+        var session = BuildSession(PlayMethod.DirectPlay, 0);
 
         var output = new OutputSpec(
             Container: "mkv",
@@ -327,7 +314,7 @@ public sealed class PlaybackSessionResponseMapperTests
         Assert.Equal(expected.UpdatedAt, actual.UpdatedAt);
     }
 
-    private static PlaybackSession BuildSession(PlayMethod playMethod, TranscodeReason reasons, StreamInfo? streamInfo)
+    private static PlaybackSession BuildSession(PlayMethod playMethod, TranscodeReason reasons)
         => new(
             PlaybackSessionId.NewId(),
             PlaybackMediaKind.Video,
@@ -336,47 +323,4 @@ public sealed class PlaybackSessionResponseMapperTests
             new PlaybackPlan(playMethod, reasons),
             DateTimeOffset.UnixEpoch,
             DateTimeOffset.UnixEpoch.AddMinutes(1));
-
-    private static StreamInfo BuildStreamInfo(
-        PlayMethod playMethod,
-        TranscodeReason reasons,
-        string container,
-        int? audioIndex = null,
-        int? subtitleIndex = null,
-        LegacySubtitleDeliveryMethod subtitleDeliveryMethod = LegacySubtitleDeliveryMethod.Embed,
-        string? colorTransfer = null,
-        string? subtitleCodec = null,
-        string? subtitleFormat = null)
-    {
-        var mediaStreams = new List<MediaStream>
-        {
-            new() { Type = MediaStreamType.Video, Index = 0, Codec = "h264", ColorTransfer = colorTransfer },
-            new() { Type = MediaStreamType.Audio, Index = 1, Codec = "aac", IsDefault = true },
-        };
-
-        if (subtitleIndex is int idx && subtitleCodec is not null)
-        {
-            mediaStreams.Add(new MediaStream { Type = MediaStreamType.Subtitle, Index = idx, Codec = subtitleCodec, IsDefault = true });
-        }
-
-        var mediaSource = new MediaSourceInfo
-        {
-            Id = "source-1",
-            Container = container,
-            MediaStreams = mediaStreams,
-        };
-
-        return new StreamInfo
-        {
-            DeviceProfile = new DeviceProfile(),
-            PlayMethod = playMethod,
-            TranscodeReasons = reasons,
-            Container = container,
-            AudioStreamIndex = audioIndex,
-            SubtitleStreamIndex = subtitleIndex,
-            SubtitleDeliveryMethod = subtitleDeliveryMethod,
-            SubtitleFormat = subtitleFormat,
-            MediaSource = mediaSource,
-        };
-    }
 }

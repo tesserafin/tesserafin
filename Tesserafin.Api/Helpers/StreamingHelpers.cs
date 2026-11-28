@@ -227,8 +227,8 @@ public static class StreamingHelpers
 
         if (string.IsNullOrEmpty(containerInternal))
         {
-            containerInternal = streamingRequest.Static ?
-                StreamBuilder.NormalizeMediaSourceFormatIntoSingleContainer(state.InputContainer, null, DlnaProfileType.Audio)
+            containerInternal = streamingRequest.Static
+                ? state.InputContainer
                 : GetOutputFileExtension(state, mediaSource);
         }
 

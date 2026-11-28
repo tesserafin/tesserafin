@@ -181,7 +181,6 @@ public class PlaybackSessionsControllerTests
     {
         var item = new Movie { Id = _itemId };
         SetUpItemAndUser(item);
-        var streamInfo = new StreamInfo { DeviceProfile = new DeviceProfile(), PlayMethod = PlayMethod.DirectPlay, Container = "mp4" };
         var plan = new PlaybackPlan(PlayMethod.DirectPlay, default);
         var planner = new Mock<IPlaybackSessionPlanner>();
         planner.Setup(p => p.PlanVideo(It.IsAny<MediaOptions>())).Returns(plan);
@@ -265,7 +264,6 @@ public class PlaybackSessionsControllerTests
     {
         var item = new Movie { Id = _itemId };
         SetUpItemAndUser(item);
-        var streamInfo = new StreamInfo { DeviceProfile = new DeviceProfile(), PlayMethod = PlayMethod.DirectPlay, Container = "mp4" };
         var session = new PlaybackSession(PlaybackSessionId.NewId(), PlaybackMediaKind.Video, null, null, new PlaybackPlan(PlayMethod.DirectPlay, default), default, default);
         _playbackSessionManager
             .Setup(m => m.Create(It.IsAny<PlaybackSessionRequest>(), null))
@@ -593,7 +591,6 @@ public class PlaybackSessionsControllerTests
     private (PlaybackSessionsController Controller, PlaybackSessionManager Manager, RecordingLogger Logger) CreateRealManagerFixture()
     {
         SetUpItemAndUser(new Movie { Id = _itemId });
-        var streamInfo = new StreamInfo { DeviceProfile = new DeviceProfile(), PlayMethod = PlayMethod.DirectPlay, Container = "mp4" };
         var plan = new PlaybackPlan(PlayMethod.DirectPlay, default);
         var planner = new Mock<IPlaybackSessionPlanner>();
         planner.Setup(p => p.PlanVideo(It.IsAny<MediaOptions>())).Returns(plan);
@@ -613,18 +610,8 @@ public class PlaybackSessionsControllerTests
         return (controller, manager, logger);
     }
 
-    private PlaybackSession BuildStreamableSession(Guid ownerId, string? playSessionId, StreamInfo? streamInfo = null)
+    private PlaybackSession BuildStreamableSession(Guid ownerId, string? playSessionId)
     {
-        var mediaSource = new MediaSourceInfo { Id = "source-1", Container = "mkv", SupportsDirectPlay = true };
-        streamInfo ??= new StreamInfo
-        {
-            ItemId = _itemId,
-            MediaSource = mediaSource,
-            DeviceProfile = new DeviceProfile(),
-            PlayMethod = PlayMethod.DirectPlay,
-            Container = "mkv",
-            AudioStreamIndex = 1,
-        };
         var options = new MediaOptions { ItemId = _itemId, UserId = ownerId, DeviceId = "device-1", Profile = new DeviceProfile() };
         return new PlaybackSession(
             PlaybackSessionId.NewId(),

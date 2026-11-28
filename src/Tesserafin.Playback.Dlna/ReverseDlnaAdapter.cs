@@ -19,12 +19,9 @@ namespace Tesserafin.Playback.Dlna;
 /// break that invariant instead of just needing a new one.
 /// </remarks>
 /// <remarks>
-/// PR114a correction: this type maps the client's REQUEST (pre-decision) - legacy still needs it as
-/// long as <c>StreamBuilder</c>, not the v2 engine, decides what to play. That is a different concern
-/// from <see cref="PlaybackExecutionPlanAdapter"/> (new in PR114a), which maps a v2 DECISION
-/// (post-<c>PlaybackEngine.Decide</c>) into a legacy <c>StreamInfo</c> so the execution machinery can
-/// run it. Landing the execution layer does not retire this type - it stays until legacy stops being
-/// consulted for live decisions at all, i.e. the PR115 canary cutover, not before.
+/// This type maps the client's REQUEST (pre-decision) onto the legacy <c>DeviceProfile</c> shape.
+/// <c>StreamBuilder</c> and <c>PlaybackExecutionPlanAdapter</c> are gone (tesserafin#129 step 7); what
+/// still reads the profile it builds is to be retired with it.
 /// </remarks>
 public static class ReverseDlnaAdapter
 {

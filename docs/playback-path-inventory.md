@@ -510,9 +510,12 @@ reaches it), then the deletion is one coordinated change.
    `main.m3u8`, `live.m3u8`, `hls1/...`, the legacy `hls/` segments), `AudioController`,
    `System/PlaybackDiagnostics/*` and its static page; the Web removed Chromecast, `getStreamUrls`,
    the V2 overlay and the diagnostics page (web#323). A client plays from
-   `Playback/Sessions/{id}/File|Progressive|Hls` alone. Still to delete: the `StreamBuilder`
-   planner, the shadow/live-wiring diagnostics stores, `PlaybackStopThresholdGuard`, the legacy
-   branches of `GetDynamicSegment`, the server cast fields.
+   `Playback/Sessions/{id}/File|Progressive|Hls` alone. The shadow comparison and its
+   diagnostics went next (#540), then `StreamBuilder`, `StreamInfo` and `PlaybackExecutionPlanAdapter`.
+   Still to delete: `ReverseDlnaAdapter` and the `DeviceProfile` it builds for `MediaOptions`, the
+   legacy branches of `GetDynamicSegment`; kept inert because the compatibility gate refuses to remove
+   a contract property: `ServerConfiguration.PlaybackShadow`, the descriptor's `ServedBy` and
+   `FallbackReason`, the cast fields.
    Original list - deletion, once the rows above are empty: `GET/POST Items/{id}/PlaybackInfo`, the inner planner
    (`PlaybackSessionPlanner`/`StreamBuilder` for sessions), `PlaybackExecutionPlanAdapter.ToStreamInfo`,
    `PlaybackSessionStreamDescriptorMapper`, `PlaybackLiveStreamResolver`, the client-option HLS and

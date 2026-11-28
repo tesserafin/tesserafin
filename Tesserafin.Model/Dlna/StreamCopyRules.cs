@@ -3,7 +3,7 @@ using System;
 namespace Tesserafin.Model.Dlna;
 
 /// <summary>
-/// Stream-copy rules that the decision (<see cref="StreamBuilder"/>) and the execution
+/// Stream-copy rules that the decision (the v2 engine) and the execution
 /// (<c>EncodingHelper.CanStreamCopyVideo</c>) have to agree on (#374).
 /// </summary>
 public static class StreamCopyRules
