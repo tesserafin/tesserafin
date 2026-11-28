@@ -90,7 +90,6 @@ public sealed class LiveTvSessionEndToEndTests : IClassFixture<DirectPlayFilmEnd
         var descriptor = await GetDescriptorAsync(owner, session.Id);
         Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/Hls/live.m3u8?"), descriptor.Url, StringComparison.Ordinal);
         Assert.Equal(StreamingProtocol.Hls, descriptor.Protocol);
-        Assert.Null(descriptor.FallbackReason);
         Assert.DoesNotContain("LiveStreamFiles", descriptor.Url, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ApiKey", descriptor.Url, StringComparison.OrdinalIgnoreCase);
 

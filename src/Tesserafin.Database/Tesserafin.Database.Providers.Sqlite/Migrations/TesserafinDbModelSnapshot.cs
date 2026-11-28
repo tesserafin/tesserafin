@@ -1413,10 +1413,6 @@ namespace Tesserafin.Server.Implementations.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("CastReceiverId")
-                        .HasMaxLength(32)
-                        .HasColumnType("TEXT");
-
                     b.Property<int>("ContentPackBrowsingPreference")
                         .HasColumnType("INTEGER");
 

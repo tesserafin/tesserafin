@@ -274,11 +274,6 @@ public class ServerConfiguration : BaseApplicationConfiguration
     public int ParallelImageEncodingLimit { get; set; }
 
     /// <summary>
-    /// Gets or sets the list of cast receiver applications.
-    /// </summary>
-    public CastReceiverApplication[] CastReceiverApplications { get; set; } = Array.Empty<CastReceiverApplication>();
-
-    /// <summary>
     /// Gets or sets the trickplay options.
     /// </summary>
     /// <value>The trickplay options.</value>
@@ -288,13 +283,4 @@ public class ServerConfiguration : BaseApplicationConfiguration
     /// Gets or sets a value indicating whether old authorization methods are allowed.
     /// </summary>
     public bool EnableLegacyAuthorization { get; set; }
-
-    // Inert: nothing reads these options since the legacy planner and the shadow comparison were
-    // deleted (tesserafin#129 step 7). The property stays because the compatibility gate refuses to
-    // remove a property of the System/Configuration contract.
-
-    /// <summary>
-    /// Gets or sets the options controlling the PR98 v2-playback-engine shadow comparison.
-    /// </summary>
-    public PlaybackShadowOptions PlaybackShadow { get; set; } = new PlaybackShadowOptions();
 }

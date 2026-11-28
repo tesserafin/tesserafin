@@ -105,8 +105,6 @@ public sealed class AudioHlsEndToEndTests : IClassFixture<DirectPlayFilmEndToEnd
         var descriptor = await GetDescriptorAsync(client, session.Id);
         Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/Hls/main.m3u8?"), descriptor.Url, StringComparison.Ordinal);
         Assert.Equal(StreamingProtocol.Hls, descriptor.Protocol);
-        Assert.Equal(PlaybackEngine.EngineVersion, descriptor.ServedBy);
-        Assert.Null(descriptor.FallbackReason);
 
         var playlist = await ReadPlaylistAsync(client, descriptor.Url);
         Assert.True(playlist.Segments.Count >= 2, FormattableString.Invariant($"expected several segments, got {playlist.Segments.Count}"));
@@ -200,8 +198,6 @@ public sealed class AudioHlsEndToEndTests : IClassFixture<DirectPlayFilmEndToEnd
         Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/Hls/main.m3u8?"), descriptor.Url, StringComparison.Ordinal);
         Assert.Equal(StreamingProtocol.Hls, descriptor.Protocol);
         Assert.Equal("mp4", descriptor.Container);
-        Assert.Equal(PlaybackEngine.EngineVersion, descriptor.ServedBy);
-        Assert.Null(descriptor.FallbackReason);
         foreach (var legacyParameter in new[] { "ApiKey", "AudioCodec", "AudioBitrate", "TranscodeReasons", "SegmentContainer", "AudioStreamIndex" })
         {
             Assert.DoesNotContain(legacyParameter, descriptor.Url, StringComparison.OrdinalIgnoreCase);

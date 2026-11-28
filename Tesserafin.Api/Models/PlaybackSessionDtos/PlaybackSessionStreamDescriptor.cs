@@ -15,17 +15,6 @@ namespace Tesserafin.Api.Models.PlaybackSessionDtos;
 /// <c>TranscodingUrl</c>).
 /// </param>
 /// <param name="Protocol">Same vocabulary as <see cref="OutputSpec.Protocol"/> (<see cref="StreamingProtocol.Hls"/>/<see cref="StreamingProtocol.Http"/>).</param>
-/// <param name="ServedBy">
-/// The version of the engine that actually produced <see cref="Url"/>, resolved at THIS call - same
-/// sentinel as <see cref="PlaybackSessionResponse.LegacyDecisionVersion"/>, but deliberately distinct
-/// from the <c>DecisionVersion</c> the originating <c>POST</c>/<c>PUT</c> announced (design doc §3.1:
-/// the two can diverge, this field is authoritative for what is actually served).
-/// </param>
-/// <param name="FallbackReason">
-/// Why legacy was served instead of v2, or <see langword="null"/> when <see cref="ServedBy"/> is a
-/// real v2 engine version. Same restricted enum already surfaced on the admin diagnostics detail
-/// route (design doc §2.2/§4).
-/// </param>
 /// <param name="SubtitleUrl">
 /// The external subtitle delivery URL, present only when the served stream's selected subtitle
 /// delivery method is <see cref="SubtitleDeliveryMethod.External"/> - <see langword="null"/>
@@ -56,8 +45,6 @@ namespace Tesserafin.Api.Models.PlaybackSessionDtos;
 public sealed record PlaybackSessionStreamDescriptor(
     string Url,
     StreamingProtocol Protocol,
-    int ServedBy,
-    PlaybackLiveFallbackReason? FallbackReason,
     string? SubtitleUrl,
     string? Container,
     string? MimeType);

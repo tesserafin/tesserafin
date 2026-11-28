@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using Tesserafin.Model.Configuration;
+using Tesserafin.Server.Core.AppBase;
 using Tesserafin.Server.Core.Serialization;
 using Xunit;
 
@@ -332,5 +333,84 @@ public sealed class MyXmlSerializerTests
         // refused before any entity — internal or external — can be looked up.
         Assert.Contains("DTD is prohibited", exception.Message, StringComparison.Ordinal);
         return exception;
+    }
+
+    /// <summary>
+    /// tesserafin#129 step 7: a <c>system.xml</c> written before the shadow comparison and the cast
+    /// receivers were removed still carries <c>PlaybackShadow</c> and <c>CastReceiverApplications</c>.
+    /// Loading it must keep every setting the server still has. <see cref="ConfigurationHelper"/>
+    /// falls back to a DEFAULT configuration, silently, when deserialisation throws, so "it did not
+    /// throw" is not enough: a value next to the removed elements has to survive, and the file the
+    /// helper writes back drops what the server no longer has.
+    /// </summary>
+    [Fact]
+    public void ServerConfiguration_WrittenWithRemovedElements_LoadsKeepingItsSettings()
+    {
+        const string Legacy = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <ServerConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <ParallelImageEncodingLimit>7</ParallelImageEncodingLimit>
+              <CastReceiverApplications>
+                <CastReceiverApplication>
+                  <Id>F007D354</Id>
+                  <Name>Stable</Name>
+                </CastReceiverApplication>
+              </CastReceiverApplications>
+              <PlaybackShadow>
+                <Enabled>false</Enabled>
+                <Mode>V2</Mode>
+                <SampleRate>0.5</SampleRate>
+                <StopThresholds>
+                  <Enabled>true</Enabled>
+                </StopThresholds>
+              </PlaybackShadow>
+              <EnableLegacyAuthorization>true</EnableLegacyAuthorization>
+            </ServerConfiguration>
+            """;
+        var directory = Directory.CreateTempSubdirectory("removed-config-elements-");
+        try
+        {
+            var path = Path.Combine(directory.FullName, "system.xml");
+            File.WriteAllText(path, Legacy, new UTF8Encoding(false));
+            var serializer = new MyXmlSerializer();
+
+            var direct = Assert.IsType<ServerConfiguration>(serializer.DeserializeFromBytes(typeof(ServerConfiguration), Encoding.UTF8.GetBytes(Legacy)));
+            Assert.Equal(7, direct.ParallelImageEncodingLimit);
+            Assert.True(direct.EnableLegacyAuthorization);
+
+            var loaded = Assert.IsType<ServerConfiguration>(ConfigurationHelper.GetXmlConfiguration(typeof(ServerConfiguration), path, serializer));
+            Assert.Equal(7, loaded.ParallelImageEncodingLimit);
+            Assert.True(loaded.EnableLegacyAuthorization);
+
+            var rewritten = File.ReadAllText(path);
+            Assert.DoesNotContain("PlaybackShadow", rewritten, StringComparison.Ordinal);
+            Assert.DoesNotContain("CastReceiver", rewritten, StringComparison.Ordinal);
+            Assert.Contains("<ParallelImageEncodingLimit>7</ParallelImageEncodingLimit>", rewritten, StringComparison.Ordinal);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// The same for a legacy user configuration file carrying the removed <c>CastReceiverId</c>.
+    /// </summary>
+    [Fact]
+    public void UserConfiguration_WrittenWithCastReceiverId_LoadsKeepingItsSettings()
+    {
+        const string Legacy = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <UserConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <PlayDefaultAudioTrack>false</PlayDefaultAudioTrack>
+              <CastReceiverId>F007D354</CastReceiverId>
+              <EnableNextEpisodeAutoPlay>false</EnableNextEpisodeAutoPlay>
+            </UserConfiguration>
+            """;
+
+        var loaded = Assert.IsType<UserConfiguration>(new MyXmlSerializer().DeserializeFromBytes(typeof(UserConfiguration), Encoding.UTF8.GetBytes(Legacy)));
+
+        Assert.False(loaded.PlayDefaultAudioTrack);
+        Assert.False(loaded.EnableNextEpisodeAutoPlay);
     }
 }

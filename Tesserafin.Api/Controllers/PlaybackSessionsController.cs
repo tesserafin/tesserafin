@@ -412,7 +412,7 @@ public class PlaybackSessionsController : BaseTesserafinApiController
             return Forbid();
         }
 
-        return Ok(LocalMediaDescriptorMapper.Map(session.Id, session.PlaySessionId, engineOptions.ItemId, enginePlan, engineDecided.Decision.EngineVersion, live: _liveStreams?.Get(session.Id) is not null));
+        return Ok(LocalMediaDescriptorMapper.Map(session.Id, session.PlaySessionId, engineOptions.ItemId, enginePlan, live: _liveStreams?.Get(session.Id) is not null));
     }
 
     /// <summary>

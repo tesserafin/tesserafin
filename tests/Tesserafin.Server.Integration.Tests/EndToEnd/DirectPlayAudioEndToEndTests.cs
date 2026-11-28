@@ -94,8 +94,6 @@ public sealed class DirectPlayAudioEndToEndTests : IClassFixture<DirectPlayFilmE
         var descriptor = await GetDescriptorAsync(client, session.Id);
         Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/File?"), descriptor.Url, StringComparison.Ordinal);
         Assert.DoesNotContain("ApiKey", descriptor.Url, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(PlaybackEngine.EngineVersion, descriptor.ServedBy);
-        Assert.Null(descriptor.FallbackReason);
         Assert.Equal("mp3", descriptor.Container);
         Assert.Equal("audio/mpeg", descriptor.MimeType);
 

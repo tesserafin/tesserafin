@@ -123,8 +123,6 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
         Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/Hls/main.m3u8?"), descriptor.Url, StringComparison.Ordinal);
         Assert.Equal(StreamingProtocol.Hls, descriptor.Protocol);
         Assert.Equal("mp4", descriptor.Container);
-        Assert.Equal(PlaybackEngine.EngineVersion, descriptor.ServedBy);
-        Assert.Null(descriptor.FallbackReason);
         foreach (var legacyParameter in new[] { "ApiKey", "VideoCodec", "AudioCodec", "VideoBitrate", "AudioBitrate", "MaxWidth", "TranscodeReasons", "SegmentContainer", "AudioStreamIndex" })
         {
             Assert.DoesNotContain(legacyParameter, descriptor.Url, StringComparison.OrdinalIgnoreCase);

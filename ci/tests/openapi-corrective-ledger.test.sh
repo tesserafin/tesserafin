@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Break controls for the one-shot corrective-transition ledger (#226, PR #227).
+# Break controls for the one-shot corrective-transition ledger (#226, PR #227;
+# finding kinds, tesserafin#129).
 #
 # A ledger that has never been observed REFUSING is not evidence that it can
 # refuse. Every case below mutates one thing about an otherwise-accepted
@@ -84,7 +85,7 @@ echo "-- the accepted transition itself --"
 expect 0 "the exact recorded transition is consumed" \
     "$LEDGER" "$ACCEPTED_FINDINGS" "$BASE_SHA" "$HEAD_SHA"
 
-if ! printf '%s' "$CASE_LOG" | grep -q 'CORRECTIVE TRANSITION APPLIES'; then
+if ! grep -q 'CORRECTIVE TRANSITION APPLIES' <<< "$CASE_LOG"; then
     bad "the accepted transition did not announce itself"
 else
     ok "the accepted transition announces itself"
@@ -208,13 +209,52 @@ jq '.transition.runtimeWireBreaks = 1' "$LEDGER" > "$WORK/wirebreak.json"
 expect 2 "a ledger admitting a runtime wire break is rejected" \
     "$WORK/wirebreak.json" "$ACCEPTED_FINDINGS" "$BASE_SHA" "$HEAD_SHA"
 
-jq 'del(.transition.findings[0].parameterName)' "$LEDGER" > "$WORK/noparam.json"
-expect 2 "a finding without a parameter name is rejected" \
+# ── Finding kinds ─────────────────────────────────────────────────────────
+# Each kind requires its own human-reviewable description; a finding cannot
+# claim a kind it does not document, nor a kind its rule does not allow.
+
+echo "-- finding kinds --"
+jq 'del(.transition.findings[0].kind)' "$LEDGER" > "$WORK/nokind.json"
+expect 2 "a finding without a kind is rejected" \
+    "$WORK/nokind.json" "$ACCEPTED_FINDINGS" "$BASE_SHA" "$HEAD_SHA"
+
+jq '.transition.findings[0].kind = "anything-goes"' "$LEDGER" > "$WORK/badkind.json"
+expect 2 "an unknown kind is rejected" \
+    "$WORK/badkind.json" "$ACCEPTED_FINDINGS" "$BASE_SHA" "$HEAD_SHA"
+
+# A parameter-shape finding must describe the parameter it corrects.
+jq '.transition.findings[0].kind = "parameter-shape"' "$LEDGER" > "$WORK/noparam.json"
+expect 2 "a parameter-shape finding without a parameter name and shapes is rejected" \
     "$WORK/noparam.json" "$ACCEPTED_FINDINGS" "$BASE_SHA" "$HEAD_SHA"
 
-jq 'del(.transition.findings[0].beforeShape)' "$LEDGER" > "$WORK/noshape.json"
-expect 2 "a finding without a before shape is rejected" \
-    "$WORK/noshape.json" "$ACCEPTED_FINDINGS" "$BASE_SHA" "$HEAD_SHA"
+for field in schema property unusedEvidence; do
+    jq --arg f "$field" '.transition.findings[0] |= del(.[$f])' "$LEDGER" > "$WORK/no-$field.json"
+    expect 2 "an inert-property-removal finding without its $field is rejected" \
+        "$WORK/no-$field.json" "$ACCEPTED_FINDINGS" "$BASE_SHA" "$HEAD_SHA"
+done
+
+# The kind is for property removals only: an operation removal cannot ride it.
+jq '.transition.findings[0].ruleId = "api-path-removed-without-deprecation"' "$LEDGER" > "$WORK/kind-rule.json"
+expect 2 "an inert-property-removal finding on a non-property rule is rejected" \
+    "$WORK/kind-rule.json" "$ACCEPTED_FINDINGS" "$BASE_SHA" "$HEAD_SHA"
+
+# The recorded property must be the one the finding's own text removes.
+jq '.transition.findings[0].property = "SomethingElse"' "$LEDGER" > "$WORK/kind-prop.json"
+expect 2 "an inert-property-removal finding naming another property than its text is rejected" \
+    "$WORK/kind-prop.json" "$ACCEPTED_FINDINGS" "$BASE_SHA" "$HEAD_SHA"
+
+jq 'del(.transition.clientsVerified)' "$LEDGER" > "$WORK/noclients.json"
+expect 2 "a property-removing transition without verified clients is rejected" \
+    "$WORK/noclients.json" "$ACCEPTED_FINDINGS" "$BASE_SHA" "$HEAD_SHA"
+
+jq '.transition.clientsVerified = []' "$LEDGER" > "$WORK/emptyclients.json"
+expect 2 "a property-removing transition with an empty client list is rejected" \
+    "$WORK/emptyclients.json" "$ACCEPTED_FINDINGS" "$BASE_SHA" "$HEAD_SHA"
+
+# A metacharacter in an identity field still widens nothing: it is rejected.
+jq '.transition.findings[0].property = "Cast.*"' "$LEDGER" > "$WORK/kind-wild.json"
+expect 2 "a wildcard in a removed property name is rejected" \
+    "$WORK/kind-wild.json" "$ACCEPTED_FINDINGS" "$BASE_SHA" "$HEAD_SHA"
 
 jq '.schemaVersion = 99' "$LEDGER" > "$WORK/schema.json"
 expect 2 "an unsupported schemaVersion is rejected" \
@@ -315,7 +355,7 @@ else
         --base "$G/base.json" --base-lock "$G/base.lock.json" \
         --head "$G/head.json" --head-lock "$G/head.lock.json" \
         --report "$G/gaccept.md"
-    if printf '%s' "$GATE_LOG" | grep -q 'CORRECTIVE TRANSITION'; then
+    if grep -q 'CORRECTIVE TRANSITION' <<< "$GATE_LOG"; then
         ok "the accepted run names the corrective transition in its verdict"
     else
         bad "the accepted run did not name the corrective transition"
@@ -334,12 +374,12 @@ else
         --head "$G/head.json" --head-lock "$G/head.lock.json" \
         --report "$G/gself.md" --corrective-consumer "$G/tripwire.sh"
 
-    if printf '%s' "$GATE_LOG" | grep -q 'CONSUMER WAS INVOKED'; then
+    if grep -q 'CONSUMER WAS INVOKED' <<< "$GATE_LOG"; then
         bad "the self-comparison reached the ledger consumer; it must never be consulted with no breaking finding"
     else
         ok "the self-comparison never reached the ledger consumer"
     fi
-    if printf '%s' "$GATE_LOG" | grep -q 'CORRECTIVE TRANSITION'; then
+    if grep -q 'CORRECTIVE TRANSITION' <<< "$GATE_LOG"; then
         bad "the self-comparison consumed a corrective transition"
     else
         ok "the self-comparison consumed no corrective transition"
@@ -350,7 +390,7 @@ else
         --base "$G/head.json" --base-lock "$G/head.lock.json" \
         --head "$G/head.json" --head-lock "$G/head.lock.json" \
         --report "$G/gself2.md"
-    if printf '%s' "$GATE_LOG" | grep -q 'CORRECTIVE TRANSITION'; then
+    if grep -q 'CORRECTIVE TRANSITION' <<< "$GATE_LOG"; then
         bad "the self-comparison consumed a corrective transition with the real consumer"
     else
         ok "the self-comparison consumed nothing with the real consumer either"

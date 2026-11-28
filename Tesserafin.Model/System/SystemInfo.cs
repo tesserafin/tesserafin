@@ -122,11 +122,6 @@ public class SystemInfo : PublicSystemInfo
     public string TranscodingTempPath { get; set; }
 
     /// <summary>
-    /// Gets or sets the list of cast receiver applications.
-    /// </summary>
-    public IReadOnlyList<CastReceiverApplication> CastReceiverApplications { get; set; }
-
-    /// <summary>
     /// Gets or sets a value indicating whether this instance has update available.
     /// </summary>
     /// <value><c>true</c> if this instance has update available; otherwise, <c>false</c>.</value>

@@ -98,7 +98,6 @@ public sealed class ToneMappingEndToEndTests : IClassFixture<DirectPlayFilmEndTo
 
         var descriptor = await GetDescriptorAsync(client, session.Id);
         Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/Hls/main.m3u8?"), descriptor.Url, StringComparison.Ordinal);
-        Assert.Null(descriptor.FallbackReason);
 
         var (init, segments) = await ReadPlaylistAsync(client, descriptor.Url);
         var produced = Path.Combine(_workDir, $"produced-{Guid.NewGuid():N}.mp4");

@@ -110,7 +110,6 @@ public sealed class BurnInSubtitleEndToEndTests : IClassFixture<DirectPlayFilmEn
         Assert.Equal(PlaybackEngine.EngineVersion, session.DecisionVersion);
         Assert.DoesNotContain(TransformKind.BurnInSubtitle, session.Transforms);
         var descriptor = await GetDescriptorAsync(client, session.Id);
-        Assert.Null(descriptor.FallbackReason);
         Assert.NotNull(descriptor.SubtitleUrl);
 
         using var stop = await client.DeleteAsync(FormattableString.Invariant($"Playback/Sessions/{session.Id:N}"), TestContext.Current.CancellationToken);
@@ -148,7 +147,6 @@ public sealed class BurnInSubtitleEndToEndTests : IClassFixture<DirectPlayFilmEn
 
         var descriptor = await GetDescriptorAsync(client, session.Id);
         Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/Hls/main.m3u8?"), descriptor.Url, StringComparison.Ordinal);
-        Assert.Null(descriptor.FallbackReason);
         Assert.Null(descriptor.SubtitleUrl);
 
         var (init, segments) = await ReadPlaylistAsync(client, descriptor.Url);

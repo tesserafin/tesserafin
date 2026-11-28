@@ -298,12 +298,6 @@ namespace Tesserafin.Data.Entities
         public SyncPlayUserAccessType SyncPlayAccess { get; set; }
 
         /// <summary>
-        /// Gets or sets the cast receiver id.
-        /// </summary>
-        [StringLength(32)]
-        public string? CastReceiverId { get; set; }
-
-        /// <summary>
         /// Gets or sets how this user prefers the top level of the library to be arranged.
         /// </summary>
         /// <remarks>

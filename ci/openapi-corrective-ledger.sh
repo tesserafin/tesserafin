@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# One-shot corrective-transition ledger consumer — issue #226, PR #227.
+# One-shot corrective-transition ledger consumer — issue #226, PR #227; finding
+# kinds added for tesserafin#129 (inert property removals, owner ruling 2026-11-28).
 #
 # WHAT THIS IS NOT. It is not a waiver, not an ignore list, not a severity
 # override and not a bypass. It cannot lower a check: `ci/openapi-severity-levels.txt`
@@ -135,7 +136,10 @@ if jq -e '[.transition.findings[]? | keys[]] | any(. | ascii_downcase | test("pa
     indeterminate "the ledger uses a pattern-matching key; a corrective ledger accepts literal values only"
 fi
 
-if jq -e '[.transition.findings[]? | .. | strings] | any(test("[*?^$|+\\[\\]\\\\]"))' "$LEDGER" >/dev/null 2>&1; then
+# Scanned on the IDENTITY fields - the ones a pattern could widen. `text` and the
+# reviewer-facing prose (`unusedEvidence`, shapes) are compared or printed
+# verbatim, never matched, and oasdiff's own texts carry `allOf[#/...]`.
+if jq -e '[.transition.findings[]? | (.fingerprint, .ruleId, .section, .operation, .operationId, .path, .parameterIn, .parameterName, .schema, .property) | strings] | any(test("[*?^$|+\\[\\]\\\\]"))' "$LEDGER" >/dev/null 2>&1; then
     indeterminate "the ledger contains a wildcard or regular-expression metacharacter; a corrective ledger accepts literal values only"
 fi
 
@@ -149,16 +153,44 @@ ACTUAL_LEDGER_COUNT="$(jq -r '.transition.findings | length' "$LEDGER" 2>/dev/nu
 [ "$ACTUAL_LEDGER_COUNT" -gt 0 ] 2>/dev/null \
     || indeterminate "the ledger lists no finding at all"
 
-# Every finding must carry the full identification the ruling requires: the
-# oasdiff identity AND the human-reviewable parameter location, name and shapes.
-for field in fingerprint ruleId section operation operationId path text parameterIn parameterName beforeShape afterShape; do
+# Every finding must carry the full oasdiff identity, and the human-reviewable
+# description its KIND requires:
+#   parameter-shape         a corrected parameter wire shape (#226): location,
+#                           name, before and after shapes;
+#   inert-property-removal  a contract property nothing reads any more
+#                           (tesserafin#129): the schema, the property and the
+#                           evidence that no client or server code uses it. Only
+#                           the two property-removal rules may carry this kind.
+for field in kind fingerprint ruleId section operation operationId path text; do
     jq -e --arg f "$field" 'all(.transition.findings[]; (.[$f] | type) == "string" and (.[$f] | length) > 0)' "$LEDGER" >/dev/null 2>&1 \
         || indeterminate "at least one ledger finding records no non-empty \`$field\`"
 done
+jq -e 'all(.transition.findings[]; .kind == "parameter-shape" or .kind == "inert-property-removal")' "$LEDGER" >/dev/null 2>&1 \
+    || indeterminate "at least one ledger finding has an unknown kind (parameter-shape | inert-property-removal)"
+for field in parameterIn parameterName beforeShape afterShape; do
+    jq -e --arg f "$field" 'all(.transition.findings[] | select(.kind == "parameter-shape"); (.[$f] | type) == "string" and (.[$f] | length) > 0)' "$LEDGER" >/dev/null 2>&1 \
+        || indeterminate "at least one parameter-shape finding records no non-empty \`$field\`"
+done
+for field in schema property unusedEvidence; do
+    jq -e --arg f "$field" 'all(.transition.findings[] | select(.kind == "inert-property-removal"); (.[$f] | type) == "string" and (.[$f] | length) > 0)' "$LEDGER" >/dev/null 2>&1 \
+        || indeterminate "at least one inert-property-removal finding records no non-empty \`$field\`"
+done
+jq -e 'all(.transition.findings[] | select(.kind == "inert-property-removal"); .ruleId == "response-optional-property-removed" or .ruleId == "request-property-removed")' "$LEDGER" >/dev/null 2>&1 \
+    || indeterminate "an inert-property-removal finding names a rule other than a property removal"
+# A finding's text must name the very property it claims to remove.
+jq -e 'all(.transition.findings[] | select(.kind == "inert-property-removal"); . as $f | ($f.text | split("`")[1] | split("/") | last) == $f.property)' "$LEDGER" >/dev/null 2>&1 \
+    || indeterminate "an inert-property-removal finding's text does not name the property it records"
+# Removing properties needs the clients that were checked against the removal.
+if jq -e 'any(.transition.findings[]; .kind == "inert-property-removal")' "$LEDGER" >/dev/null 2>&1; then
+    jq -e '(.transition.clientsVerified | type) == "array" and (.transition.clientsVerified | length) > 0 and all(.transition.clientsVerified[]; type == "string" and length > 0)' "$LEDGER" >/dev/null 2>&1 \
+        || indeterminate "a transition removing properties records no \`clientsVerified\`"
+fi
 jq -e 'all(.transition.findings[]; (.level | type) == "number")' "$LEDGER" >/dev/null 2>&1 \
     || indeterminate "at least one ledger finding records no numeric \`level\`"
-jq -e '([.transition.findings[].fingerprint] | length) == ([.transition.findings[].fingerprint] | unique | length)' "$LEDGER" >/dev/null 2>&1 \
-    || indeterminate "the ledger lists the same fingerprint twice"
+# oasdiff gives one fingerprint to a change and repeats it for each media type,
+# with a different text: an entry is unique by fingerprint AND text.
+jq -e '([.transition.findings[] | [.fingerprint, .text]] | length) == ([.transition.findings[] | [.fingerprint, .text]] | unique | length)' "$LEDGER" >/dev/null 2>&1 \
+    || indeterminate "the ledger lists the same finding twice"
 
 # --- does this transition apply to the comparison actually performed? --------
 
@@ -177,12 +209,12 @@ OBSERVED="$(jq -S -c '[.[] | select((.level // 0) >= 3) | {
       fingerprint: (.fingerprint // ""), ruleId: (.id // ""), level: (.level // 0),
       section: (.section // ""), operation: (.operation // ""),
       operationId: (.operationId // ""), path: (.path // ""), text: (.text // "")
-    }] | sort_by(.fingerprint, .operation, .path)' "$FINDINGS")" \
+    }] | sort_by(.fingerprint, .operation, .path, .text)' "$FINDINGS")" \
     || indeterminate "cannot project the observed findings"
 
 EXPECTED="$(jq -S -c '[.transition.findings[] | {
       fingerprint, ruleId, level, section, operation, operationId, path, text
-    }] | sort_by(.fingerprint, .operation, .path)' "$LEDGER")" \
+    }] | sort_by(.fingerprint, .operation, .path, .text)' "$LEDGER")" \
     || indeterminate "cannot project the ledger findings"
 
 OBSERVED_COUNT="$(printf '%s' "$OBSERVED" | jq -r 'length')"
@@ -215,9 +247,16 @@ note "  engine     $(jq -r '.transition.engine.version' "$LEDGER") $(jq -r '.tra
 note ""
 note "Accepted corrective findings ($DECLARED_COUNT of $DECLARED_COUNT consumed, none outstanding):"
 jq -r '.transition.findings[] |
-    "  ACCEPTED  \(.operation) \(.path)\n            rule       \(.ruleId) (level \(.level), \(.section))\n            operation  \(.operationId)\n            parameter  in=\(.parameterIn) name=\(.parameterName)\n            before     \(.beforeShape)\n            after      \(.afterShape)\n            fingerprint \(.fingerprint)"' "$LEDGER"
+    if .kind == "inert-property-removal" then
+      "  ACCEPTED  \(.operation) \(.path)\n            rule       \(.ruleId) (level \(.level), \(.section))\n            operation  \(.operationId)\n            removed    \(.schema).\(.property)\n            unused     \(.unusedEvidence)\n            text       \(.text)\n            fingerprint \(.fingerprint)"
+    else
+      "  ACCEPTED  \(.operation) \(.path)\n            rule       \(.ruleId) (level \(.level), \(.section))\n            operation  \(.operationId)\n            parameter  in=\(.parameterIn) name=\(.parameterName)\n            before     \(.beforeShape)\n            after      \(.afterShape)\n            fingerprint \(.fingerprint)"
+    end' "$LEDGER"
 note ""
 note "Rationale: $(jq -r '.transition.rationale' "$LEDGER")"
 note "Server binding: $(jq -r '.transition.serverBindingStatement' "$LEDGER")"
+if jq -e '(.transition.clientsVerified // []) | length > 0' "$LEDGER" >/dev/null 2>&1; then
+    note "Clients verified: $(jq -r '.transition.clientsVerified | join("; ")' "$LEDGER")"
+fi
 
 exit "$EXIT_APPLIES"

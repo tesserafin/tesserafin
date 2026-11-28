@@ -71,11 +71,6 @@ namespace Tesserafin.Model.Configuration
         public bool EnableNextEpisodeAutoPlay { get; set; }
 
         /// <summary>
-        /// Gets or sets the id of the selected cast receiver.
-        /// </summary>
-        public string? CastReceiverId { get; set; }
-
-        /// <summary>
         /// Gets or sets how the user prefers the top level of the library to be arranged.
         /// </summary>
         /// <remarks>

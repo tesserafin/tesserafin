@@ -122,8 +122,6 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
         var descriptor = await GetDescriptorAsync(client, session.Id);
         Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/File?"), descriptor.Url, StringComparison.Ordinal);
         Assert.DoesNotContain("ApiKey", descriptor.Url, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(PlaybackEngine.EngineVersion, descriptor.ServedBy);
-        Assert.Null(descriptor.FallbackReason);
         Assert.Equal("mp4", descriptor.Container);
         Assert.Equal("video/mp4", descriptor.MimeType);
 

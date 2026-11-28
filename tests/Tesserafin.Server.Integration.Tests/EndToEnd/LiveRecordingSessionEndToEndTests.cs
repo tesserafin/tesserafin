@@ -107,7 +107,6 @@ public sealed class LiveRecordingSessionEndToEndTests : IClassFixture<DirectPlay
         var descriptor = await GetDescriptorAsync(owner, session.Id);
         Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/Hls/live.m3u8?"), descriptor.Url, StringComparison.Ordinal);
         Assert.Equal(StreamingProtocol.Hls, descriptor.Protocol);
-        Assert.Null(descriptor.FallbackReason);
         Assert.DoesNotContain("LiveRecordings", descriptor.Url, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ApiKey", descriptor.Url, StringComparison.OrdinalIgnoreCase);
 

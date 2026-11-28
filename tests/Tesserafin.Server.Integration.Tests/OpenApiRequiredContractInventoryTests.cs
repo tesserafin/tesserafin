@@ -48,8 +48,11 @@ namespace Tesserafin.Server.Integration.Tests
         /// shape: one addition, no removal, and no existing schema's <c>required</c> array moves.
         /// The census is deliberately a single number rather than a list, so an addition has to be
         /// noticed and accounted for here rather than sliding in unremarked.
+        /// 32 again since tesserafin#129 step 7: <c>CastReceiverApplication</c> (required
+        /// <c>Id</c>, <c>Name</c>) left the contract with the Cast fields; no remaining schema's
+        /// <c>required</c> array moves.
         /// </remarks>
-        private const int RequiredOutsideNamespace = 33;
+        private const int RequiredOutsideNamespace = 32;
 
         /// <summary>
         /// The 18 members, across 8 schemas, that are primary-constructor parameters of

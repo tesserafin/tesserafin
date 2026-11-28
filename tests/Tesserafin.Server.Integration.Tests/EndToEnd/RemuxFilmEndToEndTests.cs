@@ -137,8 +137,6 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
         Assert.Equal(StreamingProtocol.Hls, descriptor.Protocol);
         Assert.Equal("mp4", descriptor.Container);
         Assert.Contains("mpegurl", descriptor.MimeType, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(PlaybackEngine.EngineVersion, descriptor.ServedBy);
-        Assert.Null(descriptor.FallbackReason);
         foreach (var legacyParameter in new[] { "ApiKey", "VideoCodec", "AudioCodec", "Static", "TranscodeReasons", "SegmentContainer" })
         {
             Assert.DoesNotContain(legacyParameter, descriptor.Url, StringComparison.OrdinalIgnoreCase);

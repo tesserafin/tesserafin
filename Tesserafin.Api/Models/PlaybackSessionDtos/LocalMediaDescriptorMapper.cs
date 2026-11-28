@@ -33,7 +33,6 @@ public static class LocalMediaDescriptorMapper
     /// <param name="playSessionId">The session's play session id; the file route is bound to it.</param>
     /// <param name="itemId">The item the session plays.</param>
     /// <param name="plan">The retained execution plan; see <see cref="CanMap"/>.</param>
-    /// <param name="engineVersion">The engine version that decided the plan.</param>
     /// <param name="live">Whether the plan executes a tuner stream the session holds: its output is the live playlist.</param>
     /// <returns>The descriptor.</returns>
     public static PlaybackSessionStreamDescriptor Map(
@@ -41,7 +40,6 @@ public static class LocalMediaDescriptorMapper
         string? playSessionId,
         Guid itemId,
         PlaybackExecutionPlan plan,
-        int engineVersion,
         bool live = false)
     {
         ArgumentNullException.ThrowIfNull(plan);
@@ -62,8 +60,6 @@ public static class LocalMediaDescriptorMapper
             return new PlaybackSessionStreamDescriptor(
                 FormattableString.Invariant($"/Playback/Sessions/{sessionId}/Progressive.{container}?{binding}"),
                 StreamingProtocol.Http,
-                engineVersion,
-                null,
                 SubtitleUrl(item, source, plan),
                 plan.Container,
                 MimeTypes.GetMimeType("." + plan.Container, null));
@@ -76,8 +72,6 @@ public static class LocalMediaDescriptorMapper
             return new PlaybackSessionStreamDescriptor(
                 FormattableString.Invariant($"/Playback/Sessions/{sessionId}/Hls/{(live ? "live" : "main")}.m3u8?{binding}"),
                 StreamingProtocol.Hls,
-                engineVersion,
-                null,
                 SubtitleUrl(item, source, plan),
                 plan.Container,
                 MimeTypes.GetMimeType("playlist.m3u8"));
@@ -86,8 +80,6 @@ public static class LocalMediaDescriptorMapper
         return new PlaybackSessionStreamDescriptor(
             FormattableString.Invariant($"/Playback/Sessions/{sessionId}/File?{binding}"),
             StreamingProtocol.Http,
-            engineVersion,
-            null,
             SubtitleUrl(item, source, plan),
             plan.Container,
             string.IsNullOrEmpty(plan.Container) ? null : MimeTypes.GetMimeType("." + plan.Container, null));

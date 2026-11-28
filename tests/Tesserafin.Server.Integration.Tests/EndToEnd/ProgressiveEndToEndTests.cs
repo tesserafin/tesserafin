@@ -93,7 +93,6 @@ public sealed class ProgressiveEndToEndTests : IClassFixture<DirectPlayFilmEndTo
         Assert.StartsWith(FormattableString.Invariant($"/Playback/Sessions/{session.Id:N}/Progressive.ts?"), descriptor.Url, StringComparison.Ordinal);
         Assert.Equal(StreamingProtocol.Http, descriptor.Protocol);
         Assert.Equal("ts", descriptor.Container);
-        Assert.Null(descriptor.FallbackReason);
 
         // Another user is refused before anything is started for them.
         Assert.Equal(HttpStatusCode.Forbidden, await StatusAsync(intruder, descriptor.Url));

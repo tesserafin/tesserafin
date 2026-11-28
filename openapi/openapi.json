@@ -2429,25 +2429,6 @@
         },
         "type": "object"
       },
-      "CastReceiverApplication": {
-        "additionalProperties": false,
-        "description": "The cast receiver application model.",
-        "properties": {
-          "Id": {
-            "description": "Gets or sets the cast receiver application id.",
-            "type": "string"
-          },
-          "Name": {
-            "description": "Gets or sets the cast receiver application name.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "Id",
-          "Name"
-        ],
-        "type": "object"
-      },
       "ChannelFeatures": {
         "additionalProperties": false,
         "properties": {
@@ -9404,29 +9385,6 @@
         ],
         "type": "object"
       },
-      "PlaybackEngineMode": {
-        "description": "The role the v2 playback decision engine (\u0060Tesserafin.Playback.Engine\u0060) plays for live playback\n(PR115a). This is the single explicit switch a canary rollout moves through; it supersedes the\nimplicit \u0022shadow on/off\u0022 toggle as the statement of intent, while Tesserafin.Model.Configuration.PlaybackShadowOptions.Enabled\nis kept for backward compatibility (see M:Tesserafin.Model.Configuration.PlaybackShadowOptions.GetEffectiveMode).",
-        "enum": [
-          "Legacy",
-          "Shadow",
-          "Canary",
-          "V2"
-        ],
-        "type": "string"
-      },
-      "PlaybackLiveFallbackReason": {
-        "description": "PR115c: why a live playback request fell back to the legacy \u0060StreamInfo\u0060 instead of being\nserved from the v2 Tesserafin.Playback.Execution.PlaybackExecutionPlan, for a session\nthis server otherwise had an opportunity to serve from v2. Every value here is meant to be\nobservable (logged and retained for the admin diagnostics surface, mirroring the PR113/PR114\nshadow diagnostics pattern) - a fallback must never be silent.",
-        "enum": [
-          "NoAuthoritativeRecord",
-          "PlanNotExecutable",
-          "SourceIdMismatch",
-          "DolbyVisionExclusion",
-          "KillSwitch",
-          "AdapterError",
-          "StopThresholdTripped"
-        ],
-        "type": "string"
-      },
       "PlaybackOrder": {
         "description": "Enum PlaybackOrder.",
         "enum": [
@@ -9694,24 +9652,6 @@
             "nullable": true,
             "type": "string"
           },
-          "FallbackReason": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PlaybackLiveFallbackReason"
-              }
-            ],
-            "description": "Why legacy was served instead of v2, or null when Tesserafin.Api.Models.PlaybackSessionDtos.PlaybackSessionStreamDescriptor.ServedBy is a\nreal v2 engine version. Same restricted enum already surfaced on the admin diagnostics detail\nroute (design doc \u00A72.2/\u00A74).",
-            "enum": [
-              "NoAuthoritativeRecord",
-              "PlanNotExecutable",
-              "SourceIdMismatch",
-              "DolbyVisionExclusion",
-              "KillSwitch",
-              "AdapterError",
-              "StopThresholdTripped"
-            ],
-            "nullable": true
-          },
           "MimeType": {
             "description": "The content type a client should announce to its player for Tesserafin.Api.Models.PlaybackSessionDtos.PlaybackSessionStreamDescriptor.Url, resolved from\nTesserafin.Api.Models.PlaybackSessionDtos.PlaybackSessionStreamDescriptor.Container exactly the way the delivery endpoints themselves resolve their own\n\u0060Content-Type\u0060 header - \u0060application/vnd.apple.mpegurl\u0060 on\nTesserafin.Playback.Decision.StreamingProtocol.Hls (the playlist\u0027s type, not the segments\u0027), otherwise\n\u0060MimeTypes.GetMimeType(\u0022.\u0022 \u002B Container)\u0060, the same call\nthe removed client-option stream routes make on the container they actually write. Reported\nrather than re-derived client-side so the announced type can never disagree with the response\nthe URL will really produce. null when no container is known, or when no\nmapping exists for it.",
             "nullable": true,
@@ -9729,11 +9669,6 @@
               "Hls"
             ]
           },
-          "ServedBy": {
-            "description": "The version of the engine that actually produced Tesserafin.Api.Models.PlaybackSessionDtos.PlaybackSessionStreamDescriptor.Url, resolved at THIS call - same\nsentinel as Tesserafin.Api.Models.PlaybackSessionDtos.PlaybackSessionResponse.LegacyDecisionVersion, but deliberately distinct\nfrom the \u0060DecisionVersion\u0060 the originating \u0060POST\u0060/\u0060PUT\u0060 announced (design doc \u00A73.1:\nthe two can diverge, this field is authoritative for what is actually served).",
-            "format": "int32",
-            "type": "integer"
-          },
           "SubtitleUrl": {
             "description": "The external subtitle delivery URL, present only when the served stream\u0027s selected subtitle\ndelivery method is Tesserafin.Playback.Decision.SubtitleDeliveryMethod.External - null\notherwise (design doc \u00A72.2).",
             "nullable": true,
@@ -9742,54 +9677,6 @@
           "Url": {
             "description": "The executable URL, resolved at call time - without any credential,\nrelative (the client already knows its own \u0060baseUrl\u0060, same posture as the legacy\n\u0060TranscodingUrl\u0060).",
             "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "PlaybackShadowOptions": {
-        "additionalProperties": false,
-        "description": "Configures the PR98 shadow mode that dual-runs the v2 playback decision engine\n(\u0060Tesserafin.Playback.Engine\u0060) alongside the legacy \u0060StreamBuilder\u0060-based planner for\ncomparison. Legacy always remains the source of truth for the plan returned to clients,\nregardless of these settings; they only control whether/how often/how expensively the shadow\ncomparison itself runs.",
-        "properties": {
-          "CanaryPercentage": {
-            "description": "Gets or sets the percentage (0-100) of user/device pairs in the canary cohort when\nTesserafin.Model.Configuration.PlaybackShadowOptions.Mode is Tesserafin.Model.Configuration.PlaybackEngineMode.Canary. Cohort membership is a\ndeterministic hash of the requesting user and device - the same pair is always in or always\nout for a given percentage, never a fresh random draw per request. Clamped to [0, 100] on\nset, following this type\u0027s PR104 clamp-don\u0027t-throw convention. Defaults to 0: enabling\ncanary mode without choosing a cohort size enrolls nobody.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "Enabled": {
-            "description": "Gets or sets a value indicating whether the shadow comparison runs at all. Defaults to\nfalse: shadow mode is opt-in, since PR100 removed the previous\nalways-on behavior for safety. PR115a: kept for backward compatibility with configurations\nthat predate Tesserafin.Model.Configuration.PlaybackShadowOptions.Mode - see M:Tesserafin.Model.Configuration.PlaybackShadowOptions.GetEffectiveMode for how the two\ncombine. New configurations should set Tesserafin.Model.Configuration.PlaybackShadowOptions.Mode instead.",
-            "type": "boolean"
-          },
-          "MaxExecutionMs": {
-            "description": "Gets or sets the soft time budget, in milliseconds, for a single shadow execution\n(capability/source mapping \u002B v2 engine decision \u002B projection/comparison). Exceeding this\nbudget is logged and counted; it never cancels or otherwise affects the run in progress,\nand never affects the legacy result. PR104: clamped to a minimum of 1 on set - a\nzero-or-negative budget would mean \u0022every execution always exceeds budget,\u0022 which is never\nthe intent of a misconfigured value.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "Mode": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PlaybackEngineMode"
-              }
-            ],
-            "description": "Gets or sets the explicit role the v2 engine plays for live playback (PR115a). Defaults to\nTesserafin.Model.Configuration.PlaybackEngineMode.Legacy. When left at that default, a pre-PR115a\nconfiguration with Tesserafin.Model.Configuration.PlaybackShadowOptions.Enabled set still gets shadow behavior - see\nM:Tesserafin.Model.Configuration.PlaybackShadowOptions.GetEffectiveMode.",
-            "enum": [
-              "Legacy",
-              "Shadow",
-              "Canary",
-              "V2"
-            ]
-          },
-          "SampleRate": {
-            "description": "Gets or sets the fraction of eligible playback decisions (0.0-1.0) that actually run the\nshadow comparison when Tesserafin.Model.Configuration.PlaybackShadowOptions.Enabled is true. 1.0 (the default)\nmeans every decision is shadowed; lower values sample. PR104: clamped to [0, 1] on set - a\nvalue outside that range (including NaN, clamped to 0) has no meaningful sampling\ninterpretation, so it is corrected rather than left to produce nonsensical behavior\ndownstream (for example a negative rate always sampling out, or a rate above 1 being\nindistinguishable from 1).",
-            "format": "double",
-            "type": "number"
-          },
-          "StopThresholds": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PlaybackStopThresholdOptions"
-              }
-            ],
-            "description": "Gets or sets the PR115d operational stop-threshold guard configuration - see\nTesserafin.Model.Configuration.PlaybackStopThresholdOptions for why this is a sibling type rather than fields\non this class directly. Never null; defaults to a fresh, enabled instance\nwith its own PR115d defaults, so a configuration that predates PR115d still gets the guard\u0027s\nprotection without needing to add anything."
           }
         },
         "type": "object"
@@ -9996,32 +9883,6 @@
             "description": "Gets or sets the session id.",
             "nullable": true,
             "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "PlaybackStopThresholdOptions": {
-        "additionalProperties": false,
-        "description": "PR115d: configures the operational stop-threshold guard for the v2 canary - an automatic,\nconfig-driven safety net that forces every live playback request back to legacy (the same\nobservable effect as the Tesserafin.Model.Configuration.PlaybackShadowOptions.Mode kill switch) once the v2 live\npath\u0027s own error signals cross an operator-chosen threshold, without waiting for a human to\nnotice and flip the kill switch by hand. A sibling of Tesserafin.Model.Configuration.PlaybackShadowOptions rather\nthan a merge into it - Tesserafin.Model.Configuration.PlaybackShadowOptions.StopThresholds holds one instance -\nso the two concerns (what role v2 plays; when it auto-disqualifies itself) stay independently\nreadable and independently testable, matching this configuration surface\u0027s existing\none-concern-per-type shape (\u0060TrickplayOptions\u0060, \u0060PlaybackShadowOptions\u0060 itself).",
-        "properties": {
-          "AdapterErrorRateThreshold": {
-            "description": "Gets or sets the fraction (0.0-1.0) of v2-attempted live requests that may end in an\n\u0060AdapterError\u0060 (\u0060Tesserafin.MediaEncoding.Playback.PlaybackLiveFallbackReason\u0060) before\nthe guard trips. \u0022v2-attempted\u0022 means the request passed every earlier gate (kill switch,\ncohort, resolvable plan, source id match, Dolby Vision exclusion) and reached the adapter\n(\u0060Tesserafin.Playback.Dlna.PlaybackExecutionPlanAdapter.ToStreamInfo\u0060) - the denominator is\nserved-by-v2 count plus adapter-error count, not the count of every live request. Not a\n\u0060cref\u0060 to either type: this project (\u0060Tesserafin.Model\u0060) sits below both in the\ndependency graph and must not reference them. Defaults\nto 0.10 (10%): the adapter is expected to succeed on essentially every eligible plan (PR115b\u0027s\nexecutable-parity invariant exists precisely to make adapter failures rare), so a double-digit\nerror rate is already a strong signal something is wrong. Clamped to [0, 1] on set, following\nthis type\u0027s PR104 clamp-don\u0027t-throw convention.",
-            "format": "double",
-            "type": "number"
-          },
-          "Enabled": {
-            "description": "Gets or sets a value indicating whether the stop-threshold guard evaluates at all. Defaults\nto true - deliberately the opposite default from Tesserafin.Model.Configuration.PlaybackShadowOptions.Enabled:\nPR115d\u0027s scope requires the guard to protect production canary traffic by default, with an\noperator having to make an explicit, visible choice to turn the safety net off, rather than\nhaving to remember to turn it on.",
-            "type": "boolean"
-          },
-          "MinimumSampleSize": {
-            "description": "Gets or sets the minimum number of samples (v2 attempts, for Tesserafin.Model.Configuration.PlaybackStopThresholdOptions.AdapterErrorRateThreshold;\nv2 transcode starts, for Tesserafin.Model.Configuration.PlaybackStopThresholdOptions.TranscodeStartFailureRateThreshold) required before a\nrate is trusted enough to trip the guard. Defaults to 20: without a floor, the very first v2\nrequest failing would already be a \u0022100% error rate\u0022 and would trip the guard on a single\nunlucky sample - exactly the kind of premature, noisy trip an operator opening a 1% canary\ncohort cannot afford to chase. Clamped to a minimum of 1 on set (mirrors\nTesserafin.Model.Configuration.PlaybackShadowOptions.MaxExecutionMs\u0027s own floor) - zero would make any single\nfailure trip the guard, which is never the intent of a misconfigured value.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "TranscodeStartFailureRateThreshold": {
-            "description": "Gets or sets the fraction (0.0-1.0) of ffmpeg transcode starts for v2-served sessions that may\nfail to actually launch before the guard trips - see \u0060PlaybackOperationalMetrics\u0060\u0027s remarks\nfor exactly what \u0022failed to start\u0022 means and how it is observed\n(\u0060ITranscodeManager.TranscodingJobStarted\u0060/\u0060TranscodingJobEnded\u0060). Defaults to 0.20\n(20%): transcode start failures have causes entirely outside the v2/legacy decision itself\n(disk space, hardware encoder contention, a malformed source), so this threshold is\ndeliberately looser than Tesserafin.Model.Configuration.PlaybackStopThresholdOptions.AdapterErrorRateThreshold - it exists to catch a v2\nplan that is systematically producing FFmpeg arguments ffmpeg cannot start with, not every\ntransient environmental failure. Clamped to [0, 1] on set, following this type\u0027s PR104\nclamp-don\u0027t-throw convention.",
-            "format": "double",
-            "type": "number"
           }
         },
         "type": "object"
@@ -13271,13 +13132,6 @@
             "format": "int32",
             "type": "integer"
           },
-          "CastReceiverApplications": {
-            "description": "Gets or sets the list of cast receiver applications.",
-            "items": {
-              "$ref": "#/components/schemas/CastReceiverApplication"
-            },
-            "type": "array"
-          },
           "ChapterImageResolution": {
             "allOf": [
               {
@@ -13461,14 +13315,6 @@
               "$ref": "#/components/schemas/PathSubstitution"
             },
             "type": "array"
-          },
-          "PlaybackShadow": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PlaybackShadowOptions"
-              }
-            ],
-            "description": "Gets or sets the options controlling the PR98 v2-playback-engine shadow comparison."
           },
           "PluginRepositories": {
             "items": {
@@ -14936,14 +14782,6 @@
             "deprecated": true,
             "description": "Gets or sets a value indicating whether this instance can self restart.",
             "type": "boolean"
-          },
-          "CastReceiverApplications": {
-            "description": "Gets or sets the list of cast receiver applications.",
-            "items": {
-              "$ref": "#/components/schemas/CastReceiverApplication"
-            },
-            "nullable": true,
-            "type": "array"
           },
           "CompletedInstallations": {
             "description": "Gets or sets the completed installations.",
@@ -16675,11 +16513,6 @@
         "properties": {
           "AudioLanguagePreference": {
             "description": "Gets or sets the audio language preference.",
-            "nullable": true,
-            "type": "string"
-          },
-          "CastReceiverId": {
-            "description": "Gets or sets the id of the selected cast receiver.",
             "nullable": true,
             "type": "string"
           },
