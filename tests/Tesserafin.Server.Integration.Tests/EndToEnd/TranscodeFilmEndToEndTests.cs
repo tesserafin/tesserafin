@@ -78,8 +78,6 @@ public sealed partial class TranscodeFilmEndToEndTests : IClassFixture<DirectPla
         _sessionManager = _factory.Services.GetRequiredService<IPlaybackSessionManager>();
         _logDirectory = _factory.Services.GetRequiredService<IApplicationPaths>().LogDirectoryPath;
 
-        // Decided by the engine even with the global mode left at its Legacy default.
-        _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
         _workDir = Directory.CreateTempSubdirectory("consol-transcode-e2e-").FullName;
     }
 

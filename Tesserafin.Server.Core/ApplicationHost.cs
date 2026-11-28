@@ -77,7 +77,6 @@ using Tesserafin.Networking.Manager;
 using Tesserafin.Networking.Udp;
 using Tesserafin.Photos;
 using Tesserafin.Playback.Engine;
-using Tesserafin.Playback.Shadow;
 using Tesserafin.Providers.Books;
 using Tesserafin.Providers.Books.ComicBookInfo;
 using Tesserafin.Providers.Books.ComicInfo;
@@ -694,43 +693,9 @@ namespace Tesserafin.Server.Core
             serviceCollection.AddSingleton<IHlsSegmentBindingRegistry>(
                 provider => (TranscodeManager)provider.GetRequiredService<ITranscodeManager>());
 
-            // PR98 shadow mode: the concrete legacy planner and the v2 engine are both registered so
-            // ShadowPlaybackSessionPlanner (the IPlaybackSessionPlanner actually resolved) can wrap
-            // the legacy planner - which stays the source of truth - and run the v2 engine
-            // alongside it, logging a classified diff without affecting the returned plan.
-            // PR104: ShadowMetrics is now its own singleton, consultable by anything that resolves
-            // it directly (for example a future diagnostics endpoint) instead of being privately
-            // owned/defaulted by the decorator - the decorator receives it by injection like its
-            // other dependencies.
+            // The v2 engine, and the store retaining each session's authoritative engine plan.
             serviceCollection.AddSingleton<IPlaybackEngine, PlaybackEngine>();
-            serviceCollection.AddSingleton<ShadowMetrics>();
-            // PR113: one IShadowDiagnosticsStore singleton, shared between the shadow planner (which
-            // publishes a record per shadow run, ambient-scoped by PlaybackSessionManager around its
-            // Plan() call) and the manager (which attaches that record to the real session id and
-            // evicts it on removal) - see IShadowDiagnosticsStore's remarks for the full handshake.
-            serviceCollection.AddSingleton<IShadowDiagnosticsStore, InMemoryShadowDiagnosticsStore>();
-            serviceCollection.AddSingleton<IPlaybackSessionDiagnostics>(provider => provider.GetRequiredService<IShadowDiagnosticsStore>());
-            // PR115a: one IV2PlanStore singleton, separate from IShadowDiagnosticsStore - this is the
-            // authority channel (the AUTHORITATIVE v2 plan for a canary/v2 session), not an
-            // observability one, so it must never share lifecycle/eviction semantics with the
-            // diagnostics store above.
             serviceCollection.AddSingleton<IV2PlanStore, InMemoryV2PlanStore>();
-            // PR115c: one IPlaybackLiveWiringDiagnosticsStore singleton - a third channel, separate
-            // from both stores above, retaining the observable outcome of the live streaming path's
-            // serve-v2-or-fallback decision (MediaInfoHelper), evicted by PlaybackSessionManager on
-            // the same removal paths as the other two.
-            serviceCollection.AddSingleton<IPlaybackLiveWiringDiagnosticsStore, InMemoryPlaybackLiveWiringDiagnosticsStore>();
-            // PR115d: one PlaybackOperationalMetrics singleton - the cumulative served-by-v2/
-            // fallback-by-reason/transcode-start counters behind the operational gate - and one
-            // PlaybackStopThresholdGuard singleton consulted by MediaInfoHelper on every live
-            // decision. Concrete singletons, no interface, same shape as ShadowMetrics above: this is
-            // an aggregate-counter type, not a per-session store, so it has no swap-in-tests reason to
-            // be an interface.
-            serviceCollection.AddSingleton<PlaybackOperationalMetrics>();
-            serviceCollection.AddSingleton<PlaybackStopThresholdGuard>(provider => new PlaybackStopThresholdGuard(
-                () => provider.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow,
-                provider.GetRequiredService<PlaybackOperationalMetrics>(),
-                provider.GetRequiredService<ILogger<PlaybackStopThresholdGuard>>()));
             // Consolidation (docs/playback-path-inventory.md §7): the v2 engine decides every
             // session alone; there is no other planner (tesserafin#129 step 7).
             serviceCollection.AddSingleton<IPlaybackSessionPlanner>(provider => new LocalMediaPlanner(
@@ -751,16 +716,8 @@ namespace Tesserafin.Server.Core
                 provider.GetRequiredService<IPlaybackSessionPlanner>(),
                 provider.GetRequiredService<ITranscodeManager>(),
                 provider.GetRequiredService<ISessionManager>(),
-                provider.GetRequiredService<IPlaybackSessionDiagnostics>(),
                 provider.GetRequiredService<IV2PlanStore>(),
-                provider.GetRequiredService<IPlaybackLiveWiringDiagnosticsStore>(),
-                provider.GetRequiredService<PlaybackOperationalMetrics>(),
-                // Issue #42: optional in the container too — the accessor is registered by
-                // Tesserafin.Server's Startup, which does not exist in every host that builds this
-                // service collection (integration tests build a subset).
-                provider.GetService<IRequestCorrelationAccessor>(),
-                // Issue #71: the removal-side lifecycle log. Required (unlike the accessor above) -
-                // ILoggerFactory is registered by every host that builds this service collection.
+                // Issue #71: the removal-side lifecycle log.
                 provider.GetRequiredService<ILogger<PlaybackSessionManager>>(),
                 null,
                 provider.GetRequiredService<PlaybackSessionLiveStreams>()));

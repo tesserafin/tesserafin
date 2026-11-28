@@ -81,7 +81,6 @@ public sealed class DiscImageEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
         _admin.Timeout = TimeSpan.FromSeconds(180);
         var (accessToken, _) = await _factory.EnsureAuthenticatedAsync();
         _admin.DefaultRequestHeaders.AddAuthHeader(accessToken);
-        _factory.Services.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
         _logDirectory = _factory.Services.GetRequiredService<IApplicationPaths>().LogDirectoryPath;
         _workDir = Directory.CreateTempSubdirectory("consol-disc-image-e2e-").FullName;
     }

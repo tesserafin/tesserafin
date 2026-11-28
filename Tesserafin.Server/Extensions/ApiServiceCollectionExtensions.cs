@@ -30,7 +30,6 @@ using Tesserafin.Api.Constants;
 using Tesserafin.Api.Controllers;
 using Tesserafin.Api.Formatters;
 using Tesserafin.Api.ModelBinders;
-using Tesserafin.Api.Playback;
 using Tesserafin.Common.Api;
 using Tesserafin.Common.Net;
 using Tesserafin.Controller.MediaEncoding;
@@ -133,13 +132,6 @@ namespace Tesserafin.Server.Extensions
         /// <returns>The MVC builder.</returns>
         public static IMvcBuilder AddTesserafinApi(this IServiceCollection serviceCollection, IEnumerable<Assembly> pluginAssemblies, NetworkConfiguration config)
         {
-            // Issue #75 slice 75b: the bounded request-body scanner and its cached contract topology.
-            // The provider is a singleton (the topology is immutable once built from the binder's own
-            // metadata); the filter is applied per-action via [ServiceFilter] on the POST/PUT playback
-            // endpoints and runs strictly before model binding, behind the existing shadow gate.
-            serviceCollection.AddSingleton<PlaybackContractScanModelProvider>();
-            serviceCollection.AddScoped<PlaybackContractScanFilter>();
-
             IMvcBuilder mvcBuilder = serviceCollection
                 .AddCors()
                 .AddTransient<ICorsPolicyProvider, CorsPolicyProvider>()

@@ -12,7 +12,6 @@ using Tesserafin.Api.Constants;
 using Tesserafin.Api.Extensions;
 using Tesserafin.Api.Helpers;
 using Tesserafin.Api.Models.PlaybackSessionDtos;
-using Tesserafin.Api.Playback;
 using Tesserafin.Common.Extensions;
 using Tesserafin.Controller.Entities;
 using Tesserafin.Controller.Library;
@@ -26,10 +25,8 @@ using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Dto;
 using Tesserafin.Model.MediaInfo;
 using Tesserafin.Model.Session;
-using Tesserafin.Playback.Contract.Diagnostics;
 using Tesserafin.Playback.Decision;
 using Tesserafin.Playback.Dlna;
-using Tesserafin.Playback.Shadow;
 
 namespace Tesserafin.Api.Controllers;
 
@@ -51,7 +48,6 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     private readonly IMediaSourceManager _mediaSourceManager;
     private readonly IV2PlanStore _v2PlanStore;
     private readonly PlaybackSessionLiveStreams? _liveStreams;
-    private readonly IShadowDiagnosticsStore _shadowDiagnosticsStore;
     private readonly ILogger<PlaybackSessionsController> _logger;
     private readonly IRecordingsManager? _recordingsManager;
     private readonly ITranscodeManager? _transcodeManager;
@@ -71,15 +67,6 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     /// is joinable to the other requests of that same attempt. Trailing and optional so existing
     /// test constructions keep compiling.
     /// </param>
-    /// <param name="shadowDiagnosticsStore">
-    /// Issue #75: the SAME store PR113 already uses to correlate a shadow run with its session - not
-    /// a new one. This controller is the only place that holds both halves issue #75's mapping
-    /// comparison needs (the declared <c>ClientCapabilities</c> off the request body, and the
-    /// request's <c>Content-Length</c>), so it opens the ambient capture scope carrying them; the
-    /// scope PlaybackSessionManager opens around planning inherits them. Trailing and optional,
-    /// defaulting to the no-op store, so every existing test construction keeps compiling and simply
-    /// produces no contract-mapping diagnostic.
-    /// </param>
     /// <param name="transcodeManager">#301: ends the session's own jobs when the session is deleted.</param>
     /// <param name="credentialService">#301: revokes the session's capabilities when the session is deleted.</param>
     /// <param name="recordingsManager">Tells a Live TV recording still being written from a library video; none is active when null.</param>
@@ -91,7 +78,6 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         IMediaSourceManager mediaSourceManager,
         IV2PlanStore v2PlanStore,
         ILogger<PlaybackSessionsController>? logger = null,
-        IShadowDiagnosticsStore? shadowDiagnosticsStore = null,
         ITranscodeManager? transcodeManager = null,
         IPlaybackCredentialService? credentialService = null,
         IRecordingsManager? recordingsManager = null,
@@ -102,7 +88,6 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         _transcodeManager = transcodeManager;
         _credentialService = credentialService;
         _logger = logger ?? NullLogger<PlaybackSessionsController>.Instance;
-        _shadowDiagnosticsStore = shadowDiagnosticsStore ?? NoOpShadowDiagnosticsStore.Instance;
         _playbackSessionManager = playbackSessionManager;
         _itemAccessService = itemAccessService;
         _userManager = userManager;
@@ -121,7 +106,6 @@ public class PlaybackSessionsController : BaseTesserafinApiController
     /// <response code="422">No viable playback plan exists for the given options.</response>
     /// <returns>The created session's stable decision projection.</returns>
     [HttpPost]
-    [ServiceFilter(typeof(PlaybackContractScanFilter))]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -134,17 +118,9 @@ public class PlaybackSessionsController : BaseTesserafinApiController
 
         var (kind, options, isLocalMedia, liveStreamId) = await ResolveOptions(request, request.PlaySessionId, null, HttpContext.RequestAborted).ConfigureAwait(false);
 
-        // Issue #75: the ambient scope carrying the two request-scoped facts the shadow run cannot
-        // recover on its own. Content-Length is read from the HEADER only - request buffering stays
-        // off, and an absent header stays null rather than becoming a lying 0. Opened around the
-        // planning call and closed immediately after: nothing derived from these inputs is retained
-        // beyond the counts and presence flags of the resulting ContractMappingDiagnostic. When
-        // shadow mode is off (the default) the shadow run never executes and this scope costs one
-        // AsyncLocal write and produces nothing.
         PlaybackSession? session;
         var localRequest = LocalMediaRequestOf(isLocalMedia, request, liveStreamId);
         using (localRequest is null ? null : LocalMediaPlanner.BeginRequest(localRequest))
-        using (_shadowDiagnosticsStore.BeginCapture(new ShadowCaptureInputs(request.Capabilities, HttpContext.Request.ContentLength, ReadCapturedScan())))
         {
             session = _playbackSessionManager.Create(
                 new PlaybackSessionRequest(kind, options),
@@ -241,12 +217,9 @@ public class PlaybackSessionsController : BaseTesserafinApiController
         // Issue #43: the SAME attempt id the POST carried, when the client is re-planning inside
         // one attempt. That identity across two different HTTP requests is exactly what a request
         // id could never provide, and is why this is a separate field.
-        // Issue #75: same ambient scope as the POST - a PUT re-plans with a complete new body, so it
-        // carries its own declared capabilities and its own Content-Length.
         PlaybackSession? session;
         var localRequest = LocalMediaRequestOf(isLocalMedia, request, liveStreamId);
         using (localRequest is null ? null : LocalMediaPlanner.BeginRequest(localRequest))
-        using (_shadowDiagnosticsStore.BeginCapture(new ShadowCaptureInputs(request.Capabilities, HttpContext.Request.ContentLength, ReadCapturedScan())))
         {
             session = _playbackSessionManager.Patch(id, new PlaybackSessionRequest(kind, options), request.PlaybackAttemptId);
         }
@@ -516,18 +489,6 @@ public class PlaybackSessionsController : BaseTesserafinApiController
 
         return UnprocessableEntity(problem);
     }
-
-    /// <summary>
-    /// Issue #75 slice 75b: reads back the bounded structural scan the
-    /// <see cref="PlaybackContractScanFilter"/> stashed (before model binding, behind the shadow
-    /// gate) for this request, or <see langword="null"/> when the request was not scanned. The
-    /// closed result carries only counts - never a client key or value.
-    /// </summary>
-    /// <returns>The captured scan, or <see langword="null"/> if none was stashed.</returns>
-    private ContractStructuralScan? ReadCapturedScan() =>
-        HttpContext.Items.TryGetValue(PlaybackContractScanFilter.ScanResultKey, out var value)
-            ? value as ContractStructuralScan
-            : null;
 
     private async Task<(PlaybackMediaKind Kind, MediaOptions Options, bool IsLocalMedia, string? LiveStreamId)> ResolveOptions(
         PlaybackPlanRequestBase request,

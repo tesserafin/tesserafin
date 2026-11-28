@@ -14,7 +14,7 @@ public enum PlaybackLiveFallbackReason
     /// <summary>
     /// <c>IPlaybackExecutionPlanResolver.Resolve</c> (removed, tesserafin#129 step 7) found no
     /// authoritative <see cref="V2PlanRecord"/> for this session at all: the session is outside the
-    /// canary cohort, the effective <see cref="Tesserafin.Model.Configuration.PlaybackEngineMode"/> is
+    /// canary cohort, the effective <c>PlaybackEngineMode</c> (removed, tesserafin#129 step 7) is
     /// <c>Legacy</c>/<c>Shadow</c>, or nothing was ever attached (session created before v2 became
     /// authoritative for it).
     /// </summary>
@@ -47,7 +47,7 @@ public enum PlaybackLiveFallbackReason
 
     /// <summary>
     /// The operator-controlled kill switch forced legacy for this request, independent of cohort
-    /// membership or plan executability - the effective <see cref="Tesserafin.Model.Configuration.PlaybackEngineMode"/>
+    /// membership or plan executability - the effective <c>PlaybackEngineMode</c> (removed, tesserafin#129 step 7)
     /// read at request time does not authorize serving v2 live. Takes effect on the very next
     /// request, no restart required, since it reads live server configuration on every call.
     /// </summary>
@@ -66,7 +66,7 @@ public enum PlaybackLiveFallbackReason
     /// PR115d: the operational stop-threshold guard (<c>PlaybackStopThresholdGuard</c>) found that
     /// the v2 live path's own observed error rate - <see cref="AdapterError"/> rate, or the
     /// transcode-start failure rate for v2-served sessions - crossed an operator-configured
-    /// threshold (<see cref="Tesserafin.Model.Configuration.PlaybackStopThresholdOptions"/>) and forced
+    /// threshold (<c>PlaybackStopThresholdOptions</c> (removed, tesserafin#129 step 7)) and forced
     /// legacy for this request, same observable effect as <see cref="KillSwitch"/> but triggered
     /// automatically by observed error signals rather than by an operator's own hand.
     /// </summary>

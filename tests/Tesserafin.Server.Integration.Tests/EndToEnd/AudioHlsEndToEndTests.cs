@@ -66,8 +66,6 @@ public sealed class AudioHlsEndToEndTests : IClassFixture<DirectPlayFilmEndToEnd
         _sessionManager = _factory.Services.GetRequiredService<IPlaybackSessionManager>();
         _logDirectory = _factory.Services.GetRequiredService<IApplicationPaths>().LogDirectoryPath;
 
-        // Decided by the engine even with the global mode left at its Legacy default.
-        _factory.Services.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
         _workDir = Directory.CreateTempSubdirectory("consol-audio-transcode-e2e-").FullName;
     }
 

@@ -58,7 +58,6 @@ public sealed class ProgressiveEndToEndTests : IClassFixture<DirectPlayFilmEndTo
         _admin.Timeout = TimeSpan.FromSeconds(120);
         var (accessToken, _) = await _factory.EnsureAuthenticatedAsync();
         _admin.DefaultRequestHeaders.AddAuthHeader(accessToken);
-        _factory.Services.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
         _logDirectory = _factory.Services.GetRequiredService<IApplicationPaths>().LogDirectoryPath;
         _transcodeManager = _factory.Services.GetRequiredService<ITranscodeManager>();
         _workDir = Directory.CreateTempSubdirectory("consol-progressive-e2e-").FullName;

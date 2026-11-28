@@ -7,7 +7,7 @@ namespace Tesserafin.MediaEncoding.Playback;
 /// <summary>
 /// The authoritative v2 outcome retained for a canary/v2 session (PR115a): the decision the engine
 /// made and, when the decision was executable, the execution plan built from it. A record is only
-/// ever published for a session the effective <see cref="Tesserafin.Model.Configuration.PlaybackEngineMode"/>
+/// ever published for a session the effective <c>PlaybackEngineMode</c> (removed, tesserafin#129 step 7)
 /// made v2 authoritative for (canary cohort member, or full v2 mode) - its presence in
 /// <see cref="IV2PlanStore"/> IS the statement of authority. This is deliberately independent of
 /// <c>ShadowDiagnosticRecord</c>/<c>IShadowDiagnosticsStore</c>: diagnostics are an

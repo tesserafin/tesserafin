@@ -9,13 +9,11 @@ using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Tesserafin.Api.Constants;
 using Tesserafin.Api.Controllers;
-using Tesserafin.Api.Playback;
 using Tesserafin.Controller.Library;
 using Tesserafin.Controller.MediaEncoding;
 using Tesserafin.MediaEncoding.Playback;
 using Tesserafin.Model.Dlna;
 using Tesserafin.Model.Session;
-using Tesserafin.Playback.Contract.Diagnostics;
 using Xunit;
 
 namespace Tesserafin.Server.Tests.LogForging

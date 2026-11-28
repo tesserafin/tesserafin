@@ -32,7 +32,6 @@ using Tesserafin.Playback.Decision;
 using Tesserafin.Playback.Dlna;
 using Tesserafin.Playback.Engine;
 using Tesserafin.Playback.Execution;
-using Tesserafin.Playback.Shadow;
 using Xunit;
 
 namespace Tesserafin.Api.Tests.Controllers;
@@ -40,9 +39,6 @@ namespace Tesserafin.Api.Tests.Controllers;
 public class PlaybackSessionsControllerTests
 {
     private const string AttemptId = "attempt-7f3a";
-
-    /// <summary>Issue #70: the single media source id shared by every demotion fixture below.</summary>
-    private const string DemotionSourceId = "source-1";
 
     private readonly Mock<IPlaybackSessionManager> _playbackSessionManager = new();
     private readonly Mock<IItemAccessService> _itemLookupService = new();

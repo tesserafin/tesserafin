@@ -63,7 +63,6 @@ public sealed class RemoteSourceEndToEndTests : IClassFixture<DirectPlayFilmEndT
         _admin.Timeout = TimeSpan.FromSeconds(120);
         var (accessToken, _) = await _factory.EnsureAuthenticatedAsync();
         _admin.DefaultRequestHeaders.AddAuthHeader(accessToken);
-        _factory.Services.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
         _logDirectory = _factory.Services.GetRequiredService<IApplicationPaths>().LogDirectoryPath;
         _workDir = Directory.CreateTempSubdirectory("consol-remote-e2e-").FullName;
         _fixture = await EndToEndMediaFixtures.CreateH264AacMp4Async(_workDir, durationSeconds: 12);

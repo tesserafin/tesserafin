@@ -79,9 +79,6 @@ public sealed class DirectPlayFilmEndToEndTests : IClassFixture<DirectPlayFilmEn
         _mediaStreamRepository = _factory.Services.GetRequiredService<IMediaStreamRepository>();
         _configManager = _factory.Services.GetRequiredService<IServerConfigurationManager>();
 
-        // The film journey must not depend on the global engine mode: it is decided by the engine
-        // even with the mode left at its Legacy default.
-        _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
         _workDir = Directory.CreateTempSubdirectory("consol-film-e2e-").FullName;
         _fixturePath = await EndToEndMediaFixtures.CreateH264AacMp4Async(_workDir, durationSeconds: FixtureSeconds);
         _fixtureBytes = await File.ReadAllBytesAsync(_fixturePath, TestContext.Current.CancellationToken);

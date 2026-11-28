@@ -50,12 +50,6 @@ namespace Tesserafin.Server.Integration.Tests
     public sealed class OpenApiParameterWireShapeTests
     {
         /// <summary>
-        /// The description Swashbuckle derives from the <c>streamOptions</c> XML documentation. Pinned
-        /// because #226 requires the correction to preserve descriptions, not only shapes.
-        /// </summary>
-        private const string StreamOptionsDescription = "Optional. The streaming options.";
-
-        /// <summary>
         /// The description carried by the <c>PlaybackSessionId</c> schema. The type is opaque on
         /// purpose, and that statement is the only thing the contract says about its meaning; a
         /// scalar mapping that dropped it would be a documentation regression.

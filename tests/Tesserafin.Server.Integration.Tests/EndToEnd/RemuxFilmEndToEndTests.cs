@@ -88,8 +88,6 @@ public sealed class RemuxFilmEndToEndTests : IClassFixture<DirectPlayFilmEndToEn
         _sessionManager = _factory.Services.GetRequiredService<IPlaybackSessionManager>();
         _logDirectory = _factory.Services.GetRequiredService<IApplicationPaths>().LogDirectoryPath;
 
-        // Decided by the engine even with the global mode left at its Legacy default.
-        _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
         _workDir = Directory.CreateTempSubdirectory("consol-remux-e2e-").FullName;
         _fixturePath = await EndToEndMediaFixtures.CreateH264AacMkvAsync(_workDir, durationSeconds: FixtureSeconds, keyframeEverySecond: true);
     }

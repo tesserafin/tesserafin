@@ -34,8 +34,6 @@
          retained DecisionVector), the shadow-mode comparison vocabulary - never the internal
          ShadowDiagnosticRecord's raw PlaybackDecision/DecisionVector/ShadowDivergence types beyond
          what the mapper projects out of them. -->
-    <ProjectReference Include="..\src\Tesserafin.Playback.Shadow\Tesserafin.Playback.Shadow.csproj" />
-    <ProjectReference Include="..\src\Tesserafin.Playback.Contract.Scan\Tesserafin.Playback.Contract.Scan.csproj" />
   </ItemGroup>
 
   <!-- Code Analyzers -->

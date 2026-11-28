@@ -54,7 +54,6 @@ public sealed class ToneMappingRefusalEndToEndTests : IClassFixture<ToneMappingR
         _admin.Timeout = TimeSpan.FromSeconds(120);
         var (accessToken, _) = await _factory.EnsureAuthenticatedAsync();
         _admin.DefaultRequestHeaders.AddAuthHeader(accessToken);
-        _factory.Services.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
         _workDir = Directory.CreateTempSubdirectory("consol-tonemap-refusal-e2e-").FullName;
     }
 

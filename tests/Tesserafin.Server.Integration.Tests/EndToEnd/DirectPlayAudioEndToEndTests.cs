@@ -61,8 +61,6 @@ public sealed class DirectPlayAudioEndToEndTests : IClassFixture<DirectPlayFilmE
         var (accessToken, _) = await _factory.EnsureAuthenticatedAsync();
         _admin.DefaultRequestHeaders.AddAuthHeader(accessToken);
 
-        // Decided by the engine even with the global mode left at its Legacy default.
-        _factory.Services.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
         _workDir = Directory.CreateTempSubdirectory("consol-audio-e2e-").FullName;
         _fixturePath = await EndToEndMediaFixtures.CreateMp3Async(_workDir, durationSeconds: FixtureSeconds);
         _fixtureBytes = await File.ReadAllBytesAsync(_fixturePath, TestContext.Current.CancellationToken);

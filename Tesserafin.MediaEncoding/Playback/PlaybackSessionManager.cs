@@ -56,32 +56,12 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     private readonly ITranscodeManager _transcodeManager;
     private readonly ISessionManager _sessionManager;
     private readonly IDeviceLoggedOutSource? _deviceLogouts;
-    private readonly IPlaybackSessionDiagnostics? _diagnosticsStore;
     private readonly IV2PlanStore _v2PlanStore;
-    private readonly IPlaybackLiveWiringDiagnosticsStore _liveWiringDiagnosticsStore;
-    private readonly PlaybackOperationalMetrics _operationalMetrics;
-    private readonly IRequestCorrelationAccessor _requestCorrelation;
     private readonly ILogger<PlaybackSessionManager> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly object _lock = new();
     private readonly Dictionary<PlaybackSessionId, PlaybackSession> _sessions = new();
     private readonly Dictionary<string, PlaybackSessionId> _byPlaySessionId = new(StringComparer.OrdinalIgnoreCase);
-
-    // PR115d: play session ids for which ITranscodeManager.TranscodingJobStarted has actually fired -
-    // consulted (and removed) by RecordTranscodeStartFailureIfNeverStarted to distinguish "ffmpeg
-    // started, then the job ended" (already recorded as a success at Started time, nothing further to
-    // do) from "ffmpeg never started" (a failure, recorded here). Guarded by _lock, same as
-    // _byPlaySessionId - both are read/written from the same event handlers.
-    private readonly HashSet<string> _startedPlaySessionIds = new(StringComparer.OrdinalIgnoreCase);
-
-    // Issue #71: play session ids for which a transcode-start outcome has ALREADY been recorded into
-    // _operationalMetrics. Before #71 this set was unnecessary: OnTranscodingJobEnded always evicted
-    // the session (and with it _byPlaySessionId[playSessionId]) immediately after recording, so
-    // neither a re-fired Ended nor a post-seek second job could ever correlate and record twice.
-    // Client-owned sessions now survive that signal, so the "at most one start outcome per session"
-    // invariant PlaybackStopThresholdGuard reads has to be stated explicitly instead of falling out
-    // of the eviction. Guarded by _lock; cleared in RemoveNoLock alongside _startedPlaySessionIds.
-    private readonly HashSet<string> _startOutcomeRecordedPlaySessionIds = new(StringComparer.OrdinalIgnoreCase);
 
     // Issue #71: sessions a CLIENT established through the v2 HTTP API (Create, i.e.
     // POST /Playback/Sessions) and therefore holds the PlaybackSessionId of. They are ended by that
@@ -102,42 +82,12 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     /// <param name="planner">Instance of the <see cref="IPlaybackSessionPlanner"/> interface.</param>
     /// <param name="transcodeManager">Instance of the <see cref="ITranscodeManager"/> interface.</param>
     /// <param name="sessionManager">Instance of the <see cref="ISessionManager"/> interface.</param>
-    /// <param name="diagnosticsStore">
-    /// Optional observation sink. Captures planning diagnostics and lifecycle events without
-    /// exposing comparison records to the execution path. When absent, no observations are retained.
-    /// </param>
     /// <param name="v2PlanStore">
     /// PR115a: retains the AUTHORITATIVE v2 plan (<see cref="V2PlanRecord"/>) <paramref name="planner"/>
     /// publishes when a <see cref="Create"/>/<see cref="Patch"/> call is served by v2, keyed by the
-    /// resulting session id - a separate channel from <paramref name="diagnosticsStore"/>, which only
-    /// ever holds observability data. Defaults to a no-op instance when not supplied, so every
+    /// resulting session id. Defaults to a no-op instance when not supplied, so every
     /// pre-PR115a call site - including existing test constructors - keeps compiling and behaving
     /// exactly as before: no authoritative record is ever retained.
-    /// </param>
-    /// <param name="liveWiringDiagnosticsStore">
-    /// PR115c: retains the observable outcome (<see cref="PlaybackLiveWiringOutcome"/>) of the live
-    /// streaming path's serve-v2-or-fallback decision - a third, separate channel from both
-    /// <paramref name="diagnosticsStore"/> and <paramref name="v2PlanStore"/>. This manager never
-    /// writes to it (the decision is made downstream, in <c>MediaInfoHelper</c>, after a session is
-    /// already in hand) - it only evicts it, on the exact same removal paths as the other two
-    /// per-session stores, so a stale outcome can never outlive the session it describes. Defaults
-    /// to a no-op instance when not supplied, so every pre-PR115c call site - including existing test
-    /// constructors - keeps compiling and behaving exactly as before: nothing is ever retained.
-    /// </param>
-    /// <param name="operationalMetrics">
-    /// PR115d: where <see cref="OnTranscodingJobStarted"/>/<see cref="OnTranscodingJobEnded"/> record
-    /// the ffmpeg transcode-start outcome for v2-served sessions - see
-    /// <see cref="PlaybackOperationalMetrics"/>'s remarks for exactly what is recorded and why.
-    /// Defaults to a fresh, unshared instance when not supplied, so every pre-PR115d call site -
-    /// including existing test constructors - keeps compiling and behaving exactly as before:
-    /// outcomes are recorded but never observed by anything outside this instance.
-    /// </param>
-    /// <param name="requestCorrelation">
-    /// Issue #42: supplies the correlation id of the HTTP request in flight, stamped onto each
-    /// <see cref="PlaybackLifecycleEvent"/> this manager records. Additive to the
-    /// <see cref="PlaybackSessionId"/> grouping key, never a replacement for it. Defaults to
-    /// <see cref="NullRequestCorrelationAccessor"/> when not supplied, so every pre-#42 call site —
-    /// including existing test constructors — keeps compiling and simply records no request id.
     /// </param>
     /// <param name="logger">
     /// Issue #71: the sink for this class's removal/replacement lifecycle lines - most importantly
@@ -163,11 +113,7 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         IPlaybackSessionPlanner planner,
         ITranscodeManager transcodeManager,
         ISessionManager sessionManager,
-        IPlaybackSessionDiagnostics? diagnosticsStore = null,
         IV2PlanStore? v2PlanStore = null,
-        IPlaybackLiveWiringDiagnosticsStore? liveWiringDiagnosticsStore = null,
-        PlaybackOperationalMetrics? operationalMetrics = null,
-        IRequestCorrelationAccessor? requestCorrelation = null,
         ILogger<PlaybackSessionManager>? logger = null,
         TimeProvider? timeProvider = null,
         PlaybackSessionLiveStreams? liveStreams = null)
@@ -175,17 +121,11 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         _liveStreams = liveStreams;
         _logger = logger ?? NullLogger<PlaybackSessionManager>.Instance;
         _timeProvider = timeProvider ?? TimeProvider.System;
-        _requestCorrelation = requestCorrelation ?? NullRequestCorrelationAccessor.Instance;
         _planner = planner;
         _transcodeManager = transcodeManager;
         _sessionManager = sessionManager;
-        _diagnosticsStore = diagnosticsStore;
         _v2PlanStore = v2PlanStore ?? NoOpV2PlanStore.Instance;
-        _liveWiringDiagnosticsStore = liveWiringDiagnosticsStore ?? NoOpPlaybackLiveWiringDiagnosticsStore.Instance;
-        _operationalMetrics = operationalMetrics ?? new PlaybackOperationalMetrics();
         transcodeManager.TranscodingJobEnded += OnTranscodingJobEnded;
-        transcodeManager.TranscodingJobStarted += OnTranscodingJobStarted;
-        sessionManager.PlaybackStart += OnPlaybackStart;
         sessionManager.PlaybackStopped += OnPlaybackStopped;
         // #413: the session manager is also the source of device revocations (a separate interface,
         // so ISessionManager's published surface does not change).
@@ -203,8 +143,6 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     {
         PlaybackPlan? plan;
         V2PlanRecord? v2Captured;
-        // Diagnostics own capture and correlation; execution never reads comparison records.
-        using var diagnostics = _diagnosticsStore?.BeginPlanning();
         using (_v2PlanStore.BeginCapture())
         {
             plan = Plan(request);
@@ -229,15 +167,6 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
             _clientOwnedSessions.Add(session.Id);
         }
 
-        // PR113a: attach-or-remove unconditionally, not just attach-if-captured. StoreOrReplace
-        // reuses the existing session id when playSessionId matches an in-flight session, so a
-        // successful replan with no new capture (shadow disabled/not sampled this call) must evict
-        // whatever record was retained for a *previous* capture on that same id - otherwise the
-        // admin diagnostics endpoint would show the new plan next to a stale context/capabilities/
-        // reasoning from an earlier call. Remove is a documented no-op when nothing is retained, so
-        // this is safe (if slightly redundant) for the brand-new-session case too.
-        diagnostics?.AttachTo(session.Id);
-
         // PR115a: same attach-or-remove discipline for the authoritative v2 record. A replan that is
         // no longer authoritative (mode changed, cohort resized) must evict the stale authoritative
         // record, or the session would keep being served a v2 plan its current configuration no
@@ -259,8 +188,6 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     {
         PlaybackPlan? plan;
         V2PlanRecord? v2Captured;
-        // Diagnostics own capture and correlation; execution never reads comparison records.
-        using var diagnostics = _diagnosticsStore?.BeginPlanning();
         using (_v2PlanStore.BeginCapture())
         {
             plan = Plan(request);
@@ -327,7 +254,6 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         // PR113a: attach-or-remove unconditionally (see the matching comment in Create) - a
         // successful Patch with no new capture must evict whatever record was retained from an
         // earlier Create/Patch on this id, not leave it attached to the freshly replanned session.
-        diagnostics?.AttachTo(updated.Id);
 
         // PR115a: same attach-or-remove discipline for the authoritative v2 record. A replan that is
         // no longer authoritative (mode changed, cohort resized) must evict the stale authoritative
@@ -405,8 +331,6 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
 
         _disposed = true;
         _transcodeManager.TranscodingJobEnded -= OnTranscodingJobEnded;
-        _transcodeManager.TranscodingJobStarted -= OnTranscodingJobStarted;
-        _sessionManager.PlaybackStart -= OnPlaybackStart;
         _sessionManager.PlaybackStopped -= OnPlaybackStopped;
         if (_deviceLogouts is not null)
         {
@@ -628,31 +552,12 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
             && mapped.Equals(id))
         {
             _byPlaySessionId.Remove(session.PlaySessionId);
-
-            // PR115d: belt-and-suspenders against a leaked entry - the normal path already removes
-            // this in RecordTranscodeStartFailureIfNeverStarted's Ended handling, but a session can
-            // be evicted by a DIFFERENT path first (PlaybackStopped arriving before the transcoding
-            // job's Ended event, SweepExpired's TTL backstop, an explicit Delete) while a Started was
-            // already recorded and no Ended ever follows to clean it up otherwise.
-            _startedPlaySessionIds.Remove(session.PlaySessionId);
-
-            // Issue #71: same lifetime as the set above - the next session to reuse this play
-            // session id gets a fresh start-outcome budget.
-            _startOutcomeRecordedPlaySessionIds.Remove(session.PlaySessionId);
         }
 
-        // PR113: evicts whatever shadow diagnostic was retained for this session, if any - covers
-        // every removal path (Delete, DeleteByPlaySessionId, the transcoding-job-ended/playback-stopped
-        // handlers, and SweepExpired), since they all funnel through here.
-        _diagnosticsStore?.Remove(id);
-
-        // PR115a: evicts whatever authoritative v2 record was retained for this session, if any -
-        // same removal paths as the diagnostics store above.
+        // Evicts the retained engine plan for this session, if any: every removal path (Delete,
+        // DeleteByPlaySessionId, the transcoding-job-ended/playback-stopped handlers, SweepExpired)
+        // funnels through here.
         _v2PlanStore.Remove(id);
-
-        // PR115c: evicts whatever live-wiring outcome was retained for this session, if any - same
-        // removal paths as the two stores above.
-        _liveWiringDiagnosticsStore.Remove(id);
 
         // A Live TV session holds one reference on its tuner stream; every removal path releases it
         // (the close itself runs outside this lock).
@@ -667,14 +572,6 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
         {
             return;
         }
-
-        // PR115d: recorded BEFORE the reap below, which - when it does reap - evicts (among the
-        // other two per-session stores) _liveWiringDiagnosticsStore, the ServedByV2 read this needs.
-        // Same ordering constraint RecordLifecycleEvent's callers already respect. Issue #71: the
-        // reap no longer happens for a client-owned session, so this method no longer gets its
-        // idempotency from the eviction - it claims a token in _startOutcomeRecordedPlaySessionIds
-        // instead. See that field.
-        RecordTranscodeStartFailureIfNeverStarted(job.PlaySessionId);
 
         // Issue #71: logged BEFORE the removal below, because the removal is exactly what this line
         // exists to attribute. Correlated says whether this ffmpeg job's play session id currently
@@ -695,33 +592,6 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
 
         ReapByPlaySessionId(job.PlaySessionId, PlaybackSessionRemovalReason.TranscodingJobEnded);
     }
-
-    /// <summary>
-    /// PR113b: records a real "ffmpeg launched" timeline event for the session tied to this job's
-    /// play session id, if any is currently tracked. A no-op (not an error) when no tracked session
-    /// matches - the job may belong to a live stream or a request this manager never planned.
-    /// </summary>
-    private void OnTranscodingJobStarted(object? sender, TranscodingJob job)
-    {
-        // PR115d: records the transcode-start SUCCESS here, at Started time, not at Ended - see
-        // RecordTranscodeStartSuccessIfV2Served's remarks for why doing it here (rather than
-        // inferring "it must have started" from Ended) avoids a bias toward over-counting failures
-        // when a session is evicted (PlaybackStopped, SweepExpired) before its job's Ended event
-        // arrives.
-        if (!string.IsNullOrEmpty(job.PlaySessionId))
-        {
-            RecordTranscodeStartSuccessIfV2Served(job.PlaySessionId);
-        }
-
-        RecordLifecycleEvent(job.PlaySessionId, "FfmpegStarted");
-    }
-
-    /// <summary>
-    /// PR113b: records a real "playback started" timeline event for the session tied to this
-    /// report's play session id, if any is currently tracked.
-    /// </summary>
-    private void OnPlaybackStart(object? sender, PlaybackProgressEventArgs e) =>
-        RecordLifecycleEvent(e.PlaySessionId, "PlaybackStarted");
 
     /// <summary>
     /// #413: a revoked device's sessions end with its token, the way an explicit
@@ -780,17 +650,6 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
     {
         if (!string.IsNullOrEmpty(e.PlaySessionId))
         {
-            // PR113b: recorded before eviction, for parity with FfmpegStarted/PlaybackStarted -
-            // but RemoveNoLock (reached via the reap below, when it reaps) evicts every retained
-            // PlaybackLifecycleEvent for this session, this one included, immediately afterward.
-            // For a LEGACY-tracked session the admin diagnostics endpoint can therefore never
-            // actually observe a "PlaybackStopped" entry: by the time it stops, RemoveNoLock has
-            // already deleted the session itself, so PlaybackSessionManager.Get(id) - and with it
-            // GetPlaybackSession - returns 404 regardless of what the event store retains.
-            // Issue #71: a CLIENT-OWNED session is no longer removed here, so for those the entry
-            // does survive and the endpoint can finally show it - a side benefit, not the point.
-            RecordLifecycleEvent(e.PlaySessionId, "PlaybackStopped");
-
             // Issue #71: same before-the-removal placement and same purpose as the transcoding-job
             // line above - this is the OTHER PlaySessionId-keyed reap, and an incident timeline has
             // to be able to tell the two apart.
@@ -807,136 +666,6 @@ public sealed class PlaybackSessionManager : IPlaybackSessionManager, IDisposabl
                 correlatedId);
 
             ReapByPlaySessionId(e.PlaySessionId, PlaybackSessionRemovalReason.PlaybackStopped);
-        }
-    }
-
-    /// <summary>
-    /// Correlates <paramref name="playSessionId"/> to a currently tracked session id and, if found,
-    /// records <paramref name="stage"/> as observed right now. Silently does nothing for an unknown
-    /// or null/empty play session id - a lifecycle event that cannot be correlated is simply
-    /// dropped, never thrown, matching every other diagnostics-retention failure mode in this class.
-    /// </summary>
-    private void RecordLifecycleEvent(string? playSessionId, string stage)
-    {
-        if (string.IsNullOrEmpty(playSessionId))
-        {
-            return;
-        }
-
-        PlaybackSessionId id;
-        lock (_lock)
-        {
-            if (!_byPlaySessionId.TryGetValue(playSessionId, out id))
-            {
-                return;
-            }
-        }
-
-        // Issue #42: the request id is stamped per EVENT, alongside (never instead of) the
-        // session-scoped grouping key `id`. Usually null here — these three signals arrive from
-        // ffmpeg and session callbacks, not from a request — and null is the honest answer.
-        _diagnosticsStore?.RecordEvent(
-            id,
-            new PlaybackLifecycleEvent(stage, DateTimeOffset.UtcNow, _requestCorrelation.CurrentRequestId));
-    }
-
-    /// <summary>
-    /// PR115d: called from <see cref="OnTranscodingJobStarted"/> - correlates
-    /// <paramref name="playSessionId"/> to a currently tracked session and, only when that session
-    /// was actually served by v2 (per <see cref="_liveWiringDiagnosticsStore"/>), records a
-    /// SUCCESSFUL ffmpeg transcode start into <see cref="_operationalMetrics"/> immediately.
-    /// </summary>
-    /// <remarks>
-    /// Deliberately recorded here, at Started time, rather than inferred at Ended time from
-    /// "<see cref="_startedPlaySessionIds"/> contains this id". A session can be evicted by a path
-    /// unrelated to this transcoding job - <see cref="OnPlaybackStopped"/> (the ordinary "user
-    /// stopped playback" signal) or <see cref="SweepExpired"/>'s TTL backstop - strictly BETWEEN this
-    /// job's Started and Ended events. Recording the success at Ended time would then find no
-    /// correlatable session (evicted) and silently drop it, while a job that never starts at all
-    /// produces no playback and therefore no <see cref="OnPlaybackStopped"/> signal, so ITS failure
-    /// (recorded by <see cref="RecordTranscodeStartFailureIfNeverStarted"/>) is essentially never
-    /// dropped the same way. Recording successes only at Ended would therefore have biased the
-    /// observed rate upward (successes silently dropped more often than failures) - exactly the
-    /// wrong direction for a rate a stop-threshold guard reads to decide whether to force legacy for
-    /// the whole cohort. Recording the success here, while the session is still guaranteed tracked
-    /// (this is the very job whose launch <see cref="ITranscodeManager.TranscodingJobStarted"/> is
-    /// reporting), removes that race entirely.
-    /// </remarks>
-    /// <param name="playSessionId">The play session id the started job belongs to.</param>
-    private void RecordTranscodeStartSuccessIfV2Served(string playSessionId)
-    {
-        PlaybackSessionId id;
-        lock (_lock)
-        {
-            // Marked unconditionally (not gated on correlation/ServedByV2) - RecordTranscodeStartFailureIfNeverStarted
-            // needs to know "did Started ever fire for this play session id" regardless of whether
-            // this manager can still correlate it to a v2-served session by then.
-            _startedPlaySessionIds.Add(playSessionId);
-
-            if (!_byPlaySessionId.TryGetValue(playSessionId, out id))
-            {
-                return;
-            }
-
-            // Issue #71: at most one start outcome per session - see
-            // _startOutcomeRecordedPlaySessionIds. Claimed here regardless of the ServedByV2 check
-            // below, exactly as the pre-#71 eviction consumed the opportunity regardless of it.
-            if (!_startOutcomeRecordedPlaySessionIds.Add(playSessionId))
-            {
-                return;
-            }
-        }
-
-        if (_liveWiringDiagnosticsStore.TryGet(id, out var outcome) && outcome is not null && outcome.ServedByV2)
-        {
-            _operationalMetrics.RecordTranscodeStart(failed: false);
-        }
-    }
-
-    /// <summary>
-    /// PR115d: called from <see cref="OnTranscodingJobEnded"/>, BEFORE the eviction that follows it -
-    /// records a FAILED ffmpeg transcode start into <see cref="_operationalMetrics"/> when this job
-    /// ended without <see cref="RecordTranscodeStartSuccessIfV2Served"/> ever having observed a
-    /// matching <see cref="ITranscodeManager.TranscodingJobStarted"/> for this play session id (i.e.
-    /// the successful-start case already fully handled itself, at Started time - see that method's
-    /// remarks). Silently does nothing for an unknown play session id or a legacy-served session, the
-    /// same "correlate or silently no-op" discipline <see cref="RecordLifecycleEvent"/> already
-    /// follows. Idempotent against <see cref="ITranscodeManager.TranscodingJobEnded"/>'s documented
-    /// "may be raised more than once for the same job" contract - but, since issue #71, NOT because
-    /// the caller evicts the session: it no longer does so for a client-owned one. Idempotency now
-    /// comes from <see cref="_startOutcomeRecordedPlaySessionIds"/>, which also caps the outcomes a
-    /// single session can contribute when a seek kills one job and starts another under the same
-    /// play session id.
-    /// </summary>
-    /// <param name="playSessionId">The play session id the ended job belongs to.</param>
-    private void RecordTranscodeStartFailureIfNeverStarted(string playSessionId)
-    {
-        PlaybackSessionId id;
-        lock (_lock)
-        {
-            if (_startedPlaySessionIds.Remove(playSessionId))
-            {
-                // It DID start (Started fired first) - RecordTranscodeStartSuccessIfV2Served already
-                // recorded this outcome; nothing left to do here but stop tracking the id.
-                return;
-            }
-
-            if (!_byPlaySessionId.TryGetValue(playSessionId, out id))
-            {
-                return;
-            }
-
-            // Issue #71: at most one start outcome per session - see the matching claim in
-            // RecordTranscodeStartSuccessIfV2Served.
-            if (!_startOutcomeRecordedPlaySessionIds.Add(playSessionId))
-            {
-                return;
-            }
-        }
-
-        if (_liveWiringDiagnosticsStore.TryGet(id, out var outcome) && outcome is not null && outcome.ServedByV2)
-        {
-            _operationalMetrics.RecordTranscodeStart(failed: true);
         }
     }
 

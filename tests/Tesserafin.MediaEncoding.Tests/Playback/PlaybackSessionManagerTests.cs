@@ -208,61 +208,6 @@ public class PlaybackSessionManagerTests
         Assert.NotNull(manager.Get(session.Id));
     }
 
-    [Fact]
-    public void Delete_ExistingSessionWithRetainedLiveWiringOutcome_EvictsOutcome()
-    {
-        // PR115c: the live-wiring diagnostics store is never written by PlaybackSessionManager
-        // itself (MediaInfoHelper writes it, downstream, once a session already exists) - but this
-        // manager still owns eviction, on the exact same removal paths as the other two per-session
-        // stores (IPlaybackSessionDiagnostics, IV2PlanStore).
-        var liveWiringStore = new InMemoryPlaybackLiveWiringDiagnosticsStore();
-        var manager = new PlaybackSessionManager(
-            new Mock<IPlaybackSessionPlanner>().Object,
-            new Mock<ITranscodeManager>().Object,
-            new Mock<ISessionManager>().Object,
-            diagnosticsStore: null,
-            v2PlanStore: null,
-            liveWiringDiagnosticsStore: liveWiringStore);
-        var session = manager.Track(PlaybackMediaKind.Video, new PlaybackPlan(PlayMethod.DirectPlay, default), "play-session-1");
-        liveWiringStore.Record(session.Id, PlaybackLiveWiringOutcome.Served(DateTimeOffset.UtcNow));
-
-        var removed = manager.Delete(session.Id);
-
-        Assert.True(removed);
-        Assert.False(liveWiringStore.TryGet(session.Id, out _));
-    }
-
-    /// <summary>
-    /// PR113b: <c>PlaybackStopped</c> records its event before evicting the session - but
-    /// <c>RemoveNoLock</c> (reached via <c>DeleteByPlaySessionId</c>, called synchronously right
-    /// after) evicts every retained event for the session along with it, so
-    /// the store is empty again by the time this handler
-    /// returns. A store spy proves the ordering (<c>RecordEvent</c> then <c>Remove</c>) that a
-    /// plain end-to-end assertion on <c>GetEvents</c> after the fact could never distinguish from
-    /// "never recorded at all".
-    /// </summary>
-    [Fact]
-    public void PlaybackStopped_RecordsEventBeforeSessionRemovalEvictsIt()
-    {
-        var mockSessionManager = new Mock<ISessionManager>();
-        var mockStore = new Mock<IPlaybackSessionDiagnostics>();
-        var calls = new List<string>();
-        mockStore
-            .Setup(s => s.RecordEvent(It.IsAny<PlaybackSessionId>(), It.IsAny<PlaybackLifecycleEvent>()))
-            .Callback<PlaybackSessionId, PlaybackLifecycleEvent>((_, lifecycleEvent) => calls.Add($"RecordEvent:{lifecycleEvent.Stage}"));
-        mockStore
-            .Setup(s => s.Remove(It.IsAny<PlaybackSessionId>()))
-            .Callback<PlaybackSessionId>(_ => calls.Add("Remove"));
-        var manager = new PlaybackSessionManager(new Mock<IPlaybackSessionPlanner>().Object, new Mock<ITranscodeManager>().Object, mockSessionManager.Object, mockStore.Object);
-        var session = manager.Track(PlaybackMediaKind.Video, new PlaybackPlan(PlayMethod.DirectPlay, default), "play-session-1");
-
-        var args = new PlaybackStopEventArgs { PlaySessionId = "play-session-1" };
-        mockSessionManager.Raise(m => m.PlaybackStopped += null, mockSessionManager.Object, args);
-
-        Assert.Equal(new[] { "RecordEvent:PlaybackStopped", "Remove" }, calls);
-        Assert.Null(manager.Get(session.Id));
-    }
-
     /// <summary>
     /// Issue #43: <c>StoreOrReplace</c>'s own comment claims the same "null does not erase" rule
     /// <c>Patch</c> applies to <c>PlaybackAttemptId</c>, but <c>Request</c> was assigned

@@ -49,7 +49,6 @@ public sealed class MediaByteAuthorizationEndToEndTests : IClassFixture<HlsIsola
     private const string WithheldTag = "smr1-withheld";
     private const string Player = "smr1-player/1.0";
     private const string SubtitleText = "PR119 end-to-end external subtitle fixture";
-    private const string Transcode = "static=false&videoCodec=h264&audioCodec=aac&videoBitRate=1500000&audioBitRate=128000";
     private const int Seconds = 20;
     private const int AttachmentIndex = 3;
 

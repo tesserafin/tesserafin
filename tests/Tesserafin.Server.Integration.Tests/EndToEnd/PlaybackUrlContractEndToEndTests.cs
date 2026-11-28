@@ -119,8 +119,6 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         _configManager = _factory.Services.GetRequiredService<IServerConfigurationManager>();
 
         // Explicit, known starting state regardless of framework defaults - scenarios that care about
-        // the kill switch set this themselves.
-        _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
 
         _workDir = Directory.CreateTempSubdirectory("reefin-pr119-e2e-").FullName;
         _fixturePath = await EndToEndMediaFixtures.CreateH264AacMp4Async(_workDir);
@@ -247,11 +245,6 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
 
         var (capabilities, constraints) = EndToEndCapabilityPresets.RemuxMatroskaToMpegTs();
 
-        // The reported descriptor carried ServedBy=6 and NO FallbackReason - the v2 engine, not a
-        // legacy fallback. V2 mode (not merely Canary) makes every session v2-authoritative with no
-        // cohort-hash dependency; InitializeAsync resets this to Legacy before every test.
-        _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.V2;
-
         var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-remux-mkv-to-ts", cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackMethod.Remux, session.Method);
 
@@ -337,8 +330,6 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         var (capabilities, constraints) = EndToEndCapabilityPresets.RemuxMatroskaToMpegTsTranscodingForbidden();
         Assert.False(constraints.AllowTranscoding, "Premise: this row is only meaningful with transcoding forbidden.");
 
-        _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.V2;
-
         var session = await CreateSessionAsync(itemId, capabilities, constraints, "e2e-59-remux-allowed", cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(PlaybackMethod.Remux, session.Method);
 
@@ -373,8 +364,6 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
         var itemId = SeedItem();
         var (capabilities, constraints) = EndToEndCapabilityPresets.IncompatibleCodecsTranscodingForbidden();
 
-        _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.V2;
-
         var status = await CreateSessionExpectingFailureAsync(itemId, capabilities, constraints, "e2e-59-no-plan", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, status);
@@ -391,9 +380,6 @@ public sealed class PlaybackUrlContractEndToEndTests : IClassFixture<E2eApplicat
     {
         var itemId = SeedItem();
         var (capabilities, constraints) = EndToEndCapabilityPresets.IncompatibleCodecsTranscodingForbidden();
-
-        // The legacy engine, not v2: this is the branch issue #59 was reported against.
-        _configManager.Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
 
         var status = await CreateSessionExpectingFailureAsync(itemId, capabilities, constraints, "e2e-59-no-plan-legacy", TestContext.Current.CancellationToken);
 

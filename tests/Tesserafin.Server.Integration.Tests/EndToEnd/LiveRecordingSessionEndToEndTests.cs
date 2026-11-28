@@ -60,7 +60,6 @@ public sealed class LiveRecordingSessionEndToEndTests : IClassFixture<DirectPlay
         _admin.Timeout = TimeSpan.FromSeconds(120);
         var (accessToken, _) = await _factory.EnsureAuthenticatedAsync();
         _admin.DefaultRequestHeaders.AddAuthHeader(accessToken);
-        _factory.Services.GetRequiredService<IServerConfigurationManager>().Configuration.PlaybackShadow.Mode = PlaybackEngineMode.Legacy;
         _workDir = Directory.CreateTempSubdirectory("consol-recording-e2e-").FullName;
     }
 
